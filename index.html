@@ -316,13 +316,16 @@
   input,select,textarea{
     width:100%;
     max-width:100%;
+    min-width:0;
     min-height:44px;
     padding:10px 11px;
     font-size:16px !important;
     border-radius:8px;
+    box-sizing:border-box;
   }
   textarea{min-height:88px;}
   input[type="checkbox"],input[type="radio"]{min-height:auto;width:auto;}
+  input[type="date"]{min-width:0;padding-right:8px;}
 
   .btn{
     min-height:44px;
@@ -994,9 +997,11 @@ async function ca_saveSession(){
   try{
     ca_setSyncLabel('Enregistrement…');
     const { debutCaisseAuto, debutCaisseManuel, ...cleanSession } = ca_session;
-    await ca_caisseCol.doc(ca_session.date).set({ ...cleanSession, enregistreParEn: currentUser, enregistreLe: new Date().toISOString() });
+    const saved = { ...cleanSession, enregistreParEn: currentUser, enregistreLe: new Date().toISOString() };
+    await ca_caisseCol.doc(ca_session.date).set(saved);
+    ca_allSessions = { ...ca_allSessions, [ca_session.date]: saved };
     ca_setSyncLabel('✓ Synchronisé');
-    alert('Clôture du '+fmtDateShort(ca_session.date)+' enregistrée.');
+    ca_render();
   }catch(e){
     console.warn(e);
     ca_setSyncLabel('⚠ Échec de la sauvegarde');
@@ -1211,12 +1216,12 @@ function ca_sortiesEditor(sorties){
   }
   return sorties.map(l=>`
     <div class="line-row" style="align-items:flex-start;flex-wrap:wrap;${l.motif==='retrait' ? 'grid-template-rows:auto auto;' : ''}">
-      <input class="amount" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="${l.montant}" placeholder="Montant" oninput="ca_updateLine('sorties','${l.id}','montant',this.value)" />
-      <select style="flex:1;min-width:0;" onchange="ca_updateLine('sorties','${l.id}','motif',this.value)">
+      <input class="amount" id="amt-${l.id}" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="${l.montant}" placeholder="Montant" oninput="ca_updateLine('sorties','${l.id}','montant',this.value)" />
+      <select id="motif-${l.id}" style="flex:1;min-width:0;" onchange="ca_updateLine('sorties','${l.id}','motif',this.value)">
         ${CA_SORTIE_MOTIFS.map(m=>`<option value="${m.value}" ${l.motif===m.value?'selected':''}>${esc(m.label)}</option>`).join('')}
       </select>
       <button class="x-btn" onclick="ca_removeLine('sorties','${l.id}')">✕</button>
-      ${l.motif==='retrait' ? `<input type="text" style="grid-column:1/3;flex-basis:100%;margin-top:6px;" value="${esc(l.note||'')}" placeholder="Note (ex. gérant, fournisseur…)" oninput="ca_updateLine('sorties','${l.id}','note',this.value)" />` : ''}
+      ${l.motif==='retrait' ? `<input type="text" id="note-${l.id}" style="grid-column:1/3;flex-basis:100%;margin-top:6px;" value="${esc(l.note||'')}" placeholder="Note (ex. gérant, fournisseur…)" oninput="ca_updateLine('sorties','${l.id}','note',this.value)" />` : ''}
     </div>
   `).join('');
 }
