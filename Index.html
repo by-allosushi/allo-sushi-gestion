@@ -1,0 +1,2150 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Allo Sushi — Gestion</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Allo Sushi" />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+
+  :root{
+    --paper:#F6F7F9; --surface:#FFFFFF; --ink:#16181D; --ink-muted:#6B7280; --line:#E5E7EB;
+    --forest:#4F46E5; --forest-light:#6366F1; --amber:#D97706; --amber-bg:#FFF7ED;
+    --rust:#DC2626; --rust-bg:#FEF2F2; --moss:#059669; --moss-bg:#ECFDF5;
+    --bar:#7C3AED; --bar-bg:#F5F3FF; --wrap:#78716C; --wrap-bg:#F5F5F4;
+    --cons:#0D9488; --cons-bg:#F0FDFA;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .display{font-family:'Manrope',sans-serif;}
+  header.top{background:var(--ink);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;}
+  header.top .title{color:#FFFFFF;font-weight:700;font-size:17px;letter-spacing:-0.01em;font-family:'Manrope',sans-serif;}
+  header.top .date{color:#9CA3AF;font-size:11px;margin-top:3px;}
+  .alert-badge{background:var(--rust);color:#fff;border:none;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer;}
+  nav.tabs{background:var(--surface);border-bottom:1px solid var(--line);display:flex;overflow-x:auto;position:sticky;top:0;z-index:5;}
+  nav.tabs button{background:none;border:none;padding:13px 14px;font-size:13.5px;font-weight:500;color:var(--ink-muted);white-space:nowrap;border-bottom:2px solid transparent;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:'Inter',sans-serif;}
+  nav.tabs button.active{color:var(--forest);font-weight:700;border-bottom-color:var(--forest);}
+  .count-pill{background:var(--rust-bg);color:var(--rust);border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;}
+  main{max-width:760px;margin:0 auto;padding:18px 16px 40px;}
+  .ticket{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,0.04);padding:14px;margin-bottom:12px;}
+  .grid{display:grid;gap:10px;}
+  .grid-2{grid-template-columns:repeat(2,1fr);}
+  .grid-4{grid-template-columns:repeat(2,1fr);}
+  @media(min-width:600px){.grid-4{grid-template-columns:repeat(4,1fr);}}
+  .stat-icon{width:16px;height:16px;}
+  .stat-value{font-size:20px;font-weight:700;margin-top:6px;}
+  .stat-value.money{font-size:15px;}
+  .stat-label{font-size:11px;color:var(--ink-muted);margin-top:2px;}
+  .stat-box{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
+  h2.section{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-muted);margin:22px 0 8px;}
+  .cat-card{border-radius:10px;padding:12px;border:1px solid var(--line);text-align:left;cursor:pointer;display:block;width:100%;}
+  .chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:500;}
+  .btn{display:inline-flex;align-items:center;gap:6px;border-radius:6px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid var(--forest);background:var(--forest);color:#fff;font-family:'Inter',sans-serif;transition:opacity 0.15s;}
+  .btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--line);}
+  .btn.moss{background:var(--moss);border-color:var(--moss);}
+  .btn.rust{background:var(--rust);border-color:var(--rust);}
+  .btn.small{padding:6px 10px;font-size:12px;}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:13px;}
+  .form-section{margin-bottom:18px;}
+  .form-section:not(:first-child){padding-top:16px;border-top:1px solid var(--line);}
+  .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .section-label .num{width:18px;height:18px;border-radius:4px;background:var(--forest);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;}
+  .field label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);}
+  input, select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px;color:var(--ink);background:#fff;font-family:'IBM Plex Mono',monospace;width:100%;}
+  input[type=text], input:not([type]) {font-family:'Inter',sans-serif;}
+  .filter-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+  .filter-chip{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:500;border:1px solid var(--line);background:#fff;color:var(--ink-muted);cursor:pointer;}
+  .filter-chip.active{background:var(--forest);border-color:var(--forest);color:#fff;}
+  .top-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .search-wrap{position:relative;flex:1;min-width:150px;}
+  .search-wrap input{padding-left:30px;}
+  .search-wrap .icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--ink-muted);}
+  .lot-strip{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .lot-chip{border-radius:7px;padding:5px 8px;min-width:64px;border:1px dashed;font-family:'IBM Plex Mono',monospace;}
+  .lot-chip .q{font-size:11px;font-weight:600;display:block;}
+  .lot-chip .d{font-size:9.5px;color:var(--ink-muted);}
+  .article-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;}
+  .article-name{font-size:14px;font-weight:600;}
+  .article-meta{font-size:11px;color:var(--ink-muted);margin-top:2px;}
+  .article-stock{text-align:right;}
+  .article-stock .val{font-size:17px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+  .article-stock .money{font-size:11px;color:var(--ink-muted);}
+  .row-between{display:flex;justify-content:space-between;align-items:center;}
+  .movement-row{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;background:#fff;border:1px solid var(--line);border-radius:8px;font-size:12px;margin-bottom:6px;}
+  .movement-row .sub{color:var(--ink-muted);font-family:'IBM Plex Mono',monospace;font-size:11.5px;margin-top:2px;}
+  .x-btn{background:none;border:none;color:var(--ink-muted);cursor:pointer;font-size:15px;padding:2px 6px;}
+  .empty-state{text-align:center;padding:44px 20px;}
+  footer.foot{text-align:center;color:var(--ink-muted);font-size:11px;padding:20px;}
+  .mode-toggle{display:flex;gap:6px;margin-bottom:12px;}
+
+
+  :root{
+    --paper:#F6F7F9; --surface:#FFFFFF; --ink:#16181D; --ink-muted:#6B7280; --line:#E5E7EB;
+    --forest:#4F46E5; --forest-light:#6366F1; --amber:#D97706; --amber-bg:#FFF7ED;
+    --rust:#DC2626; --rust-bg:#FEF2F2; --moss:#059669; --moss-bg:#ECFDF5;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .display{font-family:'Manrope',sans-serif;}
+  header.top{background:var(--ink);padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;}
+  header.top .title{color:#FFFFFF;font-weight:700;font-size:17px;letter-spacing:-0.01em;font-family:'Manrope',sans-serif;}
+  header.top .date{color:#9CA3AF;font-size:11px;margin-top:3px;}
+  nav.tabs{background:var(--surface);border-bottom:1px solid var(--line);display:flex;overflow-x:auto;position:sticky;top:0;z-index:5;}
+  nav.tabs button{background:none;border:none;padding:13px 14px;font-size:13.5px;font-weight:500;color:var(--ink-muted);white-space:nowrap;border-bottom:2px solid transparent;cursor:pointer;font-family:'Inter',sans-serif;}
+  nav.tabs button.active{color:var(--forest);font-weight:700;border-bottom-color:var(--forest);}
+  main{max-width:720px;margin:0 auto;padding:18px 16px 50px;}
+  .ticket{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,0.04);padding:16px;margin-bottom:14px;}
+  .step-label{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .step-badge{width:24px;height:24px;border-radius:6px;background:var(--forest);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;font-family:'Manrope',sans-serif;flex-shrink:0;}
+  .step-title{font-size:14px;font-weight:600;}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:13px;}
+  .field label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);}
+  input, select{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:15px;color:var(--ink);background:#fff;font-family:'IBM Plex Mono',monospace;width:100%;}
+  input[type=text]{font-family:'Inter',sans-serif;}
+  .btn{display:inline-flex;align-items:center;gap:6px;border-radius:6px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid var(--forest);background:var(--forest);color:#fff;font-family:'Inter',sans-serif;transition:opacity 0.15s;}
+  .btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--line);}
+  .btn.rust{background:var(--rust);border-color:var(--rust);}
+  .btn.small{padding:6px 10px;font-size:12px;}
+  .line-row{display:flex;gap:8px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;}
+  .line-row input{background:#fff;}
+  .line-row .amount{width:110px;flex-shrink:0;}
+  .line-row .label-input{flex:1;}
+  .line-row .x-btn{background:none;border:none;color:var(--ink-muted);cursor:pointer;font-size:16px;padding:2px 4px;flex-shrink:0;}
+  .subtotal{display:flex;justify-content:space-between;align-items:center;padding:8px 4px 2px;font-size:13px;font-weight:600;color:var(--ink-muted);}
+  .result-box{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-radius:10px;margin-top:4px;}
+  .result-box.prelim{background:var(--amber-bg);}
+  .result-box.final{background:var(--moss-bg);}
+  .result-box .label{font-size:12.5px;font-weight:600;color:var(--ink-muted);}
+  .result-box .value{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+  .result-box.prelim .value{color:var(--amber);}
+  .result-box.final .value{color:var(--moss);}
+  .user-chip{background:rgba(255,255,255,0.12);border:none;color:#F1F3EC;font-size:11px;padding:5px 10px;border-radius:999px;cursor:pointer;font-family:'IBM Plex Mono',monospace;}
+  .hist-row{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;cursor:pointer;}
+  .hist-row .d{font-size:13.5px;font-weight:600;}
+  .hist-row .s{font-size:11px;color:var(--ink-muted);margin-top:2px;}
+  .hist-row .e{font-size:15px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--moss);}
+  .empty-state{text-align:center;padding:40px 20px;color:var(--ink-muted);font-size:13px;}
+  footer.foot{text-align:center;color:var(--ink-muted);font-size:11px;padding:20px;}
+  .actions-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+
+
+  :root{
+    --paper:#F6F7F9; --surface:#FFFFFF; --ink:#16181D; --ink-muted:#6B7280; --line:#E5E7EB;
+    --forest:#4F46E5; --forest-light:#6366F1; --amber:#D97706; --amber-bg:#FFF7ED;
+    --rust:#DC2626; --rust-bg:#FEF2F2; --moss:#059669; --moss-bg:#ECFDF5;
+    --bar:#7C3AED; --bar-bg:#F5F3FF; --service:#0D9488; --service-bg:#F0FDFA;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .display{font-family:'Manrope',sans-serif;}
+  header.top{background:var(--ink);padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;}
+  header.top .title{color:#FFFFFF;font-weight:700;font-size:17px;letter-spacing:-0.01em;font-family:'Manrope',sans-serif;}
+  header.top .date{color:#9CA3AF;font-size:11px;margin-top:3px;}
+  nav.tabs{background:var(--surface);border-bottom:1px solid var(--line);display:flex;overflow-x:auto;position:sticky;top:0;z-index:5;}
+  nav.tabs button{background:none;border:none;padding:13px 14px;font-size:13.5px;font-weight:500;color:var(--ink-muted);white-space:nowrap;border-bottom:2px solid transparent;cursor:pointer;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:5px;}
+  nav.tabs button.active{color:var(--forest);font-weight:700;border-bottom-color:var(--forest);}
+  .count-pill{background:var(--rust-bg);color:var(--rust);border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;}
+  main{max-width:760px;margin:0 auto;padding:18px 16px 50px;}
+  .ticket{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,0.04);padding:14px;margin-bottom:12px;}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:13px;}
+  .field label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);}
+  input, select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px;color:var(--ink);background:#fff;font-family:'IBM Plex Mono',monospace;width:100%;}
+  input[type=text]{font-family:'Inter',sans-serif;}
+  .btn{display:inline-flex;align-items:center;gap:6px;border-radius:6px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid var(--forest);background:var(--forest);color:#fff;font-family:'Inter',sans-serif;transition:opacity 0.15s;}
+  .btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--line);}
+  .btn.small{padding:6px 10px;font-size:12px;}
+  .chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:500;}
+  .filter-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+  .filter-chip{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:500;border:1px solid var(--line);background:#fff;color:var(--ink-muted);cursor:pointer;}
+  .filter-chip.active{color:#fff;}
+  .grid{display:grid;gap:10px;}
+  .grid-2{grid-template-columns:repeat(2,1fr);}
+  .assign-row{display:flex;flex-direction:column;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-bottom:8px;}
+  .assign-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .assign-name{font-size:13.5px;font-weight:600;}
+  .assign-time{font-size:12px;color:var(--ink-muted);font-family:'IBM Plex Mono',monospace;}
+  .x-btn{background:none;border:none;color:var(--ink-muted);cursor:pointer;font-size:15px;padding:2px 6px;flex-shrink:0;}
+  .alert-banner{background:var(--rust-bg);border:1px solid var(--rust);border-radius:9px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:var(--rust);}
+  .alert-banner b{display:block;font-size:12.5px;margin-bottom:4px;}
+  .hist-row{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;cursor:pointer;}
+  .hist-row .d{font-size:13.5px;font-weight:600;}
+  .hist-row .s{font-size:11px;color:var(--ink-muted);margin-top:2px;}
+  .empty-state{text-align:center;padding:40px 20px;color:var(--ink-muted);font-size:13px;}
+  footer.foot{text-align:center;color:var(--ink-muted);font-size:11px;padding:20px;}
+  .user-chip{background:rgba(255,255,255,0.12);border:none;color:#F1F3EC;font-size:11px;padding:5px 10px;border-radius:999px;cursor:pointer;font-family:'IBM Plex Mono',monospace;}
+  .cat-section-title{display:flex;align-items:center;gap:8px;margin:16px 0 8px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;}
+  .time-row{display:flex;gap:8px;}
+  .time-row input{width:auto;flex:1;}
+
+.module-tabs{background:var(--surface);display:flex;overflow-x:auto;border-bottom:1px solid var(--line);padding:0 8px;}
+.module-tabs button{background:none;border:none;padding:14px 16px;font-size:13.5px;font-weight:600;color:var(--ink-muted);white-space:nowrap;cursor:pointer;font-family:'Inter',sans-serif;border-bottom:2px solid transparent;display:flex;align-items:center;gap:6px;}
+.module-tabs button.active{color:var(--forest);border-bottom-color:var(--forest);}
+.module{display:none;}
+.module.active{display:block;}
+
+/* ===== Auth / Login ===== */
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--paper);}
+.login-box{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 24px;box-shadow:0 2px 10px rgba(16,24,40,0.06);}
+.login-box .brand{font-family:'Manrope',sans-serif;font-weight:800;font-size:20px;text-align:center;margin-bottom:4px;}
+.login-box .sub{text-align:center;color:var(--ink-muted);font-size:12.5px;margin-bottom:22px;}
+.login-box .field{margin-bottom:14px;}
+.login-box .error{background:var(--rust-bg);color:var(--rust);font-size:12.5px;border-radius:8px;padding:8px 10px;margin-bottom:14px;display:none;}
+.login-box .error.show{display:block;}
+.login-box .hint{font-size:11px;color:var(--ink-muted);margin-top:14px;text-align:center;line-height:1.5;}
+.login-box button.btn{width:100%;justify-content:center;margin-top:4px;}
+
+/* ===== Header user area ===== */
+.user-chip{display:flex;align-items:center;gap:8px;}
+.user-chip .who{color:#fff;font-size:11.5px;text-align:right;}
+.user-chip .who .role{display:block;color:#9CA3AF;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;margin-top:1px;}
+.user-chip button{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.16);color:#fff;font-size:11px;padding:6px 10px;border-radius:6px;cursor:pointer;font-family:'Inter',sans-serif;}
+
+/* ===== Home dashboard ===== */
+.home-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+@media(min-width:560px){.home-grid{grid-template-columns:repeat(3,1fr);}}
+.home-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 14px;text-align:center;cursor:pointer;transition:box-shadow .15s, transform .15s;}
+.home-card:hover{box-shadow:0 4px 14px rgba(16,24,40,0.08);transform:translateY(-1px);}
+.home-card .ic{font-size:26px;margin-bottom:8px;}
+.home-card .lbl{font-weight:700;font-size:13.5px;font-family:'Manrope',sans-serif;}
+.home-card .desc{font-size:11px;color:var(--ink-muted);margin-top:3px;}
+.home-card.locked{opacity:.4;cursor:not-allowed;}
+.home-card.admin{border-color:var(--forest);background:var(--forest-light);background:linear-gradient(180deg,#EEF2FF,#FFFFFF);}
+
+/* ===== User management ===== */
+.perm-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:13px;border-bottom:1px solid var(--line);}
+.perm-row:last-child{border-bottom:none;}
+.switch{position:relative;display:inline-block;width:38px;height:22px;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;}
+.switch .slider{position:absolute;cursor:pointer;inset:0;background:#D1D5DB;border-radius:999px;transition:.15s;}
+.switch .slider:before{content:"";position:absolute;height:16px;width:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s;}
+.switch input:checked + .slider{background:var(--forest);}
+.switch input:checked + .slider:before{transform:translateX(16px);}
+.user-card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px;}
+.user-card .uh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.user-card .uname{font-weight:700;font-size:14.5px;font-family:'Manrope',sans-serif;}
+.badge-admin{background:var(--bar-bg);color:var(--bar);border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-left:6px;}
+
+
+/* =========================================================
+   SMARTPHONE UX — professional responsive layer
+   Desktop styling is preserved; mobile rules activate <= 600px.
+   ========================================================= */
+@media (max-width:600px){
+  html{font-size:16px;overflow-x:hidden;}
+  body{width:100%;min-width:0;overflow-x:hidden;padding-bottom:env(safe-area-inset-bottom);}
+  *{box-sizing:border-box;}
+
+  header.top{
+    padding:12px 14px;
+    gap:10px;
+    min-height:68px;
+    align-items:center;
+  }
+  header.top .title{font-size:16px;}
+  header.top .date{font-size:10px;}
+  header.top #sync-label{font-size:9.5px !important;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .user-chip{gap:6px;min-width:0;}
+  .user-chip .who{display:none;}
+  .user-chip button{min-height:40px;padding:8px 10px;font-size:11px;border-radius:8px;white-space:nowrap;}
+
+  .module-tabs{
+    padding:0 4px;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  .module-tabs::-webkit-scrollbar,nav.tabs::-webkit-scrollbar{display:none;}
+  .module-tabs button{
+    min-height:48px;
+    padding:12px 13px;
+    font-size:12px;
+    gap:5px;
+  }
+  nav.tabs{
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    top:48px;
+    z-index:15;
+  }
+  nav.tabs button{
+    min-height:46px;
+    padding:11px 12px;
+    font-size:12px;
+  }
+
+  main,
+  #module-home main,
+  #module-users main,
+  #caisse-main,
+  #depenses-main{
+    width:100%;
+    max-width:none !important;
+    margin:0 !important;
+    padding:14px 12px 28px !important;
+  }
+
+  h2.section{font-size:11px;margin:16px 0 8px;}
+  .ticket{
+    border-radius:12px;
+    padding:13px;
+    margin-bottom:10px;
+    box-shadow:0 1px 3px rgba(16,24,40,.05);
+  }
+
+  .grid{gap:8px;}
+  .grid-2,.grid-4{grid-template-columns:1fr;}
+  .home-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
+  .home-card{padding:16px 9px;min-height:116px;border-radius:12px;display:flex;flex-direction:column;justify-content:center;}
+  .home-card .ic{font-size:23px;margin-bottom:6px;}
+  .home-card .lbl{font-size:12.5px;}
+  .home-card .desc{font-size:10px;line-height:1.35;}
+
+  .field{gap:5px;min-width:0;}
+  .field label{font-size:10px;}
+  input,select,textarea{
+    width:100%;
+    max-width:100%;
+    min-height:44px;
+    padding:10px 11px;
+    font-size:16px !important;
+    border-radius:8px;
+  }
+  textarea{min-height:88px;}
+  input[type="checkbox"],input[type="radio"]{min-height:auto;width:auto;}
+
+  .btn{
+    min-height:44px;
+    padding:10px 13px;
+    border-radius:8px;
+    font-size:13px;
+    justify-content:center;
+  }
+  .btn.small{min-height:40px;padding:8px 11px;font-size:12px;}
+  .actions-row{gap:7px;}
+  .actions-row .btn{flex:1 1 auto;min-width:120px;}
+
+  .top-row{gap:8px;margin-bottom:11px;align-items:stretch;}
+  .top-row > *{min-width:0;}
+  .filter-row{gap:6px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;scrollbar-width:none;}
+  .filter-row::-webkit-scrollbar{display:none;}
+  .filter-row > *{flex:0 0 auto;}
+
+  .result-box{
+    padding:12px 13px;
+    min-height:62px;
+    border-radius:10px;
+    gap:12px;
+  }
+  .result-box .label{font-size:11.5px;line-height:1.3;}
+  .result-box .value{font-size:18px;white-space:nowrap;}
+
+  .stat-value{font-size:18px;}
+  .stat-value.money{font-size:14px;}
+  .stat-label{font-size:10px;}
+
+  .line-row{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:7px;
+    padding:9px;
+  }
+  .movement-row,.hist-row{padding:11px 12px;gap:10px;}
+  .movement-row > *, .hist-row > *{min-width:0;}
+
+  .perm-row{
+    min-height:52px;
+    gap:12px;
+    padding:9px 0;
+    font-size:12px;
+  }
+  .perm-row span{line-height:1.35;max-width:calc(100% - 52px);}
+  .switch{width:42px;height:24px;}
+  .switch .slider:before{height:18px;width:18px;top:3px;left:3px;}
+  .switch input:checked + .slider:before{transform:translateX(18px);}
+
+  .user-card{padding:12px;border-radius:10px;}
+  .user-card .uh{gap:8px;align-items:flex-start;}
+  .user-card .uname{font-size:13.5px;}
+
+  .mode-toggle{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;scrollbar-width:none;}
+  .mode-toggle::-webkit-scrollbar{display:none;}
+  .mode-toggle > *{flex:0 0 auto;}
+
+  .time-row{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+
+  /* Prevent long labels / generated content from breaking the viewport. */
+  .article-head,.assign-top,.row-between{gap:8px;}
+  .article-head > *, .assign-top > *, .row-between > *{min-width:0;}
+  .mono{overflow-wrap:anywhere;}
+
+  /* Tables remain usable when a particular report genuinely needs columns. */
+  table{width:100%;font-size:11px;}
+  .table-wrap,.table-responsive{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+
+  /* Login */
+  #login-screen{padding:16px;align-items:center;}
+  .login-box{max-width:390px;padding:24px 18px;border-radius:14px;}
+  .login-box .brand{font-size:19px;}
+}
+
+@media (max-width:380px){
+  header.top{padding-left:11px;padding-right:11px;}
+  header.top .title{font-size:15px;}
+  .module-tabs button{padding-left:10px;padding-right:10px;font-size:11.5px;}
+  nav.tabs button{padding-left:10px;padding-right:10px;}
+  main,#module-home main,#module-users main,#caisse-main,#depenses-main{padding-left:10px !important;padding-right:10px !important;}
+  .home-grid{gap:7px;}
+  .home-card{min-height:108px;padding:13px 7px;}
+  .home-card .lbl{font-size:11.5px;}
+}
+
+/* Reduce motion for users who prefer it. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto !important;transition:none !important;animation:none !important;}
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== ECRAN DE CONNEXION ===================== -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="brand display">ALLO SUSHI</div>
+    <div class="sub" id="login-sub">Connexion à l'espace de gestion</div>
+    <div class="error" id="login-error"></div>
+    <form id="login-form" onsubmit="return false;">
+      <div class="field">
+        <label>Nom d'utilisateur</label>
+        <input type="text" id="login-username" autocomplete="username" placeholder="ex: lila">
+      </div>
+      <div class="field">
+        <label>Mot de passe</label>
+        <input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••">
+      </div>
+      <div class="field" id="login-confirm-wrap" style="display:none;">
+        <label>Confirmer le mot de passe</label>
+        <input type="password" id="login-password-confirm" placeholder="••••••••">
+      </div>
+      <button class="btn" id="login-submit-btn" onclick="handleAuthSubmit()">Se connecter</button>
+    </form>
+    <div class="hint" id="login-hint"></div>
+  </div>
+</div>
+
+<!-- ===================== APPLICATION ===================== -->
+<div id="app-shell" style="display:none;">
+<header class="top">
+  <div>
+    <div class="title display">ALLO SUSHI</div>
+    <div class="date mono" id="today-label"></div>
+    <div class="mono" id="sync-label" style="font-size:10.5px;color:#9CA3AF;margin-top:3px;">Connexion…</div>
+  </div>
+  <div class="user-chip">
+    <div class="who" id="user-who"></div>
+    <button onclick="handleLogout()">Déconnexion</button>
+  </div>
+</header>
+
+<nav class="module-tabs" id="module-tabs"></nav>
+
+<div id="module-home" class="module active">
+  <main style="max-width:760px;margin:0 auto;padding:18px 16px 40px;">
+    <h2 class="section" style="margin-top:4px;">Rubriques</h2>
+    <div class="home-grid" id="home-grid"></div>
+  </main>
+</div>
+
+<div id="module-caisse" class="module">
+  <nav class="tabs" id="caisse-tabs"></nav>
+  <main id="caisse-main"></main>
+</div>
+
+<div id="module-depenses" class="module">
+  <nav class="tabs" id="depenses-tabs"></nav>
+  <main id="depenses-main"></main>
+</div>
+
+<div id="module-users" class="module">
+  <main style="max-width:760px;margin:0 auto;padding:18px 16px 40px;">
+    <h2 class="section" style="margin-top:4px;">Nouvel utilisateur</h2>
+    <div class="ticket">
+      <div class="grid grid-2" style="margin-bottom:10px;">
+        <div class="field">
+          <label>Nom d'utilisateur</label>
+          <input type="text" id="nu-username" placeholder="ex: karim">
+        </div>
+        <div class="field">
+          <label>Mot de passe</label>
+          <input type="password" id="nu-password" placeholder="••••••••">
+        </div>
+      </div>
+      <div class="perm-row">
+        <span>Administrateur (accès total + gestion des utilisateurs)</span>
+        <label class="switch"><input type="checkbox" id="nu-admin" onchange="uu_toggleAdminFields()"><span class="slider"></span></label>
+      </div>
+      <div id="nu-perm-detail">
+        <div class="perm-row"><span>Accès Caisse</span><label class="switch"><input type="checkbox" id="nu-perm-caisse" checked><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Dépenses</span><label class="switch"><input type="checkbox" id="nu-perm-depenses" checked><span class="slider"></span></label></div>
+        <div class="perm-row"><span>💵 Saisie du solde réel</span><label class="switch"><input type="checkbox" id="nu-perm-solde-reel" checked><span class="slider"></span></label></div>
+        <div class="perm-row"><span>🔎 Vérification / calcul de l'écart</span><label class="switch"><input type="checkbox" id="nu-perm-verification" checked><span class="slider"></span></label></div>
+      </div>
+      <button class="btn moss" style="margin-top:14px;" onclick="uu_createUser()">➕ Créer l'utilisateur</button>
+    </div>
+
+    <h2 class="section">Utilisateurs existants</h2>
+    <div id="users-list"></div>
+  </main>
+</div>
+
+<footer class="foot">Données synchronisées en temps réel entre tous les appareils connectés à cette app.</footer>
+</div><!-- /app-shell -->
+
+<script>
+/* ==================== SOCLE COMMUN (partagé par les modules Caisse et Dépenses) ==================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyAy-IYGVxejJI9uN_qJDGcY0of-vY6AwIg",
+  authDomain: "allo-sushi-project.firebaseapp.com",
+  projectId: "allo-sushi-project",
+  storageBucket: "allo-sushi-project.firebasestorage.app",
+  messagingSenderId: "1063110034519",
+  appId: "1:1063110034519:web:6bd3892757bb9ab3f9cf12"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const USER_KEY = 'allosushi-user';
+let currentUser = '';
+function askUserName(){ /* obsolète : l'utilisateur est désormais défini via la connexion */ }
+
+/* ==================== AUTHENTIFICATION & AUTORISATIONS ==================== */
+const appUsersCol = db.collection('app_users');
+const SESSION_KEY = 'allosushi-session';
+const MODULE_DEFS = [
+  { key:'caisse',   label:'Caisse',    ic:'💰', desc:'Sessions de caisse' },
+  { key:'depenses', label:'Dépenses',  ic:'🧾', desc:'Dépenses & pointages' },
+];
+let session = null; // { username, isAdmin, permissions:{caisse,depenses,soldeTheorique,soldeReel,ecart} }
+let usersCache = [];
+let usersSetupMode = false;
+
+function hasAccess(moduleKey){
+  if(!session) return false;
+  if(session.isAdmin) return true;
+  return !!(session.permissions && session.permissions[moduleKey]);
+}
+
+function showAuthError(msg){
+  const el = document.getElementById('login-error');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+function clearAuthError(){
+  document.getElementById('login-error').classList.remove('show');
+}
+
+async function initAuth(){
+  document.getElementById('sync-label').textContent = 'Connexion…';
+  let snap;
+  try{
+    snap = await appUsersCol.get();
+  }catch(e){
+    showAuthError("Impossible de contacter le serveur. Vérifiez votre connexion.");
+    return;
+  }
+  usersCache = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+
+  if(usersCache.length === 0){
+    // Premier lancement : on crée le compte administrateur
+    usersSetupMode = true;
+    document.getElementById('login-sub').textContent = "Créez votre compte administrateur";
+    document.getElementById('login-submit-btn').textContent = "Créer le compte administrateur";
+    document.getElementById('login-confirm-wrap').style.display = 'block';
+    document.getElementById('login-hint').textContent = "Ce compte aura accès à toutes les rubriques et pourra créer d'autres utilisateurs.";
+    return;
+  }
+
+  // Session déjà ouverte sur cet appareil ?
+  const saved = localStorage.getItem(SESSION_KEY);
+  if(saved){
+    try{
+      const s = JSON.parse(saved);
+      const match = usersCache.find(u=>u.id === s.username);
+      if(match){
+        applySession(match);
+        return;
+      }
+    }catch(e){}
+    localStorage.removeItem(SESSION_KEY);
+  }
+}
+
+function applySession(userDoc){
+  dp_verificationResult = null;
+  session = {
+    username: userDoc.id,
+    displayName: userDoc.username || userDoc.id,
+    isAdmin: !!userDoc.isAdmin,
+    permissions: userDoc.permissions || {}
+  };
+  currentUser = session.displayName;
+  localStorage.setItem(USER_KEY, currentUser);
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ username: session.username }));
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-shell').style.display = 'block';
+  renderUserChip();
+  buildModuleTabs();
+  showModule('home');
+  if(session.isAdmin){ uu_subscribeUsers(); dp_startVerificationListener(); }
+}
+
+async function handleAuthSubmit(){
+  clearAuthError();
+  const uname = (document.getElementById('login-username').value || '').trim().toLowerCase();
+  const pwd = document.getElementById('login-password').value || '';
+  if(!uname || !pwd){ showAuthError("Entrez un nom d'utilisateur et un mot de passe."); return; }
+
+  if(usersSetupMode){
+    const confirm = document.getElementById('login-password-confirm').value || '';
+    if(pwd.length < 4){ showAuthError("Le mot de passe doit contenir au moins 4 caractères."); return; }
+    if(pwd !== confirm){ showAuthError("Les mots de passe ne correspondent pas."); return; }
+    const userDoc = {
+      username: uname,
+      password: pwd,
+      isAdmin: true,
+      permissions: { caisse:true, depenses:true, soldeTheorique:true, soldeReel:true, ecart:true },
+      creeLe: new Date().toISOString()
+    };
+    try{
+      await appUsersCol.doc(uname).set(userDoc);
+    }catch(e){
+      showAuthError("Erreur lors de la création du compte. Réessayez.");
+      return;
+    }
+    usersCache = [{ id: uname, ...userDoc }];
+    usersSetupMode = false;
+    applySession({ id: uname, ...userDoc });
+    return;
+  }
+
+  const match = usersCache.find(u => u.id === uname);
+  if(!match || match.password !== pwd){
+    showAuthError("Nom d'utilisateur ou mot de passe incorrect.");
+    return;
+  }
+  applySession(match);
+}
+
+function handleLogout(){
+  if(!confirm('Se déconnecter ?')) return;
+  session = null;
+  currentUser = '';
+  localStorage.removeItem(SESSION_KEY);
+  document.getElementById('login-password').value = '';
+  document.getElementById('app-shell').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  initAuth();
+}
+
+function renderUserChip(){
+  const el = document.getElementById('user-who');
+  if(!el || !session) return;
+  el.innerHTML = `${esc(session.displayName)}<span class="role">${session.isAdmin ? 'Administrateur' : 'Employé'}</span>`;
+}
+
+/* ---- Onglets du haut, générés selon les autorisations ---- */
+function buildModuleTabs(){
+  const nav = document.getElementById('module-tabs');
+  let html = `<button data-mod="home" onclick="showModule('home')">🏠 Accueil</button>`;
+  MODULE_DEFS.forEach(m=>{
+    if(hasAccess(m.key)) html += `<button data-mod="${m.key}" onclick="showModule('${m.key}')">${m.ic} ${m.label}</button>`;
+  });
+  if(session && session.isAdmin) html += `<button data-mod="users" onclick="showModule('users')">👤 Utilisateurs</button>`;
+  nav.innerHTML = html;
+}
+
+function renderHome(){
+  const grid = document.getElementById('home-grid');
+  let html = '';
+  MODULE_DEFS.forEach(m=>{
+    if(hasAccess(m.key)){
+      html += `<div class="home-card" onclick="showModule('${m.key}')">
+        <div class="ic">${m.ic}</div>
+        <div class="lbl">${m.label}</div>
+        <div class="desc">${m.desc}</div>
+      </div>`;
+    }
+  });
+  if(session && session.isAdmin){
+    html += `<div class="home-card admin" onclick="showModule('users')">
+      <div class="ic">👤</div>
+      <div class="lbl">Utilisateurs</div>
+      <div class="desc">Comptes & autorisations</div>
+    </div>`;
+  }
+  if(!html) html = `<div class="empty-state">Aucune rubrique ne vous a été attribuée. Contactez votre administrateur.</div>`;
+  grid.innerHTML = html;
+}
+
+/* ---- Gestion des utilisateurs (admin) ---- */
+function uu_toggleAdminFields(){
+  document.getElementById('nu-perm-detail').style.opacity = document.getElementById('nu-admin').checked ? '0.4' : '1';
+}
+
+async function uu_createUser(){
+  const uname = (document.getElementById('nu-username').value || '').trim().toLowerCase();
+  const pwd = document.getElementById('nu-password').value || '';
+  if(!uname || !pwd){ alert("Entrez un nom d'utilisateur et un mot de passe."); return; }
+  if(pwd.length < 4){ alert("Le mot de passe doit contenir au moins 4 caractères."); return; }
+  if(usersCache.some(u=>u.id===uname)){ alert("Ce nom d'utilisateur existe déjà."); return; }
+  const isAdmin = document.getElementById('nu-admin').checked;
+  const userDoc = {
+    username: uname,
+    password: pwd,
+    isAdmin,
+    permissions: isAdmin ? { caisse:true, depenses:true, soldeTheorique:true, soldeReel:true, ecart:true, verification:true, historiqueVerification:true } : {
+      caisse: document.getElementById('nu-perm-caisse').checked,
+      depenses: document.getElementById('nu-perm-depenses').checked,
+      soldeTheorique: false,
+      soldeReel: document.getElementById('nu-perm-solde-reel').checked,
+      ecart: true,
+      verification: document.getElementById('nu-perm-verification').checked,
+      historiqueVerification: false
+    },
+    creeLe: new Date().toISOString(),
+    creePar: currentUser
+  };
+  await appUsersCol.doc(uname).set(userDoc);
+  document.getElementById('nu-username').value = '';
+  document.getElementById('nu-password').value = '';
+  document.getElementById('nu-admin').checked = false;
+  document.getElementById('nu-perm-solde-reel').checked = true;
+  uu_toggleAdminFields();
+}
+
+async function uu_togglePerm(userId, key, checked){
+  await appUsersCol.doc(userId).set({ permissions: { [key]: checked } }, { merge:true });
+}
+async function uu_toggleAdmin(userId, checked){
+  const patch = { isAdmin: checked };
+  if(checked) patch.permissions = { caisse:true, depenses:true, soldeTheorique:true, soldeReel:true, ecart:true, verification:true, historiqueVerification:true };
+  await appUsersCol.doc(userId).set(patch, { merge:true });
+}
+async function uu_deleteUser(userId){
+  if(userId === session.username){ alert("Vous ne pouvez pas supprimer votre propre compte."); return; }
+  if(!confirm(`Supprimer l'utilisateur "${userId}" ?`)) return;
+  await appUsersCol.doc(userId).delete();
+}
+async function uu_resetPassword(userId){
+  const pwd = prompt(`Nouveau mot de passe pour "${userId}" :`);
+  if(!pwd) return;
+  if(pwd.length < 4){ alert("Le mot de passe doit contenir au moins 4 caractères."); return; }
+  await appUsersCol.doc(userId).set({ password: pwd }, { merge:true });
+  alert("Mot de passe mis à jour.");
+}
+
+let uu_unsub = null;
+function uu_subscribeUsers(){
+  if(uu_unsub) return;
+  uu_unsub = appUsersCol.onSnapshot(snap=>{
+    usersCache = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    uu_render();
+    // Si notre propre compte a été modifié (retrait admin, permissions), on met à jour la session
+    if(session){
+      const me = usersCache.find(u=>u.id===session.username);
+      if(me){
+        session.isAdmin = !!me.isAdmin;
+        session.permissions = me.permissions || {};
+        buildModuleTabs();
+        renderUserChip();
+        if(!session.isAdmin && document.getElementById('module-users').classList.contains('active')) showModule('home');
+      }
+    }
+  });
+}
+
+function uu_render(){
+  const el = document.getElementById('users-list');
+  if(!el) return;
+  el.innerHTML = usersCache.slice().sort((a,b)=>a.id.localeCompare(b.id)).map(u=>{
+    const perms = u.permissions || {};
+    const permRows = MODULE_DEFS.map(m=>`
+      <div class="perm-row">
+        <span>${m.ic} ${m.label}</span>
+        <label class="switch">
+          <input type="checkbox" ${perms[m.key]?'checked':''} ${u.isAdmin?'disabled':''}
+            onchange="uu_togglePerm('${u.id}','${m.key}',this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>`).join('');
+    const soldePermRows = `
+      <div class="perm-row"><span>💵 Saisie du solde réel</span><label class="switch"><input type="checkbox" ${perms.soldeReel!==false?'checked':''} ${u.isAdmin?'disabled':''} onchange="uu_togglePerm('${u.id}','soldeReel',this.checked)"><span class="slider"></span></label></div>
+      <div class="perm-row"><span>🔎 Vérification / calcul de l'écart</span><label class="switch"><input type="checkbox" ${perms.verification!==false?'checked':''} ${u.isAdmin?'disabled':''} onchange="uu_togglePerm('${u.id}','verification',this.checked)"><span class="slider"></span></label></div>
+      <div class="perm-row"><span>📋 Historique des vérifications (admin)</span><label class="switch"><input type="checkbox" ${perms.historiqueVerification===true?'checked':''} ${!u.isAdmin?'disabled':''} onchange="uu_togglePerm('${u.id}','historiqueVerification',this.checked)"><span class="slider"></span></label></div>`;
+    return `<div class="user-card">
+      <div class="uh">
+        <div class="uname">${esc(u.username||u.id)}${u.isAdmin?'<span class="badge-admin">Admin</span>':''}</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn ghost small" onclick="uu_resetPassword('${u.id}')">🔑 Mot de passe</button>
+          <button class="btn rust small" onclick="uu_deleteUser('${u.id}')">🗑️</button>
+        </div>
+      </div>
+      <div class="perm-row">
+        <span>Administrateur</span>
+        <label class="switch"><input type="checkbox" ${u.isAdmin?'checked':''} onchange="uu_toggleAdmin('${u.id}',this.checked)"><span class="slider"></span></label>
+      </div>
+      ${permRows}
+      ${soldePermRows}
+    </div>`;
+  }).join('') || `<div class="empty-state">Aucun utilisateur.</div>`;
+}
+
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function uid(){ return Math.random().toString(36).slice(2,10); }
+function toLocalISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function todayISO(){ return toLocalISO(new Date()); }
+function prevDateStr(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setDate(d.getDate()-1);
+  return toLocalISO(d);
+}
+function fmtDateShort(iso){
+  if(!iso) return '—';
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('fr-FR',{day:'2-digit', month:'2-digit', year:'numeric'});
+}
+function fmtDateLong(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('fr-FR',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
+}
+
+let activeModule = 'home';
+function showModule(name){
+  if(name!=='home' && name!=='users' && !hasAccess(name)) name = 'home';
+  if(name==='users' && !(session && session.isAdmin)) name = 'home';
+  activeModule = name;
+  document.querySelectorAll('.module').forEach(m=>m.classList.remove('active'));
+  document.getElementById('module-'+name).classList.add('active');
+  document.querySelectorAll('#module-tabs button').forEach(b=>{
+    b.classList.toggle('active', b.getAttribute('data-mod')===name);
+  });
+  if(name==='home') renderHome();
+  if(name==='users') uu_render();
+  if(name==='caisse' && typeof ca_render==='function') ca_render();
+  if(name==='depenses' && typeof dp_render==='function') dp_render();
+}
+
+document.getElementById('today-label').textContent =
+  new Date().toLocaleDateString('fr-FR',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
+
+/* ==================== MODULE CAISSE ==================== */
+const ca_caisseCol = db.collection('caisse_sessions');
+
+
+function ca_setSyncLabel(text){
+  const el = document.getElementById('sync-label');
+  if(el) el.textContent = text;
+}
+
+
+/* ---------------- Helpers ---------------- */
+function ca_fmtMoney(n){
+  if(n===null||n===undefined||isNaN(n)) return '0 DA';
+  return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2}) + ' DA';
+}
+function ca_parseNum(v){
+  if(v===null||v===undefined||v==='') return 0;
+  const n = Number(String(v).replace(',','.'));
+  return isNaN(n) ? 0 : n;
+}
+
+/* ---------------- État ---------------- */
+let ca_allSessions = {};
+let ca_currentTab = 'caisse';
+let ca_workingDate = todayISO();
+let ca_session = ca_blankSession(ca_workingDate);
+let ca_detailOpen = true;
+function ca_toggleDetail(){ ca_detailOpen = !ca_detailOpen; ca_render(); }
+
+/* ---------------- Calculs ---------------- */
+function ca_sumLines(lines){ return (lines||[]).reduce((s,l)=>s+ca_parseNum(l.montant),0); }
+function ca_totalEntreesDiverses(s){ return ca_sumLines(s.entrees); }
+function ca_partEspecesErp(s){ return ca_parseNum(s.totalVentesErp) - ca_sumLines(s.virements) - ca_sumLines(s.enAttente); }
+function ca_montantDisponible(s){ return ca_parseNum(s.debutCaisse) + ca_totalEntreesDiverses(s) + ca_partEspecesErp(s); }
+function ca_totalRetraits(s){ return ca_sumLines(s.retraitsGerant) + ca_sumLines(s.retraitsDivers); }
+function ca_montantTheorique(s){ return ca_montantDisponible(s) - ca_totalRetraits(s); }
+function ca_ecart(s){
+  if(s.montantCompte===undefined || s.montantCompte===null || s.montantCompte==='') return null;
+  return ca_parseNum(s.montantCompte) - ca_montantTheorique(s);
+}
+function ca_montantPourLendemain(s){
+  if(s.montantCompte!==undefined && s.montantCompte!==null && s.montantCompte!==''){
+    return ca_parseNum(s.montantCompte);
+  }
+  return ca_montantTheorique(s);
+}
+
+function ca_normalizeSession(s, date){
+  return {
+    date: date,
+    debutCaisse: s.debutCaisse!==undefined ? s.debutCaisse : '',
+    debutCaisseAuto: !!s.debutCaisseAuto,
+    debutCaisseManuel: !!s.debutCaisseManuel,
+    entrees: Array.isArray(s.entrees) ? s.entrees : [],
+    totalVentesErp: s.totalVentesErp!==undefined ? s.totalVentesErp : '',
+    virements: Array.isArray(s.virements) ? s.virements : [],
+    enAttente: Array.isArray(s.enAttente) ? s.enAttente : [],
+    retraitsGerant: Array.isArray(s.retraitsGerant) ? s.retraitsGerant : [],
+    retraitsDivers: Array.isArray(s.retraitsDivers) ? s.retraitsDivers : [],
+    montantCompte: s.montantCompte!==undefined ? s.montantCompte : '',
+    noteValidation: s.noteValidation!==undefined ? s.noteValidation : '',
+    enregistreParEn: s.enregistreParEn,
+    enregistreLe: s.enregistreLe,
+  };
+}
+function ca_blankSession(date){
+  const prev = ca_allSessions[prevDateStr(date)];
+  const base = { date, entrees: [], totalVentesErp: '', virements: [], enAttente: [], retraitsGerant: [], retraitsDivers: [], montantCompte: '', noteValidation: '' };
+  if(prev){
+    return { ...base, debutCaisse: ca_montantPourLendemain(prev), debutCaisseAuto: true };
+  }
+  return { ...base, debutCaisse: '', debutCaisseAuto: false };
+}
+function ca_loadSessionForDate(date){
+  ca_workingDate = date;
+  const existing = ca_allSessions[date];
+  ca_session = existing ? ca_normalizeSession(existing, date) : ca_blankSession(date);
+  ca_detailOpen = !existing; // clôture déjà enregistrée -> repliée par défaut ; nouvelle saisie -> ouverte
+  ca_render();
+}
+
+/* ---------------- Firestore sync ---------------- */
+ca_caisseCol.onSnapshot((snap)=>{
+  const next = {};
+  snap.forEach(doc=>{ next[doc.id] = doc.data(); });
+  ca_allSessions = next;
+  if(!ca_allSessions[ca_workingDate] && !ca_session.debutCaisseManuel){
+    const prev = ca_allSessions[prevDateStr(ca_workingDate)];
+    if(prev){
+      ca_session.debutCaisse = ca_montantPourLendemain(prev);
+      ca_session.debutCaisseAuto = true;
+    }
+  }
+  ca_setSyncLabel('✓ Synchronisé');
+  ca_render();
+}, (err)=>{
+  console.error(err);
+  ca_setSyncLabel('⚠ Hors ligne / erreur de connexion');
+});
+
+async function ca_saveSession(){
+  if(!currentUser){ askUserName(false); if(!currentUser) return; }
+  try{
+    ca_setSyncLabel('Enregistrement…');
+    const { debutCaisseAuto, debutCaisseManuel, ...cleanSession } = ca_session;
+    await ca_caisseCol.doc(ca_session.date).set({ ...cleanSession, enregistreParEn: currentUser, enregistreLe: new Date().toISOString() });
+    ca_setSyncLabel('✓ Synchronisé');
+    alert('Clôture du '+fmtDateShort(ca_session.date)+' enregistrée.');
+  }catch(e){
+    console.warn(e);
+    ca_setSyncLabel('⚠ Échec de la sauvegarde');
+  }
+}
+async function ca_deleteSession(date){
+  if(!confirm('Supprimer définitivement la clôture du '+fmtDateShort(date)+' ?')) return;
+  try{ await ca_caisseCol.doc(date).delete(); }catch(e){ console.warn(e); }
+}
+
+/* ---------------- Render ---------------- */
+function ca_render(){
+  const active = document.activeElement;
+  const activeId = (active && active.id) ? active.id : null;
+  let selStart=null, selEnd=null;
+  if(active && typeof active.selectionStart === 'number'){
+    selStart = active.selectionStart; selEnd = active.selectionEnd;
+  }
+  ca_renderTabs();
+  const main = document.getElementById('caisse-main');
+  if(ca_currentTab==='caisse') main.innerHTML = ca_renderCaisseTab();
+  else main.innerHTML = ca_renderHistoriqueTab();
+  if(activeId){
+    const el = document.getElementById(activeId);
+    if(el){
+      el.focus();
+      if(selStart!=null && el.setSelectionRange){
+        try{ el.setSelectionRange(selStart, selEnd); }catch(e){}
+      }
+    }
+  }
+}
+function ca_setTab(t){ ca_currentTab = t; ca_render(); }
+
+function ca_renderTabs(){
+  const tabs = [
+    {id:'caisse', label:'Caisse du jour'},
+    {id:'historique', label:'Historique'},
+  ];
+  document.getElementById('caisse-tabs').innerHTML = tabs.map(t=>`
+    <button class="${ca_currentTab===t.id?'active':''}" onclick="ca_setTab('${t.id}')">${esc(t.label)}</button>
+  `).join('');
+}
+
+function ca_renderStatusBanner(existing, ecart){
+  const compte = ca_session.montantCompte !== '' && ca_session.montantCompte !== undefined && ca_session.montantCompte !== null;
+  let statusColor = 'var(--ink-muted)', statusBg = 'var(--paper)', statusText = '⏳ Comptage non renseigné', statusIcon = '⏳';
+  if(compte){
+    if(ecart !== null && Math.abs(ecart) < 0.01){ statusColor='var(--moss)'; statusBg='var(--moss-bg)'; statusText='Caisse correcte — aucun écart'; statusIcon='✅'; }
+    else { statusColor='var(--rust)'; statusBg='var(--rust-bg)'; statusText='Écart détecté — à vérifier avec le caissier'; statusIcon='⚠️'; }
+  }
+  return `
+    <div class="ticket" style="background:${statusBg};border:1.5px solid ${statusColor};">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:22px;">${statusIcon}</span>
+          <div>
+            <div style="font-weight:700;font-size:14px;color:${statusColor};">${statusText}</div>
+            <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort(ca_session.date)}${existing && existing.enregistreParEn ? ' · enregistrée par '+esc(existing.enregistreParEn) : ''}</div>
+          </div>
+        </div>
+        ${compte && ecart!==null ? `<div style="text-align:right;"><div style="font-size:11px;color:var(--ink-muted);">Écart</div><div style="font-weight:800;font-size:18px;color:${statusColor};">${ecart>0?'+':''}${ca_fmtMoney(ecart)}</div></div>` : ''}
+      </div>
+      <div class="grid grid-2" style="margin-top:14px;gap:10px;">
+        <div class="stat-box"><div class="stat-label">Montant théorique</div><div style="font-weight:700;font-size:15px;">${ca_fmtMoney(ca_montantTheorique(ca_session))}</div></div>
+        <div class="stat-box"><div class="stat-label">Montant compté</div><div style="font-weight:700;font-size:15px;">${compte ? ca_fmtMoney(ca_session.montantCompte) : '—'}</div></div>
+        <div class="stat-box"><div class="stat-label">Total ventes ERP</div><div style="font-weight:700;font-size:15px;">${ca_fmtMoney(ca_session.totalVentesErp)}</div></div>
+        <div class="stat-box"><div class="stat-label">Retenu pour demain</div><div style="font-weight:700;font-size:15px;">${ca_fmtMoney(ca_montantPourLendemain(ca_session))}</div></div>
+      </div>
+      <button class="btn small ghost" style="margin-top:12px;" onclick="ca_toggleDetail()">${ca_detailOpen ? '▲ Masquer le détail de la saisie' : '▼ Voir le détail de la saisie'}</button>
+    </div>
+  `;
+}
+
+function ca_renderCaisseTab(){
+  const existing = ca_allSessions[ca_workingDate];
+  const ecart = ca_ecart(ca_session);
+  return `
+    <div class="ticket">
+      <div class="field">
+        <label>Date de la caisse</label>
+        <input type="date" id="caisse-date-input" value="${ca_session.date}" onchange="ca_loadSessionForDate(this.value)" />
+      </div>
+      ${existing ? `<div style="margin-top:8px;font-size:11.5px;color:var(--amber);">⚠ Une clôture existe déjà pour cette date. L'enregistrer à nouveau la remplacera.</div>` : ''}
+    </div>
+
+    ${ca_renderStatusBanner(existing, ecart)}
+
+    ${!ca_detailOpen ? '' : `
+    <div class="ticket">
+      <div class="step-label"><div class="step-badge">A</div><div class="step-title">Début de caisse (= clôture de la veille)</div></div>
+      <div class="field">
+        <label>Montant (DA)</label>
+        <input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="debut-input" value="${ca_session.debutCaisse}" oninput="ca_session.debutCaisse=this.value;ca_session.debutCaisseAuto=false;ca_session.debutCaisseManuel=true;ca_render()" placeholder="0" />
+      </div>
+      ${ca_session.debutCaisseAuto ? `<div style="margin-top:8px;font-size:11.5px;color:var(--moss);">↺ Repris automatiquement de la clôture d'hier (${ca_fmtMoney(ca_session.debutCaisse)}). Modifiable si besoin.</div>` : ''}
+    </div>
+
+    <div class="ticket">
+      <div class="step-label"><div class="step-badge">B</div><div class="step-title">Entrées de caisse (divers)</div></div>
+      <div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:8px;">Ex. monnaie apportée, vente d'huile… — tout ajout d'espèces hors ventes ERP.</div>
+      ${ca_linesEditor(ca_session.entrees, 'entrees', 'Description (ex. monnaie, vente huile…)')}
+      <button class="btn small ghost" onclick="ca_addLine('entrees')">+ Ajouter une entrée</button>
+      <div class="subtotal"><span>Total entrées diverses</span><span class="mono">${ca_fmtMoney(ca_totalEntreesDiverses(ca_session))}</span></div>
+    </div>
+
+    <div class="ticket">
+      <div class="step-label"><div class="step-badge">C</div><div class="step-title">Total des ventes ERP</div></div>
+      <div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:8px;">Toutes les commandes, tous modes de paiement confondus (le chiffre affiché par l'ERP).</div>
+      <div class="field"><input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="erp-input" value="${ca_session.totalVentesErp}" oninput="ca_session.totalVentesErp=this.value;ca_render()" placeholder="0" /></div>
+    </div>
+
+    <div class="ticket">
+      <div class="step-label"><div class="step-badge">D</div><div class="step-title">Ventes payées par virement</div></div>
+      ${ca_linesEditor(ca_session.virements, 'virements', 'Note (ex. client, référence)')}
+      <button class="btn small ghost" onclick="ca_addLine('virements')">+ Ajouter un virement</button>
+      <div class="subtotal"><span>Total virements</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.virements))}</span></div>
+      <div style="margin-top:8px;padding:8px 10px;background:var(--rust-bg);border-radius:6px;font-size:11.5px;color:var(--rust);font-weight:600;">⚠ Ces ventes devront être validées dans l'ERP.</div>
+    </div>
+
+    <div class="ticket">
+      <div class="step-label"><div class="step-badge">E</div><div class="step-title">Ventes en attente (validées, non payées)</div></div>
+      ${ca_linesEditor(ca_session.enAttente, 'enAttente', 'Note (ex. client, raison)')}
+      <button class="btn small ghost" onclick="ca_addLine('enAttente')">+ Ajouter une vente en attente</button>
+      <div class="subtotal"><span>Total en attente</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.enAttente))}</span></div>
+    </div>
+
+    <div class="ticket" style="background:var(--paper);">
+      <div class="subtotal"><span>Part espèces des ventes ERP (C − D − E)</span><span class="mono" style="font-weight:700;">${ca_fmtMoney(ca_partEspecesErp(ca_session))}</span></div>
+    </div>
+
+    <div class="result-box prelim">
+      <div><div class="label">F — Montant disponible dans la caisse (A + B + part espèces)</div></div>
+      <div class="value">${ca_fmtMoney(ca_montantDisponible(ca_session))}</div>
+    </div>
+
+    <div class="ticket" style="margin-top:14px;">
+      <div class="step-label"><div class="step-badge">G</div><div class="step-title">Retraits de la caisse</div></div>
+      <div class="form-section">
+        <div class="section-label">Retrait par le Gérant</div>
+        ${ca_linesEditor(ca_session.retraitsGerant, 'retraitsGerant', 'Note (obligatoire)')}
+        <button class="btn small ghost" onclick="ca_addLine('retraitsGerant')">+ Ajouter un retrait gérant</button>
+        <div class="subtotal"><span>Total retraits gérant</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.retraitsGerant))}</span></div>
+      </div>
+      <div class="form-section">
+        <div class="section-label">Retrait pour divers paiements</div>
+        ${ca_linesEditor(ca_session.retraitsDivers, 'retraitsDivers', 'Motif (ex. achat, fournisseur…)')}
+        <button class="btn small ghost" onclick="ca_addLine('retraitsDivers')">+ Ajouter un retrait divers</button>
+        <div class="subtotal"><span>Total retraits divers</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.retraitsDivers))}</span></div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-muted);margin-top:4px;">Le gérant peut être sollicité plusieurs fois dans la journée — ajoute une ligne à chaque fois.</div>
+    </div>
+
+    <div class="result-box prelim">
+      <div><div class="label">Montant théorique de clôture (F − retraits)</div></div>
+      <div class="value">${ca_fmtMoney(ca_montantTheorique(ca_session))}</div>
+    </div>
+
+    <div class="ticket" style="margin-top:14px;">
+      <div class="step-label"><div class="step-badge">✓</div><div class="step-title">Validation (comptage du liquide)</div></div>
+      <div class="grid grid-2">
+        <div class="field"><label>Montant compté (comptage réel)</label><input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="compte-input" value="${ca_session.montantCompte}" oninput="ca_session.montantCompte=this.value;ca_render()" placeholder="Si vous comptez le liquide" /></div>
+        <div class="field"><label>Note (optionnel)</label><input type="text" id="note-validation-input" value="${esc(ca_session.noteValidation||'')}" oninput="ca_session.noteValidation=this.value" placeholder="Remarques" /></div>
+      </div>
+      ${ecart!==null ? `<div style="margin-top:10px;font-size:13px;font-weight:700;color:${Math.abs(ecart)<0.01?'var(--moss)':'var(--rust)'};">Écart : ${ecart>0?'+':''}${ca_fmtMoney(ecart)}</div>` : ''}
+    </div>
+
+    <div class="result-box final">
+      <div><div class="label">Montant retenu pour demain</div></div>
+      <div class="value">${ca_fmtMoney(ca_montantPourLendemain(ca_session))}</div>
+    </div>
+    `}
+
+    <div class="actions-row">
+      <button class="btn" onclick="ca_saveSession()">✓ Enregistrer la clôture du ${fmtDateShort(ca_session.date)}</button>
+      <button class="btn ghost" onclick="ca_loadSessionForDate(todayISO())">↺ Réinitialiser (aujourd'hui)</button>
+    </div>
+  `;
+}
+
+function ca_linesEditor(lines, key, placeholder){
+  if(!lines || lines.length===0){
+    return `<p style="font-size:12px;color:var(--ink-muted);margin:4px 0 10px;">Aucune ligne pour l'instant.</p>`;
+  }
+  return lines.map((l,i)=>`
+    <div class="line-row">
+      <input class="amount" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="amt-${l.id}" value="${l.montant}" placeholder="Montant" oninput="ca_updateLine('${key}','${l.id}','montant',this.value)" />
+      <input class="label-input" type="text" id="lbl-${l.id}" value="${esc(l.libelle||'')}" placeholder="${placeholder}" oninput="ca_updateLine('${key}','${l.id}','libelle',this.value)" />
+      <button class="x-btn" onclick="ca_removeLine('${key}','${l.id}')">✕</button>
+    </div>
+  `).join('');
+}
+function ca_addLine(key){
+  if(!Array.isArray(ca_session[key])) ca_session[key] = [];
+  ca_session[key].push({ id: uid(), montant: '', libelle: '' });
+  ca_render();
+}
+function ca_updateLine(key, id, field, value){
+  if(!Array.isArray(ca_session[key])) ca_session[key] = [];
+  const line = ca_session[key].find(l=>l.id===id);
+  if(line) line[field] = value;
+  ca_render();
+}
+function ca_removeLine(key, id){
+  if(!Array.isArray(ca_session[key])) ca_session[key] = [];
+  ca_session[key] = ca_session[key].filter(l=>l.id!==id);
+  ca_render();
+}
+
+function ca_renderHistoriqueTab(){
+  const dates = Object.keys(ca_allSessions).sort((a,b)=>a<b?1:-1);
+  if(dates.length===0){
+    return `<div class="empty-state">Aucune clôture enregistrée pour l'instant.</div>`;
+  }
+  return dates.map(date=>{
+    const s = ca_allSessions[date];
+    const theorique = ca_montantTheorique(s);
+    const ecart = ca_ecart(s);
+    return `<div class="hist-row" onclick="ca_setTab('caisse');ca_loadSessionForDate('${date}')">
+      <div>
+        <div class="d">${fmtDateShort(date)}</div>
+        <div class="s">Début : ${ca_fmtMoney(s.debutCaisse)} · ERP : ${ca_fmtMoney(s.totalVentesErp)} · Virement : ${ca_fmtMoney(ca_sumLines(s.virements))} · Attente : ${ca_fmtMoney(ca_sumLines(s.enAttente))} · Retraits : ${ca_fmtMoney(ca_totalRetraits(s))}${ecart!==null?` · Écart : ${ecart>0?'+':''}${ca_fmtMoney(ecart)}`:''}${s.enregistreParEn?' · par '+esc(s.enregistreParEn):''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="e">${ca_fmtMoney(theorique)}</div>
+        <button class="x-btn" style="background:none;border:none;color:var(--ink-muted);font-size:15px;" onclick="event.stopPropagation();ca_deleteSession('${date}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+ca_render();
+
+/* ==================== MODULE DÉPENSES (Gérant) ==================== */
+const dp_mouvCol = db.collection('depenses_mouvements');
+const dp_pointagesCol = db.collection('depenses_pointages');
+const dp_verificationsCol = db.collection('depenses_verifications');
+const dp_cloturesCol = db.collection('depenses_clotures');
+
+const EMPLOYES_PAR_SERVICE = {
+  'Cuisinier': ['Mejdoub','Ali','Kadi','Faiza','Nabil','Fatah'],
+  'Bar': ['Meriem','Marwa'],
+  'Service': ['Rahma','Hamid','Raouf'],
+  'Caisse': ['Racha','Hadil'],
+  'Ménage': ['Nacira','Fatima'],
+};
+const EMPLOYES_TOUS = Object.values(EMPLOYES_PAR_SERVICE).flat();
+
+const DP_TYPES = [
+  { id:'AppointCaisse', label:'Appoint caisse → gérant', shortLabel:'Appoint caisse', color:'var(--moss)', bg:'var(--moss-bg)', sign:+1 },
+  { id:'AppointDivers', label:'Appoint divers', shortLabel:'Appoint divers', color:'var(--cons)', bg:'var(--cons-bg)', sign:+1 },
+  { id:'AppointMoi', label:'Appoint moi → gérant', shortLabel:'Appoint moi', color:'var(--bar)', bg:'var(--bar-bg)', sign:+1 },
+  { id:'Recette', label:'Recette encaissée', shortLabel:'Recette', color:'var(--forest)', bg:'var(--moss-bg)', sign:+1 },
+  { id:'Charge', label:'Charge / Divers', shortLabel:'Charge', color:'var(--rust)', bg:'var(--rust-bg)', sign:-1 },
+  { id:'Achat', label:'Achat', shortLabel:'Achat', color:'var(--amber)', bg:'var(--amber-bg)', sign:-1 },
+  { id:'Retrait', label:'Retrait gérant → moi', shortLabel:'Retrait', color:'var(--wrap)', bg:'var(--wrap-bg)', sign:-1 },
+];
+// Types autorisés à la SAISIE d'un nouveau mouvement pour les utilisateurs non-admin.
+const DP_TYPES_NON_ADMIN = ['AppointCaisse', 'AppointDivers', 'Charge', 'Achat'];
+// "Retrait" n'est plus proposé à la création pour PERSONNE (admin compris) : à enregistrer
+// désormais comme une Charge avec un commentaire. On garde sa définition dans DP_TYPES
+// uniquement pour continuer à afficher correctement les mouvements "Retrait" déjà enregistrés.
+function dp_allowedTypes(){
+  const creatable = DP_TYPES.filter(t=>t.id!=='Retrait');
+  if(session && session.isAdmin) return creatable;
+  return creatable.filter(t=>DP_TYPES_NON_ADMIN.includes(t.id));
+}
+function dp_typeMeta(id){
+  if(id==='Appoint') id = 'AppointCaisse'; // compatibilité avec d'anciens mouvements déjà enregistrés
+  return DP_TYPES.find(t=>t.id===id) || DP_TYPES[0];
+}
+
+/* ---------------- Calcul de période (jour / semaine / mois / personnalisé) ---------------- */
+function dp_startOfWeek(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  const day = d.getDay();
+  const diff = (day===0?-6:1-day); // lundi = premier jour
+  d.setDate(d.getDate()+diff);
+  return toLocalISO(d);
+}
+function dp_endOfWeek(dateStr){
+  const d = new Date(dp_startOfWeek(dateStr)+'T00:00:00');
+  d.setDate(d.getDate()+6);
+  return toLocalISO(d);
+}
+function dp_startOfMonth(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  return toLocalISO(new Date(d.getFullYear(), d.getMonth(), 1));
+}
+function dp_endOfMonth(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  return toLocalISO(new Date(d.getFullYear(), d.getMonth()+1, 0));
+}
+function dp_getPeriodRange(){
+  if(dp_dashPeriod==='jour') return [dp_dashDate, dp_dashDate];
+  if(dp_dashPeriod==='semaine') return [dp_startOfWeek(dp_dashDate), dp_endOfWeek(dp_dashDate)];
+  if(dp_dashPeriod==='mois') return [dp_startOfMonth(dp_dashDate), dp_endOfMonth(dp_dashDate)];
+  return [dp_dashCustomStart||dp_dashDate, dp_dashCustomEnd||dp_dashDate];
+}
+function dp_periodLabel(){
+  const [start,end] = dp_getPeriodRange();
+  if(start===end) return fmtDateShort(start);
+  return `${fmtDateShort(start)} → ${fmtDateShort(end)}`;
+}
+
+let dp_mouvements = [];
+let dp_pointages = [];
+let dp_currentTab = 'mouvements';
+let dp_typeFilter = 'Tous';
+let dp_dateFilterStart = '';
+let dp_dateFilterEnd = '';
+let dp_searchTerm = '';
+let dp_showMouvForm = false;
+let dp_formType = 'Achat';
+let dp_showPointageForm = false;
+let dp_pointageChecks = {};
+let dp_workingDate = todayISO();
+let dp_draft = [];
+let dp_dashPeriod = 'jour';
+let dp_dashDate = todayISO();
+let dp_dashCustomStart = todayISO();
+let dp_dashCustomEnd = todayISO();
+let dp_achatCalcMode = 'prix';
+let dp_editingMouvId = null;
+let dp_editPrefill = null;
+let dp_avanceNomFilter = 'Tous';
+let dp_avanceDateStart = '';
+let dp_avanceDateEnd = '';
+let dp_clotures = [];
+let dp_clotureStart = '';
+let dp_clotureEnd = '';
+let dp_verifications = [];
+let dp_verificationResult = null;
+let dp_verificationBusy = false;
+
+dp_mouvCol.onSnapshot((snap)=>{
+  dp_mouvements = [];
+  snap.forEach(doc=>dp_mouvements.push({ id: doc.id, ...doc.data() }));
+  dp_verificationResult = null;
+  dp_render();
+}, (err)=>console.error(err));
+dp_pointagesCol.onSnapshot((snap)=>{
+  dp_pointages = [];
+  snap.forEach(doc=>dp_pointages.push({ id: doc.id, ...doc.data() }));
+  dp_render();
+}, (err)=>console.error(err));
+let dp_verificationsUnsub = null;
+function dp_startVerificationListener(){
+  if(dp_verificationsUnsub) return;
+  if(!(session && session.isAdmin)) return;
+  dp_verificationsUnsub = dp_verificationsCol.onSnapshot((snap)=>{
+    dp_verifications = [];
+    snap.forEach(doc=>dp_verifications.push({ id: doc.id, ...doc.data() }));
+    dp_render();
+  }, (err)=>console.error(err));
+}
+dp_cloturesCol.onSnapshot((snap)=>{
+  dp_clotures = [];
+  snap.forEach(doc=>dp_clotures.push({ id: doc.id, ...doc.data() }));
+  dp_render();
+}, (err)=>console.error(err));
+
+// Renvoie la clôture active couvrant une date donnée (mode simple : une seule date)
+// ou couvrant exactement une plage donnée (mode : deux dates, pour l'affichage du badge).
+function dp_closureFor(dateOrStart, end){
+  if(end===undefined){
+    return dp_clotures.find(c => c.statut==='clos' && dateOrStart>=c.dateDebut && dateOrStart<=c.dateFin) || null;
+  }
+  return dp_clotures.find(c => c.statut==='clos' && c.dateDebut===dateOrStart && c.dateFin===end) || null;
+}
+
+function dp_computeSolde(mouvements){
+  return mouvements.reduce((s,m)=> s + dp_typeMeta(m.type).sign * (Number(m.montant)||0), 0);
+}
+
+function dp_canSee(key){
+  if(session && session.isAdmin) return true;
+  return !!(session && session.permissions && session.permissions[key] !== false);
+}
+function dp_canVerify(){
+  if(session && session.isAdmin) return true;
+  return !!(session && session.permissions && session.permissions.verification !== false && session.permissions.depenses !== false);
+}
+function dp_canSeeVerificationHistory(){
+  return !!(session && session.isAdmin);
+}
+function dp_fmtDateTime(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? esc(iso) : d.toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'medium'});
+}
+async function dp_saveVerification(realAmount){
+  if(!dp_canVerify()) { alert('Vous n’avez pas l’autorisation de vérifier la caisse.'); return null; }
+  if(realAmount==null || !isFinite(realAmount)){ alert('Saisissez un solde réel valide.'); return null; }
+  const now = new Date().toISOString();
+  const soldeTheorique = dp_computeSolde(dp_mouvements);
+  const ecart = realAmount - soldeTheorique;
+  const docRef = dp_verificationsCol.doc();
+  const verification = {
+    id: docRef.id,
+    soldeReel: realAmount,
+    soldeTheorique: soldeTheorique,
+    ecart: ecart,
+    date: now.slice(0,10),
+    dateHeure: now,
+    verifiePar: currentUser,
+    creeLe: now
+  };
+  // Une nouvelle vérification utilise un nouvel ID Firestore : aucune vérification précédente n'est écrasée.
+  await docRef.set(verification);
+  return verification;
+}
+async function dp_verifierSolde(){
+  if(dp_verificationBusy) return;
+  const el = document.getElementById('dp-solde-reel-verification');
+  const raw = el ? el.value : '';
+  const real = raw==='' ? null : dp_parseNum(raw);
+  if(real==null || !isFinite(real)){ alert('Veuillez saisir le solde réel compté avant de cliquer sur Vérification.'); return; }
+  dp_verificationBusy = true;
+  try{
+    const v = await dp_saveVerification(real);
+    if(v) dp_verificationResult = v;
+    dp_render();
+  }catch(e){
+    console.error(e);
+    alert('Erreur lors de la vérification : '+e.message);
+  }finally{ dp_verificationBusy = false; }
+}
+function dp_renderVerificationBox(){
+  if(!dp_canVerify() || !dp_canSee('soldeReel')) return '';
+  const isAdmin = !!(session && session.isAdmin);
+  const v = dp_verificationResult;
+  const soldeTheorique = dp_computeSolde(dp_mouvements);
+  const helper = isAdmin
+    ? 'Vous pouvez consulter le solde théorique, saisir le solde réellement compté, puis lancer la vérification.'
+    : 'Saisissez le montant réellement compté, puis cliquez sur Vérification. Le solde théorique reste masqué.';
+  const theoreticalBox = isAdmin ? `<div class="result-box final" style="margin-top:10px;">
+      <div class="label">Solde théorique</div><div class="value">${dp_fmtMoney(soldeTheorique)}</div>
+    </div>` : '';
+  const displayedEcart = v && dp_canSee('ecart') ? `<div class="result-box ${Math.abs(Number(v.ecart))<0.01?'final':'prelim'}" style="margin:0;flex:1;min-width:220px;">
+      <div class="label">Écart constaté</div><div class="value">${v.ecart>0?'+':''}${dp_fmtMoney(v.ecart)}</div>
+    </div>` : '';
+  return `<div class="ticket" style="padding:16px;margin-bottom:14px;border-color:var(--forest);">
+    <div style="font-size:13px;font-weight:700;margin-bottom:5px;color:var(--forest);">🔎 Vérification du solde</div>
+    <div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:12px;">${helper}</div>
+    ${theoreticalBox}
+    <div class="field" style="margin-top:${isAdmin?'12px':'0'};"><label>Solde réel compté</label><input id="dp-solde-reel-verification" type="text" inputmode="decimal" placeholder="Ex. 25 000" value="${v ? esc(String(v.soldeReel)) : ''}" /></div>
+    <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap;">
+      <button class="btn" type="button" onclick="dp_verifierSolde()">✓ Vérification</button>
+      ${displayedEcart}
+    </div>
+    ${v && session && session.isAdmin ? `<div style="font-size:10.5px;color:var(--ink-muted);margin-top:8px;">Dernière vérification : ${dp_fmtDateTime(v.dateHeure)}${v.verifiePar?' · par '+esc(v.verifiePar):''}</div>` : ''}
+  </div>`;
+}
+function dp_renderVerificationHistory(){
+  if(!dp_canSeeVerificationHistory()) return '';
+  const rows = dp_verifications.slice().sort((a,b)=>(a.dateHeure||a.creeLe||'')<(b.dateHeure||b.creeLe||'')?1:-1).map(v=>`
+    <div class="ticket" style="padding:12px 14px;">
+      <div class="row-between">
+        <div>
+          <div style="font-size:13px;font-weight:700;">${dp_fmtDateTime(v.dateHeure||v.creeLe)}</div>
+          <div style="font-size:11.5px;color:var(--ink-muted);">${v.verifiePar?'Vérifié par '+esc(v.verifiePar):'Utilisateur non renseigné'}</div>
+        </div>
+        <span class="mono" style="font-weight:700;color:${Number(v.ecart)<0?'var(--rust)':'var(--moss)'};">${v.ecart>0?'+':''}${dp_fmtMoney(v.ecart)}</span>
+      </div>
+      <div class="grid grid-3" style="margin-top:10px;">
+        <div class="field"><label>Solde réel</label><div class="result-box final" style="margin:0;"><div class="value">${dp_fmtMoney(v.soldeReel)}</div></div></div>
+        <div class="field"><label>Solde théorique</label><div class="result-box final" style="margin:0;"><div class="value">${dp_fmtMoney(v.soldeTheorique)}</div></div></div>
+        <div class="field"><label>Écart</label><div class="result-box ${Math.abs(Number(v.ecart))<0.01?'final':'prelim'}" style="margin:0;"><div class="value">${v.ecart>0?'+':''}${dp_fmtMoney(v.ecart)}</div></div></div>
+      </div>
+    </div>`).join('');
+  return `<div class="ticket" style="border-color:var(--forest);background:var(--surface);">
+    <div style="font-size:13px;font-weight:700;color:var(--forest);">📋 Historique complet des vérifications</div>
+    <div style="font-size:11.5px;color:var(--ink-muted);margin-top:4px;">Chaque clic sur « Vérification » crée une nouvelle entrée. Les vérifications précédentes ne sont pas remplacées.</div>
+  </div>${rows || `<p style="font-size:12.5px;color:var(--ink-muted);">Aucune vérification enregistrée.</p>`}`;
+}
+
+async function dp_deleteMouvement(id){
+  const m = dp_mouvements.find(x=>x.id===id);
+  if(m){
+    const closure = dp_closureFor(m.date);
+    if(closure){ alert(`Cette période (${fmtDateShort(closure.dateDebut)} → ${fmtDateShort(closure.dateFin)}) est clôturée. Réouvrez-la dans l'onglet Clôtures pour modifier.`); return; }
+  }
+  if(!confirm('Supprimer ce mouvement ?')) return;
+  await dp_mouvCol.doc(id).delete();
+}
+async function dp_savePointage(p){
+  if(!currentUser){ askUserName(false); if(!currentUser) return; }
+  await dp_pointagesCol.doc(p.id).set(p);
+  // Marquer les mouvements cochés comme pointés
+  for(const mid of p.mouvementsValides){
+    const m = dp_mouvements.find(x=>x.id===mid);
+    if(m){
+      await dp_mouvCol.doc(mid).set({ ...m, pointe:true, pointeParEn: currentUser, pointeLe: new Date().toISOString() });
+    }
+  }
+}
+
+function dp_render(){
+  const active = document.activeElement;
+  const activeId = (active && active.id) ? active.id : null;
+  let selStart=null, selEnd=null;
+  if(active && typeof active.selectionStart === 'number'){ selStart = active.selectionStart; selEnd = active.selectionEnd; }
+
+  const isAdmin = session && session.isAdmin;
+  if(dp_currentTab==='tableau' || dp_currentTab==='pointage') dp_currentTab = 'mouvements';
+  if(dp_currentTab==='verification' && !dp_canVerify()) dp_currentTab = 'mouvements';
+  if(dp_currentTab==='historiqueVerification' && !dp_canSeeVerificationHistory()) dp_currentTab = 'mouvements';
+  if(!isAdmin && (dp_currentTab==='clotures' || dp_currentTab==='avances')) dp_currentTab = 'mouvements';
+
+  dp_renderTabs();
+  const main = document.getElementById('depenses-main');
+  if(dp_currentTab==='mouvements') main.innerHTML = dp_renderMouvementsTab();
+  else if(dp_currentTab==='verification') main.innerHTML = dp_renderVerificationBox();
+  else if(dp_currentTab==='historiqueVerification') main.innerHTML = dp_renderVerificationHistory();
+  else if(dp_currentTab==='avances') main.innerHTML = dp_renderAvancesTab();
+  else if(dp_currentTab==='clotures') main.innerHTML = dp_renderCloturesTab();
+  else main.innerHTML = dp_renderMouvementsTab();
+
+  if(activeId){
+    const el = document.getElementById(activeId);
+    if(el){ el.focus(); if(selStart!=null && el.setSelectionRange){ try{ el.setSelectionRange(selStart, selEnd); }catch(e){} } }
+  }
+}
+function dp_setTab(t){ dp_currentTab = t; dp_render(); }
+function dp_renderTabs(){
+  const isAdmin = session && session.isAdmin;
+  const tabs = isAdmin
+    ? [ {id:'mouvements', label:'Mouvements'}, {id:'verification', label:'🔎 Vérification'}, {id:'historiqueVerification', label:'📋 Historique'}, {id:'avances', label:'Avances salaire'}, {id:'clotures', label:'🔒 Clôtures'} ]
+    : [ {id:'mouvements', label:'Mouvements'}, {id:'verification', label:'🔎 Vérification'} ];
+  document.getElementById('depenses-tabs').innerHTML = tabs.map(t=>`
+    <button class="${dp_currentTab===t.id?'active':''}" onclick="dp_setTab('${t.id}')">${esc(t.label)}</button>
+  `).join('');
+}
+
+/* ---------------- Onglet Tableau de bord ---------------- */
+function dp_renderTableauTab(){
+  const [start, end] = dp_getPeriodRange();
+  const periodMouv = dp_mouvements.filter(m=>m.date>=start && m.date<=end);
+
+  const totalEntrees = periodMouv.filter(m=>dp_typeMeta(m.type).sign>0).reduce((s,m)=>s+(Number(m.montant)||0),0);
+  const totalSorties = periodMouv.filter(m=>dp_typeMeta(m.type).sign<0).reduce((s,m)=>s+(Number(m.montant)||0),0);
+  const net = totalEntrees - totalSorties;
+
+  const periodChips = `<div class="filter-row">
+    ${[['jour','Jour'],['semaine','Semaine'],['mois','Mois'],['perso','Personnalisé']].map(([id,label])=>
+      `<button class="filter-chip ${dp_dashPeriod===id?'active':''}" style="${dp_dashPeriod===id?'background:var(--forest);border-color:var(--forest);color:#fff;':''}" onclick="dp_dashPeriod='${id}';dp_render()">${label}</button>`
+    ).join('')}
+  </div>`;
+
+  const dateControls = dp_dashPeriod==='perso' ? `
+    <div class="grid grid-2" style="margin-top:8px;">
+      <div class="field"><label>Du</label><input type="date" id="dp-dash-start" value="${dp_dashCustomStart}" onchange="dp_dashCustomStart=this.value;dp_render()" /></div>
+      <div class="field"><label>Au</label><input type="date" id="dp-dash-end" value="${dp_dashCustomEnd}" onchange="dp_dashCustomEnd=this.value;dp_render()" /></div>
+    </div>
+  ` : `
+    <div class="field" style="margin-top:8px;"><label>Date de référence</label><input type="date" id="dp-dash-date" value="${dp_dashDate}" onchange="dp_dashDate=this.value;dp_render()" /></div>
+  `;
+
+  const periodBar = `<div class="ticket" style="padding:14px 16px;">
+    ${periodChips}
+    ${dateControls}
+    <div style="margin-top:10px;font-size:12.5px;color:var(--ink-muted);">Période affichée : <strong>${dp_periodLabel()}</strong> · ${periodMouv.length} mouvement(s)</div>
+  </div>`;
+
+  const summary = `<div class="grid grid-2" style="margin-bottom:12px;">
+    <div class="result-box final"><div class="label">Total entrées</div><div class="value">${dp_fmtMoney(totalEntrees)}</div></div>
+    <div class="result-box prelim" style="background:var(--rust-bg);"><div class="label" style="color:var(--rust);">Total dépenses</div><div class="value" style="color:var(--rust);">${dp_fmtMoney(totalSorties)}</div></div>
+  </div>
+  <div class="result-box ${net>=0?'final':'prelim'}" style="margin-bottom:14px;">
+    <div class="label">Solde net de la période</div>
+    <div class="value">${net>=0?'+':''}${dp_fmtMoney(net)}</div>
+  </div>`;
+
+  const byType = {};
+  periodMouv.forEach(m=>{ byType[m.type] = (byType[m.type]||0) + (Number(m.montant)||0); });
+  const typeBreakdown = DP_TYPES.filter(t=>byType[t.id]).map(t=>`
+    <div class="row-between" style="padding:6px 0;font-size:13px;">
+      <span><span class="chip" style="color:${t.color};background:${t.bg};margin-right:6px;">${esc(t.shortLabel)}</span></span>
+      <span class="mono" style="font-weight:600;">${dp_fmtMoney(byType[t.id])}</span>
+    </div>
+  `).join('');
+  const breakdownBox = `<div class="ticket" style="padding:14px 16px;">
+    <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);margin-bottom:6px;">Répartition par type</div>
+    ${typeBreakdown || '<p style="font-size:12.5px;color:var(--ink-muted);">Aucun mouvement sur cette période.</p>'}
+  </div>`;
+
+  const byDate = {};
+  periodMouv.forEach(m=>{
+    if(!byDate[m.date]) byDate[m.date] = {entrees:0, sorties:0};
+    if(dp_typeMeta(m.type).sign>0) byDate[m.date].entrees += (Number(m.montant)||0);
+    else byDate[m.date].sorties += (Number(m.montant)||0);
+  });
+  const dates = Object.keys(byDate).sort();
+  const dailyRows = dates.map(d=>`
+    <div class="movement-row">
+      <div style="font-weight:500;font-size:13px;">${fmtDateShort(d)}</div>
+      <div style="display:flex;gap:14px;">
+        <span class="mono" style="color:var(--moss);font-size:12.5px;">+${dp_fmtNum(byDate[d].entrees)}</span>
+        <span class="mono" style="color:var(--rust);font-size:12.5px;">−${dp_fmtNum(byDate[d].sorties)}</span>
+        <span class="mono" style="font-weight:700;font-size:12.5px;">${(byDate[d].entrees-byDate[d].sorties)>=0?'+':''}${dp_fmtNum(byDate[d].entrees-byDate[d].sorties)}</span>
+      </div>
+    </div>
+  `).join('');
+  const dailyBox = dates.length>1 ? `<h2 class="section">Détail par jour</h2>${dailyRows}` : '';
+
+  return periodBar + summary + breakdownBox + dailyBox;
+}
+
+function dp_exportMouvementsExcel(){
+  if(!(session && session.isAdmin)){ alert('Seule l’administratrice peut exporter les mouvements.'); return; }
+  if(typeof XLSX==='undefined'){ alert('Le module Excel n’est pas disponible. Vérifiez votre connexion puis réessayez.'); return; }
+
+  let rows = dp_mouvements.slice();
+  if(dp_dateFilterStart) rows = rows.filter(m=>m.date>=dp_dateFilterStart);
+  if(dp_dateFilterEnd) rows = rows.filter(m=>m.date<=dp_dateFilterEnd);
+  if(dp_typeFilter!=='Tous') rows = rows.filter(m => (dp_typeMeta(m.type).sign>0 ? 'in' : 'out') === dp_typeFilter);
+  if(dp_searchTerm.trim()){
+    const q=dp_searchTerm.trim().toLowerCase();
+    rows=rows.filter(m=>[m.libelle,m.articleNom,m.fournisseur,m.employeNom,m.creePar,m.modifiePar,m.type,m.unite].filter(Boolean).join(' ').toLowerCase().includes(q));
+  }
+  rows.sort((a,b)=> (a.date||'').localeCompare(b.date||'') || (a.creeLe||'').localeCompare(b.creeLe||''));
+
+  const exportRows = rows.map(m=>{
+    const sign = dp_typeMeta(m.type).sign;
+    const montant = Number(m.montant)||0;
+    return {
+      'Date': m.date || '',
+      'Type': m.type || '',
+      'Sens': sign>0 ? 'Entrée' : 'Sortie',
+      'Désignation / Motif': m.articleNom || m.libelle || '',
+      'Quantité': m.quantite ?? '',
+      'Unité': m.unite || '',
+      'Prix unitaire (DA)': (m.type==='Achat' && m.quantite) ? montant/Number(m.quantite) : '',
+      'Montant (DA)': montant,
+      'Fournisseur': m.fournisseur || '',
+      'Employé': m.employeNom || '',
+      'Avance salaire': m.estAvanceSalaire ? 'Oui' : 'Non',
+      'Saisi par': m.creePar || '',
+      'Date/heure saisie': m.creeLe || '',
+      'Modifié par': m.modifiePar || '',
+      'Date/heure modification': m.modifieLe || '',
+      'Pointé': m.pointe ? 'Oui' : 'Non',
+      'ID mouvement': m.id || ''
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(exportRows.length ? exportRows : [{ 'Information':'Aucun mouvement pour les critères sélectionnés.' }]);
+  ws['!cols']=[
+    {wch:12},{wch:14},{wch:10},{wch:30},{wch:12},{wch:10},{wch:18},{wch:16},{wch:24},{wch:22},{wch:16},{wch:18},{wch:24},{wch:18},{wch:26},{wch:10},{wch:30}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Mouvements');
+
+  const filters = [];
+  if(dp_dateFilterStart) filters.push('du_'+dp_dateFilterStart);
+  if(dp_dateFilterEnd) filters.push('au_'+dp_dateFilterEnd);
+  const suffix = filters.length ? '_'+filters.join('_') : '_tous';
+  XLSX.writeFile(wb, `mouvements_depenses${suffix}.xlsx`);
+}
+
+function dp_renderMouvementsTab(){
+  const isAdmin = session && session.isAdmin;
+  let filtered = dp_typeFilter==='Tous' ? dp_mouvements : dp_mouvements.filter(m=> (dp_typeMeta(m.type).sign>0 ? 'in' : 'out') === dp_typeFilter);
+  if(isAdmin && dp_dateFilterStart) filtered = filtered.filter(m=>m.date>=dp_dateFilterStart);
+  if(isAdmin && dp_dateFilterEnd) filtered = filtered.filter(m=>m.date<=dp_dateFilterEnd);
+  if(dp_searchTerm.trim()){
+    const q = dp_searchTerm.trim().toLowerCase();
+    filtered = filtered.filter(m=>{
+      const hay = [m.libelle, m.articleNom, m.fournisseur, m.employeNom, m.creePar, m.type].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  const sorted = filtered.slice().sort((a,b)=> a.date<b.date?1: a.date>b.date?-1: (a.creeLe<b.creeLe?1:-1));
+
+  // Le solde théorique tient compte UNIQUEMENT du filtre par date (indépendamment du type/recherche),
+  // conformément à la demande : seules les entrées/sorties des dates sélectionnées comptent.
+  // Réservé à l'admin (le filtre par date lui-même est admin-only).
+  let soldeBox = '';
+  if(isAdmin){
+    const hasDateFilterForSolde = !!(dp_dateFilterStart || dp_dateFilterEnd);
+    let mouvementsPourSolde = dp_mouvements;
+    if(dp_dateFilterStart) mouvementsPourSolde = mouvementsPourSolde.filter(m=>m.date>=dp_dateFilterStart);
+    if(dp_dateFilterEnd) mouvementsPourSolde = mouvementsPourSolde.filter(m=>m.date<=dp_dateFilterEnd);
+    const solde = dp_computeSolde(mouvementsPourSolde);
+    const closureForRange = (dp_dateFilterStart && dp_dateFilterEnd) ? dp_closureFor(dp_dateFilterStart, dp_dateFilterEnd) : null;
+    soldeBox = `<div class="result-box ${solde>=0?'final':'prelim'}" style="margin-bottom:14px;">
+      <div class="label">${hasDateFilterForSolde ? `Solde théorique — ${dp_dateFilterStart?fmtDateShort(dp_dateFilterStart):'…'} → ${dp_dateFilterEnd?fmtDateShort(dp_dateFilterEnd):'…'}` : 'Solde théorique enregistré'}</div>
+      <div class="value">${dp_fmtMoney(solde)}</div>
+      ${closureForRange ? `<div style="font-size:11px;color:var(--forest);margin-top:4px;">🔒 Période clôturée le ${fmtDateShort(closureForRange.clotureLe.slice(0,10))} par ${esc(closureForRange.clotureParEn)}</div>` : ''}
+    </div>`;
+  }
+
+  const addBar = !dp_showMouvForm ? `<button class="btn" style="width:100%;justify-content:center;padding:14px;font-size:15px;" onclick="dp_editingMouvId=null;dp_editPrefill=null;dp_showMouvForm=true;dp_render()">Ajouter</button>` : '';
+
+  const form = dp_showMouvForm ? dp_renderMouvForm() : '';
+
+  const draftBox = dp_draft.length>0 ? `
+    <div class="ticket" style="padding:14px 16px;border-color:var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:700;color:var(--amber);">📝 Brouillon du ${fmtDateShort(dp_workingDate)} — ${dp_draft.length} mouvement(s) non enregistré(s)</div>
+      </div>
+      ${dp_draft.map(m=>{
+        const meta = dp_typeMeta(m.type);
+        const detail = m.type==='Achat' ? `${esc(m.articleNom||'')} · ${dp_fmtNum(m.quantite)} ${esc(m.unite||'')}` : (esc(m.libelle||'') + (m.estAvanceSalaire?` · 👤 Avance : ${esc(m.employeNom)}`:''));
+        return `<div class="movement-row">
+          <div>
+            <div style="font-weight:500;"><span class="chip" style="color:${meta.color};background:${meta.bg};margin-right:5px;">${esc(m.type)}</span>${detail}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="mono" style="font-weight:600;color:${meta.color};">${meta.sign>0?'+':'−'}${dp_fmtMoney(m.montant)}</div>
+            <button class="x-btn" onclick="dp_removeFromDraft('${m.id}')">✕</button>
+          </div>
+        </div>`;
+      }).join('')}
+      <div style="font-size:12.5px;color:var(--ink-muted);margin:8px 0 10px;">Effet sur le solde : ${dp_computeSolde(dp_draft)>=0?'+':''}${dp_fmtMoney(dp_computeSolde(dp_draft))}</div>
+      <button class="btn" onclick="dp_saveDraftDay()">✓ Valider la journée (${dp_draft.length} mouvement(s))</button>
+    </div>
+  ` : '';
+
+  const hasDateFilter = dp_dateFilterStart || dp_dateFilterEnd;
+  let dateFilterSummary = '';
+  if(dp_dateFilterStart && dp_dateFilterEnd) dateFilterSummary = `du ${fmtDateShort(dp_dateFilterStart)} au ${fmtDateShort(dp_dateFilterEnd)}`;
+  else if(dp_dateFilterStart) dateFilterSummary = `à partir du ${fmtDateShort(dp_dateFilterStart)}`;
+  else if(dp_dateFilterEnd) dateFilterSummary = `jusqu'au ${fmtDateShort(dp_dateFilterEnd)}`;
+
+  const filterChips = `<h2 class="section">Mouvements déjà enregistrés</h2>
+    <div class="ticket" style="padding:10px 14px;margin-bottom:10px;">
+      <div class="search-wrap" style="${isAdmin?'margin-bottom:10px;':''}"><span class="icon">🔎</span><input type="text" id="dp-search" placeholder="Rechercher (motif, fournisseur, article, employé, saisi par…)" value="${esc(dp_searchTerm)}" oninput="dp_searchTerm=this.value;dp_render()" /></div>
+      ${isAdmin ? `<div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;">
+        <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Du</label><input type="date" id="dp-date-filter-start" value="${dp_dateFilterStart}" onchange="dp_dateFilterStart=this.value;dp_render()" /></div>
+        <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Au</label><input type="date" id="dp-date-filter-end" value="${dp_dateFilterEnd}" onchange="dp_dateFilterEnd=this.value;dp_render()" /></div>
+        <button class="btn small" style="white-space:nowrap;" onclick="dp_exportMouvementsExcel()">📊 Télécharger Excel</button>
+        ${(hasDateFilter||dp_searchTerm) ? `<button class="btn ghost small" onclick="dp_dateFilterStart='';dp_dateFilterEnd='';dp_searchTerm='';dp_render()">✕ Effacer</button>` : ''}
+      </div>` : ''}
+    </div>
+    ${((isAdmin&&hasDateFilter)||dp_searchTerm) ? `<div style="font-size:12px;color:var(--forest);margin-bottom:8px;">${isAdmin?dateFilterSummary:''}${isAdmin&&dateFilterSummary&&dp_searchTerm?' · ':''}${dp_searchTerm?`recherche « ${esc(dp_searchTerm)} »`:''} — ${sorted.length} mouvement(s)</div>` : ''}
+    <div class="filter-row">
+    <button class="filter-chip ${dp_typeFilter==='Tous'?'active':''}" style="${dp_typeFilter==='Tous'?'background:var(--forest);border-color:var(--forest);color:#fff;':''}" onclick="dp_typeFilter='Tous';dp_render()">Tous</button>
+    <button class="filter-chip ${dp_typeFilter==='in'?'active':''}" style="${dp_typeFilter==='in'?'background:var(--moss);border-color:var(--moss);color:#fff;':''}" onclick="dp_typeFilter='in';dp_render()">↓ Entrée</button>
+    <button class="filter-chip ${dp_typeFilter==='out'?'active':''}" style="${dp_typeFilter==='out'?'background:var(--rust);border-color:var(--rust);color:#fff;':''}" onclick="dp_typeFilter='out';dp_render()">↑ Sortie</button>
+  </div>`;
+
+  const list = sorted.length===0 ? `<p style="font-size:13px;color:var(--ink-muted);">Aucun mouvement.</p>` :
+    sorted.map(m=>{
+      const meta = dp_typeMeta(m.type);
+      const detail = m.type==='Achat' ? `${esc(m.articleNom||'')} · ${dp_fmtNum(m.quantite)} ${esc(m.unite||'')}` : (esc(m.libelle||'') + (m.estAvanceSalaire?` · 👤 Avance : ${esc(m.employeNom)}`:''));
+      return `<div class="movement-row">
+        <div>
+          <div style="font-weight:500;"><span class="chip" style="color:${meta.color};background:${meta.bg};margin-right:5px;">${esc(m.type)}</span>${detail}</div>
+          <div class="sub">${fmtDateShort(m.date)}${m.creePar?' · par '+esc(m.creePar):''}${m.modifiePar?' · modifié par '+esc(m.modifiePar):''}${m.pointe?' · ✓ pointé':''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="mono" style="font-weight:600;color:${meta.color};">${meta.sign>0?'+':'−'}${dp_fmtMoney(m.montant)}</div>
+          ${session && session.isAdmin ? `<button class="x-btn" style="color:var(--forest);font-size:13px;" onclick="dp_openEditMouv('${m.id}')">✏️</button>` : ''}
+          <button class="x-btn" onclick="dp_deleteMouvement('${m.id}')">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+
+  const verificationBox = dp_renderVerificationBox();
+  return soldeBox + verificationBox + addBar + form + draftBox + filterChips + list;
+}
+
+function dp_openEditMouv(id){
+  if(!(session && session.isAdmin)){ alert("Seule l'administratrice peut modifier un mouvement déjà enregistré."); return; }
+  const m = dp_mouvements.find(x=>x.id===id);
+  if(!m) return;
+  const closure = dp_closureFor(m.date);
+  if(closure){ alert(`Cette période (${fmtDateShort(closure.dateDebut)} → ${fmtDateShort(closure.dateFin)}) est clôturée. Réouvrez-la dans l'onglet Clôtures pour modifier.`); return; }
+  dp_editingMouvId = id;
+  dp_editPrefill = m;
+  dp_formType = m.type;
+  dp_workingDate = m.date;
+  if(m.type==='Achat') dp_achatCalcMode = 'montant';
+  dp_showMouvForm = true;
+  dp_render();
+  const el = document.getElementById('dp-form');
+  if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+}
+function dp_cancelEditMouv(){
+  dp_editingMouvId = null;
+  dp_editPrefill = null;
+  dp_showMouvForm = false;
+  dp_render();
+}
+
+function dp_renderMouvForm(){
+  if(!(session && session.isAdmin) && !DP_TYPES_NON_ADMIN.includes(dp_formType)) dp_formType = 'Achat';
+  const E = dp_editPrefill || {};
+  const isEditing = !!dp_editingMouvId;
+  const employeeSuggestions = EMPLOYES_TOUS.map(n=>`<option value="${esc(n)}">`).join('');
+  const direction = dp_typeMeta(dp_formType).sign > 0 ? 'in' : 'out';
+  const allowedTypes = dp_allowedTypes();
+  const typesIn = allowedTypes.filter(t=>t.sign>0);
+  const typesOut = allowedTypes.filter(t=>t.sign<0);
+  const isAdminForm = session && session.isAdmin;
+  const workingDateClosure = dp_closureFor(dp_workingDate);
+  return `
+    <div class="ticket" id="dp-form" style="padding:18px;${isEditing?'border-color:var(--forest);':''}">
+      ${isEditing ? `<div style="font-size:12.5px;font-weight:700;color:var(--forest);margin-bottom:10px;">✏️ Modification du mouvement du ${fmtDateShort(E.date)}</div>` : ''}
+      <div class="form-section">
+        <div class="section-label"><span class="num">1</span>Date</div>
+        <div class="field"><input type="date" id="dp-working-date" value="${dp_workingDate}" onchange="dp_workingDate=this.value;dp_render()" /></div>
+        ${workingDateClosure ? `<div style="margin-top:8px;font-size:12px;color:var(--rust);">🔒 Cette date fait partie d'une période clôturée (${fmtDateShort(workingDateClosure.dateDebut)} → ${fmtDateShort(workingDateClosure.dateFin)}). Réouvrez-la dans l'onglet Clôtures pour ajouter ou modifier un mouvement.</div>` : ''}
+      </div>
+      <div class="form-section">
+        <div class="section-label"><span class="num">2</span>Type de mouvement</div>
+        <div class="grid grid-2" style="gap:8px;margin-bottom:12px;">
+          <button type="button" onclick="dp_setDirection('in')" style="padding:14px;border-radius:8px;border:2px solid ${direction==='in'?'var(--moss)':'var(--line)'};background:${direction==='in'?'var(--moss-bg)':'var(--surface)'};text-align:left;cursor:pointer;">
+            <div style="font-weight:700;font-size:14px;color:${direction==='in'?'var(--moss)':'var(--ink)'};">↓ Entrée d'argent</div>
+            <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${isAdminForm?'Appoint, recette':'Prélèvement caisse'}</div>
+          </button>
+          <button type="button" onclick="dp_setDirection('out')" style="padding:14px;border-radius:8px;border:2px solid ${direction==='out'?'var(--rust)':'var(--line)'};background:${direction==='out'?'var(--rust-bg)':'var(--surface)'};text-align:left;cursor:pointer;">
+            <div style="font-weight:700;font-size:14px;color:${direction==='out'?'var(--rust)':'var(--ink)'};">↑ Sortie d'argent</div>
+            <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">Achat, charge</div>
+          </button>
+        </div>
+        ${(direction==='in'?typesIn:typesOut).length>1 ? `<div class="grid grid-2" style="gap:8px;">
+          ${(direction==='in'?typesIn:typesOut).map(t=>`<button type="button" onclick="dp_formType='${t.id}';dp_render()" style="padding:14px;border-radius:8px;border:2px solid ${dp_formType===t.id?t.color:'var(--line)'};background:${dp_formType===t.id?t.bg:'var(--surface)'};text-align:left;cursor:pointer;">
+            <div style="font-weight:700;font-size:14px;color:${dp_formType===t.id?t.color:'var(--ink)'};">${esc(t.label)}</div>
+          </button>`).join('')}
+        </div>` : ''}
+      </div>
+
+      ${dp_formType==='Achat' ? `
+        <div class="form-section">
+          <div class="section-label"><span class="num">3</span>Article et quantité</div>
+          <div class="grid grid-2">
+             <div class="field" style="grid-column:1/-1;"><label>Article / désignation</label>
+               <input type="text" id="dp-article" placeholder="Ex. Saumon, riz, emballages…" value="${esc(E.type==='Achat'?(E.articleNom||''):'')}" />
+             </div>
+            <div class="field"><label>Quantité</label><input type="text" inputmode="decimal" id="dp-qty" placeholder="0" value="${E.type==='Achat'&&E.quantite!=null?esc(String(E.quantite)):''}" oninput="dp_updateAchatCalc()" /></div>
+            <div class="field"><label>Mode de saisie</label>
+              <div class="filter-row" style="margin:0;">
+                <button type="button" class="filter-chip ${dp_achatCalcMode==='prix'?'active':''}" style="${dp_achatCalcMode==='prix'?'background:var(--amber);border-color:var(--amber);color:#fff;':''}" onclick="dp_achatCalcMode='prix';dp_render()">Prix unitaire</button>
+                <button type="button" class="filter-chip ${dp_achatCalcMode==='montant'?'active':''}" style="${dp_achatCalcMode==='montant'?'background:var(--amber);border-color:var(--amber);color:#fff;':''}" onclick="dp_achatCalcMode='montant';dp_render()">Montant total</button>
+              </div>
+            </div>
+            ${dp_achatCalcMode==='prix' ? `
+              <div class="field" style="grid-column:1/-1;"><label>Prix unitaire (DA)</label><input type="text" inputmode="decimal" id="dp-prix" placeholder="0" value="${(E.type==='Achat'&&E.quantite)?esc(String(E.montant/E.quantite)):''}" oninput="dp_updateAchatCalc()" /></div>
+            ` : `
+              <div class="field" style="grid-column:1/-1;"><label>Montant total (DA)</label><input type="text" inputmode="decimal" id="dp-montant-total" placeholder="0" value="${(E.type==='Achat'&&E.montant!=null)?esc(String(E.montant)):''}" oninput="dp_updateAchatCalc()" /></div>
+            `}
+            <div style="grid-column:1/-1;font-size:12.5px;color:var(--ink-muted);" id="dp-achat-calc-preview"></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="section-label"><span class="num">4</span>Compléments (optionnel)</div>
+          <div class="grid grid-2">
+            <div class="field"><label>Fournisseur</label><input type="text" id="dp-fourn" value="${esc(E.type==='Achat'?(E.fournisseur||''):'')}" /></div>
+             <div class="field"><label>Unité</label><input type="text" id="dp-unite" value="${esc(E.type==='Achat'?(E.unite||''):'')}" placeholder="kg, L, unité…" /></div>
+          </div>
+        </div>
+      ` : `
+        <div class="form-section">
+          <div class="section-label"><span class="num">3</span>Montant et détail</div>
+          <div class="grid grid-2">
+            <div class="field"><label>Montant (DA)</label><input type="text" inputmode="decimal" id="dp-montant" placeholder="0" value="${(E.type&&E.type!=='Achat'&&E.montant!=null)?esc(String(E.montant)):''}" /></div>
+            <div class="field"><label>${dp_formType==='Charge'?'Motif / catégorie':'Note (optionnel)'}</label>
+              <input type="text" id="dp-libelle" placeholder="${dp_formType==='Charge'?'Ex. Loyer, Carburant…':'Ex. Appoint du matin'}" value="${esc(E.type&&E.type!=='Achat'?(E.libelle||''):'')}" />
+            </div>
+          </div>
+        </div>
+        ${dp_formType==='Charge' ? `
+          <div class="form-section">
+            <div class="section-label"><span class="num">4</span>Options complémentaires</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="dp-isavance" style="width:auto;" ${E.estAvanceSalaire?'checked':''} onchange="document.getElementById('dp-avance-wrap').style.display=this.checked?'flex':'none'" />
+              <label style="text-transform:none;font-size:12.5px;font-weight:500;color:var(--ink);">Ceci est une avance / un acompte sur salaire</label>
+            </div>
+            <div id="dp-avance-wrap" class="field" style="display:${E.estAvanceSalaire?'flex':'none'};margin-top:10px;">
+              <label>Nom de l'employé</label>
+              <input type="text" id="dp-employe" list="dp-employe-list" placeholder="Prénom de l'employé" value="${esc(E.employeNom||'')}" />
+              <datalist id="dp-employe-list">${employeeSuggestions}</datalist>
+            </div>
+          </div>
+        ` : ''}
+      `}
+      <div style="display:flex;align-items:center;gap:12px;margin-top:14px;">
+        ${isEditing ? `
+          <button class="btn" onclick="dp_submitMouv()">✓ Enregistrer les modifications</button>
+          <button class="btn ghost" onclick="dp_cancelEditMouv()">Annuler la modification</button>
+        ` : `
+          <button onclick="dp_submitMouv()" title="Ajouter cette saisie et passer à la suivante" style="width:52px;height:52px;flex-shrink:0;border-radius:50%;border:none;background:var(--forest);color:#fff;font-size:26px;font-weight:700;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;">+</button>
+          <div style="font-size:11.5px;color:var(--ink-muted);flex:1;">Ajoutez cette saisie, puis enchaînez la suivante.</div>
+          <button class="btn ghost small" onclick="dp_showMouvForm=false;dp_render()">Fermer</button>
+        `}
+      </div>
+    </div>
+  `;
+}
+function dp_setDirection(dir){
+  const allowed = dp_allowedTypes();
+  const first = allowed.find(t => dir==='in' ? t.sign>0 : t.sign<0);
+  if(!first) return;
+  dp_formType = first.id;
+  dp_render();
+}
+function dp_updateAchatCalc(){
+  const qtyEl = document.getElementById('dp-qty');
+  const previewEl = document.getElementById('dp-achat-calc-preview');
+  if(!qtyEl || !previewEl) return;
+  const qty = dp_parseNum(qtyEl.value);
+  if(dp_achatCalcMode==='prix'){
+    const prixEl = document.getElementById('dp-prix');
+    const prix = prixEl ? dp_parseNum(prixEl.value) : 0;
+    previewEl.textContent = (qty && prix) ? `= ${dp_fmtMoney(qty*prix)} au total` : '';
+  } else {
+    const montantEl = document.getElementById('dp-montant-total');
+    const montant = montantEl ? dp_parseNum(montantEl.value) : 0;
+    previewEl.textContent = (qty && montant) ? `= ${dp_fmtMoney(montant/qty)} / unité` : '';
+  }
+}
+
+async function dp_submitMouv(){
+  if(!currentUser){ askUserName(false); if(!currentUser) return; }
+  if(dp_editingMouvId && !(session && session.isAdmin)){ alert("Seule l'administratrice peut modifier un mouvement déjà enregistré."); return; }
+  const date = dp_workingDate;
+  const closure = dp_closureFor(date);
+  if(closure){ alert(`La date sélectionnée (${fmtDateShort(date)}) fait partie d'une période clôturée (${fmtDateShort(closure.dateDebut)} → ${fmtDateShort(closure.dateFin)}). Réouvrez-la dans l'onglet Clôtures pour modifier.`); return; }
+  let mouv;
+  if(dp_formType==='Achat'){
+    const typed = document.getElementById('dp-article') ? document.getElementById('dp-article').value.trim() : '';
+    if(!typed){ alert('Merci de renseigner la désignation de l’achat.'); return; }
+    const qty = dp_parseNum(document.getElementById('dp-qty').value);
+    if(!qty){ alert('Merci de renseigner une quantité.'); return; }
+    let prix, montantTotal;
+    if(dp_achatCalcMode==='prix'){
+      prix = dp_parseNum(document.getElementById('dp-prix').value);
+      montantTotal = qty*prix;
+    } else {
+      montantTotal = dp_parseNum(document.getElementById('dp-montant-total').value);
+      prix = qty ? montantTotal/qty : 0;
+    }
+    if(!montantTotal){ alert('Merci de renseigner le montant de l’achat.'); return; }
+    const fournisseur = document.getElementById('dp-fourn').value;
+    const unite = document.getElementById('dp-unite').value.trim();
+
+    if(dp_editingMouvId){
+      const original = dp_mouvements.find(m=>m.id===dp_editingMouvId);
+      mouv = {
+        ...original, type:'Achat', date, montant: montantTotal,
+        articleNom: typed, quantite: qty, unite, fournisseur,
+        modifiePar: currentUser, modifieLe: new Date().toISOString(),
+      };
+      await dp_mouvCol.doc(dp_editingMouvId).set(mouv);
+    } else {
+      mouv = {
+        id: uid(), type:'Achat', date, montant: montantTotal,
+        articleNom: typed, quantite: qty, unite, fournisseur,
+        pointe:false, creePar: currentUser, creeLe: new Date().toISOString(),
+      };
+      dp_draft.push(mouv);
+    }
+  } else {
+    const montant = dp_parseNum(document.getElementById('dp-montant').value);
+    if(!montant){ alert('Merci de renseigner un montant.'); return; }
+    const isAvanceEl = document.getElementById('dp-isavance');
+    const estAvanceSalaire = dp_formType==='Charge' && isAvanceEl && isAvanceEl.checked;
+    const employeEl = document.getElementById('dp-employe');
+    const employeNom = estAvanceSalaire && employeEl ? employeEl.value.trim() : '';
+    if(estAvanceSalaire && !employeNom){ alert("Merci de renseigner le nom de l'employé pour cette avance."); return; }
+    const libelle = document.getElementById('dp-libelle').value;
+
+    if(dp_editingMouvId){
+      const original = dp_mouvements.find(m=>m.id===dp_editingMouvId);
+      mouv = {
+        ...original, type: dp_formType, date, montant, libelle,
+        estAvanceSalaire: !!estAvanceSalaire, employeNom,
+        modifiePar: currentUser, modifieLe: new Date().toISOString(),
+      };
+      await dp_mouvCol.doc(dp_editingMouvId).set(mouv);
+    } else {
+      mouv = {
+        id: uid(), type: dp_formType, date, montant, libelle,
+        estAvanceSalaire: !!estAvanceSalaire, employeNom,
+        pointe:false, creePar: currentUser, creeLe: new Date().toISOString(),
+      };
+      dp_draft.push(mouv);
+    }
+  }
+  if(dp_editingMouvId){
+    dp_editingMouvId = null;
+    dp_editPrefill = null;
+    dp_showMouvForm = false;
+  }
+  dp_render();
+}
+function dp_removeFromDraft(id){
+  dp_draft = dp_draft.filter(m=>m.id!==id);
+  dp_render();
+}
+async function dp_saveDraftDay(){
+  if(dp_draft.length===0) return;
+  if(!currentUser){ askUserName(false); if(!currentUser) return; }
+  const syncEl = document.getElementById('sync-label');
+  try{
+    if(syncEl) syncEl.textContent = 'Enregistrement…';
+    const batch = db.batch();
+    dp_draft.forEach(m=>{
+      batch.set(dp_mouvCol.doc(m.id), m);
+    });
+    await batch.commit();
+    const count = dp_draft.length;
+    dp_draft = [];
+    if(syncEl) syncEl.textContent = '✓ Synchronisé';
+    alert('Journée du '+fmtDateShort(dp_workingDate)+' enregistrée ('+count+' mouvement(s)).');
+    dp_render();
+  }catch(e){
+    console.warn(e);
+    alert("Erreur d'enregistrement : "+e.message);
+    if(syncEl) syncEl.textContent = '⚠ Échec de la sauvegarde';
+  }
+}
+
+/* ---------------- Onglet Pointage ---------------- */
+function dp_renderPointageTab(){
+  return dp_renderVerificationBox();
+}
+
+function dp_quickFollowup(type){
+  const soldeTheorique = dp_computeSolde(dp_mouvements);
+  const compteEl = document.getElementById('dp-compte');
+  const compteRaw = compteEl ? compteEl.value : '';
+  const compte = compteRaw==='' ? null : dp_parseNum(compteRaw);
+  const suggested = compte!=null ? Math.abs(compte - soldeTheorique) : null;
+  dp_showPointageForm = false; // on quitte le pointage en cours pour saisir le mouvement (à refaire ensuite si besoin)
+  dp_formType = type;
+  dp_showMouvForm = true;
+  dp_currentTab = 'mouvements';
+  dp_render();
+  if(suggested!=null){
+    const montantEl = document.getElementById('dp-montant');
+    if(montantEl) montantEl.value = suggested;
+  }
+}
+async function dp_submitPointage(){
+  // Compatibilité avec d'anciennes sessions : la nouvelle procédure utilise Vérification.
+  return dp_verifierSolde();
+}
+
+
+/* ---------------- Onglet Avances salaire ---------------- */
+function dp_renderAvancesTab(){
+  let avances = dp_mouvements.filter(m=>m.type==='Charge' && m.estAvanceSalaire).sort((a,b)=>a.date<b.date?1:-1);
+
+  const filterBar = `<div class="ticket" style="padding:12px 14px;margin-bottom:12px;">
+    <div class="field" style="margin-bottom:10px;"><label>Employé</label>
+      <select id="dp-avance-nom-filter" onchange="dp_avanceNomFilter=this.value;dp_render()">
+        <option value="Tous" ${dp_avanceNomFilter==='Tous'?'selected':''}>Tous les employés</option>
+        ${Object.keys(EMPLOYES_PAR_SERVICE).map(service=>`
+          <optgroup label="${esc(service)}">
+            ${EMPLOYES_PAR_SERVICE[service].map(nom=>`<option value="${esc(nom)}" ${dp_avanceNomFilter===nom?'selected':''}>${esc(nom)}</option>`).join('')}
+          </optgroup>
+        `).join('')}
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Du</label><input type="date" id="dp-avance-date-start" value="${dp_avanceDateStart}" onchange="dp_avanceDateStart=this.value;dp_render()" /></div>
+      <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Au</label><input type="date" id="dp-avance-date-end" value="${dp_avanceDateEnd}" onchange="dp_avanceDateEnd=this.value;dp_render()" /></div>
+      ${(dp_avanceNomFilter!=='Tous'||dp_avanceDateStart||dp_avanceDateEnd) ? `<button class="btn ghost small" onclick="dp_avanceNomFilter='Tous';dp_avanceDateStart='';dp_avanceDateEnd='';dp_render()">✕ Effacer</button>` : ''}
+    </div>
+  </div>`;
+
+  if(dp_avanceNomFilter!=='Tous') avances = avances.filter(a=>a.employeNom===dp_avanceNomFilter);
+  if(dp_avanceDateStart) avances = avances.filter(a=>a.date>=dp_avanceDateStart);
+  if(dp_avanceDateEnd) avances = avances.filter(a=>a.date<=dp_avanceDateEnd);
+
+  if(avances.length===0){
+    return filterBar + `<div class="empty-state">Aucune avance sur salaire ${(dp_avanceNomFilter!=='Tous'||dp_avanceDateStart||dp_avanceDateEnd)?'ne correspond à ces filtres':"enregistrée pour l'instant"}.<br/><span style="font-size:11.5px;">Coche "Ceci est une avance / un acompte sur salaire" en créant une Charge pour qu'elle apparaisse ici.</span></div>`;
+  }
+  const parEmploye = {};
+  avances.forEach(a=>{
+    const key = a.employeNom || '—';
+    parEmploye[key] = (parEmploye[key]||0) + (Number(a.montant)||0);
+  });
+  const totalGeneral = avances.reduce((s,a)=>s+(Number(a.montant)||0),0);
+
+  const summary = `<div class="ticket" style="padding:14px 16px;">
+    <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);margin-bottom:8px;">Total par employé</div>
+    ${Object.keys(parEmploye).sort().map(nom=>`
+      <div class="row-between" style="padding:4px 0;font-size:13px;">
+        <span>${esc(nom)}</span>
+        <span class="mono" style="font-weight:600;">${dp_fmtMoney(parEmploye[nom])}</span>
+      </div>
+    `).join('')}
+    <div class="row-between" style="padding:8px 0 0;margin-top:6px;border-top:1px solid var(--line);font-size:13px;font-weight:700;">
+      <span>Total ${(dp_avanceNomFilter!=='Tous'||dp_avanceDateStart||dp_avanceDateEnd)?'(filtré)':'général'}</span>
+      <span class="mono">${dp_fmtMoney(totalGeneral)}</span>
+    </div>
+  </div>`;
+
+  const list = avances.map(a=>`
+    <div class="movement-row">
+      <div>
+        <div style="font-weight:500;">${esc(a.employeNom)}</div>
+        <div class="sub">${fmtDateShort(a.date)}${a.libelle?' · '+esc(a.libelle):''}${a.creePar?' · saisi par '+esc(a.creePar):''}</div>
+      </div>
+      <div class="mono" style="font-weight:600;color:var(--rust);">${dp_fmtMoney(a.montant)}</div>
+    </div>
+  `).join('');
+
+  return filterBar + `<h2 class="section">Récapitulatif des avances sur salaire</h2>` + summary +
+    `<h2 class="section">Détail chronologique</h2>` + list;
+}
+
+/* ---------------- Petits utilitaires locaux ---------------- */
+function dp_fmtNum(n){ if(n===null||n===undefined||isNaN(n)) return '0'; return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2}); }
+function dp_fmtMoney(n){ return dp_fmtNum(n)+' DA'; }
+function dp_parseNum(v){ if(v===null||v===undefined||v==='') return 0; const n = Number(String(v).replace(',','.')); return isNaN(n)?0:n; }
+
+/* ---------------- Onglet Clôtures (admin uniquement) ---------------- */
+function dp_renderCloturesTab(){
+  const preview = (dp_clotureStart && dp_clotureEnd && dp_clotureStart<=dp_clotureEnd)
+    ? dp_computeSolde(dp_mouvements.filter(m=>m.date>=dp_clotureStart && m.date<=dp_clotureEnd))
+    : null;
+  const overlap = (dp_clotureStart && dp_clotureEnd) ? dp_clotures.find(c=>c.statut==='clos' && !(dp_clotureEnd<c.dateDebut || dp_clotureStart>c.dateFin)) : null;
+
+  const form = `<div class="ticket">
+    <div class="step-label"><div class="step-badge">🔒</div><div class="step-title">Clôturer une période</div></div>
+    <div style="font-size:12px;color:var(--ink-muted);margin-bottom:10px;">Une fois la vérification faite avec le gérant, clôturez la période pour verrouiller les mouvements correspondants (plus aucune saisie ni modification possible sans réouverture).</div>
+    <div class="grid grid-2">
+      <div class="field"><label>Du</label><input type="date" id="dp-clot-start" value="${dp_clotureStart}" onchange="dp_clotureStart=this.value;dp_render()" /></div>
+      <div class="field"><label>Au</label><input type="date" id="dp-clot-end" value="${dp_clotureEnd}" onchange="dp_clotureEnd=this.value;dp_render()" /></div>
+    </div>
+    ${preview!==null ? `<div class="result-box ${preview>=0?'final':'prelim'}" style="margin-top:12px;">
+      <div class="label">Solde théorique de la période</div>
+      <div class="value">${dp_fmtMoney(preview)}</div>
+    </div>` : ''}
+    ${overlap ? `<div style="margin-top:10px;font-size:12px;color:var(--rust);">⚠ Cette plage chevauche une période déjà clôturée (${fmtDateShort(overlap.dateDebut)} → ${fmtDateShort(overlap.dateFin)}). Réouvrez-la d'abord si besoin.</div>` : ''}
+    <button class="btn moss" style="margin-top:12px;" ${(!dp_clotureStart||!dp_clotureEnd||dp_clotureStart>dp_clotureEnd||overlap)?'disabled':''} onclick="dp_creerCloture()">🔒 Clôturer cette période</button>
+  </div>`;
+
+  const list = dp_clotures.slice().sort((a,b)=> a.dateDebut<b.dateDebut?1:-1).map(c=>{
+    const isClosed = c.statut==='clos';
+    return `<div class="ticket" style="${isClosed?'border-color:var(--forest);':'border-color:var(--amber);'}">
+      <div class="row-between">
+        <div>
+          <div style="font-weight:700;font-size:13.5px;">${fmtDateShort(c.dateDebut)} → ${fmtDateShort(c.dateFin)}</div>
+          <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">
+            ${isClosed ? `🔒 Clôturée par ${esc(c.clotureParEn)} le ${fmtDateShort(c.clotureLe.slice(0,10))}` : `🔓 Réouverte par ${esc(c.reouverteParEn||'')} le ${fmtDateShort((c.reouverteLe||'').slice(0,10))}`}
+          </div>
+        </div>
+        <div class="mono" style="font-weight:700;color:${isClosed?'var(--moss)':'var(--amber)'};">${dp_fmtMoney(c.soldeTheorique)}</div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        ${isClosed
+          ? `<button class="btn ghost small" onclick="dp_reouvrirCloture('${c.id}')">🔓 Réouvrir</button>`
+          : `<button class="btn moss small" onclick="dp_recloturer('${c.id}')">🔒 Reclôturer</button>`}
+      </div>
+    </div>`;
+  }).join('') || `<div class="empty-state">Aucune clôture enregistrée pour l'instant.</div>`;
+
+  return form + `<h2 class="section">Historique des clôtures</h2>` + list;
+}
+
+async function dp_creerCloture(){
+  if(!dp_clotureStart || !dp_clotureEnd || dp_clotureStart>dp_clotureEnd) return;
+  const overlap = dp_clotures.find(c=>c.statut==='clos' && !(dp_clotureEnd<c.dateDebut || dp_clotureStart>c.dateFin));
+  if(overlap){ alert('Cette plage chevauche une période déjà clôturée.'); return; }
+  const solde = dp_computeSolde(dp_mouvements.filter(m=>m.date>=dp_clotureStart && m.date<=dp_clotureEnd));
+  if(!confirm(`Clôturer la période du ${fmtDateShort(dp_clotureStart)} au ${fmtDateShort(dp_clotureEnd)} avec un solde théorique de ${dp_fmtMoney(solde)} ?\n\nLes mouvements de cette période ne pourront plus être ajoutés, modifiés ni supprimés tant que la clôture n'est pas réouverte.`)) return;
+  await dp_cloturesCol.doc(uid()).set({
+    dateDebut: dp_clotureStart, dateFin: dp_clotureEnd, soldeTheorique: solde,
+    statut: 'clos', clotureParEn: currentUser, clotureLe: new Date().toISOString(),
+  });
+  dp_clotureStart = ''; dp_clotureEnd = '';
+  dp_render();
+}
+async function dp_reouvrirCloture(id){
+  if(!confirm("Réouvrir cette période ? Les mouvements redeviendront modifiables jusqu'à une nouvelle clôture.")) return;
+  await dp_cloturesCol.doc(id).set({ statut:'reouvert', reouverteParEn: currentUser, reouverteLe: new Date().toISOString() }, { merge:true });
+}
+async function dp_recloturer(id){
+  const c = dp_clotures.find(x=>x.id===id);
+  if(!c) return;
+  const solde = dp_computeSolde(dp_mouvements.filter(m=>m.date>=c.dateDebut && m.date<=c.dateFin));
+  if(!confirm(`Reclôturer la période du ${fmtDateShort(c.dateDebut)} au ${fmtDateShort(c.dateFin)} avec un solde théorique de ${dp_fmtMoney(solde)} ?`)) return;
+  await dp_cloturesCol.doc(id).set({ statut:'clos', soldeTheorique: solde, clotureParEn: currentUser, clotureLe: new Date().toISOString() }, { merge:true });
+}
+
+dp_render();
+
+initAuth();
+</script>
+</body>
+</html>
