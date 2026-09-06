@@ -904,9 +904,9 @@ function ca_sectionSubtotal(key){
 }
 
 const CA_SORTIE_MOTIFS = [
-  {value:'virement', label:'Virement (client, société, livraison…)', calcType:'virement'},
-  {value:'nonregle', label:'Commande non réglée (invitation, différé…)', calcType:'nonregle'},
-  {value:'retrait', label:'Retrait de caisse (gérant, fournisseur…)', calcType:'retrait'}
+  {value:'virement', label:'Virement', calcType:'virement'},
+  {value:'nonregle', label:'Commande non réglée', calcType:'nonregle'},
+  {value:'retrait', label:'Retrait de caisse', calcType:'retrait'}
 ];
 function ca_sortieCalcType(motif){ const m = CA_SORTIE_MOTIFS.find(x=>x.value===motif); return m ? m.calcType : 'retrait'; }
 function ca_sumSortiesByType(sorties, calcType){ return (sorties||[]).filter(l=>ca_sortieCalcType(l.motif)===calcType).reduce((s,l)=>s+ca_parseNum(l.montant),0); }
@@ -1210,12 +1210,13 @@ function ca_sortiesEditor(sorties){
     return `<p style="font-size:12px;color:var(--ink-muted);margin:4px 0 10px;">Aucune sortie pour l'instant.</p>`;
   }
   return sorties.map(l=>`
-    <div class="line-row" style="align-items:flex-start;">
+    <div class="line-row" style="align-items:flex-start;flex-wrap:wrap;${l.motif==='retrait' ? 'grid-template-rows:auto auto;' : ''}">
       <input class="amount" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="${l.montant}" placeholder="Montant" oninput="ca_updateLine('sorties','${l.id}','montant',this.value)" />
       <select style="flex:1;min-width:0;" onchange="ca_updateLine('sorties','${l.id}','motif',this.value)">
         ${CA_SORTIE_MOTIFS.map(m=>`<option value="${m.value}" ${l.motif===m.value?'selected':''}>${esc(m.label)}</option>`).join('')}
       </select>
       <button class="x-btn" onclick="ca_removeLine('sorties','${l.id}')">✕</button>
+      ${l.motif==='retrait' ? `<input type="text" style="grid-column:1/3;flex-basis:100%;margin-top:6px;" value="${esc(l.note||'')}" placeholder="Note (ex. gérant, fournisseur…)" oninput="ca_updateLine('sorties','${l.id}','note',this.value)" />` : ''}
     </div>
   `).join('');
 }
