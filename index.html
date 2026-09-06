@@ -2218,6 +2218,7 @@ const ST_SECTIONS = [
   { key:'france',     label:'France Achat',    ic:'🇫🇷', desc:'Achats & envoi depuis la France' },
 ];
 let st_currentSection = null;
+function st_min2(a){ return (a && a.max1 ? a.max1 : 0) + 5; }
 const st_articlesCol = db.collection('stock_articles');
 let st_articles = [];
 st_articlesCol.onSnapshot((snap)=>{
@@ -2293,7 +2294,7 @@ function st_renderArticlesSection(){
         <label>Max Arrivage Maison</label>
         <input type="text" inputmode="decimal" id="st-art-max2" placeholder="0" />
       </div>
-      <div style="font-size:11px;color:var(--ink-muted);margin-bottom:12px;">Le Min de l'Arrivage Maison est calculé automatiquement (= Max Restaurant).</div>
+      <div style="font-size:11px;color:var(--ink-muted);margin-bottom:12px;">Le Min de l'Arrivage Maison est calculé automatiquement (= Max Restaurant + 5).</div>
       <div class="actions-row">
         <button class="btn" onclick="st_saveArticle()">${st_editingArticleId ? '✓ Enregistrer les modifications' : '+ Ajouter cet article'}</button>
         ${st_editingArticleId ? `<button class="btn ghost" onclick="st_cancelEditArticle()">Annuler</button>` : ''}
@@ -2306,7 +2307,7 @@ function st_renderArticlesSection(){
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
           <div>
             <div style="font-weight:700;font-size:14px;">${esc(a.nom)} <span style="font-weight:400;color:var(--ink-muted);font-size:12px;">(${esc(a.unite||'-')})</span></div>
-            <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Min R: ${a.min1||0} · Max R: ${a.max1||0} · Min AM: ${a.max1||0} (auto) · Max AM: ${a.max2||0}</div>
+            <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Min R: ${a.min1||0} · Max R: ${a.max1||0} · Min AM: ${st_min2(a)} (auto) · Max AM: ${a.max2||0}</div>
           </div>
           <div style="display:flex;gap:6px;flex-shrink:0;">
             <button class="btn small ghost" onclick="st_editArticle('${a.id}')">✎</button>
