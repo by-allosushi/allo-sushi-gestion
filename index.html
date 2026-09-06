@@ -1020,6 +1020,7 @@ function ca_render(){
   if(active && typeof active.selectionStart === 'number'){
     selStart = active.selectionStart; selEnd = active.selectionEnd;
   }
+  const scrollY = window.scrollY;
   ca_renderTabs();
   const main = document.getElementById('caisse-main');
   if(ca_currentTab==='caisse') main.innerHTML = ca_renderCaisseTab();
@@ -1033,6 +1034,7 @@ function ca_render(){
       }
     }
   }
+  window.scrollTo(0, scrollY);
 }
 function ca_setTab(t){ ca_currentTab = t; ca_render(); }
 
@@ -1160,7 +1162,9 @@ function ca_renderCaisseTab(){
     <div class="ticket">
       <div class="field">
         <label>Date de la caisse</label>
-        <input type="date" id="caisse-date-input" value="${ca_session.date}" onchange="ca_loadSessionForDate(this.value)" />
+        <div style="overflow:hidden;border-radius:8px;">
+          <input type="date" id="caisse-date-input" value="${ca_session.date}" onchange="ca_loadSessionForDate(this.value)" style="display:block;box-sizing:border-box;width:100%;" />
+        </div>
       </div>
       ${existing ? `<div style="margin-top:8px;font-size:11.5px;color:var(--amber);">⚠ Une clôture existe déjà pour cette date. L'enregistrer à nouveau la remplacera.</div>` : ''}
     </div>
