@@ -14,17 +14,17 @@
 <style>
 
   :root{
-    --paper:#F6F7F9; --surface:#FFFFFF; --ink:#16181D; --ink-muted:#6B7280; --line:#E5E7EB;
-    --forest:#4F46E5; --forest-light:#6366F1; --amber:#D97706; --amber-bg:#FFF7ED;
-    --rust:#DC2626; --rust-bg:#FEF2F2; --moss:#059669; --moss-bg:#ECFDF5;
-    --bar:#7C3AED; --bar-bg:#F5F3FF; --wrap:#78716C; --wrap-bg:#F5F5F4;
+    --paper:#0B0F0D; --surface:#151A17; --ink:#EAEDE9; --ink-muted:#8B958F; --line:#262E29;
+    --forest:#3B82F6; --forest-light:#60A5FA; --amber:#FBBF24; --amber-bg:#2A2410;
+    --rust:#F87171; --rust-bg:#2A0F13; --moss:#22C55E; --moss-bg:#0F2A1A;
+    --bar:#A78BFA; --bar-bg:#221B36; --wrap:#A8A29E; --wrap-bg:#242220;
     --cons:#0D9488; --cons-bg:#F0FDFA;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
   .mono{font-family:'IBM Plex Mono',monospace;}
   .display{font-family:'Manrope',sans-serif;}
-  header.top{background:var(--ink);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;}
+  header.top{background:#0B0F0D;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;}
   header.top .title{color:#FFFFFF;font-weight:700;font-size:17px;letter-spacing:-0.01em;font-family:'Manrope',sans-serif;}
   header.top .date{color:#9CA3AF;font-size:11px;margin-top:3px;}
   .alert-badge{background:var(--rust);color:#fff;border:none;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer;}
@@ -57,10 +57,10 @@
   .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
   .section-label .num{width:18px;height:18px;border-radius:4px;background:var(--forest);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;}
   .field label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);}
-  input, select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px;color:var(--ink);background:#fff;font-family:'IBM Plex Mono',monospace;width:100%;}
+  input, select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px;color:var(--ink);background:var(--surface);font-family:'IBM Plex Mono',monospace;width:100%;}
   input[type=text], input:not([type]) {font-family:'Inter',sans-serif;}
   .filter-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
-  .filter-chip{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:500;border:1px solid var(--line);background:#fff;color:var(--ink-muted);cursor:pointer;}
+  .filter-chip{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--ink-muted);cursor:pointer;}
   .filter-chip.active{background:var(--forest);border-color:var(--forest);color:#fff;}
   .top-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin-bottom:14px;}
   .search-wrap{position:relative;flex:1;min-width:150px;}
@@ -77,7 +77,7 @@
   .article-stock .val{font-size:17px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
   .article-stock .money{font-size:11px;color:var(--ink-muted);}
   .row-between{display:flex;justify-content:space-between;align-items:center;}
-  .movement-row{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;background:#fff;border:1px solid var(--line);border-radius:8px;font-size:12px;margin-bottom:6px;}
+  .movement-row{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;background:var(--surface);border:1px solid var(--line);border-radius:8px;font-size:12px;margin-bottom:6px;}
   .movement-row .sub{color:var(--ink-muted);font-family:'IBM Plex Mono',monospace;font-size:11.5px;margin-top:2px;}
   .x-btn{background:none;border:none;color:var(--ink-muted);cursor:pointer;font-size:15px;padding:2px 6px;}
   .empty-state{text-align:center;padding:44px 20px;}
@@ -86,15 +86,15 @@
 
 
   :root{
-    --paper:#F6F7F9; --surface:#FFFFFF; --ink:#16181D; --ink-muted:#6B7280; --line:#E5E7EB;
-    --forest:#4F46E5; --forest-light:#6366F1; --amber:#D97706; --amber-bg:#FFF7ED;
-    --rust:#DC2626; --rust-bg:#FEF2F2; --moss:#059669; --moss-bg:#ECFDF5;
+    --paper:#0B0F0D; --surface:#151A17; --ink:#EAEDE9; --ink-muted:#8B958F; --line:#262E29;
+    --forest:#3B82F6; --forest-light:#60A5FA; --amber:#FBBF24; --amber-bg:#2A2410;
+    --rust:#F87171; --rust-bg:#2A0F13; --moss:#22C55E; --moss-bg:#0F2A1A;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
   .mono{font-family:'IBM Plex Mono',monospace;}
   .display{font-family:'Manrope',sans-serif;}
-  header.top{background:var(--ink);padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;}
+  header.top{background:#0B0F0D;padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;}
   header.top .title{color:#FFFFFF;font-weight:700;font-size:17px;letter-spacing:-0.01em;font-family:'Manrope',sans-serif;}
   header.top .date{color:#9CA3AF;font-size:11px;margin-top:3px;}
   nav.tabs{background:var(--surface);border-bottom:1px solid var(--line);display:flex;overflow-x:auto;position:sticky;top:0;z-index:5;}
@@ -107,14 +107,14 @@
   .step-title{font-size:14px;font-weight:600;}
   .field{display:flex;flex-direction:column;gap:4px;font-size:13px;}
   .field label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);}
-  input, select{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:15px;color:var(--ink);background:#fff;font-family:'IBM Plex Mono',monospace;width:100%;}
+  input, select{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:15px;color:var(--ink);background:var(--surface);font-family:'IBM Plex Mono',monospace;width:100%;}
   input[type=text]{font-family:'Inter',sans-serif;}
   .btn{display:inline-flex;align-items:center;gap:6px;border-radius:6px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid var(--forest);background:var(--forest);color:#fff;font-family:'Inter',sans-serif;transition:opacity 0.15s;}
   .btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--line);}
   .btn.rust{background:var(--rust);border-color:var(--rust);}
   .btn.small{padding:6px 10px;font-size:12px;}
   .line-row{display:flex;gap:8px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;}
-  .line-row input{background:#fff;}
+  .line-row input{background:var(--surface);}
   .line-row .amount{width:110px;flex-shrink:0;}
   .line-row .label-input{flex:1;}
   .line-row .x-btn{background:none;border:none;color:var(--ink-muted);cursor:pointer;font-size:16px;padding:2px 4px;flex-shrink:0;}
@@ -127,7 +127,7 @@
   .result-box.prelim .value{color:var(--amber);}
   .result-box.final .value{color:var(--moss);}
   .user-chip{background:rgba(255,255,255,0.12);border:none;color:#F1F3EC;font-size:11px;padding:5px 10px;border-radius:999px;cursor:pointer;font-family:'IBM Plex Mono',monospace;}
-  .hist-row{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;cursor:pointer;}
+  .hist-row{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:9px;margin-bottom:8px;cursor:pointer;}
   .hist-row .d{font-size:13.5px;font-weight:600;}
   .hist-row .s{font-size:11px;color:var(--ink-muted);margin-top:2px;}
   .hist-row .e{font-size:15px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--moss);}
@@ -137,16 +137,16 @@
 
 
   :root{
-    --paper:#F6F7F9; --surface:#FFFFFF; --ink:#16181D; --ink-muted:#6B7280; --line:#E5E7EB;
-    --forest:#4F46E5; --forest-light:#6366F1; --amber:#D97706; --amber-bg:#FFF7ED;
-    --rust:#DC2626; --rust-bg:#FEF2F2; --moss:#059669; --moss-bg:#ECFDF5;
-    --bar:#7C3AED; --bar-bg:#F5F3FF; --service:#0D9488; --service-bg:#F0FDFA;
+    --paper:#0B0F0D; --surface:#151A17; --ink:#EAEDE9; --ink-muted:#8B958F; --line:#262E29;
+    --forest:#3B82F6; --forest-light:#60A5FA; --amber:#FBBF24; --amber-bg:#2A2410;
+    --rust:#F87171; --rust-bg:#2A0F13; --moss:#22C55E; --moss-bg:#0F2A1A;
+    --bar:#A78BFA; --bar-bg:#221B36; --service:#2DD4BF; --service-bg:#0F2A28;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
   .mono{font-family:'IBM Plex Mono',monospace;}
   .display{font-family:'Manrope',sans-serif;}
-  header.top{background:var(--ink);padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;}
+  header.top{background:#0B0F0D;padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;}
   header.top .title{color:#FFFFFF;font-weight:700;font-size:17px;letter-spacing:-0.01em;font-family:'Manrope',sans-serif;}
   header.top .date{color:#9CA3AF;font-size:11px;margin-top:3px;}
   nav.tabs{background:var(--surface);border-bottom:1px solid var(--line);display:flex;overflow-x:auto;position:sticky;top:0;z-index:5;}
@@ -157,14 +157,14 @@
   .ticket{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,0.04);padding:14px;margin-bottom:12px;}
   .field{display:flex;flex-direction:column;gap:4px;font-size:13px;}
   .field label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);}
-  input, select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px;color:var(--ink);background:#fff;font-family:'IBM Plex Mono',monospace;width:100%;}
+  input, select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px;color:var(--ink);background:var(--surface);font-family:'IBM Plex Mono',monospace;width:100%;}
   input[type=text]{font-family:'Inter',sans-serif;}
   .btn{display:inline-flex;align-items:center;gap:6px;border-radius:6px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid var(--forest);background:var(--forest);color:#fff;font-family:'Inter',sans-serif;transition:opacity 0.15s;}
   .btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--line);}
   .btn.small{padding:6px 10px;font-size:12px;}
   .chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:500;}
   .filter-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
-  .filter-chip{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:500;border:1px solid var(--line);background:#fff;color:var(--ink-muted);cursor:pointer;}
+  .filter-chip{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--ink-muted);cursor:pointer;}
   .filter-chip.active{color:#fff;}
   .grid{display:grid;gap:10px;}
   .grid-2{grid-template-columns:repeat(2,1fr);}
@@ -175,7 +175,7 @@
   .x-btn{background:none;border:none;color:var(--ink-muted);cursor:pointer;font-size:15px;padding:2px 6px;flex-shrink:0;}
   .alert-banner{background:var(--rust-bg);border:1px solid var(--rust);border-radius:9px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:var(--rust);}
   .alert-banner b{display:block;font-size:12.5px;margin-bottom:4px;}
-  .hist-row{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;cursor:pointer;}
+  .hist-row{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:9px;margin-bottom:8px;cursor:pointer;}
   .hist-row .d{font-size:13.5px;font-weight:600;}
   .hist-row .s{font-size:11px;color:var(--ink-muted);margin-top:2px;}
   .empty-state{text-align:center;padding:40px 20px;color:var(--ink-muted);font-size:13px;}
@@ -245,6 +245,7 @@
 
   header.top{
     padding:12px 14px;
+    padding-top:max(12px, env(safe-area-inset-top));
     gap:10px;
     min-height:68px;
     align-items:center;
@@ -879,7 +880,25 @@ let ca_currentTab = 'caisse';
 let ca_workingDate = todayISO();
 let ca_session = ca_blankSession(ca_workingDate);
 let ca_detailOpen = true;
+let ca_openSections = ['entrant'];
+const CA_SECTIONS = [
+  {key:'entrant', title:'Fonds de caisse', icon:'💵'},
+  {key:'horscaisse', title:'Sorties de caisse', subtitle:'Virements, non réglé, retraits', icon:'↗'},
+  {key:'erp', title:'Total des ventes (ERP)', icon:'🧾'},
+  {key:'validation', title:'Comptage & validation', icon:'✓'}
+];
 function ca_toggleDetail(){ ca_detailOpen = !ca_detailOpen; ca_render(); }
+function ca_toggleSection(key){
+  const i = ca_openSections.indexOf(key);
+  if(i>-1) ca_openSections.splice(i,1); else ca_openSections.push(key);
+  ca_render();
+}
+function ca_sectionSubtotal(key){
+  if(key==='entrant') return ca_parseNum(ca_session.debutCaisse)+ca_totalEntreesDiverses(ca_session);
+  if(key==='horscaisse') return ca_sumLines(ca_session.virements)+ca_sumLines(ca_session.enAttente)+ca_sumLines(ca_session.retraitsGerant)+ca_sumLines(ca_session.retraitsDivers);
+  if(key==='erp') return ca_parseNum(ca_session.totalVentesErp);
+  return null;
+}
 
 /* ---------------- Calculs ---------------- */
 function ca_sumLines(lines){ return (lines||[]).reduce((s,l)=>s+ca_parseNum(l.montant),0); }
@@ -1008,20 +1027,21 @@ function ca_renderStatusBanner(existing, ecart){
   const compte = ca_session.montantCompte !== '' && ca_session.montantCompte !== undefined && ca_session.montantCompte !== null;
   let statusColor = 'var(--ink-muted)', statusBg = 'var(--paper)', statusText = '⏳ Comptage non renseigné', statusIcon = '⏳';
   if(compte){
-    if(ecart !== null && Math.abs(ecart) < 0.01){ statusColor='var(--moss)'; statusBg='var(--moss-bg)'; statusText='Caisse correcte — aucun écart'; statusIcon='✅'; }
-    else { statusColor='var(--rust)'; statusBg='var(--rust-bg)'; statusText='Écart détecté — à vérifier avec le caissier'; statusIcon='⚠️'; }
+    if(ecart !== null && Math.abs(ecart) < 0.01){ statusColor='#22C55E'; statusBg='#0F2A1A'; statusText='Caisse correcte — aucun écart'; statusIcon='✓'; }
+    else { statusColor='#F87171'; statusBg='#2A0F13'; statusText='Écart détecté — à vérifier avec le caissier'; statusIcon='⚠'; }
   }
+  const mutedColor = compte ? 'rgba(255,255,255,0.55)' : 'var(--ink-muted)';
   return `
     <div class="ticket" style="background:${statusBg};border:1.5px solid ${statusColor};">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:22px;">${statusIcon}</span>
+          <span style="font-size:20px;color:${statusColor};font-weight:700;">${statusIcon}</span>
           <div>
             <div style="font-weight:700;font-size:14px;color:${statusColor};">${statusText}</div>
-            <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort(ca_session.date)}${existing && existing.enregistreParEn ? ' · enregistrée par '+esc(existing.enregistreParEn) : ''}</div>
+            <div style="font-size:11.5px;color:${mutedColor};margin-top:2px;">${fmtDateShort(ca_session.date)}${existing && existing.enregistreParEn ? ' · enregistrée par '+esc(existing.enregistreParEn) : ''}</div>
           </div>
         </div>
-        ${compte && ecart!==null ? `<div style="text-align:right;"><div style="font-size:11px;color:var(--ink-muted);">Écart</div><div style="font-weight:800;font-size:18px;color:${statusColor};">${ecart>0?'+':''}${ca_fmtMoney(ecart)}</div></div>` : ''}
+        ${compte && ecart!==null ? `<div style="text-align:right;"><div style="font-size:11px;color:${mutedColor};">Écart</div><div style="font-weight:800;font-size:18px;color:${statusColor};">${ecart>0?'+':''}${ca_fmtMoney(ecart)}</div></div>` : ''}
       </div>
       <div class="grid grid-2" style="margin-top:14px;gap:10px;">
         <div class="stat-box"><div class="stat-label">Montant théorique</div><div style="font-weight:700;font-size:15px;">${ca_fmtMoney(ca_montantTheorique(ca_session))}</div></div>
@@ -1029,9 +1049,114 @@ function ca_renderStatusBanner(existing, ecart){
         <div class="stat-box"><div class="stat-label">Total ventes ERP</div><div style="font-weight:700;font-size:15px;">${ca_fmtMoney(ca_session.totalVentesErp)}</div></div>
         <div class="stat-box"><div class="stat-label">Retenu pour demain</div><div style="font-weight:700;font-size:15px;">${ca_fmtMoney(ca_montantPourLendemain(ca_session))}</div></div>
       </div>
-      <button class="btn small ghost" style="margin-top:12px;" onclick="ca_toggleDetail()">${ca_detailOpen ? '▲ Masquer le détail de la saisie' : '▼ Voir le détail de la saisie'}</button>
+      <button class="btn small ghost" style="margin-top:12px;${compte ? 'background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.25);color:#fff;' : ''}" onclick="ca_toggleDetail()">${ca_detailOpen ? '▲ Masquer le détail de la saisie' : '▼ Voir le détail de la saisie'}</button>
     </div>
   `;
+}
+
+function ca_renderStepDots(){
+  return `
+    <div style="display:flex;align-items:center;gap:4px;margin:14px 0;overflow-x:auto;padding-bottom:4px;">
+      ${CA_STEPS.map((s,i)=>`
+        <button onclick="ca_wizardGoTo(${i})" title="${esc(s.title)}" style="flex-shrink:0;width:${i===ca_wizardStep?'28px':'22px'};height:22px;border-radius:11px;border:1.5px solid ${i===ca_wizardStep?'var(--forest)':'var(--line)'};background:${i<ca_wizardStep?'var(--forest)':(i===ca_wizardStep?'var(--forest)':'var(--surface)')};color:${i<=ca_wizardStep?'#fff':'var(--ink-muted)'};font-size:10.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;">${i<ca_wizardStep?'✓':s.badge}</button>
+      `).join('')}
+    </div>
+    <div style="font-size:12px;color:var(--ink-muted);margin-bottom:10px;">Étape ${ca_wizardStep+1} / ${CA_STEPS.length} — ${esc(CA_STEPS[ca_wizardStep].title)}</div>
+  `;
+}
+
+function ca_renderSectionBody(key, ecart){
+  if(key==='entrant') return `
+    <div class="field">
+      <label>Début de caisse — Montant (DA)</label>
+      <input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="debut-input" value="${ca_session.debutCaisse}" oninput="ca_session.debutCaisse=this.value;ca_session.debutCaisseAuto=false;ca_session.debutCaisseManuel=true;ca_render()" placeholder="0" />
+    </div>
+    ${ca_session.debutCaisseAuto ? `<div style="margin-top:8px;font-size:11.5px;color:var(--moss);">↺ Repris automatiquement de la clôture d'hier. Modifiable si besoin.</div>` : ''}
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);">
+      <div class="section-label">Entrées de caisse (divers)</div>
+      <div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:8px;">Ex. monnaie apportée, vente d'huile… — tout ajout d'espèces hors ventes ERP.</div>
+      ${ca_linesEditor(ca_session.entrees, 'entrees', 'Description (ex. monnaie, vente huile…)')}
+      <button class="btn small ghost" onclick="ca_addLine('entrees')">+ Ajouter une entrée</button>
+      <div class="subtotal"><span>Total entrées diverses</span><span class="mono">${ca_fmtMoney(ca_totalEntreesDiverses(ca_session))}</span></div>
+    </div>`;
+
+  if(key==='horscaisse') return `
+    <div class="section-label">Ventes payées par virement</div>
+    ${ca_linesEditor(ca_session.virements, 'virements', 'Note (ex. client, référence)')}
+    <button class="btn small ghost" onclick="ca_addLine('virements')">+ Ajouter un virement</button>
+    <div class="subtotal"><span>Total virements</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.virements))}</span></div>
+    <div style="margin-top:8px;margin-bottom:16px;padding:8px 10px;background:var(--rust-bg);border-radius:6px;font-size:11.5px;color:var(--rust);font-weight:600;">⚠ Ces ventes devront être validées dans l'ERP.</div>
+
+    <div class="section-label" style="padding-top:14px;border-top:1px solid var(--line);">Commandes non réglées (validées dans l'ERP, non payées)</div>
+    ${ca_linesEditor(ca_session.enAttente, 'enAttente', 'Note (ex. client, raison)')}
+    <button class="btn small ghost" onclick="ca_addLine('enAttente')">+ Ajouter une commande non réglée</button>
+    <div class="subtotal"><span>Total non réglé</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.enAttente))}</span></div>
+
+    <div class="section-label" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);">Retraits de la caisse</div>
+    <div class="form-section">
+      <div class="section-label">Retrait par le Gérant</div>
+      ${ca_linesEditor(ca_session.retraitsGerant, 'retraitsGerant', 'Note (obligatoire)')}
+      <button class="btn small ghost" onclick="ca_addLine('retraitsGerant')">+ Ajouter un retrait gérant</button>
+      <div class="subtotal"><span>Total retraits gérant</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.retraitsGerant))}</span></div>
+    </div>
+    <div class="form-section">
+      <div class="section-label">Retrait pour divers paiements</div>
+      ${ca_linesEditor(ca_session.retraitsDivers, 'retraitsDivers', 'Motif (ex. achat, fournisseur…)')}
+      <button class="btn small ghost" onclick="ca_addLine('retraitsDivers')">+ Ajouter un retrait divers</button>
+      <div class="subtotal"><span>Total retraits divers</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.retraitsDivers))}</span></div>
+    </div>
+    <div style="font-size:11px;color:var(--ink-muted);margin-top:4px;">Le gérant peut être sollicité plusieurs fois dans la journée — ajoute une ligne à chaque fois.</div>`;
+
+  if(key==='erp') return `
+    <div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:8px;">Toutes les commandes, tous modes de paiement confondus (le chiffre affiché par l'ERP).</div>
+    <div class="field"><input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="erp-input" value="${ca_session.totalVentesErp}" oninput="ca_session.totalVentesErp=this.value;ca_render()" placeholder="0" /></div>`;
+
+  // validation
+  return `
+    <div class="ticket" style="background:var(--paper);margin-bottom:10px;">
+      <div class="subtotal"><span>Part espèces des ventes ERP (C − D − E)</span><span class="mono" style="font-weight:700;">${ca_fmtMoney(ca_partEspecesErp(ca_session))}</span></div>
+    </div>
+    <div class="result-box prelim">
+      <div><div class="label">Montant disponible dans la caisse</div></div>
+      <div class="value">${ca_fmtMoney(ca_montantDisponible(ca_session))}</div>
+    </div>
+    <div class="result-box prelim">
+      <div><div class="label">Montant théorique de clôture</div></div>
+      <div class="value">${ca_fmtMoney(ca_montantTheorique(ca_session))}</div>
+    </div>
+    <div class="grid grid-2" style="margin-top:14px;">
+      <div class="field"><label>Montant compté (comptage réel)</label><input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="compte-input" value="${ca_session.montantCompte}" oninput="ca_session.montantCompte=this.value;ca_render()" placeholder="Si vous comptez le liquide" /></div>
+      <div class="field"><label>Note (optionnel)</label><input type="text" id="note-validation-input" value="${esc(ca_session.noteValidation||'')}" oninput="ca_session.noteValidation=this.value" placeholder="Remarques" /></div>
+    </div>
+    ${ecart!==null ? `<div style="margin-top:10px;font-size:13px;font-weight:700;color:${Math.abs(ecart)<0.01?'var(--moss)':'var(--rust)'};">Écart : ${ecart>0?'+':''}${ca_fmtMoney(ecart)}</div>` : ''}
+    <div class="result-box final" style="margin-top:14px;">
+      <div><div class="label">Montant retenu pour demain</div></div>
+      <div class="value">${ca_fmtMoney(ca_montantPourLendemain(ca_session))}</div>
+    </div>`;
+}
+
+function ca_renderAccordion(ecart){
+  return CA_SECTIONS.map(s=>{
+    const open = ca_openSections.includes(s.key);
+    const subtotal = ca_sectionSubtotal(s.key);
+    return `
+    <div class="ticket" style="padding:0;overflow:hidden;">
+      <button onclick="ca_toggleSection('${s.key}')" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;background:none;border:none;padding:14px 16px;cursor:pointer;text-align:left;font-family:'Inter',sans-serif;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:16px;">${s.icon}</span>
+          <div>
+            <div style="font-weight:600;font-size:13.5px;">${esc(s.title)}</div>
+            ${s.subtitle ? `<div style="font-size:10.5px;color:var(--ink-muted);margin-top:1px;">${esc(s.subtitle)}</div>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          ${subtotal!==null ? `<span class="mono" style="font-size:13px;color:var(--ink-muted);">${ca_fmtMoney(subtotal)}</span>` : ''}
+          <span style="color:var(--ink-muted);">${open?'▲':'▼'}</span>
+        </div>
+      </button>
+      ${open ? `<div style="padding:0 16px 16px;border-top:1px solid var(--line);padding-top:14px;">${ca_renderSectionBody(s.key, ecart)}</div>` : ''}
+    </div>`;
+  }).join('');
 }
 
 function ca_renderCaisseTab(){
@@ -1049,94 +1174,16 @@ function ca_renderCaisseTab(){
     ${ca_renderStatusBanner(existing, ecart)}
 
     ${!ca_detailOpen ? '' : `
-    <div class="ticket">
-      <div class="step-label"><div class="step-badge">A</div><div class="step-title">Début de caisse (= clôture de la veille)</div></div>
-      <div class="field">
-        <label>Montant (DA)</label>
-        <input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="debut-input" value="${ca_session.debutCaisse}" oninput="ca_session.debutCaisse=this.value;ca_session.debutCaisseAuto=false;ca_session.debutCaisseManuel=true;ca_render()" placeholder="0" />
-      </div>
-      ${ca_session.debutCaisseAuto ? `<div style="margin-top:8px;font-size:11.5px;color:var(--moss);">↺ Repris automatiquement de la clôture d'hier (${ca_fmtMoney(ca_session.debutCaisse)}). Modifiable si besoin.</div>` : ''}
-    </div>
-
-    <div class="ticket">
-      <div class="step-label"><div class="step-badge">B</div><div class="step-title">Entrées de caisse (divers)</div></div>
-      <div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:8px;">Ex. monnaie apportée, vente d'huile… — tout ajout d'espèces hors ventes ERP.</div>
-      ${ca_linesEditor(ca_session.entrees, 'entrees', 'Description (ex. monnaie, vente huile…)')}
-      <button class="btn small ghost" onclick="ca_addLine('entrees')">+ Ajouter une entrée</button>
-      <div class="subtotal"><span>Total entrées diverses</span><span class="mono">${ca_fmtMoney(ca_totalEntreesDiverses(ca_session))}</span></div>
-    </div>
-
-    <div class="ticket">
-      <div class="step-label"><div class="step-badge">C</div><div class="step-title">Total des ventes ERP</div></div>
-      <div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:8px;">Toutes les commandes, tous modes de paiement confondus (le chiffre affiché par l'ERP).</div>
-      <div class="field"><input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="erp-input" value="${ca_session.totalVentesErp}" oninput="ca_session.totalVentesErp=this.value;ca_render()" placeholder="0" /></div>
-    </div>
-
-    <div class="ticket">
-      <div class="step-label"><div class="step-badge">D</div><div class="step-title">Ventes payées par virement</div></div>
-      ${ca_linesEditor(ca_session.virements, 'virements', 'Note (ex. client, référence)')}
-      <button class="btn small ghost" onclick="ca_addLine('virements')">+ Ajouter un virement</button>
-      <div class="subtotal"><span>Total virements</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.virements))}</span></div>
-      <div style="margin-top:8px;padding:8px 10px;background:var(--rust-bg);border-radius:6px;font-size:11.5px;color:var(--rust);font-weight:600;">⚠ Ces ventes devront être validées dans l'ERP.</div>
-    </div>
-
-    <div class="ticket">
-      <div class="step-label"><div class="step-badge">E</div><div class="step-title">Ventes en attente (validées, non payées)</div></div>
-      ${ca_linesEditor(ca_session.enAttente, 'enAttente', 'Note (ex. client, raison)')}
-      <button class="btn small ghost" onclick="ca_addLine('enAttente')">+ Ajouter une vente en attente</button>
-      <div class="subtotal"><span>Total en attente</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.enAttente))}</span></div>
-    </div>
-
-    <div class="ticket" style="background:var(--paper);">
-      <div class="subtotal"><span>Part espèces des ventes ERP (C − D − E)</span><span class="mono" style="font-weight:700;">${ca_fmtMoney(ca_partEspecesErp(ca_session))}</span></div>
-    </div>
-
-    <div class="result-box prelim">
-      <div><div class="label">F — Montant disponible dans la caisse (A + B + part espèces)</div></div>
-      <div class="value">${ca_fmtMoney(ca_montantDisponible(ca_session))}</div>
-    </div>
-
-    <div class="ticket" style="margin-top:14px;">
-      <div class="step-label"><div class="step-badge">G</div><div class="step-title">Retraits de la caisse</div></div>
-      <div class="form-section">
-        <div class="section-label">Retrait par le Gérant</div>
-        ${ca_linesEditor(ca_session.retraitsGerant, 'retraitsGerant', 'Note (obligatoire)')}
-        <button class="btn small ghost" onclick="ca_addLine('retraitsGerant')">+ Ajouter un retrait gérant</button>
-        <div class="subtotal"><span>Total retraits gérant</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.retraitsGerant))}</span></div>
-      </div>
-      <div class="form-section">
-        <div class="section-label">Retrait pour divers paiements</div>
-        ${ca_linesEditor(ca_session.retraitsDivers, 'retraitsDivers', 'Motif (ex. achat, fournisseur…)')}
-        <button class="btn small ghost" onclick="ca_addLine('retraitsDivers')">+ Ajouter un retrait divers</button>
-        <div class="subtotal"><span>Total retraits divers</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.retraitsDivers))}</span></div>
-      </div>
-      <div style="font-size:11px;color:var(--ink-muted);margin-top:4px;">Le gérant peut être sollicité plusieurs fois dans la journée — ajoute une ligne à chaque fois.</div>
-    </div>
-
-    <div class="result-box prelim">
-      <div><div class="label">Montant théorique de clôture (F − retraits)</div></div>
-      <div class="value">${ca_fmtMoney(ca_montantTheorique(ca_session))}</div>
-    </div>
-
-    <div class="ticket" style="margin-top:14px;">
-      <div class="step-label"><div class="step-badge">✓</div><div class="step-title">Validation (comptage du liquide)</div></div>
-      <div class="grid grid-2">
-        <div class="field"><label>Montant compté (comptage réel)</label><input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="compte-input" value="${ca_session.montantCompte}" oninput="ca_session.montantCompte=this.value;ca_render()" placeholder="Si vous comptez le liquide" /></div>
-        <div class="field"><label>Note (optionnel)</label><input type="text" id="note-validation-input" value="${esc(ca_session.noteValidation||'')}" oninput="ca_session.noteValidation=this.value" placeholder="Remarques" /></div>
-      </div>
-      ${ecart!==null ? `<div style="margin-top:10px;font-size:13px;font-weight:700;color:${Math.abs(ecart)<0.01?'var(--moss)':'var(--rust)'};">Écart : ${ecart>0?'+':''}${ca_fmtMoney(ecart)}</div>` : ''}
-    </div>
-
-    <div class="result-box final">
-      <div><div class="label">Montant retenu pour demain</div></div>
-      <div class="value">${ca_fmtMoney(ca_montantPourLendemain(ca_session))}</div>
+    ${ca_renderAccordion(ecart)}
+    <div class="actions-row" style="margin-top:14px;">
+      <button class="btn" onclick="ca_saveSession()">✓ Enregistrer la clôture du ${fmtDateShort(ca_session.date)}</button>
     </div>
     `}
 
+    ${!ca_detailOpen ? `
     <div class="actions-row">
-      <button class="btn" onclick="ca_saveSession()">✓ Enregistrer la clôture du ${fmtDateShort(ca_session.date)}</button>
       <button class="btn ghost" onclick="ca_loadSessionForDate(todayISO())">↺ Réinitialiser (aujourd'hui)</button>
-    </div>
+    </div>` : ''}
   `;
 }
 
@@ -1181,7 +1228,7 @@ function ca_renderHistoriqueTab(){
     return `<div class="hist-row" onclick="ca_setTab('caisse');ca_loadSessionForDate('${date}')">
       <div>
         <div class="d">${fmtDateShort(date)}</div>
-        <div class="s">Début : ${ca_fmtMoney(s.debutCaisse)} · ERP : ${ca_fmtMoney(s.totalVentesErp)} · Virement : ${ca_fmtMoney(ca_sumLines(s.virements))} · Attente : ${ca_fmtMoney(ca_sumLines(s.enAttente))} · Retraits : ${ca_fmtMoney(ca_totalRetraits(s))}${ecart!==null?` · Écart : ${ecart>0?'+':''}${ca_fmtMoney(ecart)}`:''}${s.enregistreParEn?' · par '+esc(s.enregistreParEn):''}</div>
+        <div class="s">Début : ${ca_fmtMoney(s.debutCaisse)} · ERP : ${ca_fmtMoney(s.totalVentesErp)} · Virement : ${ca_fmtMoney(ca_sumLines(s.virements))} · Non réglé : ${ca_fmtMoney(ca_sumLines(s.enAttente))} · Retraits : ${ca_fmtMoney(ca_totalRetraits(s))}${ecart!==null?` · Écart : ${ecart>0?'+':''}${ca_fmtMoney(ecart)}`:''}${s.enregistreParEn?' · par '+esc(s.enregistreParEn):''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         <div class="e">${ca_fmtMoney(theorique)}</div>
