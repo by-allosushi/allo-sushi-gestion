@@ -1294,12 +1294,13 @@ const DP_TYPES = [
   { id:'Retrait', label:'Retrait gérant → moi', shortLabel:'Retrait', color:'var(--wrap)', bg:'var(--wrap-bg)', sign:-1 },
 ];
 // Types autorisés à la SAISIE d'un nouveau mouvement pour les utilisateurs non-admin.
-const DP_TYPES_NON_ADMIN = ['AppointCaisse', 'AppointDivers', 'Charge'];
-// "Retrait" et "Achat" ne sont plus proposés à la création (Achat est désormais géré dans le
-// module Stock, avec quantités et prix). On garde leur définition dans DP_TYPES uniquement
-// pour continuer à afficher correctement les mouvements déjà enregistrés.
+const DP_TYPES_NON_ADMIN = ['AppointCaisse', 'Charge'];
+// "Retrait", "Achat", "AppointDivers", "AppointMoi" et "Recette" ne sont plus proposés à la
+// création — un seul type suffit par direction (AppointCaisse pour les entrées, Charge pour
+// les sorties ; Achat est désormais géré dans le module Stock). On garde leur définition dans
+// DP_TYPES uniquement pour continuer à afficher correctement les mouvements déjà enregistrés.
 function dp_allowedTypes(){
-  const creatable = DP_TYPES.filter(t=>t.id!=='Retrait' && t.id!=='Achat');
+  const creatable = DP_TYPES.filter(t=>['AppointCaisse','Charge'].includes(t.id));
   if(session && session.isAdmin) return creatable;
   return creatable.filter(t=>DP_TYPES_NON_ADMIN.includes(t.id));
 }
@@ -1804,10 +1805,6 @@ function dp_renderMouvForm(){
   const isEditing = !!dp_editingMouvId;
   const employeeSuggestions = EMPLOYES_TOUS.map(n=>`<option value="${esc(n)}">`).join('');
   const direction = dp_typeMeta(dp_formType).sign > 0 ? 'in' : 'out';
-  const allowedTypes = dp_allowedTypes();
-  const typesIn = allowedTypes.filter(t=>t.sign>0);
-  const typesOut = allowedTypes.filter(t=>t.sign<0);
-  const isAdminForm = session && session.isAdmin;
   return `
     <div class="ticket" id="dp-form" style="padding:18px;${isEditing?'border-color:var(--forest);':''}">
       ${isEditing ? `<div style="font-size:12.5px;font-weight:700;color:var(--forest);margin-bottom:10px;">✏️ Modification du mouvement du ${fmtDateShort(E.date)}</div>` : ''}
@@ -1815,27 +1812,13 @@ function dp_renderMouvForm(){
         <div class="section-label"><span class="num">1</span>Date</div>
         <div class="field"><input type="date" id="dp-working-date" value="${dp_workingDate}" onchange="dp_workingDate=this.value;dp_render()" /></div>
       </div>
-      <div class="form-section">
-        <div class="section-label"><span class="num">2</span>Type de mouvement</div>
-        <div class="grid grid-2" style="gap:8px;margin-bottom:12px;">
-          <button type="button" onclick="dp_setDirection('in')" style="padding:14px;border-radius:8px;border:2px solid ${direction==='in'?'var(--moss)':'var(--line)'};background:${direction==='in'?'var(--moss-bg)':'var(--surface)'};text-align:left;cursor:pointer;">
-            <div style="font-weight:700;font-size:14px;color:${direction==='in'?'var(--moss)':'var(--ink)'};">↓ Entrée d'argent</div>
-            <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${isAdminForm?'Appoint, recette':'Prélèvement caisse'}</div>
-          </button>
-          <button type="button" onclick="dp_setDirection('out')" style="padding:14px;border-radius:8px;border:2px solid ${direction==='out'?'var(--rust)':'var(--line)'};background:${direction==='out'?'var(--rust-bg)':'var(--surface)'};text-align:left;cursor:pointer;">
-            <div style="font-weight:700;font-size:14px;color:${direction==='out'?'var(--rust)':'var(--ink)'};">↑ Sortie d'argent</div>
-            <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">Achat, charge</div>
-          </button>
-        </div>
-        ${(direction==='in'?typesIn:typesOut).length>1 ? `<div class="grid grid-2" style="gap:8px;">
-          ${(direction==='in'?typesIn:typesOut).map(t=>`<button type="button" onclick="dp_formType='${t.id}';dp_render()" style="padding:14px;border-radius:8px;border:2px solid ${dp_formType===t.id?t.color:'var(--line)'};background:${dp_formType===t.id?t.bg:'var(--surface)'};text-align:left;cursor:pointer;">
-            <div style="font-weight:700;font-size:14px;color:${dp_formType===t.id?t.color:'var(--ink)'};">${esc(t.label)}</div>
-          </button>`).join('')}
-        </div>` : ''}
-      </div>
 
       <div class="form-section">
-        <div class="section-label"><span class="num">3</span>Montant et détail</div>
+        <div class="section-label"><span class="num">2</span>Montant et détail</div>
+        <div style="display:inline-flex;border-radius:20px;border:1px solid var(--line);overflow:hidden;margin-bottom:12px;">
+          <button type="button" onclick="dp_setDirection('in')" style="padding:7px 16px;border:none;font-size:12.5px;font-weight:700;cursor:pointer;background:${direction==='in'?'var(--moss)':'var(--surface)'};color:${direction==='in'?'#fff':'var(--ink-muted)'};">↓ Entrée</button>
+          <button type="button" onclick="dp_setDirection('out')" style="padding:7px 16px;border:none;font-size:12.5px;font-weight:700;cursor:pointer;background:${direction==='out'?'var(--rust)':'var(--surface)'};color:${direction==='out'?'#fff':'var(--ink-muted)'};">↑ Sortie</button>
+        </div>
         <div class="grid grid-2">
           <div class="field"><label>Montant (DA)</label><input type="text" inputmode="decimal" id="dp-montant" placeholder="0" value="${(E.type&&E.type!=='Achat'&&E.montant!=null)?esc(String(E.montant)):''}" /></div>
           <div class="field"><label>${dp_formType==='Charge'?'Motif / catégorie':'Note (optionnel)'}</label>
@@ -1845,7 +1828,6 @@ function dp_renderMouvForm(){
       </div>
       ${dp_formType==='Charge' ? `
           <div class="form-section">
-            <div class="section-label"><span class="num">4</span>Options complémentaires</div>
             <div style="display:flex;align-items:center;gap:8px;">
               <input type="checkbox" id="dp-isavance" style="width:auto;" ${E.estAvanceSalaire?'checked':''} onchange="document.getElementById('dp-avance-wrap').style.display=this.checked?'flex':'none'" />
               <label style="text-transform:none;font-size:12.5px;font-weight:500;color:var(--ink);">Ceci est une avance / un acompte sur salaire</label>
