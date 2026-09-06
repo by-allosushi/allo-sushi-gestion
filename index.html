@@ -2216,6 +2216,7 @@ const ST_SECTIONS = [
   { key:'restaurant', label:'Restaurant',      ic:'🍽️', desc:'Stock au restaurant' },
   { key:'arrivage',   label:'Arrivage Maison', ic:'🏠', desc:'Dépôt maison' },
   { key:'france',     label:'France Achat',    ic:'🇫🇷', desc:'Achats & envoi depuis la France' },
+  { key:'achatlocal', label:'Achat local',     ic:'🛒', desc:'Achat direct Restaurant/Maison' },
 ];
 let st_currentSection = null;
 function st_min2(a){ return (a && a.max1 ? a.max1 : 0) + 5; }
@@ -2268,6 +2269,7 @@ function st_renderSection(key){
   const s = ST_SECTIONS.find(x=>x.key===key);
   if(key==='articles') return st_renderArticlesSection();
   if(key==='france') return st_renderFranceSection();
+  if(key==='achatlocal') return st_renderAchatLocalSection();
   if(key==='arrivage') return st_renderArrivageSection();
   if(key==='restaurant') return st_renderRestaurantSection();
   return `
@@ -2312,20 +2314,61 @@ function st_renderFranceApercu(){
     </div>`;
   }).join('');
 }
+function st_lastTauxChange(){
+  const last = st_movements.find(m=>m.type==='achat_france' && m.taux);
+  return last ? last.taux : '';
+}
+function st_lastPrices(articleId){
+  const lastLocal = st_movements.find(m=>m.type==='achat_local' && m.articleId===articleId && m.prixDa);
+  const lastFrance = st_movements.find(m=>m.type==='achat_france' && m.articleId===articleId && m.prixDzd);
+  return { local: lastLocal ? lastLocal.prixDa : null, france: lastFrance ? lastFrance.prixDzd : null };
+}
+function st_renderPriceCompare(articleId){
+  const p = st_lastPrices(articleId);
+  return `<div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:10px;padding:8px 10px;background:var(--paper);border-radius:6px;">
+    Dernier prix local : ${p.local ? ca_fmtMoney(p.local)+' /u' : '—'} &nbsp;·&nbsp; Dernier prix France : ${p.france ? ca_fmtMoney(p.france)+' /u' : '—'}
+  </div>`;
+}
+function st_updateFrancePreview(){
+  const prix = ca_parseNum(document.getElementById('st-fr-prix-eur').value);
+  const taux = ca_parseNum(document.getElementById('st-fr-taux').value);
+  const qte = ca_parseNum(document.getElementById('st-fr-qte').value);
+  const prixDzd = prix * taux;
+  const totalDzd = prixDzd * qte;
+  const el = document.getElementById('st-fr-preview');
+  if(el) el.textContent = 'Prix unitaire : ' + ca_fmtMoney(prixDzd) + '  ·  Total : ' + ca_fmtMoney(totalDzd);
+}
+let st_frArticleId = null;
+function st_frSelectArticle(id){ st_frArticleId = id; st_render(); }
 function st_renderFranceForm(mode){
   if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
+  if(!st_frArticleId || !st_articles.find(a=>a.id===st_frArticleId)) st_frArticleId = st_articles[0].id;
   return `
     <div class="ticket">
       <div class="field" style="margin-bottom:10px;">
         <label>Article</label>
-        <select id="st-fr-article">
-          ${st_articles.map(a=>`<option value="${a.id}">${esc(a.nom)} (stock France: ${a.stock3||0})</option>`).join('')}
+        <select id="st-fr-article" onchange="st_frSelectArticle(this.value)">
+          ${st_articles.map(a=>`<option value="${a.id}" ${a.id===st_frArticleId?'selected':''}>${esc(a.nom)} (stock France: ${a.stock3||0})</option>`).join('')}
         </select>
       </div>
+      ${mode==='achat' ? st_renderPriceCompare(st_frArticleId) : ''}
       <div class="field" style="margin-bottom:10px;">
         <label>Quantité</label>
-        <input type="text" inputmode="decimal" id="st-fr-qte" placeholder="0" />
+        <input type="text" inputmode="decimal" id="st-fr-qte" placeholder="0" oninput="st_updateFrancePreview()" />
       </div>
+      ${mode==='achat' ? `
+      <div class="grid grid-2" style="margin-bottom:6px;">
+        <div class="field">
+          <label>Prix unitaire (EUR)</label>
+          <input type="text" inputmode="decimal" id="st-fr-prix-eur" placeholder="0" oninput="st_updateFrancePreview()" />
+        </div>
+        <div class="field">
+          <label>Taux de change (1€ = ? DA)</label>
+          <input type="text" inputmode="decimal" id="st-fr-taux" value="${st_lastTauxChange()}" placeholder="0" oninput="st_updateFrancePreview()" />
+        </div>
+      </div>
+      <div id="st-fr-preview" style="font-size:12px;color:var(--ink-muted);margin-bottom:12px;">Prix unitaire : — · Total : —</div>
+      ` : ''}
       <div class="field" style="margin-bottom:12px;">
         <label>Note (optionnel)</label>
         <input type="text" id="st-fr-note" placeholder="Ex: fournisseur, référence…" />
@@ -2344,6 +2387,7 @@ function st_renderFranceHistorique(){
         <div class="mono" style="font-weight:700;">${m.quantite}</div>
       </div>
       <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
+      ${m.type==='achat_france' && m.prixEur ? `<div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${m.prixEur} € × taux ${m.taux} = ${ca_fmtMoney(m.prixDzd)} /u · Total ${ca_fmtMoney(m.totalDzd)}</div>` : ''}
     </div>
   `).join('');
 }
@@ -2356,8 +2400,14 @@ async function st_recordFranceMovement(mode){
   if(!qte || qte<=0){ alert('Entre une quantité valide.'); return; }
   try{
     if(mode==='achat'){
+      const prixEur = ca_parseNum(document.getElementById('st-fr-prix-eur').value);
+      const taux = ca_parseNum(document.getElementById('st-fr-taux').value);
+      if(!prixEur || prixEur<=0){ alert('Entre un prix unitaire en EUR valide.'); return; }
+      if(!taux || taux<=0){ alert('Entre un taux de change valide.'); return; }
+      const prixDzd = prixEur * taux;
+      const totalDzd = prixDzd * qte;
       await st_articlesCol.doc(articleId).update({ stock3: firebase.firestore.FieldValue.increment(qte) });
-      await st_movementsCol.add({ type:'achat_france', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() });
+      await st_movementsCol.add({ type:'achat_france', articleId, articleNom:article.nom, quantite:qte, prixEur, taux, prixDzd, totalDzd, note, par:currentUser, date:new Date().toISOString() });
     } else {
       if(qte > (article.stock3||0)){ alert('Quantité supérieure au stock disponible en France ('+(article.stock3||0)+').'); return; }
       await st_articlesCol.doc(articleId).update({
@@ -2368,6 +2418,101 @@ async function st_recordFranceMovement(mode){
     }
     document.getElementById('st-fr-qte').value = '';
     document.getElementById('st-fr-note').value = '';
+    if(mode==='achat'){
+      document.getElementById('st-fr-prix-eur').value = '';
+      st_updateFrancePreview();
+    }
+    st_render();
+  }catch(e){
+    console.warn(e);
+    alert('Erreur lors de l\u2019enregistrement.');
+  }
+}
+
+/* ---- Sous-écran : Achat local (direct Restaurant ou Arrivage Maison) ---- */
+let st_alTab = 'achat';
+function st_setAlTab(t){ st_alTab = t; st_render(); }
+function st_renderAchatLocalSection(){
+  return `
+    <button class="btn small ghost" style="margin-bottom:14px;" onclick="st_backToStockHome()">← Retour</button>
+    <h2 class="section" style="margin-top:0;">🛒 Achat local</h2>
+    <nav class="tabs" style="margin-bottom:12px;">
+      <button class="${st_alTab==='achat'?'active':''}" onclick="st_setAlTab('achat')">Enregistrer un achat</button>
+      <button class="${st_alTab==='historique'?'active':''}" onclick="st_setAlTab('historique')">Historique</button>
+    </nav>
+    ${st_alTab==='achat' ? st_renderAlForm() : st_renderAlHistorique()}
+  `;
+}
+let st_alArticleId = null;
+function st_alSelectArticle(id){ st_alArticleId = id; st_render(); }
+function st_renderAlForm(){
+  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
+  if(!st_alArticleId || !st_articles.find(a=>a.id===st_alArticleId)) st_alArticleId = st_articles[0].id;
+  return `
+    <div class="ticket">
+      <div class="field" style="margin-bottom:10px;">
+        <label>Destination</label>
+        <select id="st-al-dest">
+          <option value="restaurant">Restaurant</option>
+          <option value="arrivage">Arrivage Maison</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>Article</label>
+        <select id="st-al-article" onchange="st_alSelectArticle(this.value)">
+          ${st_articles.map(a=>`<option value="${a.id}" ${a.id===st_alArticleId?'selected':''}>${esc(a.nom)}</option>`).join('')}
+        </select>
+      </div>
+      ${st_renderPriceCompare(st_alArticleId)}
+      <div class="grid grid-2" style="margin-bottom:10px;">
+        <div class="field">
+          <label>Quantité</label>
+          <input type="text" inputmode="decimal" id="st-al-qte" placeholder="0" />
+        </div>
+        <div class="field">
+          <label>Prix unitaire (DA)</label>
+          <input type="text" inputmode="decimal" id="st-al-prix" placeholder="0" />
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:12px;">
+        <label>Note (optionnel)</label>
+        <input type="text" id="st-al-note" placeholder="Ex: fournisseur, marché…" />
+      </div>
+      <button class="btn" onclick="st_recordAchatLocal()">+ Enregistrer l\u2019achat local</button>
+    </div>
+  `;
+}
+function st_renderAlHistorique(){
+  const items = st_movements.filter(m=>m.type==='achat_local');
+  if(items.length===0) return `<div class="empty-state">Aucun achat local pour l'instant.</div>`;
+  return items.map(m=>`
+    <div class="ticket" style="padding:10px 14px;">
+      <div style="display:flex;justify-content:space-between;">
+        <div style="font-weight:600;font-size:13px;">🛒 Achat local → ${m.destination==='restaurant'?'Restaurant':'Arrivage Maison'} — ${esc(m.articleNom)}</div>
+        <div class="mono" style="font-weight:700;">${m.quantite}</div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
+      ${m.prixDa ? `<div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${ca_fmtMoney(m.prixDa)} /u · Total ${ca_fmtMoney(m.prixDa*m.quantite)}</div>` : ''}
+    </div>
+  `).join('');
+}
+async function st_recordAchatLocal(){
+  const dest = document.getElementById('st-al-dest').value;
+  const articleId = document.getElementById('st-al-article').value;
+  const qte = ca_parseNum(document.getElementById('st-al-qte').value);
+  const prixDa = ca_parseNum(document.getElementById('st-al-prix').value);
+  const note = (document.getElementById('st-al-note').value||'').trim();
+  const article = st_articles.find(a=>a.id===articleId);
+  if(!article){ alert('Article introuvable.'); return; }
+  if(!qte || qte<=0){ alert('Entre une quantité valide.'); return; }
+  if(!prixDa || prixDa<=0){ alert('Entre un prix unitaire en DA valide.'); return; }
+  try{
+    const field = dest==='restaurant' ? 'stock1' : 'stock2';
+    await st_articlesCol.doc(articleId).update({ [field]: firebase.firestore.FieldValue.increment(qte) });
+    await st_movementsCol.add({ type:'achat_local', destination:dest, articleId, articleNom:article.nom, quantite:qte, prixDa, note, par:currentUser, date:new Date().toISOString() });
+    document.getElementById('st-al-qte').value = '';
+    document.getElementById('st-al-prix').value = '';
+    document.getElementById('st-al-note').value = '';
     st_render();
   }catch(e){
     console.warn(e);
@@ -2436,12 +2581,12 @@ function st_renderArrivageForm(){
   `;
 }
 function st_renderArrivageHistorique(){
-  const items = st_movements.filter(m=>m.type==='transfert_restaurant' || m.type==='envoi_maison');
+  const items = st_movements.filter(m=>m.type==='transfert_restaurant' || m.type==='envoi_maison' || (m.type==='achat_local' && m.destination==='arrivage'));
   if(items.length===0) return `<div class="empty-state">Aucun mouvement pour l'instant.</div>`;
   return items.map(m=>`
     <div class="ticket" style="padding:10px 14px;">
       <div style="display:flex;justify-content:space-between;">
-        <div style="font-weight:600;font-size:13px;">${m.type==='envoi_maison' ? '↙ Reçu de France' : '↗ Transfert vers Restaurant'} — ${esc(m.articleNom)}</div>
+        <div style="font-weight:600;font-size:13px;">${m.type==='envoi_maison' ? '↙ Reçu de France' : m.type==='achat_local' ? '🛒 Achat local' : '↗ Transfert vers Restaurant'} — ${esc(m.articleNom)}</div>
         <div class="mono" style="font-weight:700;">${m.quantite}</div>
       </div>
       <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
@@ -2531,12 +2676,12 @@ function st_renderRestaurantForm(){
   `;
 }
 function st_renderRestaurantHistorique(){
-  const items = st_movements.filter(m=>m.type==='sortie_restaurant' || m.type==='transfert_restaurant');
+  const items = st_movements.filter(m=>m.type==='sortie_restaurant' || m.type==='transfert_restaurant' || (m.type==='achat_local' && m.destination==='restaurant'));
   if(items.length===0) return `<div class="empty-state">Aucun mouvement pour l'instant.</div>`;
   return items.map(m=>`
     <div class="ticket" style="padding:10px 14px;">
       <div style="display:flex;justify-content:space-between;">
-        <div style="font-weight:600;font-size:13px;">${m.type==='transfert_restaurant' ? '↙ Reçu d\u2019Arrivage Maison' : '− Sortie'} — ${esc(m.articleNom)}</div>
+        <div style="font-weight:600;font-size:13px;">${m.type==='transfert_restaurant' ? '↙ Reçu d\u2019Arrivage Maison' : m.type==='achat_local' ? '🛒 Achat local' : '− Sortie'} — ${esc(m.articleNom)}</div>
         <div class="mono" style="font-weight:700;">${m.quantite}</div>
       </div>
       <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
