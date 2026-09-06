@@ -1294,12 +1294,12 @@ const DP_TYPES = [
   { id:'Retrait', label:'Retrait gérant → moi', shortLabel:'Retrait', color:'var(--wrap)', bg:'var(--wrap-bg)', sign:-1 },
 ];
 // Types autorisés à la SAISIE d'un nouveau mouvement pour les utilisateurs non-admin.
-const DP_TYPES_NON_ADMIN = ['AppointCaisse', 'AppointDivers', 'Charge', 'Achat'];
-// "Retrait" n'est plus proposé à la création pour PERSONNE (admin compris) : à enregistrer
-// désormais comme une Charge avec un commentaire. On garde sa définition dans DP_TYPES
-// uniquement pour continuer à afficher correctement les mouvements "Retrait" déjà enregistrés.
+const DP_TYPES_NON_ADMIN = ['AppointCaisse', 'AppointDivers', 'Charge'];
+// "Retrait" et "Achat" ne sont plus proposés à la création (Achat est désormais géré dans le
+// module Stock, avec quantités et prix). On garde leur définition dans DP_TYPES uniquement
+// pour continuer à afficher correctement les mouvements déjà enregistrés.
 function dp_allowedTypes(){
-  const creatable = DP_TYPES.filter(t=>t.id!=='Retrait');
+  const creatable = DP_TYPES.filter(t=>t.id!=='Retrait' && t.id!=='Achat');
   if(session && session.isAdmin) return creatable;
   return creatable.filter(t=>DP_TYPES_NON_ADMIN.includes(t.id));
 }
@@ -1349,11 +1349,10 @@ let dp_dateFilterStart = '';
 let dp_dateFilterEnd = '';
 let dp_searchTerm = '';
 let dp_showMouvForm = false;
-let dp_formType = 'Achat';
+let dp_formType = 'Charge';
 let dp_showPointageForm = false;
 let dp_pointageChecks = {};
 let dp_workingDate = todayISO();
-let dp_draft = [];
 let dp_dashPeriod = 'jour';
 let dp_dashDate = todayISO();
 let dp_dashCustomStart = todayISO();
@@ -1426,6 +1425,11 @@ function dp_fmtDateTime(iso){
   if(!iso) return '—';
   const d = new Date(iso);
   return isNaN(d.getTime()) ? esc(iso) : d.toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'medium'});
+}
+function dp_fmtTime(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
 }
 async function dp_saveVerification(realAmount){
   if(!dp_canVerify()) { alert('Vous n’avez pas l’autorisation de vérifier la caisse.'); return null; }
@@ -1514,11 +1518,6 @@ function dp_renderVerificationHistory(){
 }
 
 async function dp_deleteMouvement(id){
-  const m = dp_mouvements.find(x=>x.id===id);
-  if(m){
-    const closure = dp_closureFor(m.date);
-    if(closure){ alert(`Cette période (${fmtDateShort(closure.dateDebut)} → ${fmtDateShort(closure.dateFin)}) est clôturée. Réouvrez-la dans l'onglet Clôtures pour modifier.`); return; }
-  }
   if(!confirm('Supprimer ce mouvement ?')) return;
   await dp_mouvCol.doc(id).delete();
 }
@@ -1544,7 +1543,8 @@ function dp_render(){
   if(dp_currentTab==='tableau' || dp_currentTab==='pointage') dp_currentTab = 'mouvements';
   if(dp_currentTab==='verification' && !dp_canVerify()) dp_currentTab = 'mouvements';
   if(dp_currentTab==='historiqueVerification' && !dp_canSeeVerificationHistory()) dp_currentTab = 'mouvements';
-  if(!isAdmin && (dp_currentTab==='clotures' || dp_currentTab==='avances')) dp_currentTab = 'mouvements';
+  if(!isAdmin && dp_currentTab==='avances') dp_currentTab = 'mouvements';
+  if(dp_currentTab==='clotures') dp_currentTab = 'mouvements';
 
   dp_renderTabs();
   const main = document.getElementById('depenses-main');
@@ -1552,7 +1552,6 @@ function dp_render(){
   else if(dp_currentTab==='verification') main.innerHTML = dp_renderVerificationBox();
   else if(dp_currentTab==='historiqueVerification') main.innerHTML = dp_renderVerificationHistory();
   else if(dp_currentTab==='avances') main.innerHTML = dp_renderAvancesTab();
-  else if(dp_currentTab==='clotures') main.innerHTML = dp_renderCloturesTab();
   else main.innerHTML = dp_renderMouvementsTab();
 
   if(activeId){
@@ -1564,7 +1563,7 @@ function dp_setTab(t){ dp_currentTab = t; dp_render(); }
 function dp_renderTabs(){
   const isAdmin = session && session.isAdmin;
   const tabs = isAdmin
-    ? [ {id:'mouvements', label:'Mouvements'}, {id:'verification', label:'🔎 Vérification'}, {id:'historiqueVerification', label:'📋 Historique'}, {id:'avances', label:'Avances salaire'}, {id:'clotures', label:'🔒 Clôtures'} ]
+    ? [ {id:'mouvements', label:'Mouvements'}, {id:'verification', label:'🔎 Vérification'}, {id:'historiqueVerification', label:'📋 Historique'}, {id:'avances', label:'Avances salaire'} ]
     : [ {id:'mouvements', label:'Mouvements'}, {id:'verification', label:'🔎 Vérification'} ];
   document.getElementById('depenses-tabs').innerHTML = tabs.map(t=>`
     <button class="${dp_currentTab===t.id?'active':''}" onclick="dp_setTab('${t.id}')">${esc(t.label)}</button>
@@ -1721,11 +1720,9 @@ function dp_renderMouvementsTab(){
     if(dp_dateFilterStart) mouvementsPourSolde = mouvementsPourSolde.filter(m=>m.date>=dp_dateFilterStart);
     if(dp_dateFilterEnd) mouvementsPourSolde = mouvementsPourSolde.filter(m=>m.date<=dp_dateFilterEnd);
     const solde = dp_computeSolde(mouvementsPourSolde);
-    const closureForRange = (dp_dateFilterStart && dp_dateFilterEnd) ? dp_closureFor(dp_dateFilterStart, dp_dateFilterEnd) : null;
     soldeBox = `<div class="result-box ${solde>=0?'final':'prelim'}" style="margin-bottom:14px;">
       <div class="label">${hasDateFilterForSolde ? `Solde théorique — ${dp_dateFilterStart?fmtDateShort(dp_dateFilterStart):'…'} → ${dp_dateFilterEnd?fmtDateShort(dp_dateFilterEnd):'…'}` : 'Solde théorique enregistré'}</div>
       <div class="value">${dp_fmtMoney(solde)}</div>
-      ${closureForRange ? `<div style="font-size:11px;color:var(--forest);margin-top:4px;">🔒 Période clôturée le ${fmtDateShort(closureForRange.clotureLe.slice(0,10))} par ${esc(closureForRange.clotureParEn)}</div>` : ''}
     </div>`;
   }
 
@@ -1733,28 +1730,6 @@ function dp_renderMouvementsTab(){
 
   const form = dp_showMouvForm ? dp_renderMouvForm() : '';
 
-  const draftBox = dp_draft.length>0 ? `
-    <div class="ticket" style="padding:14px 16px;border-color:var(--amber);">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-size:13px;font-weight:700;color:var(--amber);">📝 Brouillon du ${fmtDateShort(dp_workingDate)} — ${dp_draft.length} mouvement(s) non enregistré(s)</div>
-      </div>
-      ${dp_draft.map(m=>{
-        const meta = dp_typeMeta(m.type);
-        const detail = m.type==='Achat' ? `${esc(m.articleNom||'')} · ${dp_fmtNum(m.quantite)} ${esc(m.unite||'')}` : (esc(m.libelle||'') + (m.estAvanceSalaire?` · 👤 Avance : ${esc(m.employeNom)}`:''));
-        return `<div class="movement-row">
-          <div>
-            <div style="font-weight:500;"><span class="chip" style="color:${meta.color};background:${meta.bg};margin-right:5px;">${esc(m.type)}</span>${detail}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <div class="mono" style="font-weight:600;color:${meta.color};">${meta.sign>0?'+':'−'}${dp_fmtMoney(m.montant)}</div>
-            <button class="x-btn" onclick="dp_removeFromDraft('${m.id}')">✕</button>
-          </div>
-        </div>`;
-      }).join('')}
-      <div style="font-size:12.5px;color:var(--ink-muted);margin:8px 0 10px;">Effet sur le solde : ${dp_computeSolde(dp_draft)>=0?'+':''}${dp_fmtMoney(dp_computeSolde(dp_draft))}</div>
-      <button class="btn" onclick="dp_saveDraftDay()">✓ Valider la journée (${dp_draft.length} mouvement(s))</button>
-    </div>
-  ` : '';
 
   const hasDateFilter = dp_dateFilterStart || dp_dateFilterEnd;
   let dateFilterSummary = '';
@@ -1782,11 +1757,14 @@ function dp_renderMouvementsTab(){
   const list = sorted.length===0 ? `<p style="font-size:13px;color:var(--ink-muted);">Aucun mouvement.</p>` :
     sorted.map(m=>{
       const meta = dp_typeMeta(m.type);
-      const detail = m.type==='Achat' ? `${esc(m.articleNom||'')} · ${dp_fmtNum(m.quantite)} ${esc(m.unite||'')}` : (esc(m.libelle||'') + (m.estAvanceSalaire?` · 👤 Avance : ${esc(m.employeNom)}`:''));
-      return `<div class="movement-row">
+      const chipLabel = m.estAvanceSalaire ? '👤 Avance salaire' : m.type;
+      const chipColor = m.estAvanceSalaire ? 'var(--bar)' : meta.color;
+      const chipBg = m.estAvanceSalaire ? 'var(--bar-bg)' : meta.bg;
+      const detail = m.type==='Achat' ? `${esc(m.articleNom||'')} · ${dp_fmtNum(m.quantite)} ${esc(m.unite||'')}` : (m.estAvanceSalaire ? `${esc(m.employeNom)}${m.libelle?' · '+esc(m.libelle):''}` : esc(m.libelle||''));
+      return `<div class="movement-row" style="${m.estAvanceSalaire?'border-color:var(--bar);':''}">
         <div>
-          <div style="font-weight:500;"><span class="chip" style="color:${meta.color};background:${meta.bg};margin-right:5px;">${esc(m.type)}</span>${detail}</div>
-          <div class="sub">${fmtDateShort(m.date)}${m.creePar?' · par '+esc(m.creePar):''}${m.modifiePar?' · modifié par '+esc(m.modifiePar):''}${m.pointe?' · ✓ pointé':''}</div>
+          <div style="font-weight:500;"><span class="chip" style="color:${chipColor};background:${chipBg};margin-right:5px;">${esc(chipLabel)}</span>${detail}</div>
+          <div class="sub">${fmtDateShort(m.date)}${m.creeLe?' à '+dp_fmtTime(m.creeLe):''}${m.creePar?' · par '+esc(m.creePar):''}${m.modifiePar?' · modifié par '+esc(m.modifiePar):''}${m.pointe?' · ✓ pointé':''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <div class="mono" style="font-weight:600;color:${meta.color};">${meta.sign>0?'+':'−'}${dp_fmtMoney(m.montant)}</div>
@@ -1796,16 +1774,13 @@ function dp_renderMouvementsTab(){
       </div>`;
     }).join('');
 
-  const verificationBox = dp_renderVerificationBox();
-  return soldeBox + verificationBox + addBar + form + draftBox + filterChips + list;
+  return soldeBox + addBar + form + filterChips + list;
 }
 
 function dp_openEditMouv(id){
   if(!(session && session.isAdmin)){ alert("Seule l'administratrice peut modifier un mouvement déjà enregistré."); return; }
   const m = dp_mouvements.find(x=>x.id===id);
   if(!m) return;
-  const closure = dp_closureFor(m.date);
-  if(closure){ alert(`Cette période (${fmtDateShort(closure.dateDebut)} → ${fmtDateShort(closure.dateFin)}) est clôturée. Réouvrez-la dans l'onglet Clôtures pour modifier.`); return; }
   dp_editingMouvId = id;
   dp_editPrefill = m;
   dp_formType = m.type;
@@ -1824,7 +1799,7 @@ function dp_cancelEditMouv(){
 }
 
 function dp_renderMouvForm(){
-  if(!(session && session.isAdmin) && !DP_TYPES_NON_ADMIN.includes(dp_formType)) dp_formType = 'Achat';
+  if(!(session && session.isAdmin) && !DP_TYPES_NON_ADMIN.includes(dp_formType)) dp_formType = 'Charge';
   const E = dp_editPrefill || {};
   const isEditing = !!dp_editingMouvId;
   const employeeSuggestions = EMPLOYES_TOUS.map(n=>`<option value="${esc(n)}">`).join('');
@@ -1833,14 +1808,12 @@ function dp_renderMouvForm(){
   const typesIn = allowedTypes.filter(t=>t.sign>0);
   const typesOut = allowedTypes.filter(t=>t.sign<0);
   const isAdminForm = session && session.isAdmin;
-  const workingDateClosure = dp_closureFor(dp_workingDate);
   return `
     <div class="ticket" id="dp-form" style="padding:18px;${isEditing?'border-color:var(--forest);':''}">
       ${isEditing ? `<div style="font-size:12.5px;font-weight:700;color:var(--forest);margin-bottom:10px;">✏️ Modification du mouvement du ${fmtDateShort(E.date)}</div>` : ''}
       <div class="form-section">
         <div class="section-label"><span class="num">1</span>Date</div>
         <div class="field"><input type="date" id="dp-working-date" value="${dp_workingDate}" onchange="dp_workingDate=this.value;dp_render()" /></div>
-        ${workingDateClosure ? `<div style="margin-top:8px;font-size:12px;color:var(--rust);">🔒 Cette date fait partie d'une période clôturée (${fmtDateShort(workingDateClosure.dateDebut)} → ${fmtDateShort(workingDateClosure.dateFin)}). Réouvrez-la dans l'onglet Clôtures pour ajouter ou modifier un mouvement.</div>` : ''}
       </div>
       <div class="form-section">
         <div class="section-label"><span class="num">2</span>Type de mouvement</div>
@@ -1861,46 +1834,16 @@ function dp_renderMouvForm(){
         </div>` : ''}
       </div>
 
-      ${dp_formType==='Achat' ? `
-        <div class="form-section">
-          <div class="section-label"><span class="num">3</span>Article et quantité</div>
-          <div class="grid grid-2">
-             <div class="field" style="grid-column:1/-1;"><label>Article / désignation</label>
-               <input type="text" id="dp-article" placeholder="Ex. Saumon, riz, emballages…" value="${esc(E.type==='Achat'?(E.articleNom||''):'')}" />
-             </div>
-            <div class="field"><label>Quantité</label><input type="text" inputmode="decimal" id="dp-qty" placeholder="0" value="${E.type==='Achat'&&E.quantite!=null?esc(String(E.quantite)):''}" oninput="dp_updateAchatCalc()" /></div>
-            <div class="field"><label>Mode de saisie</label>
-              <div class="filter-row" style="margin:0;">
-                <button type="button" class="filter-chip ${dp_achatCalcMode==='prix'?'active':''}" style="${dp_achatCalcMode==='prix'?'background:var(--amber);border-color:var(--amber);color:#fff;':''}" onclick="dp_achatCalcMode='prix';dp_render()">Prix unitaire</button>
-                <button type="button" class="filter-chip ${dp_achatCalcMode==='montant'?'active':''}" style="${dp_achatCalcMode==='montant'?'background:var(--amber);border-color:var(--amber);color:#fff;':''}" onclick="dp_achatCalcMode='montant';dp_render()">Montant total</button>
-              </div>
-            </div>
-            ${dp_achatCalcMode==='prix' ? `
-              <div class="field" style="grid-column:1/-1;"><label>Prix unitaire (DA)</label><input type="text" inputmode="decimal" id="dp-prix" placeholder="0" value="${(E.type==='Achat'&&E.quantite)?esc(String(E.montant/E.quantite)):''}" oninput="dp_updateAchatCalc()" /></div>
-            ` : `
-              <div class="field" style="grid-column:1/-1;"><label>Montant total (DA)</label><input type="text" inputmode="decimal" id="dp-montant-total" placeholder="0" value="${(E.type==='Achat'&&E.montant!=null)?esc(String(E.montant)):''}" oninput="dp_updateAchatCalc()" /></div>
-            `}
-            <div style="grid-column:1/-1;font-size:12.5px;color:var(--ink-muted);" id="dp-achat-calc-preview"></div>
+      <div class="form-section">
+        <div class="section-label"><span class="num">3</span>Montant et détail</div>
+        <div class="grid grid-2">
+          <div class="field"><label>Montant (DA)</label><input type="text" inputmode="decimal" id="dp-montant" placeholder="0" value="${(E.type&&E.type!=='Achat'&&E.montant!=null)?esc(String(E.montant)):''}" /></div>
+          <div class="field"><label>${dp_formType==='Charge'?'Motif / catégorie':'Note (optionnel)'}</label>
+            <input type="text" id="dp-libelle" placeholder="${dp_formType==='Charge'?'Ex. Loyer, Carburant…':'Ex. Appoint du matin'}" value="${esc(E.type&&E.type!=='Achat'?(E.libelle||''):'')}" />
           </div>
         </div>
-        <div class="form-section">
-          <div class="section-label"><span class="num">4</span>Compléments (optionnel)</div>
-          <div class="grid grid-2">
-            <div class="field"><label>Fournisseur</label><input type="text" id="dp-fourn" value="${esc(E.type==='Achat'?(E.fournisseur||''):'')}" /></div>
-             <div class="field"><label>Unité</label><input type="text" id="dp-unite" value="${esc(E.type==='Achat'?(E.unite||''):'')}" placeholder="kg, L, unité…" /></div>
-          </div>
-        </div>
-      ` : `
-        <div class="form-section">
-          <div class="section-label"><span class="num">3</span>Montant et détail</div>
-          <div class="grid grid-2">
-            <div class="field"><label>Montant (DA)</label><input type="text" inputmode="decimal" id="dp-montant" placeholder="0" value="${(E.type&&E.type!=='Achat'&&E.montant!=null)?esc(String(E.montant)):''}" /></div>
-            <div class="field"><label>${dp_formType==='Charge'?'Motif / catégorie':'Note (optionnel)'}</label>
-              <input type="text" id="dp-libelle" placeholder="${dp_formType==='Charge'?'Ex. Loyer, Carburant…':'Ex. Appoint du matin'}" value="${esc(E.type&&E.type!=='Achat'?(E.libelle||''):'')}" />
-            </div>
-          </div>
-        </div>
-        ${dp_formType==='Charge' ? `
+      </div>
+      ${dp_formType==='Charge' ? `
           <div class="form-section">
             <div class="section-label"><span class="num">4</span>Options complémentaires</div>
             <div style="display:flex;align-items:center;gap:8px;">
@@ -1914,7 +1857,6 @@ function dp_renderMouvForm(){
             </div>
           </div>
         ` : ''}
-      `}
       <div style="display:flex;align-items:center;gap:12px;margin-top:14px;">
         ${isEditing ? `
           <button class="btn" onclick="dp_submitMouv()">✓ Enregistrer les modifications</button>
@@ -1955,9 +1897,8 @@ async function dp_submitMouv(){
   if(!currentUser){ askUserName(false); if(!currentUser) return; }
   if(dp_editingMouvId && !(session && session.isAdmin)){ alert("Seule l'administratrice peut modifier un mouvement déjà enregistré."); return; }
   const date = dp_workingDate;
-  const closure = dp_closureFor(date);
-  if(closure){ alert(`La date sélectionnée (${fmtDateShort(date)}) fait partie d'une période clôturée (${fmtDateShort(closure.dateDebut)} → ${fmtDateShort(closure.dateFin)}). Réouvrez-la dans l'onglet Clôtures pour modifier.`); return; }
   let mouv;
+  try{
   if(dp_formType==='Achat'){
     const typed = document.getElementById('dp-article') ? document.getElementById('dp-article').value.trim() : '';
     if(!typed){ alert('Merci de renseigner la désignation de l’achat.'); return; }
@@ -1989,7 +1930,7 @@ async function dp_submitMouv(){
         articleNom: typed, quantite: qty, unite, fournisseur,
         pointe:false, creePar: currentUser, creeLe: new Date().toISOString(),
       };
-      dp_draft.push(mouv);
+      await dp_mouvCol.doc(mouv.id).set(mouv);
     }
   } else {
     const montant = dp_parseNum(document.getElementById('dp-montant').value);
@@ -2015,40 +1956,18 @@ async function dp_submitMouv(){
         estAvanceSalaire: !!estAvanceSalaire, employeNom,
         pointe:false, creePar: currentUser, creeLe: new Date().toISOString(),
       };
-      dp_draft.push(mouv);
+      await dp_mouvCol.doc(mouv.id).set(mouv);
     }
   }
   if(dp_editingMouvId){
     dp_editingMouvId = null;
     dp_editPrefill = null;
-    dp_showMouvForm = false;
   }
+  dp_showMouvForm = false;
   dp_render();
-}
-function dp_removeFromDraft(id){
-  dp_draft = dp_draft.filter(m=>m.id!==id);
-  dp_render();
-}
-async function dp_saveDraftDay(){
-  if(dp_draft.length===0) return;
-  if(!currentUser){ askUserName(false); if(!currentUser) return; }
-  const syncEl = document.getElementById('sync-label');
-  try{
-    if(syncEl) syncEl.textContent = 'Enregistrement…';
-    const batch = db.batch();
-    dp_draft.forEach(m=>{
-      batch.set(dp_mouvCol.doc(m.id), m);
-    });
-    await batch.commit();
-    const count = dp_draft.length;
-    dp_draft = [];
-    if(syncEl) syncEl.textContent = '✓ Synchronisé';
-    alert('Journée du '+fmtDateShort(dp_workingDate)+' enregistrée ('+count+' mouvement(s)).');
-    dp_render();
   }catch(e){
     console.warn(e);
     alert("Erreur d'enregistrement : "+e.message);
-    if(syncEl) syncEl.textContent = '⚠ Échec de la sauvegarde';
   }
 }
 
@@ -2148,68 +2067,6 @@ function dp_fmtNum(n){ if(n===null||n===undefined||isNaN(n)) return '0'; return 
 function dp_fmtMoney(n){ return dp_fmtNum(n)+' DA'; }
 function dp_parseNum(v){ if(v===null||v===undefined||v==='') return 0; const n = Number(String(v).replace(',','.')); return isNaN(n)?0:n; }
 
-/* ---------------- Onglet Clôtures (admin uniquement) ---------------- */
-function dp_renderCloturesTab(){
-  const preview = (dp_clotureStart && dp_clotureEnd && dp_clotureStart<=dp_clotureEnd)
-    ? dp_computeSolde(dp_mouvements.filter(m=>m.date>=dp_clotureStart && m.date<=dp_clotureEnd))
-    : null;
-  const overlap = (dp_clotureStart && dp_clotureEnd) ? dp_clotures.find(c=>c.statut==='clos' && !(dp_clotureEnd<c.dateDebut || dp_clotureStart>c.dateFin)) : null;
-
-  const form = `<div class="ticket">
-    <div class="step-label"><div class="step-badge">🔒</div><div class="step-title">Clôturer une période</div></div>
-    <div style="font-size:12px;color:var(--ink-muted);margin-bottom:10px;">Une fois la vérification faite avec le gérant, clôturez la période pour verrouiller les mouvements correspondants (plus aucune saisie ni modification possible sans réouverture).</div>
-    <div class="grid grid-2">
-      <div class="field"><label>Du</label><input type="date" id="dp-clot-start" value="${dp_clotureStart}" onchange="dp_clotureStart=this.value;dp_render()" /></div>
-      <div class="field"><label>Au</label><input type="date" id="dp-clot-end" value="${dp_clotureEnd}" onchange="dp_clotureEnd=this.value;dp_render()" /></div>
-    </div>
-    ${preview!==null ? `<div class="result-box ${preview>=0?'final':'prelim'}" style="margin-top:12px;">
-      <div class="label">Solde théorique de la période</div>
-      <div class="value">${dp_fmtMoney(preview)}</div>
-    </div>` : ''}
-    ${overlap ? `<div style="margin-top:10px;font-size:12px;color:var(--rust);">⚠ Cette plage chevauche une période déjà clôturée (${fmtDateShort(overlap.dateDebut)} → ${fmtDateShort(overlap.dateFin)}). Réouvrez-la d'abord si besoin.</div>` : ''}
-    <button class="btn moss" style="margin-top:12px;" ${(!dp_clotureStart||!dp_clotureEnd||dp_clotureStart>dp_clotureEnd||overlap)?'disabled':''} onclick="dp_creerCloture()">🔒 Clôturer cette période</button>
-  </div>`;
-
-  const list = dp_clotures.slice().sort((a,b)=> a.dateDebut<b.dateDebut?1:-1).map(c=>{
-    const isClosed = c.statut==='clos';
-    return `<div class="ticket" style="${isClosed?'border-color:var(--forest);':'border-color:var(--amber);'}">
-      <div class="row-between">
-        <div>
-          <div style="font-weight:700;font-size:13.5px;">${fmtDateShort(c.dateDebut)} → ${fmtDateShort(c.dateFin)}</div>
-          <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">
-            ${isClosed ? `🔒 Clôturée par ${esc(c.clotureParEn)} le ${fmtDateShort(c.clotureLe.slice(0,10))}` : `🔓 Réouverte par ${esc(c.reouverteParEn||'')} le ${fmtDateShort((c.reouverteLe||'').slice(0,10))}`}
-          </div>
-        </div>
-        <div class="mono" style="font-weight:700;color:${isClosed?'var(--moss)':'var(--amber)'};">${dp_fmtMoney(c.soldeTheorique)}</div>
-      </div>
-      <div style="margin-top:10px;display:flex;gap:8px;">
-        ${isClosed
-          ? `<button class="btn ghost small" onclick="dp_reouvrirCloture('${c.id}')">🔓 Réouvrir</button>`
-          : `<button class="btn moss small" onclick="dp_recloturer('${c.id}')">🔒 Reclôturer</button>`}
-      </div>
-    </div>`;
-  }).join('') || `<div class="empty-state">Aucune clôture enregistrée pour l'instant.</div>`;
-
-  return form + `<h2 class="section">Historique des clôtures</h2>` + list;
-}
-
-async function dp_creerCloture(){
-  if(!dp_clotureStart || !dp_clotureEnd || dp_clotureStart>dp_clotureEnd) return;
-  const overlap = dp_clotures.find(c=>c.statut==='clos' && !(dp_clotureEnd<c.dateDebut || dp_clotureStart>c.dateFin));
-  if(overlap){ alert('Cette plage chevauche une période déjà clôturée.'); return; }
-  const solde = dp_computeSolde(dp_mouvements.filter(m=>m.date>=dp_clotureStart && m.date<=dp_clotureEnd));
-  if(!confirm(`Clôturer la période du ${fmtDateShort(dp_clotureStart)} au ${fmtDateShort(dp_clotureEnd)} avec un solde théorique de ${dp_fmtMoney(solde)} ?\n\nLes mouvements de cette période ne pourront plus être ajoutés, modifiés ni supprimés tant que la clôture n'est pas réouverte.`)) return;
-  await dp_cloturesCol.doc(uid()).set({
-    dateDebut: dp_clotureStart, dateFin: dp_clotureEnd, soldeTheorique: solde,
-    statut: 'clos', clotureParEn: currentUser, clotureLe: new Date().toISOString(),
-  });
-  dp_clotureStart = ''; dp_clotureEnd = '';
-  dp_render();
-}
-async function dp_reouvrirCloture(id){
-  if(!confirm("Réouvrir cette période ? Les mouvements redeviendront modifiables jusqu'à une nouvelle clôture.")) return;
-  await dp_cloturesCol.doc(id).set({ statut:'reouvert', reouverteParEn: currentUser, reouverteLe: new Date().toISOString() }, { merge:true });
-}
 /* ==================== MODULE STOCK ==================== */
 const ST_SECTIONS = [
   { key:'articles',   label:'Articles',        ic:'📋', desc:'Catalogue & seuils Min/Max' },
@@ -3028,14 +2885,6 @@ async function st_deleteArticle(id){
   if(!a) return;
   if(!confirm('Supprimer cet article : "'+a.nom+'" ?')) return;
   try{ await st_articlesCol.doc(id).delete(); }catch(e){ console.warn(e); }
-}
-
-async function dp_recloturer(id){
-  const c = dp_clotures.find(x=>x.id===id);
-  if(!c) return;
-  const solde = dp_computeSolde(dp_mouvements.filter(m=>m.date>=c.dateDebut && m.date<=c.dateFin));
-  if(!confirm(`Reclôturer la période du ${fmtDateShort(c.dateDebut)} au ${fmtDateShort(c.dateFin)} avec un solde théorique de ${dp_fmtMoney(solde)} ?`)) return;
-  await dp_cloturesCol.doc(id).set({ statut:'clos', soldeTheorique: solde, clotureParEn: currentUser, clotureLe: new Date().toISOString() }, { merge:true });
 }
 
 dp_render();
