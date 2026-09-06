@@ -1002,6 +1002,7 @@ async function ca_saveSession(){
     ca_allSessions = { ...ca_allSessions, [ca_session.date]: saved };
     ca_setSyncLabel('✓ Synchronisé');
     ca_render();
+    alert('Clôture du '+fmtDateShort(ca_session.date)+' enregistrée.');
   }catch(e){
     console.warn(e);
     ca_setSyncLabel('⚠ Échec de la sauvegarde');
