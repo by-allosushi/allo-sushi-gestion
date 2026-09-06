@@ -895,17 +895,25 @@ function ca_toggleSection(key){
 }
 function ca_sectionSubtotal(key){
   if(key==='entrant') return ca_parseNum(ca_session.debutCaisse)+ca_totalEntreesDiverses(ca_session);
-  if(key==='horscaisse') return ca_sumLines(ca_session.virements)+ca_sumLines(ca_session.enAttente)+ca_sumLines(ca_session.retraitsGerant)+ca_sumLines(ca_session.retraitsDivers);
+  if(key==='horscaisse') return ca_sumLines(ca_session.sorties);
   if(key==='erp') return ca_parseNum(ca_session.totalVentesErp);
   return null;
 }
 
+const CA_SORTIE_MOTIFS = [
+  {value:'virement', label:'Virement (client, société, livraison…)', calcType:'virement'},
+  {value:'nonregle', label:'Commande non réglée (invitation, différé…)', calcType:'nonregle'},
+  {value:'retrait', label:'Retrait de caisse (gérant, fournisseur…)', calcType:'retrait'}
+];
+function ca_sortieCalcType(motif){ const m = CA_SORTIE_MOTIFS.find(x=>x.value===motif); return m ? m.calcType : 'retrait'; }
+function ca_sumSortiesByType(sorties, calcType){ return (sorties||[]).filter(l=>ca_sortieCalcType(l.motif)===calcType).reduce((s,l)=>s+ca_parseNum(l.montant),0); }
+
 /* ---------------- Calculs ---------------- */
 function ca_sumLines(lines){ return (lines||[]).reduce((s,l)=>s+ca_parseNum(l.montant),0); }
 function ca_totalEntreesDiverses(s){ return ca_sumLines(s.entrees); }
-function ca_partEspecesErp(s){ return ca_parseNum(s.totalVentesErp) - ca_sumLines(s.virements) - ca_sumLines(s.enAttente); }
+function ca_partEspecesErp(s){ return ca_parseNum(s.totalVentesErp) - ca_sumSortiesByType(s.sorties,'virement') - ca_sumSortiesByType(s.sorties,'nonregle'); }
 function ca_montantDisponible(s){ return ca_parseNum(s.debutCaisse) + ca_totalEntreesDiverses(s) + ca_partEspecesErp(s); }
-function ca_totalRetraits(s){ return ca_sumLines(s.retraitsGerant) + ca_sumLines(s.retraitsDivers); }
+function ca_totalRetraits(s){ return ca_sumSortiesByType(s.sorties,'retrait'); }
 function ca_montantTheorique(s){ return ca_montantDisponible(s) - ca_totalRetraits(s); }
 function ca_ecart(s){
   if(s.montantCompte===undefined || s.montantCompte===null || s.montantCompte==='') return null;
@@ -919,6 +927,16 @@ function ca_montantPourLendemain(s){
 }
 
 function ca_normalizeSession(s, date){
+  // migration : anciennes données en listes séparées -> liste unique "sorties"
+  let sorties = Array.isArray(s.sorties) ? s.sorties : null;
+  if(!sorties){
+    sorties = [
+      ...(Array.isArray(s.virements) ? s.virements.map(l=>({...l, motif:'virement'})) : []),
+      ...(Array.isArray(s.enAttente) ? s.enAttente.map(l=>({...l, motif:'nonregle'})) : []),
+      ...(Array.isArray(s.retraitsGerant) ? s.retraitsGerant.map(l=>({...l, motif:'retrait'})) : []),
+      ...(Array.isArray(s.retraitsDivers) ? s.retraitsDivers.map(l=>({...l, motif:'retrait'})) : []),
+    ];
+  }
   return {
     date: date,
     debutCaisse: s.debutCaisse!==undefined ? s.debutCaisse : '',
@@ -926,10 +944,7 @@ function ca_normalizeSession(s, date){
     debutCaisseManuel: !!s.debutCaisseManuel,
     entrees: Array.isArray(s.entrees) ? s.entrees : [],
     totalVentesErp: s.totalVentesErp!==undefined ? s.totalVentesErp : '',
-    virements: Array.isArray(s.virements) ? s.virements : [],
-    enAttente: Array.isArray(s.enAttente) ? s.enAttente : [],
-    retraitsGerant: Array.isArray(s.retraitsGerant) ? s.retraitsGerant : [],
-    retraitsDivers: Array.isArray(s.retraitsDivers) ? s.retraitsDivers : [],
+    sorties: sorties,
     montantCompte: s.montantCompte!==undefined ? s.montantCompte : '',
     noteValidation: s.noteValidation!==undefined ? s.noteValidation : '',
     enregistreParEn: s.enregistreParEn,
@@ -938,7 +953,7 @@ function ca_normalizeSession(s, date){
 }
 function ca_blankSession(date){
   const prev = ca_allSessions[prevDateStr(date)];
-  const base = { date, entrees: [], totalVentesErp: '', virements: [], enAttente: [], retraitsGerant: [], retraitsDivers: [], montantCompte: '', noteValidation: '' };
+  const base = { date, entrees: [], totalVentesErp: '', sorties: [], montantCompte: '', noteValidation: '' };
   if(prev){
     return { ...base, debutCaisse: ca_montantPourLendemain(prev), debutCaisseAuto: true };
   }
@@ -1081,31 +1096,9 @@ function ca_renderSectionBody(key, ecart){
     </div>`;
 
   if(key==='horscaisse') return `
-    <div class="section-label">Ventes payées par virement</div>
-    ${ca_linesEditor(ca_session.virements, 'virements', 'Note (ex. client, référence)')}
-    <button class="btn small ghost" onclick="ca_addLine('virements')">+ Ajouter un virement</button>
-    <div class="subtotal"><span>Total virements</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.virements))}</span></div>
-    <div style="margin-top:8px;margin-bottom:16px;padding:8px 10px;background:var(--rust-bg);border-radius:6px;font-size:11.5px;color:var(--rust);font-weight:600;">⚠ Ces ventes devront être validées dans l'ERP.</div>
-
-    <div class="section-label" style="padding-top:14px;border-top:1px solid var(--line);">Commandes non réglées (validées dans l'ERP, non payées)</div>
-    ${ca_linesEditor(ca_session.enAttente, 'enAttente', 'Note (ex. client, raison)')}
-    <button class="btn small ghost" onclick="ca_addLine('enAttente')">+ Ajouter une commande non réglée</button>
-    <div class="subtotal"><span>Total non réglé</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.enAttente))}</span></div>
-
-    <div class="section-label" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);">Retraits de la caisse</div>
-    <div class="form-section">
-      <div class="section-label">Retrait par le Gérant</div>
-      ${ca_linesEditor(ca_session.retraitsGerant, 'retraitsGerant', 'Note (obligatoire)')}
-      <button class="btn small ghost" onclick="ca_addLine('retraitsGerant')">+ Ajouter un retrait gérant</button>
-      <div class="subtotal"><span>Total retraits gérant</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.retraitsGerant))}</span></div>
-    </div>
-    <div class="form-section">
-      <div class="section-label">Retrait pour divers paiements</div>
-      ${ca_linesEditor(ca_session.retraitsDivers, 'retraitsDivers', 'Motif (ex. achat, fournisseur…)')}
-      <button class="btn small ghost" onclick="ca_addLine('retraitsDivers')">+ Ajouter un retrait divers</button>
-      <div class="subtotal"><span>Total retraits divers</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.retraitsDivers))}</span></div>
-    </div>
-    <div style="font-size:11px;color:var(--ink-muted);margin-top:4px;">Le gérant peut être sollicité plusieurs fois dans la journée — ajoute une ligne à chaque fois.</div>`;
+    ${ca_sortiesEditor(ca_session.sorties)}
+    <button class="btn small ghost" onclick="ca_addSortie()">+ Ajouter une sortie</button>
+    <div class="subtotal"><span>Total sorties de caisse</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.sorties))}</span></div>`;
 
   if(key==='erp') return `
     <div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:8px;">Toutes les commandes, tous modes de paiement confondus (le chiffre affiché par l'ERP).</div>
@@ -1113,13 +1106,6 @@ function ca_renderSectionBody(key, ecart){
 
   // validation
   return `
-    <div class="ticket" style="background:var(--paper);margin-bottom:10px;">
-      <div class="subtotal"><span>Part espèces des ventes ERP (C − D − E)</span><span class="mono" style="font-weight:700;">${ca_fmtMoney(ca_partEspecesErp(ca_session))}</span></div>
-    </div>
-    <div class="result-box prelim">
-      <div><div class="label">Montant disponible dans la caisse</div></div>
-      <div class="value">${ca_fmtMoney(ca_montantDisponible(ca_session))}</div>
-    </div>
     <div class="result-box prelim">
       <div><div class="label">Montant théorique de clôture</div></div>
       <div class="value">${ca_fmtMoney(ca_montantTheorique(ca_session))}</div>
@@ -1216,6 +1202,26 @@ function ca_removeLine(key, id){
   ca_render();
 }
 
+function ca_sortiesEditor(sorties){
+  if(!sorties || sorties.length===0){
+    return `<p style="font-size:12px;color:var(--ink-muted);margin:4px 0 10px;">Aucune sortie pour l'instant.</p>`;
+  }
+  return sorties.map(l=>`
+    <div class="line-row" style="align-items:flex-start;">
+      <input class="amount" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="${l.montant}" placeholder="Montant" oninput="ca_updateLine('sorties','${l.id}','montant',this.value)" />
+      <select style="flex:1;min-width:0;" onchange="ca_updateLine('sorties','${l.id}','motif',this.value)">
+        ${CA_SORTIE_MOTIFS.map(m=>`<option value="${m.value}" ${l.motif===m.value?'selected':''}>${esc(m.label)}</option>`).join('')}
+      </select>
+      <button class="x-btn" onclick="ca_removeLine('sorties','${l.id}')">✕</button>
+    </div>
+  `).join('');
+}
+function ca_addSortie(){
+  if(!Array.isArray(ca_session.sorties)) ca_session.sorties = [];
+  ca_session.sorties.push({ id: uid(), montant: '', motif: CA_SORTIE_MOTIFS[0].value });
+  ca_render();
+}
+
 function ca_renderHistoriqueTab(){
   const dates = Object.keys(ca_allSessions).sort((a,b)=>a<b?1:-1);
   if(dates.length===0){
@@ -1228,7 +1234,7 @@ function ca_renderHistoriqueTab(){
     return `<div class="hist-row" onclick="ca_setTab('caisse');ca_loadSessionForDate('${date}')">
       <div>
         <div class="d">${fmtDateShort(date)}</div>
-        <div class="s">Début : ${ca_fmtMoney(s.debutCaisse)} · ERP : ${ca_fmtMoney(s.totalVentesErp)} · Virement : ${ca_fmtMoney(ca_sumLines(s.virements))} · Non réglé : ${ca_fmtMoney(ca_sumLines(s.enAttente))} · Retraits : ${ca_fmtMoney(ca_totalRetraits(s))}${ecart!==null?` · Écart : ${ecart>0?'+':''}${ca_fmtMoney(ecart)}`:''}${s.enregistreParEn?' · par '+esc(s.enregistreParEn):''}</div>
+        <div class="s">Début : ${ca_fmtMoney(s.debutCaisse)} · ERP : ${ca_fmtMoney(s.totalVentesErp)} · Virement : ${ca_fmtMoney(ca_sumSortiesByType(s.sorties,'virement'))} · Non réglé : ${ca_fmtMoney(ca_sumSortiesByType(s.sorties,'nonregle'))} · Retraits : ${ca_fmtMoney(ca_totalRetraits(s))}${ecart!==null?` · Écart : ${ecart>0?'+':''}${ca_fmtMoney(ecart)}`:''}${s.enregistreParEn?' · par '+esc(s.enregistreParEn):''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         <div class="e">${ca_fmtMoney(theorique)}</div>
