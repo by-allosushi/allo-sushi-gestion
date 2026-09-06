@@ -2220,6 +2220,17 @@ const ST_SECTIONS = [
 let st_currentSection = null;
 function st_min2(a){ return (a && a.max1 ? a.max1 : 0) + 5; }
 const st_articlesCol = db.collection('stock_articles');
+const st_movementsCol = db.collection('stock_movements');
+let st_movements = [];
+st_movementsCol.onSnapshot((snap)=>{
+  st_movements = snap.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(activeModule==='stock') st_render();
+}, (err)=>console.warn(err));
+
+function st_qteAAcheter(a){
+  const q = (a.max2||0) - (a.stock2||0) - (a.stock3||0);
+  return q > 0 ? q : 0;
+}
 let st_articles = [];
 st_articlesCol.onSnapshot((snap)=>{
   st_articles = snap.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));
@@ -2256,11 +2267,300 @@ function st_backToStockHome(){
 function st_renderSection(key){
   const s = ST_SECTIONS.find(x=>x.key===key);
   if(key==='articles') return st_renderArticlesSection();
+  if(key==='france') return st_renderFranceSection();
+  if(key==='arrivage') return st_renderArrivageSection();
+  if(key==='restaurant') return st_renderRestaurantSection();
   return `
     <button class="btn small ghost" style="margin-bottom:14px;" onclick="st_backToStockHome()">← Retour</button>
     <h2 class="section" style="margin-top:0;">${s.ic} ${esc(s.label)}</h2>
     <div class="empty-state">Écran "${esc(s.label)}" à construire.</div>
   `;
+}
+
+/* ---- Sous-écran : France Achat (Stock 3) ---- */
+let st_franceTab = 'apercu';
+function st_setFranceTab(t){ st_franceTab = t; st_render(); }
+function st_renderFranceSection(){
+  return `
+    <button class="btn small ghost" style="margin-bottom:14px;" onclick="st_backToStockHome()">← Retour</button>
+    <h2 class="section" style="margin-top:0;">🇫🇷 France Achat</h2>
+    <nav class="tabs" style="margin-bottom:12px;">
+      <button class="${st_franceTab==='apercu'?'active':''}" onclick="st_setFranceTab('apercu')">Aperçu</button>
+      <button class="${st_franceTab==='achat'?'active':''}" onclick="st_setFranceTab('achat')">Enregistrer un achat</button>
+      <button class="${st_franceTab==='envoi'?'active':''}" onclick="st_setFranceTab('envoi')">Envoyer vers Maison</button>
+      <button class="${st_franceTab==='historique'?'active':''}" onclick="st_setFranceTab('historique')">Historique</button>
+    </nav>
+    ${st_franceTab==='apercu' ? st_renderFranceApercu() : ''}
+    ${st_franceTab==='achat' ? st_renderFranceForm('achat') : ''}
+    ${st_franceTab==='envoi' ? st_renderFranceForm('envoi') : ''}
+    ${st_franceTab==='historique' ? st_renderFranceHistorique() : ''}
+  `;
+}
+function st_renderFranceApercu(){
+  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
+  return st_articles.map(a=>{
+    const qte = st_qteAAcheter(a);
+    return `
+    <div class="ticket" style="padding:12px 14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:700;font-size:14px;">${esc(a.nom)}</div>
+          <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Stock France : ${a.stock3||0} ${esc(a.unite||'')}</div>
+        </div>
+        ${qte>0 ? `<div style="text-align:right;"><div style="font-size:10.5px;color:var(--rust);">À acheter</div><div style="font-weight:800;color:var(--rust);">${qte} ${esc(a.unite||'')}</div></div>` : `<div style="font-size:11px;color:var(--moss);">✓ Stock suffisant</div>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+function st_renderFranceForm(mode){
+  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
+  return `
+    <div class="ticket">
+      <div class="field" style="margin-bottom:10px;">
+        <label>Article</label>
+        <select id="st-fr-article">
+          ${st_articles.map(a=>`<option value="${a.id}">${esc(a.nom)} (stock France: ${a.stock3||0})</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>Quantité</label>
+        <input type="text" inputmode="decimal" id="st-fr-qte" placeholder="0" />
+      </div>
+      <div class="field" style="margin-bottom:12px;">
+        <label>Note (optionnel)</label>
+        <input type="text" id="st-fr-note" placeholder="Ex: fournisseur, référence…" />
+      </div>
+      <button class="btn" onclick="st_recordFranceMovement('${mode}')">${mode==='achat' ? '+ Enregistrer l\u2019achat' : '↗ Envoyer vers Arrivage Maison'}</button>
+    </div>
+  `;
+}
+function st_renderFranceHistorique(){
+  const items = st_movements.filter(m=>m.type==='achat_france' || m.type==='envoi_maison');
+  if(items.length===0) return `<div class="empty-state">Aucun mouvement pour l'instant.</div>`;
+  return items.map(m=>`
+    <div class="ticket" style="padding:10px 14px;">
+      <div style="display:flex;justify-content:space-between;">
+        <div style="font-weight:600;font-size:13px;">${m.type==='achat_france' ? '🇫🇷 Achat' : '↗ Envoi vers Maison'} — ${esc(m.articleNom)}</div>
+        <div class="mono" style="font-weight:700;">${m.quantite}</div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
+    </div>
+  `).join('');
+}
+async function st_recordFranceMovement(mode){
+  const articleId = document.getElementById('st-fr-article').value;
+  const qte = ca_parseNum(document.getElementById('st-fr-qte').value);
+  const note = (document.getElementById('st-fr-note').value||'').trim();
+  const article = st_articles.find(a=>a.id===articleId);
+  if(!article){ alert('Article introuvable.'); return; }
+  if(!qte || qte<=0){ alert('Entre une quantité valide.'); return; }
+  try{
+    if(mode==='achat'){
+      await st_articlesCol.doc(articleId).update({ stock3: firebase.firestore.FieldValue.increment(qte) });
+      await st_movementsCol.add({ type:'achat_france', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() });
+    } else {
+      if(qte > (article.stock3||0)){ alert('Quantité supérieure au stock disponible en France ('+(article.stock3||0)+').'); return; }
+      await st_articlesCol.doc(articleId).update({
+        stock3: firebase.firestore.FieldValue.increment(-qte),
+        stock2: firebase.firestore.FieldValue.increment(qte)
+      });
+      await st_movementsCol.add({ type:'envoi_maison', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() });
+    }
+    document.getElementById('st-fr-qte').value = '';
+    document.getElementById('st-fr-note').value = '';
+    st_render();
+  }catch(e){
+    console.warn(e);
+    alert('Erreur lors de l\u2019enregistrement.');
+  }
+}
+
+/* ---- Sous-écran : Arrivage Maison (Stock 2) ---- */
+let st_arrivageTab = 'apercu';
+function st_setArrivageTab(t){ st_arrivageTab = t; st_render(); }
+function st_renderArrivageSection(){
+  return `
+    <button class="btn small ghost" style="margin-bottom:14px;" onclick="st_backToStockHome()">← Retour</button>
+    <h2 class="section" style="margin-top:0;">🏠 Arrivage Maison</h2>
+    <nav class="tabs" style="margin-bottom:12px;">
+      <button class="${st_arrivageTab==='apercu'?'active':''}" onclick="st_setArrivageTab('apercu')">Aperçu</button>
+      <button class="${st_arrivageTab==='transfert'?'active':''}" onclick="st_setArrivageTab('transfert')">Transférer vers Restaurant</button>
+      <button class="${st_arrivageTab==='historique'?'active':''}" onclick="st_setArrivageTab('historique')">Historique</button>
+    </nav>
+    ${st_arrivageTab==='apercu' ? st_renderArrivageApercu() : ''}
+    ${st_arrivageTab==='transfert' ? st_renderArrivageForm() : ''}
+    ${st_arrivageTab==='historique' ? st_renderArrivageHistorique() : ''}
+  `;
+}
+function st_renderArrivageApercu(){
+  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
+  return st_articles.map(a=>{
+    const min2 = st_min2(a);
+    const sousMin = (a.stock2||0) < min2;
+    return `
+    <div class="ticket" style="padding:12px 14px;${sousMin ? 'border-color:var(--rust);' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:700;font-size:14px;">${esc(a.nom)}</div>
+          <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Min: ${min2} (auto) · Max: ${a.max2||0}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:10.5px;color:${sousMin?'var(--rust)':'var(--ink-muted)'};">Stock actuel</div>
+          <div style="font-weight:800;color:${sousMin?'var(--rust)':'var(--ink)'};">${a.stock2||0} ${esc(a.unite||'')}</div>
+        </div>
+      </div>
+      ${sousMin ? `<div style="margin-top:8px;font-size:11px;color:var(--rust);">⚠ Sous le seuil minimum — pense à envoyer depuis la France.</div>` : ''}
+    </div>`;
+  }).join('');
+}
+function st_renderArrivageForm(){
+  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
+  return `
+    <div class="ticket">
+      <div class="field" style="margin-bottom:10px;">
+        <label>Article</label>
+        <select id="st-am-article">
+          ${st_articles.map(a=>`<option value="${a.id}">${esc(a.nom)} (stock Maison: ${a.stock2||0})</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>Quantité</label>
+        <input type="text" inputmode="decimal" id="st-am-qte" placeholder="0" />
+      </div>
+      <div class="field" style="margin-bottom:12px;">
+        <label>Note (optionnel)</label>
+        <input type="text" id="st-am-note" placeholder="Ex: motif, référence…" />
+      </div>
+      <button class="btn" onclick="st_recordArrivageTransfert()">↗ Transférer vers le Restaurant</button>
+    </div>
+  `;
+}
+function st_renderArrivageHistorique(){
+  const items = st_movements.filter(m=>m.type==='transfert_restaurant' || m.type==='envoi_maison');
+  if(items.length===0) return `<div class="empty-state">Aucun mouvement pour l'instant.</div>`;
+  return items.map(m=>`
+    <div class="ticket" style="padding:10px 14px;">
+      <div style="display:flex;justify-content:space-between;">
+        <div style="font-weight:600;font-size:13px;">${m.type==='envoi_maison' ? '↙ Reçu de France' : '↗ Transfert vers Restaurant'} — ${esc(m.articleNom)}</div>
+        <div class="mono" style="font-weight:700;">${m.quantite}</div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
+    </div>
+  `).join('');
+}
+async function st_recordArrivageTransfert(){
+  const articleId = document.getElementById('st-am-article').value;
+  const qte = ca_parseNum(document.getElementById('st-am-qte').value);
+  const note = (document.getElementById('st-am-note').value||'').trim();
+  const article = st_articles.find(a=>a.id===articleId);
+  if(!article){ alert('Article introuvable.'); return; }
+  if(!qte || qte<=0){ alert('Entre une quantité valide.'); return; }
+  if(qte > (article.stock2||0)){ alert('Quantité supérieure au stock disponible à l\u2019Arrivage Maison ('+(article.stock2||0)+').'); return; }
+  try{
+    await st_articlesCol.doc(articleId).update({
+      stock2: firebase.firestore.FieldValue.increment(-qte),
+      stock1: firebase.firestore.FieldValue.increment(qte)
+    });
+    await st_movementsCol.add({ type:'transfert_restaurant', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() });
+    document.getElementById('st-am-qte').value = '';
+    document.getElementById('st-am-note').value = '';
+    st_render();
+  }catch(e){
+    console.warn(e);
+    alert('Erreur lors de l\u2019enregistrement.');
+  }
+}
+
+/* ---- Sous-écran : Restaurant (Stock 1) ---- */
+let st_restaurantTab = 'apercu';
+function st_setRestaurantTab(t){ st_restaurantTab = t; st_render(); }
+function st_renderRestaurantSection(){
+  return `
+    <button class="btn small ghost" style="margin-bottom:14px;" onclick="st_backToStockHome()">← Retour</button>
+    <h2 class="section" style="margin-top:0;">🍽️ Restaurant</h2>
+    <nav class="tabs" style="margin-bottom:12px;">
+      <button class="${st_restaurantTab==='apercu'?'active':''}" onclick="st_setRestaurantTab('apercu')">Aperçu</button>
+      <button class="${st_restaurantTab==='sortie'?'active':''}" onclick="st_setRestaurantTab('sortie')">Enregistrer une sortie</button>
+      <button class="${st_restaurantTab==='historique'?'active':''}" onclick="st_setRestaurantTab('historique')">Historique</button>
+    </nav>
+    ${st_restaurantTab==='apercu' ? st_renderRestaurantApercu() : ''}
+    ${st_restaurantTab==='sortie' ? st_renderRestaurantForm() : ''}
+    ${st_restaurantTab==='historique' ? st_renderRestaurantHistorique() : ''}
+  `;
+}
+function st_renderRestaurantApercu(){
+  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
+  return st_articles.map(a=>{
+    const sousMin = (a.stock1||0) < (a.min1||0);
+    return `
+    <div class="ticket" style="padding:12px 14px;${sousMin ? 'border-color:var(--rust);' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:700;font-size:14px;">${esc(a.nom)}</div>
+          <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Min: ${a.min1||0} · Max: ${a.max1||0}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:10.5px;color:${sousMin?'var(--rust)':'var(--ink-muted)'};">Stock actuel</div>
+          <div style="font-weight:800;color:${sousMin?'var(--rust)':'var(--ink)'};">${a.stock1||0} ${esc(a.unite||'')}</div>
+        </div>
+      </div>
+      ${sousMin ? `<div style="margin-top:8px;font-size:11px;color:var(--rust);">⚠ Sous le seuil minimum — pense à transférer depuis l'Arrivage Maison.</div>` : ''}
+    </div>`;
+  }).join('');
+}
+function st_renderRestaurantForm(){
+  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
+  return `
+    <div class="ticket">
+      <div class="field" style="margin-bottom:10px;">
+        <label>Article</label>
+        <select id="st-re-article">
+          ${st_articles.map(a=>`<option value="${a.id}">${esc(a.nom)} (stock: ${a.stock1||0})</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>Quantité sortie</label>
+        <input type="text" inputmode="decimal" id="st-re-qte" placeholder="0" />
+      </div>
+      <div class="field" style="margin-bottom:12px;">
+        <label>Motif (optionnel)</label>
+        <input type="text" id="st-re-note" placeholder="Ex: consommation, casse, perte…" />
+      </div>
+      <button class="btn" onclick="st_recordRestaurantSortie()">− Enregistrer la sortie</button>
+    </div>
+  `;
+}
+function st_renderRestaurantHistorique(){
+  const items = st_movements.filter(m=>m.type==='sortie_restaurant' || m.type==='transfert_restaurant');
+  if(items.length===0) return `<div class="empty-state">Aucun mouvement pour l'instant.</div>`;
+  return items.map(m=>`
+    <div class="ticket" style="padding:10px 14px;">
+      <div style="display:flex;justify-content:space-between;">
+        <div style="font-weight:600;font-size:13px;">${m.type==='transfert_restaurant' ? '↙ Reçu d\u2019Arrivage Maison' : '− Sortie'} — ${esc(m.articleNom)}</div>
+        <div class="mono" style="font-weight:700;">${m.quantite}</div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
+    </div>
+  `).join('');
+}
+async function st_recordRestaurantSortie(){
+  const articleId = document.getElementById('st-re-article').value;
+  const qte = ca_parseNum(document.getElementById('st-re-qte').value);
+  const note = (document.getElementById('st-re-note').value||'').trim();
+  const article = st_articles.find(a=>a.id===articleId);
+  if(!article){ alert('Article introuvable.'); return; }
+  if(!qte || qte<=0){ alert('Entre une quantité valide.'); return; }
+  if(qte > (article.stock1||0)){ alert('Quantité supérieure au stock disponible au restaurant ('+(article.stock1||0)+').'); return; }
+  try{
+    await st_articlesCol.doc(articleId).update({ stock1: firebase.firestore.FieldValue.increment(-qte) });
+    await st_movementsCol.add({ type:'sortie_restaurant', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() });
+    document.getElementById('st-re-qte').value = '';
+    document.getElementById('st-re-note').value = '';
+    st_render();
+  }catch(e){
+    console.warn(e);
+    alert('Erreur lors de l\u2019enregistrement.');
+  }
 }
 
 /* ---- Sous-écran : Articles (catalogue + seuils) ---- */
