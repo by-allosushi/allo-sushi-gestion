@@ -2232,6 +2232,38 @@ function st_qteAAcheter(a){
   const q = (a.max2||0) - (a.stock2||0) - (a.stock3||0);
   return q > 0 ? q : 0;
 }
+
+/* ---- Moteur générique d'effets sur le stock (pour édition/suppression de n'importe quel mouvement) ---- */
+function st_movementEffects(m){
+  if(m.type==='achat_france') return [{articleId:m.articleId, field:'stock3', delta:m.quantite}];
+  if(m.type==='envoi_maison') return [{articleId:m.articleId, field:'stock3', delta:-m.quantite},{articleId:m.articleId, field:'stock2', delta:m.quantite}];
+  if(m.type==='transfert_restaurant') return [{articleId:m.articleId, field:'stock2', delta:-m.quantite},{articleId:m.articleId, field:'stock1', delta:m.quantite}];
+  if(m.type==='sortie_restaurant') return [{articleId:m.articleId, field:'stock1', delta:-m.quantite}];
+  if(m.type==='achat_local') return [{articleId:m.articleId, field: m.destination==='restaurant'?'stock1':'stock2', delta:m.quantite}];
+  return [];
+}
+async function st_applyEffects(effects, sign){
+  const byArticle = {};
+  effects.forEach(e=>{
+    if(!byArticle[e.articleId]) byArticle[e.articleId] = {};
+    byArticle[e.articleId][e.field] = (byArticle[e.articleId][e.field]||0) + e.delta*sign;
+  });
+  for(const articleId in byArticle){
+    const updates = {};
+    for(const field in byArticle[articleId]) updates[field] = firebase.firestore.FieldValue.increment(byArticle[articleId][field]);
+    await st_articlesCol.doc(articleId).update(updates);
+  }
+}
+async function st_deleteMovementGeneric(id){
+  const m = st_movements.find(x=>x.id===id);
+  if(!m) return;
+  if(!confirm('Supprimer ce mouvement ? Le stock sera ajusté en conséquence.')) return;
+  try{
+    await st_applyEffects(st_movementEffects(m), -1);
+    await st_movementsCol.doc(id).delete();
+    st_render();
+  }catch(e){ console.warn(e); alert('Erreur lors de la suppression.'); }
+}
 let st_articles = [];
 st_articlesCol.onSnapshot((snap)=>{
   st_articles = snap.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));
@@ -2255,6 +2287,7 @@ function st_render(){
     home.style.display = 'none';
     section.style.display = 'block';
     section.innerHTML = st_renderSection(st_currentSection);
+    if(st_currentSection==='france' && st_franceTab==='achat') st_updateFrancePreview();
   }
 }
 function st_showSection(key){
@@ -2340,6 +2373,7 @@ function st_updateFrancePreview(){
 }
 let st_frArticleId = null;
 function st_frSelectArticle(id){ st_frArticleId = id; st_render(); }
+let st_frEditingId = null;
 function st_renderFranceForm(mode){
   if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
   if(!st_frArticleId || !st_articles.find(a=>a.id===st_frArticleId)) st_frArticleId = st_articles[0].id;
@@ -2353,8 +2387,8 @@ function st_renderFranceForm(mode){
       </div>
       ${mode==='achat' ? st_renderPriceCompare(st_frArticleId) : ''}
       <div class="field" style="margin-bottom:10px;">
-        <label>Quantité</label>
-        <input type="text" inputmode="decimal" id="st-fr-qte" placeholder="0" oninput="st_updateFrancePreview()" />
+        <label>Quantité${mode==='achat' && !st_frEditingId ? ' <span style="font-weight:400;color:var(--ink-muted);">(suggestion pré-remplie, modifiable)</span>' : ''}</label>
+        <input type="text" inputmode="decimal" id="st-fr-qte" value="${mode==='achat' && !st_frEditingId ? st_qteAAcheter(st_articles.find(a=>a.id===st_frArticleId)) : ''}" placeholder="0" oninput="st_updateFrancePreview()" />
       </div>
       ${mode==='achat' ? `
       <div class="grid grid-2" style="margin-bottom:6px;">
@@ -2373,21 +2407,49 @@ function st_renderFranceForm(mode){
         <label>Note (optionnel)</label>
         <input type="text" id="st-fr-note" placeholder="Ex: fournisseur, référence…" />
       </div>
-      <button class="btn" onclick="st_recordFranceMovement('${mode}')">${mode==='achat' ? '+ Enregistrer l\u2019achat' : '↗ Envoyer vers Arrivage Maison'}</button>
+      <div class="actions-row">
+        <button class="btn" onclick="st_recordFranceMovement('${mode}')">${st_frEditingId ? '✓ Enregistrer les modifications' : (mode==='achat' ? '+ Enregistrer l\u2019achat' : '↗ Envoyer vers Arrivage Maison')}</button>
+        ${st_frEditingId ? `<button class="btn ghost" onclick="st_cancelEditFrance()">Annuler</button>` : ''}
+      </div>
     </div>
   `;
+}
+function st_cancelEditFrance(){ st_frEditingId = null; st_render(); }
+function st_editFranceMovement(id){
+  const m = st_movements.find(x=>x.id===id);
+  if(!m) return;
+  st_frEditingId = id;
+  st_frArticleId = m.articleId;
+  st_franceTab = m.type==='achat_france' ? 'achat' : 'envoi';
+  st_render();
+  setTimeout(()=>{
+    document.getElementById('st-fr-article').value = m.articleId;
+    document.getElementById('st-fr-qte').value = m.quantite;
+    document.getElementById('st-fr-note').value = m.note||'';
+    if(m.type==='achat_france'){
+      document.getElementById('st-fr-prix-eur').value = m.prixEur||'';
+      document.getElementById('st-fr-taux').value = m.taux||'';
+      st_updateFrancePreview();
+    }
+  }, 0);
 }
 function st_renderFranceHistorique(){
   const items = st_movements.filter(m=>m.type==='achat_france' || m.type==='envoi_maison');
   if(items.length===0) return `<div class="empty-state">Aucun mouvement pour l'instant.</div>`;
   return items.map(m=>`
     <div class="ticket" style="padding:10px 14px;">
-      <div style="display:flex;justify-content:space-between;">
-        <div style="font-weight:600;font-size:13px;">${m.type==='achat_france' ? '🇫🇷 Achat' : '↗ Envoi vers Maison'} — ${esc(m.articleNom)}</div>
-        <div class="mono" style="font-weight:700;">${m.quantite}</div>
+      <div style="display:flex;justify-content:space-between;gap:10px;">
+        <div>
+          <div style="font-weight:600;font-size:13px;">${m.type==='achat_france' ? '🇫🇷 Achat' : '↗ Envoi vers Maison'} — ${esc(m.articleNom)}</div>
+          <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
+          ${m.type==='achat_france' && m.prixEur ? `<div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${m.prixEur} € × taux ${m.taux} = ${ca_fmtMoney(m.prixDzd)} /u · Total ${ca_fmtMoney(m.totalDzd)}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <div class="mono" style="font-weight:700;">${m.quantite}</div>
+          <button class="btn small ghost" onclick="st_editFranceMovement('${m.id}')">✎</button>
+          <button class="btn small ghost" onclick="st_deleteMovementGeneric('${m.id}')">✕</button>
+        </div>
       </div>
-      <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
-      ${m.type==='achat_france' && m.prixEur ? `<div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${m.prixEur} € × taux ${m.taux} = ${ca_fmtMoney(m.prixDzd)} /u · Total ${ca_fmtMoney(m.totalDzd)}</div>` : ''}
     </div>
   `).join('');
 }
@@ -2406,15 +2468,30 @@ async function st_recordFranceMovement(mode){
       if(!taux || taux<=0){ alert('Entre un taux de change valide.'); return; }
       const prixDzd = prixEur * taux;
       const totalDzd = prixDzd * qte;
-      await st_articlesCol.doc(articleId).update({ stock3: firebase.firestore.FieldValue.increment(qte) });
-      await st_movementsCol.add({ type:'achat_france', articleId, articleNom:article.nom, quantite:qte, prixEur, taux, prixDzd, totalDzd, note, par:currentUser, date:new Date().toISOString() });
+      const newMove = { type:'achat_france', articleId, articleNom:article.nom, quantite:qte, prixEur, taux, prixDzd, totalDzd, note, par:currentUser, date:new Date().toISOString() };
+      if(st_frEditingId){
+        const old = st_movements.find(x=>x.id===st_frEditingId);
+        if(old) await st_applyEffects(st_movementEffects(old), -1);
+        await st_applyEffects(st_movementEffects(newMove), 1);
+        await st_movementsCol.doc(st_frEditingId).set(newMove);
+        st_frEditingId = null;
+      } else {
+        await st_applyEffects(st_movementEffects(newMove), 1);
+        await st_movementsCol.add(newMove);
+      }
     } else {
-      if(qte > (article.stock3||0)){ alert('Quantité supérieure au stock disponible en France ('+(article.stock3||0)+').'); return; }
-      await st_articlesCol.doc(articleId).update({
-        stock3: firebase.firestore.FieldValue.increment(-qte),
-        stock2: firebase.firestore.FieldValue.increment(qte)
-      });
-      await st_movementsCol.add({ type:'envoi_maison', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() });
+      const newMove = { type:'envoi_maison', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() };
+      if(st_frEditingId){
+        const old = st_movements.find(x=>x.id===st_frEditingId);
+        if(old) await st_applyEffects(st_movementEffects(old), -1);
+        await st_applyEffects(st_movementEffects(newMove), 1);
+        await st_movementsCol.doc(st_frEditingId).set(newMove);
+        st_frEditingId = null;
+      } else {
+        if(qte > (article.stock3||0)){ alert('Quantité supérieure au stock disponible en France ('+(article.stock3||0)+').'); return; }
+        await st_applyEffects(st_movementEffects(newMove), 1);
+        await st_movementsCol.add(newMove);
+      }
     }
     document.getElementById('st-fr-qte').value = '';
     document.getElementById('st-fr-note').value = '';
@@ -2478,7 +2555,10 @@ function st_renderAlForm(){
         <label>Note (optionnel)</label>
         <input type="text" id="st-al-note" placeholder="Ex: fournisseur, marché…" />
       </div>
-      <button class="btn" onclick="st_recordAchatLocal()">+ Enregistrer l\u2019achat local</button>
+      <div class="actions-row">
+        <button class="btn" onclick="st_recordAchatLocal()">${st_alEditingId ? '✓ Enregistrer les modifications' : '+ Enregistrer l\u2019achat local'}</button>
+        ${st_alEditingId ? `<button class="btn ghost" onclick="st_cancelEditAchatLocal()">Annuler</button>` : ''}
+      </div>
     </div>
   `;
 }
@@ -2487,14 +2567,52 @@ function st_renderAlHistorique(){
   if(items.length===0) return `<div class="empty-state">Aucun achat local pour l'instant.</div>`;
   return items.map(m=>`
     <div class="ticket" style="padding:10px 14px;">
-      <div style="display:flex;justify-content:space-between;">
-        <div style="font-weight:600;font-size:13px;">🛒 Achat local → ${m.destination==='restaurant'?'Restaurant':'Arrivage Maison'} — ${esc(m.articleNom)}</div>
-        <div class="mono" style="font-weight:700;">${m.quantite}</div>
+      <div style="display:flex;justify-content:space-between;gap:10px;">
+        <div>
+          <div style="font-weight:600;font-size:13px;">🛒 Achat local → ${m.destination==='restaurant'?'Restaurant':'Arrivage Maison'} — ${esc(m.articleNom)}</div>
+          <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
+          ${m.prixDa ? `<div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${ca_fmtMoney(m.prixDa)} /u · Total ${ca_fmtMoney(m.prixDa*m.quantite)}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <div class="mono" style="font-weight:700;">${m.quantite}</div>
+          <button class="btn small ghost" onclick="st_editAchatLocal('${m.id}')">✎</button>
+          <button class="btn small ghost" onclick="st_deleteAchatLocal('${m.id}')">✕</button>
+        </div>
       </div>
-      <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
-      ${m.prixDa ? `<div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${ca_fmtMoney(m.prixDa)} /u · Total ${ca_fmtMoney(m.prixDa*m.quantite)}</div>` : ''}
     </div>
   `).join('');
+}
+let st_alEditingId = null;
+function st_cancelEditAchatLocal(){ st_alEditingId = null; st_render(); }
+function st_editAchatLocal(id){
+  const m = st_movements.find(x=>x.id===id);
+  if(!m) return;
+  st_alEditingId = id;
+  st_alArticleId = m.articleId;
+  st_alTab = 'achat';
+  st_render();
+  setTimeout(()=>{
+    document.getElementById('st-al-dest').value = m.destination;
+    document.getElementById('st-al-article').value = m.articleId;
+    document.getElementById('st-al-qte').value = m.quantite;
+    document.getElementById('st-al-prix').value = m.prixDa||'';
+    document.getElementById('st-al-note').value = m.note||'';
+  }, 0);
+}
+async function st_deleteAchatLocal(id){
+  const m = st_movements.find(x=>x.id===id);
+  if(!m) return;
+  if(!confirm('Supprimer cet achat local de '+m.quantite+' '+m.articleNom+' ?')) return;
+  try{
+    const field = m.destination==='restaurant' ? 'stock1' : 'stock2';
+    await st_articlesCol.doc(m.articleId).update({ [field]: firebase.firestore.FieldValue.increment(-m.quantite) });
+    await st_movementsCol.doc(id).delete();
+    if(st_alEditingId===id){ st_alEditingId = null; }
+    st_render();
+  }catch(e){
+    console.warn(e);
+    alert('Erreur lors de la suppression.');
+  }
 }
 async function st_recordAchatLocal(){
   const dest = document.getElementById('st-al-dest').value;
@@ -2508,8 +2626,25 @@ async function st_recordAchatLocal(){
   if(!prixDa || prixDa<=0){ alert('Entre un prix unitaire en DA valide.'); return; }
   try{
     const field = dest==='restaurant' ? 'stock1' : 'stock2';
-    await st_articlesCol.doc(articleId).update({ [field]: firebase.firestore.FieldValue.increment(qte) });
-    await st_movementsCol.add({ type:'achat_local', destination:dest, articleId, articleNom:article.nom, quantite:qte, prixDa, note, par:currentUser, date:new Date().toISOString() });
+    if(st_alEditingId){
+      const old = st_movements.find(x=>x.id===st_alEditingId);
+      if(old){
+        const oldField = old.destination==='restaurant' ? 'stock1' : 'stock2';
+        if(oldField===field && old.articleId===articleId){
+          // même article/destination : on applique juste la différence
+          await st_articlesCol.doc(articleId).update({ [field]: firebase.firestore.FieldValue.increment(qte - old.quantite) });
+        } else {
+          // article ou destination différent : on annule l'ancien effet puis on applique le nouveau
+          await st_articlesCol.doc(old.articleId).update({ [oldField]: firebase.firestore.FieldValue.increment(-old.quantite) });
+          await st_articlesCol.doc(articleId).update({ [field]: firebase.firestore.FieldValue.increment(qte) });
+        }
+      }
+      await st_movementsCol.doc(st_alEditingId).set({ type:'achat_local', destination:dest, articleId, articleNom:article.nom, quantite:qte, prixDa, note, par:currentUser, date:new Date().toISOString() });
+      st_alEditingId = null;
+    } else {
+      await st_articlesCol.doc(articleId).update({ [field]: firebase.firestore.FieldValue.increment(qte) });
+      await st_movementsCol.add({ type:'achat_local', destination:dest, articleId, articleNom:article.nom, quantite:qte, prixDa, note, par:currentUser, date:new Date().toISOString() });
+    }
     document.getElementById('st-al-qte').value = '';
     document.getElementById('st-al-prix').value = '';
     document.getElementById('st-al-note').value = '';
@@ -2558,6 +2693,7 @@ function st_renderArrivageApercu(){
     </div>`;
   }).join('');
 }
+let st_amEditingId = null;
 function st_renderArrivageForm(){
   if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
   return `
@@ -2576,20 +2712,41 @@ function st_renderArrivageForm(){
         <label>Note (optionnel)</label>
         <input type="text" id="st-am-note" placeholder="Ex: motif, référence…" />
       </div>
-      <button class="btn" onclick="st_recordArrivageTransfert()">↗ Transférer vers le Restaurant</button>
+      <div class="actions-row">
+        <button class="btn" onclick="st_recordArrivageTransfert()">${st_amEditingId ? '✓ Enregistrer les modifications' : '↗ Transférer vers le Restaurant'}</button>
+        ${st_amEditingId ? `<button class="btn ghost" onclick="st_cancelEditArrivage()">Annuler</button>` : ''}
+      </div>
     </div>
   `;
+}
+function st_cancelEditArrivage(){ st_amEditingId = null; st_render(); }
+function st_editArrivageMovement(id){
+  const m = st_movements.find(x=>x.id===id);
+  if(!m) return;
+  st_amEditingId = id;
+  st_arrivageTab = 'transfert';
+  st_render();
+  setTimeout(()=>{
+    document.getElementById('st-am-article').value = m.articleId;
+    document.getElementById('st-am-qte').value = m.quantite;
+    document.getElementById('st-am-note').value = m.note||'';
+  }, 0);
 }
 function st_renderArrivageHistorique(){
   const items = st_movements.filter(m=>m.type==='transfert_restaurant' || m.type==='envoi_maison' || (m.type==='achat_local' && m.destination==='arrivage'));
   if(items.length===0) return `<div class="empty-state">Aucun mouvement pour l'instant.</div>`;
   return items.map(m=>`
     <div class="ticket" style="padding:10px 14px;">
-      <div style="display:flex;justify-content:space-between;">
-        <div style="font-weight:600;font-size:13px;">${m.type==='envoi_maison' ? '↙ Reçu de France' : m.type==='achat_local' ? '🛒 Achat local' : '↗ Transfert vers Restaurant'} — ${esc(m.articleNom)}</div>
-        <div class="mono" style="font-weight:700;">${m.quantite}</div>
+      <div style="display:flex;justify-content:space-between;gap:10px;">
+        <div>
+          <div style="font-weight:600;font-size:13px;">${m.type==='envoi_maison' ? '↙ Reçu de France' : m.type==='achat_local' ? '🛒 Achat local' : '↗ Transfert vers Restaurant'} — ${esc(m.articleNom)}</div>
+          <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <div class="mono" style="font-weight:700;">${m.quantite}</div>
+          ${m.type==='transfert_restaurant' ? `<button class="btn small ghost" onclick="st_editArrivageMovement('${m.id}')">✎</button><button class="btn small ghost" onclick="st_deleteMovementGeneric('${m.id}')">✕</button>` : ''}
+        </div>
       </div>
-      <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
     </div>
   `).join('');
 }
@@ -2600,13 +2757,19 @@ async function st_recordArrivageTransfert(){
   const article = st_articles.find(a=>a.id===articleId);
   if(!article){ alert('Article introuvable.'); return; }
   if(!qte || qte<=0){ alert('Entre une quantité valide.'); return; }
-  if(qte > (article.stock2||0)){ alert('Quantité supérieure au stock disponible à l\u2019Arrivage Maison ('+(article.stock2||0)+').'); return; }
+  const newMove = { type:'transfert_restaurant', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() };
   try{
-    await st_articlesCol.doc(articleId).update({
-      stock2: firebase.firestore.FieldValue.increment(-qte),
-      stock1: firebase.firestore.FieldValue.increment(qte)
-    });
-    await st_movementsCol.add({ type:'transfert_restaurant', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() });
+    if(st_amEditingId){
+      const old = st_movements.find(x=>x.id===st_amEditingId);
+      if(old) await st_applyEffects(st_movementEffects(old), -1);
+      await st_applyEffects(st_movementEffects(newMove), 1);
+      await st_movementsCol.doc(st_amEditingId).set(newMove);
+      st_amEditingId = null;
+    } else {
+      if(qte > (article.stock2||0)){ alert('Quantité supérieure au stock disponible à l\u2019Arrivage Maison ('+(article.stock2||0)+').'); return; }
+      await st_applyEffects(st_movementEffects(newMove), 1);
+      await st_movementsCol.add(newMove);
+    }
     document.getElementById('st-am-qte').value = '';
     document.getElementById('st-am-note').value = '';
     st_render();
@@ -2653,6 +2816,7 @@ function st_renderRestaurantApercu(){
     </div>`;
   }).join('');
 }
+let st_reEditingId = null;
 function st_renderRestaurantForm(){
   if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
   return `
@@ -2671,20 +2835,41 @@ function st_renderRestaurantForm(){
         <label>Motif (optionnel)</label>
         <input type="text" id="st-re-note" placeholder="Ex: consommation, casse, perte…" />
       </div>
-      <button class="btn" onclick="st_recordRestaurantSortie()">− Enregistrer la sortie</button>
+      <div class="actions-row">
+        <button class="btn" onclick="st_recordRestaurantSortie()">${st_reEditingId ? '✓ Enregistrer les modifications' : '− Enregistrer la sortie'}</button>
+        ${st_reEditingId ? `<button class="btn ghost" onclick="st_cancelEditRestaurant()">Annuler</button>` : ''}
+      </div>
     </div>
   `;
+}
+function st_cancelEditRestaurant(){ st_reEditingId = null; st_render(); }
+function st_editRestaurantMovement(id){
+  const m = st_movements.find(x=>x.id===id);
+  if(!m) return;
+  st_reEditingId = id;
+  st_restaurantTab = 'sortie';
+  st_render();
+  setTimeout(()=>{
+    document.getElementById('st-re-article').value = m.articleId;
+    document.getElementById('st-re-qte').value = m.quantite;
+    document.getElementById('st-re-note').value = m.note||'';
+  }, 0);
 }
 function st_renderRestaurantHistorique(){
   const items = st_movements.filter(m=>m.type==='sortie_restaurant' || m.type==='transfert_restaurant' || (m.type==='achat_local' && m.destination==='restaurant'));
   if(items.length===0) return `<div class="empty-state">Aucun mouvement pour l'instant.</div>`;
   return items.map(m=>`
     <div class="ticket" style="padding:10px 14px;">
-      <div style="display:flex;justify-content:space-between;">
-        <div style="font-weight:600;font-size:13px;">${m.type==='transfert_restaurant' ? '↙ Reçu d\u2019Arrivage Maison' : m.type==='achat_local' ? '🛒 Achat local' : '− Sortie'} — ${esc(m.articleNom)}</div>
-        <div class="mono" style="font-weight:700;">${m.quantite}</div>
+      <div style="display:flex;justify-content:space-between;gap:10px;">
+        <div>
+          <div style="font-weight:600;font-size:13px;">${m.type==='transfert_restaurant' ? '↙ Reçu d\u2019Arrivage Maison' : m.type==='achat_local' ? '🛒 Achat local' : '− Sortie'} — ${esc(m.articleNom)}</div>
+          <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <div class="mono" style="font-weight:700;">${m.quantite}</div>
+          ${m.type==='sortie_restaurant' ? `<button class="btn small ghost" onclick="st_editRestaurantMovement('${m.id}')">✎</button><button class="btn small ghost" onclick="st_deleteMovementGeneric('${m.id}')">✕</button>` : ''}
+        </div>
       </div>
-      <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
     </div>
   `).join('');
 }
@@ -2695,10 +2880,19 @@ async function st_recordRestaurantSortie(){
   const article = st_articles.find(a=>a.id===articleId);
   if(!article){ alert('Article introuvable.'); return; }
   if(!qte || qte<=0){ alert('Entre une quantité valide.'); return; }
-  if(qte > (article.stock1||0)){ alert('Quantité supérieure au stock disponible au restaurant ('+(article.stock1||0)+').'); return; }
+  const newMove = { type:'sortie_restaurant', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() };
   try{
-    await st_articlesCol.doc(articleId).update({ stock1: firebase.firestore.FieldValue.increment(-qte) });
-    await st_movementsCol.add({ type:'sortie_restaurant', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() });
+    if(st_reEditingId){
+      const old = st_movements.find(x=>x.id===st_reEditingId);
+      if(old) await st_applyEffects(st_movementEffects(old), -1);
+      await st_applyEffects(st_movementEffects(newMove), 1);
+      await st_movementsCol.doc(st_reEditingId).set(newMove);
+      st_reEditingId = null;
+    } else {
+      if(qte > (article.stock1||0)){ alert('Quantité supérieure au stock disponible au restaurant ('+(article.stock1||0)+').'); return; }
+      await st_applyEffects(st_movementEffects(newMove), 1);
+      await st_movementsCol.add(newMove);
+    }
     document.getElementById('st-re-qte').value = '';
     document.getElementById('st-re-note').value = '';
     st_render();
