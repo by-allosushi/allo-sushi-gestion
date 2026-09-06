@@ -482,6 +482,13 @@
   <main id="depenses-main"></main>
 </div>
 
+<div id="module-stock" class="module">
+  <main style="max-width:760px;margin:0 auto;padding:18px 16px 40px;">
+    <div id="stock-home" class="home-grid"></div>
+    <div id="stock-section" style="display:none;"></div>
+  </main>
+</div>
+
 <div id="module-users" class="module">
   <main style="max-width:760px;margin:0 auto;padding:18px 16px 40px;">
     <h2 class="section" style="margin-top:4px;">Nouvel utilisateur</h2>
@@ -540,6 +547,7 @@ const SESSION_KEY = 'allosushi-session';
 const MODULE_DEFS = [
   { key:'caisse',   label:'Caisse',    ic:'💰', desc:'Sessions de caisse' },
   { key:'depenses', label:'Dépenses',  ic:'🧾', desc:'Dépenses & pointages' },
+  { key:'stock',    label:'Stock',     ic:'📦', desc:'Gestion du stock' },
 ];
 let session = null; // { username, isAdmin, permissions:{caisse,depenses,soldeTheorique,soldeReel,ecart} }
 let usersCache = [];
@@ -854,6 +862,7 @@ function showModule(name){
   if(name==='users') uu_render();
   if(name==='caisse' && typeof ca_render==='function') ca_render();
   if(name==='depenses' && typeof dp_render==='function') dp_render();
+  if(name==='stock' && typeof st_render==='function') st_render();
 }
 
 document.getElementById('today-label').textContent =
@@ -2201,6 +2210,157 @@ async function dp_reouvrirCloture(id){
   if(!confirm("Réouvrir cette période ? Les mouvements redeviendront modifiables jusqu'à une nouvelle clôture.")) return;
   await dp_cloturesCol.doc(id).set({ statut:'reouvert', reouverteParEn: currentUser, reouverteLe: new Date().toISOString() }, { merge:true });
 }
+/* ==================== MODULE STOCK ==================== */
+const ST_SECTIONS = [
+  { key:'articles',   label:'Articles',        ic:'📋', desc:'Catalogue & seuils Min/Max' },
+  { key:'restaurant', label:'Restaurant',      ic:'🍽️', desc:'Stock au restaurant' },
+  { key:'arrivage',   label:'Arrivage Maison', ic:'🏠', desc:'Dépôt maison' },
+  { key:'france',     label:'France Achat',    ic:'🇫🇷', desc:'Achats & envoi depuis la France' },
+];
+let st_currentSection = null;
+const st_articlesCol = db.collection('stock_articles');
+let st_articles = [];
+st_articlesCol.onSnapshot((snap)=>{
+  st_articles = snap.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));
+  if(activeModule==='stock') st_render();
+}, (err)=>console.warn(err));
+
+function st_render(){
+  const home = document.getElementById('stock-home');
+  const section = document.getElementById('stock-section');
+  if(!st_currentSection){
+    home.style.display = 'grid';
+    section.style.display = 'none';
+    home.innerHTML = ST_SECTIONS.map(s=>`
+      <div class="home-card" onclick="st_showSection('${s.key}')">
+        <div class="ic">${s.ic}</div>
+        <div class="lbl">${s.label}</div>
+        <div class="desc">${s.desc}</div>
+      </div>
+    `).join('');
+  } else {
+    home.style.display = 'none';
+    section.style.display = 'block';
+    section.innerHTML = st_renderSection(st_currentSection);
+  }
+}
+function st_showSection(key){
+  st_currentSection = key;
+  st_render();
+}
+function st_backToStockHome(){
+  st_currentSection = null;
+  st_render();
+}
+function st_renderSection(key){
+  const s = ST_SECTIONS.find(x=>x.key===key);
+  if(key==='articles') return st_renderArticlesSection();
+  return `
+    <button class="btn small ghost" style="margin-bottom:14px;" onclick="st_backToStockHome()">← Retour</button>
+    <h2 class="section" style="margin-top:0;">${s.ic} ${esc(s.label)}</h2>
+    <div class="empty-state">Écran "${esc(s.label)}" à construire.</div>
+  `;
+}
+
+/* ---- Sous-écran : Articles (catalogue + seuils) ---- */
+let st_editingArticleId = null;
+function st_renderArticlesSection(){
+  return `
+    <button class="btn small ghost" style="margin-bottom:14px;" onclick="st_backToStockHome()">← Retour</button>
+    <h2 class="section" style="margin-top:0;">📋 Articles</h2>
+
+    <div class="ticket">
+      <div class="step-label"><div class="step-title">${st_editingArticleId ? 'Modifier cet article' : 'Nouvel article'}</div></div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>Nom de l'article</label>
+        <input type="text" id="st-art-nom" placeholder="Ex: Saumon, Riz, Panko…" />
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label>Unité</label>
+        <input type="text" id="st-art-unite" placeholder="Ex: kg, L, pièce…" />
+      </div>
+      <div class="grid grid-2" style="margin-bottom:6px;">
+        <div class="field">
+          <label>Min Restaurant</label>
+          <input type="text" inputmode="decimal" id="st-art-min1" placeholder="0" />
+        </div>
+        <div class="field">
+          <label>Max Restaurant</label>
+          <input type="text" inputmode="decimal" id="st-art-max1" placeholder="0" />
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:6px;">
+        <label>Max Arrivage Maison</label>
+        <input type="text" inputmode="decimal" id="st-art-max2" placeholder="0" />
+      </div>
+      <div style="font-size:11px;color:var(--ink-muted);margin-bottom:12px;">Le Min de l'Arrivage Maison est calculé automatiquement (= Max Restaurant).</div>
+      <div class="actions-row">
+        <button class="btn" onclick="st_saveArticle()">${st_editingArticleId ? '✓ Enregistrer les modifications' : '+ Ajouter cet article'}</button>
+        ${st_editingArticleId ? `<button class="btn ghost" onclick="st_cancelEditArticle()">Annuler</button>` : ''}
+      </div>
+    </div>
+
+    <h2 class="section">Articles existants (${st_articles.length})</h2>
+    ${st_articles.length===0 ? `<div class="empty-state">Aucun article pour l'instant.</div>` : st_articles.map(a=>`
+      <div class="ticket" style="padding:12px 14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+          <div>
+            <div style="font-weight:700;font-size:14px;">${esc(a.nom)} <span style="font-weight:400;color:var(--ink-muted);font-size:12px;">(${esc(a.unite||'-')})</span></div>
+            <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Min R: ${a.min1||0} · Max R: ${a.max1||0} · Min AM: ${a.max1||0} (auto) · Max AM: ${a.max2||0}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button class="btn small ghost" onclick="st_editArticle('${a.id}')">✎</button>
+            <button class="btn small ghost" onclick="st_deleteArticle('${a.id}')">✕</button>
+          </div>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+function st_editArticle(id){
+  const a = st_articles.find(x=>x.id===id);
+  if(!a) return;
+  st_editingArticleId = id;
+  st_render();
+  setTimeout(()=>{
+    document.getElementById('st-art-nom').value = a.nom||'';
+    document.getElementById('st-art-unite').value = a.unite||'';
+    document.getElementById('st-art-min1').value = a.min1||'';
+    document.getElementById('st-art-max1').value = a.max1||'';
+    document.getElementById('st-art-max2').value = a.max2||'';
+  }, 0);
+}
+function st_cancelEditArticle(){
+  st_editingArticleId = null;
+  st_render();
+}
+async function st_saveArticle(){
+  const nom = (document.getElementById('st-art-nom').value||'').trim();
+  const unite = (document.getElementById('st-art-unite').value||'').trim();
+  const min1 = ca_parseNum(document.getElementById('st-art-min1').value);
+  const max1 = ca_parseNum(document.getElementById('st-art-max1').value);
+  const max2 = ca_parseNum(document.getElementById('st-art-max2').value);
+  if(!nom){ alert('Le nom est obligatoire.'); return; }
+  try{
+    if(st_editingArticleId){
+      await st_articlesCol.doc(st_editingArticleId).set({ nom, unite, min1, max1, max2 }, { merge:true });
+    } else {
+      await st_articlesCol.add({ nom, unite, min1, max1, max2, stock1:0, stock2:0, stock3:0, creeLe: new Date().toISOString() });
+    }
+    st_editingArticleId = null;
+    st_render();
+  }catch(e){
+    console.warn(e);
+    alert('Erreur lors de l\'enregistrement.');
+  }
+}
+async function st_deleteArticle(id){
+  const a = st_articles.find(x=>x.id===id);
+  if(!a) return;
+  if(!confirm('Supprimer cet article : "'+a.nom+'" ?')) return;
+  try{ await st_articlesCol.doc(id).delete(); }catch(e){ console.warn(e); }
+}
+
 async function dp_recloturer(id){
   const c = dp_clotures.find(x=>x.id===id);
   if(!c) return;
