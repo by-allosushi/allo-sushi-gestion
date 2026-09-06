@@ -356,10 +356,13 @@
 
   .line-row{
     display:grid;
-    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-columns:88px minmax(0,1fr) 32px;
     gap:7px;
     padding:9px;
+    align-items:center;
   }
+  .line-row .amount{width:100%;}
+  .line-row select{width:100%;min-width:0;}
   .movement-row,.hist-row{padding:11px 12px;gap:10px;}
   .movement-row > *, .hist-row > *{min-width:0;}
 
