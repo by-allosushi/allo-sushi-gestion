@@ -1295,10 +1295,11 @@ const DP_TYPES = [
 ];
 const DP_CATEGORIES = [
   { id:'cuisine',        label:'Cuisine',        ic:'🍳', color:'var(--amber)', bg:'var(--amber-bg)' },
-  { id:'hygiene',        label:'Hygiène',        ic:'🧼', color:'var(--service)', bg:'var(--service-bg)' },
+  { id:'detergents',     label:'Détergents',     ic:'🧼', color:'var(--service)', bg:'var(--service-bg)' },
+  { id:'emballage',      label:'Emballage',      ic:'📦', color:'var(--cons)', bg:'var(--cons-bg)' },
   { id:'livraison',      label:'Livraison',      ic:'🛵', color:'var(--bar)', bg:'var(--bar-bg)' },
   { id:'investissement', label:'Investissement', ic:'🏗️', color:'var(--rust)', bg:'var(--rust-bg)' },
-  { id:'avance',         label:'Avance / acompte sur salaire', ic:'👤', color:'var(--bar)', bg:'var(--bar-bg)' },
+  { id:'avance',         label:'Avance salaire', ic:'👤', color:'var(--wrap)', bg:'var(--wrap-bg)' },
 ];
 function dp_categoryMeta(id){ return DP_CATEGORIES.find(c=>c.id===id) || null; }
 // Types autorisés à la SAISIE d'un nouveau mouvement pour les utilisateurs non-admin.
@@ -1358,6 +1359,8 @@ let dp_dateFilterStart = '';
 let dp_dateFilterEnd = '';
 let dp_searchTerm = '';
 let dp_showMouvForm = false;
+let dp_selectedCategorie = '';
+function dp_selectCategorie(id){ dp_selectedCategorie = (dp_selectedCategorie===id) ? '' : id; dp_render(); }
 let dp_formType = 'Charge';
 let dp_showPointageForm = false;
 let dp_pointageChecks = {};
@@ -1738,8 +1741,8 @@ function dp_renderMouvementsTab(){
   }
 
   const addBar = !dp_showMouvForm ? `<div class="grid grid-2" style="gap:8px;">
-    <button class="btn moss" style="justify-content:center;padding:14px;font-size:14px;" onclick="dp_openForm('in')">↓ Entrée</button>
     <button class="btn rust" style="justify-content:center;padding:14px;font-size:14px;" onclick="dp_openForm('out')">↑ Sortie</button>
+    <button class="btn moss" style="justify-content:center;padding:14px;font-size:14px;" onclick="dp_openForm('in')">↓ Entrée</button>
   </div>` : '';
 
   const form = dp_showMouvForm ? dp_renderMouvForm() : '';
@@ -1800,6 +1803,7 @@ function dp_openEditMouv(id){
   dp_editPrefill = m;
   dp_formType = m.type;
   dp_workingDate = m.date;
+  dp_selectedCategorie = m.estAvanceSalaire ? 'avance' : (m.categorie || '');
   if(m.type==='Achat') dp_achatCalcMode = 'montant';
   dp_showMouvForm = true;
   dp_render();
@@ -1819,38 +1823,38 @@ function dp_renderMouvForm(){
   const isEditing = !!dp_editingMouvId;
   const employeeSuggestions = EMPLOYES_TOUS.map(n=>`<option value="${esc(n)}">`).join('');
   const direction = dp_typeMeta(dp_formType).sign > 0 ? 'in' : 'out';
+  const dirColor = direction==='in' ? 'var(--moss)' : 'var(--rust)';
+  const dirBg = direction==='in' ? 'var(--moss-bg)' : 'var(--rust-bg)';
   return `
-    <div class="ticket" id="dp-form" style="padding:18px;${isEditing?'border-color:var(--forest);':''}">
-      ${isEditing ? `<div style="font-size:12.5px;font-weight:700;color:var(--forest);margin-bottom:10px;">✏️ Modification du mouvement du ${fmtDateShort(E.date)}</div>` : ''}
+    <div class="ticket" id="dp-form" style="padding:18px;border:2px solid ${isEditing?'var(--forest)':dirColor};background:${isEditing?'var(--surface)':dirBg};">
+      ${isEditing ? `<div style="font-size:12.5px;font-weight:700;color:var(--forest);margin-bottom:10px;">✏️ Modification du mouvement du ${fmtDateShort(E.date)}</div>`
+        : `<div style="font-size:13px;font-weight:800;color:${dirColor};margin-bottom:12px;">${direction==='in'?'↓ Entrée d\u2019argent':'↑ Sortie d\u2019argent'}</div>`}
       <div class="form-section">
         <div class="section-label"><span class="num">1</span>Date</div>
         <div class="field"><input type="date" id="dp-working-date" value="${dp_workingDate}" onchange="dp_workingDate=this.value;dp_render()" /></div>
       </div>
 
       <div class="form-section">
-        <div style="display:inline-flex;border-radius:20px;border:1px solid var(--line);overflow:hidden;margin-bottom:14px;">
-          <button type="button" onclick="dp_setDirection('in')" style="padding:7px 16px;border:none;font-size:12.5px;font-weight:700;cursor:pointer;background:${direction==='in'?'var(--moss)':'var(--surface)'};color:${direction==='in'?'#fff':'var(--ink-muted)'};">↓ Entrée</button>
-          <button type="button" onclick="dp_setDirection('out')" style="padding:7px 16px;border:none;font-size:12.5px;font-weight:700;cursor:pointer;background:${direction==='out'?'var(--rust)':'var(--surface)'};color:${direction==='out'?'#fff':'var(--ink-muted)'};">↑ Sortie</button>
-        </div>
-
         ${dp_formType==='Charge' ? `
           <div class="section-label"><span class="num">2</span>Catégorie</div>
-          <div class="field" style="margin-bottom:10px;">
-            <select id="dp-categorie" onchange="document.getElementById('dp-avance-wrap').style.display=this.value==='avance'?'flex':'none';">
-              <option value="">— Choisir une catégorie —</option>
-              ${DP_CATEGORIES.map(c=>`<option value="${c.id}" ${E.categorie===c.id?'selected':''}>${c.ic} ${esc(c.label)}</option>`).join('')}
-            </select>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+            ${DP_CATEGORIES.map(c=>`
+              <button type="button" onclick="dp_selectCategorie('${c.id}')" style="padding:9px 14px;border-radius:20px;border:2px solid ${dp_selectedCategorie===c.id?c.color:'var(--line)'};background:${dp_selectedCategorie===c.id?c.bg:'var(--surface)'};color:${dp_selectedCategorie===c.id?c.color:'var(--ink-muted)'};font-weight:700;font-size:12.5px;cursor:pointer;">${c.ic} ${esc(c.label)}</button>
+            `).join('')}
           </div>
-          <div id="dp-avance-wrap" class="field" style="display:${E.categorie==='avance'?'flex':'none'};margin-bottom:10px;">
+          ${dp_selectedCategorie==='avance' ? `
+          <div id="dp-avance-wrap" class="field" style="margin-bottom:12px;">
             <label>Nom de l'employé</label>
             <input type="text" id="dp-employe" list="dp-employe-list" placeholder="Prénom de l'employé" value="${esc(E.employeNom||'')}" />
             <datalist id="dp-employe-list">${employeeSuggestions}</datalist>
           </div>
+          ` : `
           <div class="section-label"><span class="num">3</span>Note</div>
-          <div class="field" style="margin-bottom:10px;">
+          <div class="field" style="margin-bottom:12px;">
             <input type="text" id="dp-libelle" placeholder="Ex. Loyer, Carburant…" value="${esc(E.type==='Charge'?(E.libelle||''):'')}" />
           </div>
-          <div class="section-label"><span class="num">4</span>Montant</div>
+          `}
+          <div class="section-label"><span class="num">${dp_selectedCategorie==='avance'?'3':'4'}</span>Montant</div>
           <div class="field">
             <input type="text" inputmode="decimal" id="dp-montant" placeholder="0" value="${(E.type==='Charge'&&E.montant!=null)?esc(String(E.montant)):''}" />
           </div>
@@ -1878,6 +1882,7 @@ function dp_renderMouvForm(){
 function dp_openForm(dir){
   dp_editingMouvId = null;
   dp_editPrefill = null;
+  dp_selectedCategorie = '';
   dp_showMouvForm = true;
   dp_setDirection(dir);
 }
@@ -1946,13 +1951,13 @@ async function dp_submitMouv(){
   } else {
     const montant = dp_parseNum(document.getElementById('dp-montant').value);
     if(!montant){ alert('Merci de renseigner un montant.'); return; }
-    const categorieEl = document.getElementById('dp-categorie');
-    const categorie = (dp_formType==='Charge' && categorieEl) ? categorieEl.value : '';
+    const categorie = (dp_formType==='Charge') ? dp_selectedCategorie : '';
     const estAvanceSalaire = categorie==='avance';
     const employeEl = document.getElementById('dp-employe');
     const employeNom = estAvanceSalaire && employeEl ? employeEl.value.trim() : '';
     if(estAvanceSalaire && !employeNom){ alert("Merci de renseigner le nom de l'employé pour cette avance."); return; }
-    const libelle = document.getElementById('dp-libelle').value;
+    const libelleEl = document.getElementById('dp-libelle');
+    const libelle = (libelleEl && !estAvanceSalaire) ? libelleEl.value : '';
 
     if(dp_editingMouvId){
       const original = dp_mouvements.find(m=>m.id===dp_editingMouvId);
@@ -1977,6 +1982,7 @@ async function dp_submitMouv(){
     dp_editPrefill = null;
   }
   if(wasEditing) dp_showMouvForm = false;
+  else dp_selectedCategorie = '';
   dp_render();
   }catch(e){
     console.warn(e);
