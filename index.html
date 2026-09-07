@@ -1293,6 +1293,13 @@ const DP_TYPES = [
   { id:'Achat', label:'Achat', shortLabel:'Achat', color:'var(--amber)', bg:'var(--amber-bg)', sign:-1 },
   { id:'Retrait', label:'Retrait gérant → moi', shortLabel:'Retrait', color:'var(--wrap)', bg:'var(--wrap-bg)', sign:-1 },
 ];
+const DP_CATEGORIES = [
+  { id:'cuisine',        label:'Cuisine',        ic:'🍳', color:'var(--amber)', bg:'var(--amber-bg)' },
+  { id:'hygiene',        label:'Hygiène',        ic:'🧼', color:'var(--service)', bg:'var(--service-bg)' },
+  { id:'livraison',      label:'Livraison',      ic:'🛵', color:'var(--bar)', bg:'var(--bar-bg)' },
+  { id:'investissement', label:'Investissement', ic:'🏗️', color:'var(--rust)', bg:'var(--rust-bg)' },
+];
+function dp_categoryMeta(id){ return DP_CATEGORIES.find(c=>c.id===id) || null; }
 // Types autorisés à la SAISIE d'un nouveau mouvement pour les utilisateurs non-admin.
 const DP_TYPES_NON_ADMIN = ['AppointCaisse', 'Charge'];
 // "Retrait", "Achat", "AppointDivers", "AppointMoi" et "Recette" ne sont plus proposés à la
@@ -1545,6 +1552,7 @@ function dp_render(){
   if(dp_currentTab==='verification' && !dp_canVerify()) dp_currentTab = 'mouvements';
   if(dp_currentTab==='historiqueVerification' && !dp_canSeeVerificationHistory()) dp_currentTab = 'mouvements';
   if(!isAdmin && dp_currentTab==='avances') dp_currentTab = 'mouvements';
+  if(!isAdmin && dp_currentTab==='analyse') dp_currentTab = 'mouvements';
   if(dp_currentTab==='clotures') dp_currentTab = 'mouvements';
 
   dp_renderTabs();
@@ -1553,6 +1561,7 @@ function dp_render(){
   else if(dp_currentTab==='verification') main.innerHTML = dp_renderVerificationBox();
   else if(dp_currentTab==='historiqueVerification') main.innerHTML = dp_renderVerificationHistory();
   else if(dp_currentTab==='avances') main.innerHTML = dp_renderAvancesTab();
+  else if(dp_currentTab==='analyse') main.innerHTML = dp_renderAnalyseTab();
   else main.innerHTML = dp_renderMouvementsTab();
 
   if(activeId){
@@ -1564,7 +1573,7 @@ function dp_setTab(t){ dp_currentTab = t; dp_render(); }
 function dp_renderTabs(){
   const isAdmin = session && session.isAdmin;
   const tabs = isAdmin
-    ? [ {id:'mouvements', label:'Mouvements'}, {id:'verification', label:'🔎 Vérification'}, {id:'historiqueVerification', label:'📋 Historique'}, {id:'avances', label:'Avances salaire'} ]
+    ? [ {id:'mouvements', label:'Mouvements'}, {id:'verification', label:'🔎 Vérification'}, {id:'historiqueVerification', label:'📋 Historique'}, {id:'avances', label:'Avances salaire'}, {id:'analyse', label:'📊 Analyse'} ]
     : [ {id:'mouvements', label:'Mouvements'}, {id:'verification', label:'🔎 Vérification'} ];
   document.getElementById('depenses-tabs').innerHTML = tabs.map(t=>`
     <button class="${dp_currentTab===t.id?'active':''}" onclick="dp_setTab('${t.id}')">${esc(t.label)}</button>
@@ -1761,10 +1770,11 @@ function dp_renderMouvementsTab(){
       const chipLabel = m.estAvanceSalaire ? '👤 Avance salaire' : m.type;
       const chipColor = m.estAvanceSalaire ? 'var(--bar)' : meta.color;
       const chipBg = m.estAvanceSalaire ? 'var(--bar-bg)' : meta.bg;
+      const catMeta = m.categorie ? dp_categoryMeta(m.categorie) : null;
       const detail = m.type==='Achat' ? `${esc(m.articleNom||'')} · ${dp_fmtNum(m.quantite)} ${esc(m.unite||'')}` : (m.estAvanceSalaire ? `${esc(m.employeNom)}${m.libelle?' · '+esc(m.libelle):''}` : esc(m.libelle||''));
-      return `<div class="movement-row" style="${m.estAvanceSalaire?'border-color:var(--bar);':''}">
+      return `<div class="movement-row" style="${m.estAvanceSalaire?'border-color:var(--bar);':(catMeta&&catMeta.id==='investissement'?'border-color:var(--rust);':'')}">
         <div>
-          <div style="font-weight:500;"><span class="chip" style="color:${chipColor};background:${chipBg};margin-right:5px;">${esc(chipLabel)}</span>${detail}</div>
+          <div style="font-weight:500;"><span class="chip" style="color:${chipColor};background:${chipBg};margin-right:5px;">${esc(chipLabel)}</span>${catMeta?`<span class="chip" style="color:${catMeta.color};background:${catMeta.bg};margin-right:5px;">${catMeta.ic} ${esc(catMeta.label)}</span>`:''}${detail}</div>
           <div class="sub">${fmtDateShort(m.date)}${m.creeLe?' à '+dp_fmtTime(m.creeLe):''}${m.creePar?' · par '+esc(m.creePar):''}${m.modifiePar?' · modifié par '+esc(m.modifiePar):''}${m.pointe?' · ✓ pointé':''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
@@ -1829,13 +1839,21 @@ function dp_renderMouvForm(){
       ${dp_formType==='Charge' ? `
           <div class="form-section">
             <div style="display:flex;align-items:center;gap:8px;">
-              <input type="checkbox" id="dp-isavance" style="width:auto;" ${E.estAvanceSalaire?'checked':''} onchange="document.getElementById('dp-avance-wrap').style.display=this.checked?'flex':'none'" />
+              <input type="checkbox" id="dp-isavance" style="width:auto;" ${E.estAvanceSalaire?'checked':''} onchange="document.getElementById('dp-avance-wrap').style.display=this.checked?'flex':'none';document.getElementById('dp-categorie-wrap').style.display=this.checked?'none':'flex';" />
               <label style="text-transform:none;font-size:12.5px;font-weight:500;color:var(--ink);">Ceci est une avance / un acompte sur salaire</label>
             </div>
             <div id="dp-avance-wrap" class="field" style="display:${E.estAvanceSalaire?'flex':'none'};margin-top:10px;">
               <label>Nom de l'employé</label>
               <input type="text" id="dp-employe" list="dp-employe-list" placeholder="Prénom de l'employé" value="${esc(E.employeNom||'')}" />
               <datalist id="dp-employe-list">${employeeSuggestions}</datalist>
+            </div>
+            <div id="dp-categorie-wrap" class="field" style="display:${E.estAvanceSalaire?'none':'flex'};margin-top:10px;">
+              <label>Catégorie</label>
+              <select id="dp-categorie">
+                <option value="">— Aucune —</option>
+                ${DP_CATEGORIES.map(c=>`<option value="${c.id}" ${E.categorie===c.id?'selected':''}>${c.ic} ${esc(c.label)}</option>`).join('')}
+              </select>
+              <div style="font-size:11px;color:var(--ink-muted);margin-top:4px;">"Investissement" = matériel, réparation, entretien du restaurant — sera transféré au Carnet d'investissement.</div>
             </div>
           </div>
         ` : ''}
@@ -1923,19 +1941,21 @@ async function dp_submitMouv(){
     const employeNom = estAvanceSalaire && employeEl ? employeEl.value.trim() : '';
     if(estAvanceSalaire && !employeNom){ alert("Merci de renseigner le nom de l'employé pour cette avance."); return; }
     const libelle = document.getElementById('dp-libelle').value;
+    const categorieEl = document.getElementById('dp-categorie');
+    const categorie = (dp_formType==='Charge' && !estAvanceSalaire && categorieEl) ? categorieEl.value : '';
 
     if(dp_editingMouvId){
       const original = dp_mouvements.find(m=>m.id===dp_editingMouvId);
       mouv = {
         ...original, type: dp_formType, date, montant, libelle,
-        estAvanceSalaire: !!estAvanceSalaire, employeNom,
+        estAvanceSalaire: !!estAvanceSalaire, employeNom, categorie,
         modifiePar: currentUser, modifieLe: new Date().toISOString(),
       };
       await dp_mouvCol.doc(dp_editingMouvId).set(mouv);
     } else {
       mouv = {
         id: uid(), type: dp_formType, date, montant, libelle,
-        estAvanceSalaire: !!estAvanceSalaire, employeNom,
+        estAvanceSalaire: !!estAvanceSalaire, employeNom, categorie,
         pointe:false, creePar: currentUser, creeLe: new Date().toISOString(),
       };
       await dp_mouvCol.doc(mouv.id).set(mouv);
@@ -1981,6 +2001,54 @@ async function dp_submitPointage(){
 
 
 /* ---------------- Onglet Avances salaire ---------------- */
+/* ---------------- Onglet Analyse (admin uniquement) ---------------- */
+let dp_analyseStart = '';
+let dp_analyseEnd = '';
+function dp_setAnalyseRange(field, val){ if(field==='start') dp_analyseStart=val; else dp_analyseEnd=val; dp_render(); }
+function dp_renderAnalyseTab(){
+  const inRange = m => (!dp_analyseStart || m.date>=dp_analyseStart) && (!dp_analyseEnd || m.date<=dp_analyseEnd);
+  const charges = dp_mouvements.filter(m=>m.type==='Charge' && !m.estAvanceSalaire && inRange(m));
+
+  const totals = {};
+  let sansCategorie = 0;
+  charges.forEach(m=>{
+    if(m.categorie){ totals[m.categorie] = (totals[m.categorie]||0) + dp_parseNum(m.montant); }
+    else { sansCategorie += dp_parseNum(m.montant); }
+  });
+  const totalGeneral = charges.reduce((s,m)=>s+dp_parseNum(m.montant),0);
+
+  const rangeBar = `<div class="ticket">
+    <div class="grid grid-2">
+      <div class="field"><label>Du</label><input type="date" value="${dp_analyseStart}" onchange="dp_setAnalyseRange('start',this.value)" /></div>
+      <div class="field"><label>Au</label><input type="date" value="${dp_analyseEnd}" onchange="dp_setAnalyseRange('end',this.value)" /></div>
+    </div>
+    <div style="font-size:11.5px;color:var(--ink-muted);margin-top:8px;">Laisse vide pour analyser toutes les dépenses. Les avances sur salaire ne sont pas comptées ici (déjà suivies dans leur propre onglet).</div>
+  </div>`;
+
+  const cards = DP_CATEGORIES.map(c=>{
+    const total = totals[c.id] || 0;
+    const pct = totalGeneral>0 ? Math.round((total/totalGeneral)*100) : 0;
+    const isInvest = c.id==='investissement';
+    return `<div class="ticket" style="${isInvest && total>0 ? 'border-color:var(--rust);' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-weight:700;font-size:13.5px;">${c.ic} ${esc(c.label)}</div>
+        <div class="mono" style="font-weight:800;font-size:15px;color:${c.color};">${dp_fmtMoney(total)}</div>
+      </div>
+      <div style="font-size:11px;color:var(--ink-muted);margin-top:4px;">${pct}% du total des charges de la période</div>
+      ${isInvest && total>0 ? `<div style="margin-top:8px;font-size:11px;color:var(--rust);">À transférer vers le Carnet d'investissement (module à venir).</div>` : ''}
+    </div>`;
+  }).join('');
+
+  const totalBox = `<div class="result-box prelim" style="margin-top:14px;">
+    <div class="label">Total des charges de la période</div>
+    <div class="value">${dp_fmtMoney(totalGeneral)}</div>
+  </div>`;
+
+  const sansCatBox = sansCategorie > 0 ? `<div style="margin-top:10px;font-size:11.5px;color:var(--amber);">⚠ ${dp_fmtMoney(sansCategorie)} de charges sans catégorie sur cette période.</div>` : '';
+
+  return rangeBar + `<h2 class="section">Répartition par catégorie</h2>` + cards + totalBox + sansCatBox;
+}
+
 function dp_renderAvancesTab(){
   let avances = dp_mouvements.filter(m=>m.type==='Charge' && m.estAvanceSalaire).sort((a,b)=>a.date<b.date?1:-1);
 
