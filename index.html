@@ -3158,19 +3158,40 @@ function pt_addEntryDoc(data){ return pt_entriesCol.add({ ...data, creePar: (typ
 
 /* ---------- import ZKBio ---------- */
 function pt_parseRaw(text){
+  // Formats acceptés :
+  //  1) export ZKBio       : code <TAB> jj/mm/aaaa hh:mm        <TAB> 0|1
+  //  2) fichier brut appareil : code <TAB> aaaa-mm-jj hh:mm:ss  <TAB> vérif <TAB> statut <TAB> ...
+  //     statut : 0 Entrée · 1 Sortie · 2 Sortie pause · 3 Entrée pause · 4 Entrée heures sup. · 5 Sortie heures sup.
+  const STATUS = { 0:0, 1:1, 2:1, 3:0, 4:0, 5:1 };
+  const lines = text.split(/\r?\n/);
   const out = [];
-  text.split(/\r?\n/).forEach(raw=>{
-    const line = raw.trim(); if(!line) return;
-    const parts = line.split('\t').length >= 3 ? line.split('\t') : line.split(/\s{2,}|,/);
-    if(parts.length < 3) return;
-    const code = parseInt(parts[0], 10); if(isNaN(code)) return;
-    const m = parts[1].trim().match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/); if(!m) return;
-    const type = parseInt(parts[2].trim(), 10); if(type !== 0 && type !== 1) return;
-    const dt = new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], 0);
-    out.push({ code, iso: dt.toISOString(), type });
-  });
+  for (const raw of lines){
+    const line = raw.trim();
+    if (!line) continue;
+    const parts = line.split("\t").length >= 3 ? line.split("\t") : line.split(/\s{2,}|,|;/);
+    if (parts.length < 3) continue;
+    const code = parseInt(parts[0], 10);
+    if (isNaN(code)) continue; // ligne d'en-tête ou déchet
+    const dtStr = parts[1].trim();
+    let dt = null, type = NaN;
+    let m = dtStr.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+    if (m){ // fichier brut de l'appareil : le statut est en 4e colonne
+      dt = new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], 0);
+      const st = parseInt((parts.length >= 4 ? parts[3] : parts[2]).trim(), 10);
+      type = (st in STATUS) ? STATUS[st] : NaN;
+    } else {
+      m = dtStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
+      if (m){
+        dt = new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], 0);
+        type = parseInt(parts[2].trim(), 10);
+      }
+    }
+    if (!dt || isNaN(dt.getTime()) || (type !== 0 && type !== 1)) continue;
+    out.push({ code, iso: dt.toISOString(), type }); // secondes ignorées : deux pointages dans la même minute n'en font qu'un
+  }
   return out;
 }
+/* ---------- import ZKBio ---------- */
 function pt_status(msg, cls){
   const el = document.getElementById('pt-import-status');
   if(el){ el.textContent = msg; el.style.color = cls==='err' ? 'var(--rust)' : 'var(--moss)'; }
@@ -3181,14 +3202,15 @@ async function pt_importFile(){
   if(!f){ pt_status('Choisis un fichier d’abord.', 'err'); return; }
   if(!pt_ready.events){ pt_status('Données en cours de chargement, réessaie dans un instant.', 'err'); return; }
   const parsed = pt_parseRaw(await f.text());
-  if(!parsed.length){ pt_status('Aucune ligne de pointage reconnue dans ce fichier.', 'err'); return; }
+  if(!parsed.length){ pt_status('Aucune ligne de pointage reconnue. Formats acceptés : export ZKBio (code ⇥ jj/mm/aaaa hh:mm ⇥ 0/1) ou fichier brut du pointeur (code ⇥ aaaa-mm-jj hh:mm:ss ⇥ … ⇥ statut).', 'err'); return; }
   const seen = new Set(pt_events.map(e=>e.code + '|' + e.dt + '|' + e.type));
   const fresh = [];
   parsed.forEach(p=>{ const k = p.code + '|' + p.iso + '|' + p.type; if(!seen.has(k)){ seen.add(k); fresh.push(p); } });
   try{
     if(fresh.length) await pt_addEvents(fresh);
     inp.value = '';
-    pt_status(fresh.length + ' nouveau(x) pointage(s) ajouté(s) (' + (parsed.length - fresh.length) + ' déjà connus, ignorés).', 'ok');
+    const ts = parsed.map(x=>x.iso).sort();
+    pt_status(fresh.length + ' nouveau(x) pointage(s) ajouté(s) (' + (parsed.length - fresh.length) + ' déjà connus ou en double, ignorés). Période du fichier : ' + fmtDateShort(toLocalISO(new Date(ts[0]))) + ' → ' + fmtDateShort(toLocalISO(new Date(ts[ts.length-1]))) + '.', 'ok');
   }catch(e){ console.error(e); pt_status('Erreur d’enregistrement : ' + (e.message || e), 'err'); }
 }
 
