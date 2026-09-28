@@ -420,6 +420,52 @@
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto !important;transition:none !important;animation:none !important;}
 }
+
+/* ===== Module Pointage & Paie ===== */
+.pt-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.pt-muted{color:var(--ink-muted);font-size:12px;line-height:1.45;}
+.pt-link{color:var(--forest-light);text-decoration:underline;}
+.pt-auto{width:auto;}
+.pt-time{width:118px;}
+.pt-w90{width:90px;}
+.pt-grow{flex:1;min-width:120px;}
+.pt-filein{width:auto;font-size:12px;padding:6px 8px;}
+.pt-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0;}
+@media(min-width:600px){.pt-kpis{grid-template-columns:repeat(4,1fr);}}
+.pt-kpi{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+.pt-kpi .n{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:var(--forest-light);}
+.pt-kpi .l{font-size:10.5px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.03em;margin-top:2px;}
+.pt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.pt-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.pt-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-muted);padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+.pt-table td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle;}
+.pt-table input,.pt-table select{padding:6px 8px;font-size:13px;min-width:0;}
+.pt-table tr.pt-total td{background:var(--paper);font-weight:700;}
+.pt-table tr.pt-manual td{color:var(--ink-muted);font-style:italic;}
+.pt-form{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px;align-items:center;margin-top:12px;}
+.pt-form-title{display:flex;align-items:center;gap:8px;}
+.pt-form-title label{font-size:13.5px;font-weight:700;white-space:nowrap;}
+@media(max-width:600px){
+  .pt-form{grid-template-columns:1fr 1fr;}
+  .pt-form .pt-form-title{grid-column:1/-1;}
+  .pt-form .btn{grid-column:1/-1;justify-content:center;}
+}
+.pt-badge{display:inline-block;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;}
+.pt-b-prime{background:var(--moss-bg);color:var(--moss);}
+.pt-b-off{background:var(--amber-bg);color:var(--amber);}
+.pt-b-avance{background:var(--rust-bg);color:var(--rust);}
+.pt-src{font-size:10px;color:var(--ink-muted);margin-left:6px;}
+.pt-plus{color:var(--moss);font-family:'IBM Plex Mono',monospace;}
+.pt-minus{color:var(--rust);font-family:'IBM Plex Mono',monospace;}
+.pt-an{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 11px;background:var(--rust-bg);border:1px solid var(--rust);border-radius:8px;margin-bottom:6px;font-size:12.5px;color:var(--rust);}
+.pt-an .pt-an-reason{font-size:11.5px;opacity:.85;margin-top:2px;}
+.pt-an.ok{background:var(--moss-bg);border-color:var(--moss);color:var(--moss);}
+.pt-fix{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px;margin:-2px 0 10px;}
+.pt-cl-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);}
+.pt-cl-row:last-child{border-bottom:none;}
+.pt-cl-name{flex:1;font-size:13.5px;font-weight:500;min-width:0;}
+.pt-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--surface);border:1px solid var(--moss);color:var(--moss);padding:10px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:60;}
+.pt-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 </style>
 </head>
 <body>
@@ -489,6 +535,32 @@
   </main>
 </div>
 
+<div id="module-pointage" class="module">
+  <nav class="tabs" id="pointage-tabs"></nav>
+  <main id="pointage-main" style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
+    <div class="ticket" id="pt-head">
+      <div class="section-label">Importer un export ZKBio</div>
+      <div class="pt-row">
+        <input type="file" id="pt-file" accept=".dat,.txt,.csv" class="pt-filein">
+        <button class="btn small" onclick="pt_importFile()">Importer</button>
+      </div>
+      <div class="pt-muted" id="pt-import-status" style="margin-top:6px;"></div>
+      <div class="section-label" style="margin-top:16px;">Période affichée <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— s’applique à tous les onglets</span></div>
+      <div class="filter-row">
+        <button class="filter-chip" onclick="pt_preset('this')">Cette semaine</button>
+        <button class="filter-chip" onclick="pt_preset('last')">Semaine dernière</button>
+        <button class="filter-chip" onclick="pt_preset('all')">Tout</button>
+      </div>
+      <div class="grid grid-2">
+        <div class="field"><label>Du</label><input type="date" id="pt-from" onchange="pt_periodInput()"></div>
+        <div class="field"><label>Au</label><input type="date" id="pt-to" onchange="pt_periodInput()"></div>
+      </div>
+      <div class="pt-muted" id="pt-period-status" style="margin-top:8px;"></div>
+    </div>
+    <div id="pt-body"></div>
+  </main>
+</div>
+
 <div id="module-users" class="module">
   <main style="max-width:760px;margin:0 auto;padding:18px 16px 40px;">
     <h2 class="section" style="margin-top:4px;">Nouvel utilisateur</h2>
@@ -548,6 +620,7 @@ const MODULE_DEFS = [
   { key:'caisse',   label:'Caisse',    ic:'💰', desc:'Sessions de caisse' },
   { key:'depenses', label:'Dépenses',  ic:'🧾', desc:'Dépenses & pointages' },
   { key:'stock',    label:'Stock',     ic:'📦', desc:'Gestion du stock' },
+  { key:'pointage', label:'Pointage',  ic:'⏱️', desc:'Heures, anomalies & paie' },
 ];
 let session = null; // { username, isAdmin, permissions:{caisse,depenses,soldeTheorique,soldeReel,ecart} }
 let usersCache = [];
@@ -863,6 +936,7 @@ function showModule(name){
   if(name==='caisse' && typeof ca_render==='function') ca_render();
   if(name==='depenses' && typeof dp_render==='function') dp_render();
   if(name==='stock' && typeof st_render==='function') st_render();
+  if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
 }
 
 document.getElementById('today-label').textContent =
@@ -1387,6 +1461,7 @@ dp_mouvCol.onSnapshot((snap)=>{
   snap.forEach(doc=>dp_mouvements.push({ id: doc.id, ...doc.data() }));
   dp_verificationResult = null;
   dp_render();
+  if(typeof pt_onDepensesChanged==='function') pt_onDepensesChanged();
 }, (err)=>console.error(err));
 dp_pointagesCol.onSnapshot((snap)=>{
   dp_pointages = [];
@@ -2962,6 +3037,759 @@ async function st_deleteArticle(id){
   if(!confirm('Supprimer cet article : "'+a.nom+'" ?')) return;
   try{ await st_articlesCol.doc(id).delete(); }catch(e){ console.warn(e); }
 }
+
+/* ==================== MODULE POINTAGE & PAIE ==================== */
+/* Données Firestore :
+   - pointage_events        : 1 document par mois  { ev: { <id>: { c: code, t: ISO, y: 0|1 } } }
+   - pointage_config/employes : { emp: { <code>: { name, poste, payMode, rate, transport:{enabled,amount}, extra } } }
+   - pointage_entries       : primes, jours off, avances manuelles, sessions manuelles, corrections résolues
+   Les avances saisies dans Dépenses (estAvanceSalaire) sont reprises automatiquement dans la paie. */
+const pt_eventsCol = db.collection('pointage_events');
+const pt_configRef = db.collection('pointage_config').doc('employes');
+const pt_entriesCol = db.collection('pointage_entries');
+const PT_DEFAULT_NAMES = {5:'Mejdoub',8:'Fatima',10:'Kadi',15:'Sidahmed',16:'Marwa',17:'Meriem',18:'Hamid',19:'Nabil',20:'Ali'};
+
+let pt_events = [];          // [{id, code, dt(ISO), type}]
+let pt_emp = {};             // { code: {...} }
+let pt_entries = [];         // [{id, kind, code, date, amount, hours, note, ...}]
+let pt_ready = { events:false, cfg:false, entries:false };
+let pt_started = false, pt_error = '';
+let pt_tab = 'cloture', pt_sel = null, pt_openFix = null, pt_anomList = [];
+let pt_filter = { from:null, to:null };
+let pt_cl = { date:null, checked:{}, times:{}, quick:'' };
+let pt_idn = 0;
+
+/* ---------- utilitaires ---------- */
+function pt_e(v){ return esc(v==null ? '' : String(v)); }
+function pt_norm(s){ return (s||'').toString().trim().toLowerCase(); }
+function pt_fmtMoney(n){ return Math.round(Number(n)||0).toLocaleString('fr-FR') + ' DA'; }
+function pt_fmtH(h){ return (Number(h)||0).toFixed(2).replace('.',','); }
+function pt_hhmm(d){ return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
+function pt_dm(d){ return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0'); }
+function pt_fmtDT(d){ return pt_dm(d) + ' ' + pt_hhmm(d); }
+function pt_day(d){ return toLocalISO(d); }
+function pt_newId(){ pt_idn++; return Date.now().toString(36) + Math.random().toString(36).slice(2,7) + pt_idn.toString(36); }
+function pt_inRange(dk){
+  if(pt_filter.from && dk < pt_filter.from) return false;
+  if(pt_filter.to && dk > pt_filter.to) return false;
+  return true;
+}
+function pt_monday(d){ const day=(d.getDay()+6)%7; const m=new Date(d); m.setDate(d.getDate()-day); m.setHours(0,0,0,0); return m; }
+function pt_download(filename, blobParts, type){
+  const blob = new Blob(blobParts, { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+
+/* ---------- employés ---------- */
+function pt_codes(){
+  const s = new Set(pt_events.map(e=>e.code));
+  Object.keys(pt_emp).forEach(k=>s.add(Number(k)));
+  return Array.from(s).filter(c=>!isNaN(c)).sort((a,b)=>a-b);
+}
+function pt_name(c){ const e=pt_emp[c]; if(e && e.name) return e.name; if(PT_DEFAULT_NAMES[c]) return PT_DEFAULT_NAMES[c]; return 'Code ' + c + ' (à identifier)'; }
+function pt_poste(c){ return (pt_emp[c] && pt_emp[c].poste) || ''; }
+function pt_label(c){ const p=pt_poste(c); return pt_name(c) + (p ? ' — ' + p : ''); }
+function pt_rate(c){ return Number(pt_emp[c] && pt_emp[c].rate) || 0; }
+function pt_mode(c){ return (pt_emp[c] && pt_emp[c].payMode) === 'daily' ? 'daily' : 'hourly'; }
+function pt_transport(c){ const t=(pt_emp[c] && pt_emp[c].transport) || {}; return { enabled:!!t.enabled, amount:Number(t.amount)||0 }; }
+
+/* ---------- écoute Firestore (démarrée à la première ouverture du module) ---------- */
+function pt_start(){
+  if(pt_started) return;
+  pt_started = true;
+  try{ const raw = localStorage.getItem('pt-period'); if(raw) pt_filter = JSON.parse(raw); }catch(e){}
+  const onErr = (err)=>{ console.error(err); pt_error = (err && err.message) || 'Lecture impossible'; pt_render(); };
+  pt_eventsCol.onSnapshot((snap)=>{
+    const list = [];
+    snap.forEach(d=>{
+      const ev = (d.data() || {}).ev || {};
+      for(const id in ev){ const e = ev[id]; if(e) list.push({ id, code:Number(e.c), dt:e.t, type:Number(e.y) }); }
+    });
+    pt_events = list; pt_ready.events = true; pt_render();
+  }, onErr);
+  pt_configRef.onSnapshot((doc)=>{
+    const data = doc.exists ? (doc.data() || {}) : {};
+    pt_emp = data.emp || {}; pt_ready.cfg = true; pt_render();
+  }, onErr);
+  pt_entriesCol.onSnapshot((snap)=>{
+    const list = [];
+    snap.forEach(d=>list.push({ id:d.id, ...d.data() }));
+    pt_entries = list; pt_ready.entries = true; pt_render();
+  }, onErr);
+}
+function pt_onDepensesChanged(){ if(activeModule==='pointage' && pt_started) pt_render(); }
+
+/* ---------- écritures Firestore ---------- */
+const PT_DEL = ()=>firebase.firestore.FieldValue.delete();
+async function pt_commit(ops){
+  for(let i=0; i<ops.length; i+=400){
+    const batch = db.batch();
+    ops.slice(i, i+400).forEach(op=>{
+      if(op.t==='set') batch.set(op.ref, op.data, { merge:true });
+      else if(op.t==='del') batch.delete(op.ref);
+    });
+    await batch.commit();
+  }
+}
+function pt_monthRef(mk){ return pt_eventsCol.doc(mk); }
+async function pt_addEvents(list){ // [{code, iso, type}]
+  const byMonth = {};
+  list.forEach(e=>{ const mk = e.iso.slice(0,7); (byMonth[mk] = byMonth[mk] || {})[pt_newId()] = { c:e.code, t:e.iso, y:e.type }; });
+  await pt_commit(Object.keys(byMonth).map(mk=>({ t:'set', ref:pt_monthRef(mk), data:{ ev:byMonth[mk] } })));
+}
+async function pt_updateEvent(id, patch){
+  const e = pt_events.find(x=>x.id===id); if(!e) return;
+  const n = { ...e, ...patch };
+  const oldMk = e.dt.slice(0,7), newMk = n.dt.slice(0,7);
+  const ops = [];
+  if(oldMk !== newMk) ops.push({ t:'set', ref:pt_monthRef(oldMk), data:{ ev:{ [id]:PT_DEL() } } });
+  ops.push({ t:'set', ref:pt_monthRef(newMk), data:{ ev:{ [id]:{ c:n.code, t:n.dt, y:n.type } } } });
+  await pt_commit(ops);
+}
+async function pt_deleteEvents(ids){
+  const byMonth = {};
+  ids.forEach(id=>{ const e = pt_events.find(x=>x.id===id); if(e){ const mk = e.dt.slice(0,7); (byMonth[mk] = byMonth[mk] || {})[id] = PT_DEL(); } });
+  await pt_commit(Object.keys(byMonth).map(mk=>({ t:'set', ref:pt_monthRef(mk), data:{ ev:byMonth[mk] } })));
+}
+function pt_setEmp(code, patch){ return pt_configRef.set({ emp:{ [code]: patch } }, { merge:true }); }
+function pt_addEntryDoc(data){ return pt_entriesCol.add({ ...data, creePar: (typeof currentUser!=='undefined' ? currentUser : ''), creeLe: new Date().toISOString() }); }
+
+/* ---------- import ZKBio ---------- */
+function pt_parseRaw(text){
+  const out = [];
+  text.split(/\r?\n/).forEach(raw=>{
+    const line = raw.trim(); if(!line) return;
+    const parts = line.split('\t').length >= 3 ? line.split('\t') : line.split(/\s{2,}|,/);
+    if(parts.length < 3) return;
+    const code = parseInt(parts[0], 10); if(isNaN(code)) return;
+    const m = parts[1].trim().match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/); if(!m) return;
+    const type = parseInt(parts[2].trim(), 10); if(type !== 0 && type !== 1) return;
+    const dt = new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], 0);
+    out.push({ code, iso: dt.toISOString(), type });
+  });
+  return out;
+}
+function pt_status(msg, cls){
+  const el = document.getElementById('pt-import-status');
+  if(el){ el.textContent = msg; el.style.color = cls==='err' ? 'var(--rust)' : 'var(--moss)'; }
+}
+async function pt_importFile(){
+  const inp = document.getElementById('pt-file');
+  const f = inp && inp.files && inp.files[0];
+  if(!f){ pt_status('Choisis un fichier d’abord.', 'err'); return; }
+  if(!pt_ready.events){ pt_status('Données en cours de chargement, réessaie dans un instant.', 'err'); return; }
+  const parsed = pt_parseRaw(await f.text());
+  if(!parsed.length){ pt_status('Aucune ligne de pointage reconnue dans ce fichier.', 'err'); return; }
+  const seen = new Set(pt_events.map(e=>e.code + '|' + e.dt + '|' + e.type));
+  const fresh = [];
+  parsed.forEach(p=>{ const k = p.code + '|' + p.iso + '|' + p.type; if(!seen.has(k)){ seen.add(k); fresh.push(p); } });
+  try{
+    if(fresh.length) await pt_addEvents(fresh);
+    inp.value = '';
+    pt_status(fresh.length + ' nouveau(x) pointage(s) ajouté(s) (' + (parsed.length - fresh.length) + ' déjà connus, ignorés).', 'ok');
+  }catch(e){ console.error(e); pt_status('Erreur d’enregistrement : ' + (e.message || e), 'err'); }
+}
+
+/* ---------- filtre de période ---------- */
+function pt_setFilter(from, to){
+  pt_filter = { from: from || null, to: to || null };
+  try{ localStorage.setItem('pt-period', JSON.stringify(pt_filter)); }catch(e){}
+  pt_render();
+}
+function pt_preset(kind){
+  if(kind === 'all'){ pt_setFilter(null, null); return; }
+  const mon = pt_monday(new Date());
+  if(kind === 'last') mon.setDate(mon.getDate() - 7);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  pt_setFilter(toLocalISO(mon), toLocalISO(sun));
+}
+function pt_periodInput(){ pt_setFilter(document.getElementById('pt-from').value, document.getElementById('pt-to').value); }
+function pt_renderPeriod(){
+  const f = document.getElementById('pt-from'), t = document.getElementById('pt-to'), s = document.getElementById('pt-period-status');
+  if(!f) return;
+  f.value = pt_filter.from || ''; t.value = pt_filter.to || '';
+  s.textContent = (!pt_filter.from && !pt_filter.to) ? 'Toutes les périodes affichées.'
+    : 'Filtré du ' + (pt_filter.from ? fmtDateShort(pt_filter.from) : '…') + ' au ' + (pt_filter.to ? fmtDateShort(pt_filter.to) : '…') + '.';
+}
+
+/* ---------- appariement entrées/sorties ---------- */
+function pt_compute(){
+  const byCode = {};
+  pt_events.forEach(e=>{ (byCode[e.code] = byCode[e.code] || []).push({ dt:new Date(e.dt), type:e.type }); });
+  const sessions = [], anomalies = [];
+  Object.keys(byCode).forEach(k=>{
+    const code = Number(k);
+    const evs = byCode[k].sort((a,b)=>a.dt - b.dt || a.type - b.type);
+    let open = null;
+    for(const ev of evs){
+      if(ev.type === 0){
+        if(open === null) open = ev.dt;
+        else { anomalies.push({ code, dt:open, type:'Entrée', reason:'Sortie manquante (nouvelle entrée avant clôture)' }); open = ev.dt; }
+      } else if(open !== null){
+        const start = open, end = ev.dt, hours = (end - start) / 3600000;
+        if(hours > 15){
+          anomalies.push({ code, dt:start, type:'Entrée', reason:'Sortie manquante (écart trop long avec le pointage suivant)' });
+          const b2 = new Date(end); if(end.getHours() < 6) b2.setDate(b2.getDate() - 1);
+          anomalies.push({ code, dt:end, type:'Sortie', reason:'Entrée manquante (jour rattaché ' + pt_dm(b2) + ')' });
+        } else {
+          sessions.push({ code, date:new Date(start.getFullYear(), start.getMonth(), start.getDate()), start, end, hours });
+        }
+        open = null;
+      } else {
+        const b = new Date(ev.dt); if(ev.dt.getHours() < 6) b.setDate(b.getDate() - 1);
+        anomalies.push({ code, dt:ev.dt, type:'Sortie', reason:'Entrée manquante (jour rattaché ' + pt_dm(b) + ')' });
+      }
+    }
+    if(open !== null) anomalies.push({ code, dt:open, type:'Entrée', reason:'Sortie manquante (fin de période)' });
+  });
+  sessions.sort((a,b)=>a.date - b.date || a.code - b.code);
+  anomalies.sort((a,b)=>a.dt - b.dt || a.code - b.code);
+  return { sessions, anomalies };
+}
+function pt_anomKey(a){ return a.code + '|' + a.dt.toISOString() + '|' + a.type; }
+function pt_eventsNear(code, dt){
+  const from = dt.getTime() - 12*3600000, to = dt.getTime() + 12*3600000;
+  return pt_events.filter(e=>e.code === code && new Date(e.dt).getTime() >= from && new Date(e.dt).getTime() <= to)
+    .sort((a,b)=>new Date(a.dt) - new Date(b.dt));
+}
+
+/* ---------- paie ---------- */
+function pt_depAvances(code){
+  if(typeof dp_mouvements === 'undefined') return [];
+  const n = pt_norm(pt_name(code));
+  return dp_mouvements
+    .filter(m=>m.type === 'Charge' && m.estAvanceSalaire && pt_norm(m.employeNom) === n)
+    .map(m=>({ id:m.id, date:m.date, amount:Number(m.montant)||0, note:m.libelle || '', src:'depenses' }));
+}
+function pt_unmatchedAdvances(codes){
+  if(typeof dp_mouvements === 'undefined') return [];
+  const known = new Set(codes.map(c=>pt_norm(pt_name(c))));
+  const out = {};
+  dp_mouvements.forEach(m=>{
+    if(m.type === 'Charge' && m.estAvanceSalaire && pt_inRange(m.date) && !known.has(pt_norm(m.employeNom))){
+      const k = m.employeNom || '(sans nom)'; out[k] = (out[k] || 0) + (Number(m.montant)||0);
+    }
+  });
+  return Object.keys(out).map(k=>({ name:k, amount:out[k] }));
+}
+function pt_entriesOf(kind, code){
+  return pt_entries.filter(e=>e.kind === kind && e.code === code && pt_inRange(e.date))
+    .map(e=>({ id:e.id, date:e.date, amount:Number(e.amount)||0, note:e.note || '', src:'local' }));
+}
+function pt_payroll(code, sessions){
+  const mySess = sessions.filter(s=>s.code === code);
+  const myManual = pt_entries.filter(e=>e.kind === 'manual' && e.code === code && pt_inRange(e.date));
+  const totalHours = mySess.reduce((s,x)=>s+x.hours, 0) + myManual.reduce((s,x)=>s+(Number(x.hours)||0), 0);
+  const rate = pt_rate(code), mode = pt_mode(code);
+  const workedDays = new Set([...mySess.map(s=>pt_day(s.date)), ...myManual.map(m=>m.date)]).size;
+  const baseWage = mode === 'daily' ? workedDays * rate : totalHours * rate;
+  const tr = pt_transport(code);
+  const transportTotal = tr.enabled ? workedDays * tr.amount : 0;
+  const bonuses = pt_entriesOf('prime', code), leaves = pt_entriesOf('off', code);
+  const advances = [...pt_entriesOf('avance', code), ...pt_depAvances(code).filter(a=>pt_inRange(a.date))];
+  const sum = (arr)=>arr.reduce((s,x)=>s+x.amount, 0);
+  const bonusesTotal = sum(bonuses), leavesTotal = sum(leaves), advancesTotal = sum(advances);
+  const subTotal = baseWage + transportTotal + bonusesTotal;
+  const net = subTotal + leavesTotal - advancesTotal;
+  return { totalHours, rate, mode, workedDays, baseWage, transport:tr, transportTotal, bonuses, leaves, advances, bonusesTotal, leavesTotal, advancesTotal, subTotal, net };
+}
+
+/* ==================== rendu ==================== */
+function pt_num(v){ const n = Number(String(v==null?'':v).replace(/[\s\u00a0]/g,'').replace(',','.')); return isNaN(n) ? 0 : n; }
+function pt_toast(msg){
+  let t = document.getElementById('pt-toast');
+  if(!t){ t = document.createElement('div'); t.id = 'pt-toast'; t.className = 'pt-toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(pt_toast._t); pt_toast._t = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function pt_saveInputs(body){
+  const saved = {};
+  body.querySelectorAll('.pt-draft').forEach(el=>{ if(el.id) saved[el.id] = el.value; });
+  const a = document.activeElement; let focus = null;
+  if(a && a.id && body.contains(a)){
+    focus = { id:a.id };
+    if(typeof a.selectionStart === 'number'){ try{ focus.s = a.selectionStart; focus.e = a.selectionEnd; }catch(e){} }
+  }
+  return { saved, focus };
+}
+function pt_restoreInputs(st, withValues){
+  if(withValues) for(const id in st.saved){ const el = document.getElementById(id); if(el && el.value !== st.saved[id]) el.value = st.saved[id]; }
+  if(st.focus){
+    const el = document.getElementById(st.focus.id);
+    if(el){ el.focus(); if(st.focus.s != null && el.setSelectionRange){ try{ el.setSelectionRange(st.focus.s, st.focus.e); }catch(e){} } }
+  }
+}
+function pt_setTab(t){ pt_tab = t; pt_openFix = null; pt_render(true); window.scrollTo({ top:0 }); }
+function pt_selEmp(v){ pt_sel = Number(v); pt_render(true); }
+function pt_isAdmin(){ return !!(session && session.isAdmin); }
+function pt_renderTabs(nAnom){
+  // Paie et Réglages (salaires, taux) : réservés aux administrateurs
+  const tabs = [['cloture','Clôture du soir'],['anomalies','Anomalies'],['paie','Paie'],['employe','Par employé'],['reglages','Réglages']]
+    .filter(t=>pt_isAdmin() || (t[0] !== 'paie' && t[0] !== 'reglages'));
+  document.getElementById('pointage-tabs').innerHTML = tabs.map(([id,l])=>
+    `<button class="${pt_tab===id?'active':''}" onclick="pt_setTab('${id}')">${l}${id==='anomalies' && nAnom ? ` <span class="count-pill">${nAnom}</span>` : ''}</button>`).join('');
+}
+function pt_render(fresh){
+  if(activeModule !== 'pointage') return;
+  const body = document.getElementById('pt-body'); if(!body) return;
+  if(!pt_isAdmin() && (pt_tab === 'paie' || pt_tab === 'reglages')) pt_tab = 'cloture';
+  pt_renderPeriod();
+  if(pt_error){ pt_renderTabs(0); body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
+  if(!(pt_ready.events && pt_ready.cfg && pt_ready.entries)){ pt_renderTabs(0); body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  const st = pt_saveInputs(body);
+  const all = pt_compute();
+  const sessions = all.sessions.filter(s=>pt_inRange(pt_day(s.date)));
+  const anoms = all.anomalies.filter(a=>pt_inRange(pt_day(a.dt)));
+  const codes = pt_codes();
+  if(pt_sel === null || !codes.includes(pt_sel)) pt_sel = codes.length ? codes[0] : null;
+  pt_renderTabs(anoms.length);
+  let html;
+  if(pt_tab === 'cloture') html = pt_tabCloture(codes);
+  else if(pt_tab === 'anomalies') html = pt_tabAnomalies(anoms);
+  else if(pt_tab === 'paie') html = pt_tabPaie(codes, sessions);
+  else if(pt_tab === 'employe') html = pt_tabEmploye(codes, sessions, anoms);
+  else html = pt_tabReglages(codes);
+  body.innerHTML = html;
+  pt_restoreInputs(st, !fresh);
+}
+function pt_empty(msg){ return `<div class="ticket"><div class="empty-state">${msg}</div></div>`; }
+function pt_empSelect(codes){
+  return `<div class="field" style="margin-bottom:12px;"><label>Employé</label><select id="pt-sel" onchange="pt_selEmp(this.value)">${
+    codes.map(x=>`<option value="${x}" ${x===pt_sel?'selected':''}>${pt_e(pt_label(x))} (code ${x})</option>`).join('')}</select></div>`;
+}
+
+/* ---------- onglet Clôture du soir ---------- */
+function pt_closingDT(dayStr, t){
+  const h = parseInt(t.split(':')[0], 10);
+  const d = new Date(dayStr + 'T00:00:00');
+  if(h < 6) d.setDate(d.getDate() + 1); // une sortie avant 6 h appartient au lendemain calendaire
+  return toLocalISO(d) + 'T' + t + ':00';
+}
+function pt_tabCloture(codes){
+  if(!pt_cl.date) pt_cl.date = todayISO();
+  if(!codes.length) return pt_empty('Importe un export ZKBio ou ajoute un employé dans Réglages.');
+  const rows = codes.map(c=>{
+    const on = !!pt_cl.checked[c];
+    return `<div class="pt-cl-row">
+      <label class="switch"><input type="checkbox" ${on?'checked':''} onchange="pt_clToggle(${c},this.checked)"><span class="slider"></span></label>
+      <span class="pt-cl-name">${pt_e(pt_label(c))}</span>
+      <input type="time" class="pt-time" value="${pt_e(pt_cl.times[c]||'')}" ${on?'':'disabled'} onchange="pt_clTime(${c},this.value)">
+    </div>`;
+  }).join('');
+  return `<div class="ticket">
+    <div class="section-label">Clôture du soir</div>
+    <div class="pt-muted" style="margin-bottom:12px;">Chacun a sa propre heure de sortie : coche qui était là et indique son heure. Indique la date du jour où le service a commencé — une sortie avant 6 h est rattachée à cette même nuit.</div>
+    <div class="field" style="max-width:230px;"><label>Date du service</label><input type="date" value="${pt_e(pt_cl.date)}" onchange="pt_clDate(this.value)"></div>
+    <div class="pt-row" style="margin-top:14px;">
+      <span class="pt-muted">Heure par défaut (optionnel) :</span>
+      <input type="time" class="pt-time" value="${pt_e(pt_cl.quick)}" onchange="pt_cl.quick=this.value">
+      <button class="btn ghost small" onclick="pt_clApplyAll()">Appliquer à tous les cochés</button>
+    </div>
+    <div style="margin-top:12px;">${rows}</div>
+    <button class="btn" style="margin-top:16px;" onclick="pt_clValidate()">Valider la clôture</button>
+  </div>`;
+}
+function pt_clDate(v){ pt_cl.date = v; pt_cl.checked = {}; pt_render(true); }
+function pt_clToggle(c, on){ pt_cl.checked[c] = !!on; pt_render(true); }
+function pt_clTime(c, v){ pt_cl.times[c] = v; }
+function pt_clApplyAll(){
+  if(!pt_cl.quick) return;
+  pt_codes().forEach(c=>{ if(pt_cl.checked[c]) pt_cl.times[c] = pt_cl.quick; });
+  pt_render(true);
+}
+async function pt_clValidate(){
+  const entries = [], missing = [];
+  pt_codes().forEach(c=>{
+    if(!pt_cl.checked[c]) return;
+    const t = pt_cl.times[c];
+    if(!t){ missing.push(pt_name(c)); return; }
+    entries.push({ code:c, iso:new Date(pt_closingDT(pt_cl.date, t)).toISOString(), type:1 });
+  });
+  if(missing.length){ alert('Indique une heure pour : ' + missing.join(', ')); return; }
+  if(!entries.length){ alert('Coche au moins un employé et indique son heure.'); return; }
+  try{
+    const n = entries.length;
+    pt_cl.checked = {}; pt_cl.times = {};
+    await pt_addEvents(entries);
+    pt_toast(n + ' sortie(s) enregistrée(s) pour le ' + fmtDateShort(pt_cl.date) + '.');
+    pt_render(true);
+  }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+
+/* ---------- onglet Anomalies ---------- */
+function pt_anomRow(i){
+  const a = pt_anomList[i], open = pt_openFix === pt_anomKey(a);
+  let h = `<div class="pt-an"><div><b>${pt_fmtDT(a.dt)}</b> · ${a.type}<div class="pt-an-reason">${pt_e(a.reason)}</div></div>
+    <button class="btn ghost small" onclick="pt_toggleFix(${i})">${open ? 'Annuler' : 'Corriger'}</button></div>`;
+  if(!open) return h;
+  const corrType = a.type === 'Entrée' ? 1 : 0;
+  h += `<div class="pt-fix"><div class="pt-muted" style="margin-bottom:6px;">Ajouter le pointage manquant (${corrType===0?'Entrée':'Sortie'}) :</div>
+    <div class="pt-row"><input type="date" id="pt-fix-date" class="pt-draft pt-auto" value="${pt_day(a.dt)}"><input type="time" id="pt-fix-time" class="pt-draft pt-auto" value="${pt_hhmm(a.dt)}"><button class="btn small" onclick="pt_saveFix(${i})">Enregistrer</button></div>`;
+  const near = pt_eventsNear(a.code, a.dt);
+  if(near.length > 1){
+    h += `<div class="pt-muted" style="margin:14px 0 4px;">Ou compare les pointages de ${pt_e(pt_name(a.code))} autour de ce moment — utile si c’est un doublon à supprimer :</div>
+      <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date / heure</th><th>Type</th><th></th></tr></thead><tbody>${
+      near.map(ev=>{
+        const d = new Date(ev.dt), isThis = d.getTime() === a.dt.getTime() && (ev.type === 0 ? 'Entrée' : 'Sortie') === a.type;
+        return `<tr><td>${pt_fmtDT(d)}${isThis ? ' ⚠️' : ''}</td><td>${ev.type===0?'Entrée':'Sortie'}</td><td><button class="btn ghost small" onclick="pt_delEventConfirm('${ev.id}')">Supprimer</button></td></tr>`;
+      }).join('')}</tbody></table></div>`;
+  }
+  return h + `</div>`;
+}
+function pt_tabAnomalies(anoms){
+  pt_anomList = anoms;
+  let html = '';
+  if(!anoms.length) html += pt_empty('Aucune anomalie ouverte sur cette période 🎉');
+  else {
+    const byCode = {};
+    anoms.forEach((a,i)=>{ (byCode[a.code] = byCode[a.code] || []).push(i); });
+    Object.keys(byCode).map(Number).sort((a,b)=>a-b).forEach(code=>{
+      const idxs = byCode[code];
+      html += `<div class="ticket"><div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;">${pt_e(pt_label(code))}</div><span class="pt-muted">${idxs.length} anomalie${idxs.length>1?'s':''}</span></div>${idxs.map(pt_anomRow).join('')}</div>`;
+    });
+  }
+  const resolved = pt_entries.filter(e=>e.kind === 'resolved').sort((a,b)=>(b.resolvedAt||'').localeCompare(a.resolvedAt||''));
+  if(resolved.length){
+    html += `<div class="ticket"><div class="section-label">Corrigées — historique</div>${
+      resolved.map(r=>`<div class="pt-an ok"><div><b>${pt_fmtDT(new Date(r.dt))}</b> · ${pt_e(pt_name(r.code))}<div class="pt-an-reason">${pt_e(r.reason)} — corrigé le ${fmtDateShort(String(r.resolvedAt||'').slice(0,10))}</div></div>
+        <button class="btn ghost small" onclick="pt_delEntry('${r.id}')">Effacer</button></div>`).join('')}
+      <button class="btn ghost small" style="margin-top:8px;" onclick="pt_clearResolved()">Vider l’historique des corrections</button></div>`;
+  }
+  return html;
+}
+function pt_toggleFix(i){
+  const a = pt_anomList[i]; if(!a) return;
+  const k = pt_anomKey(a);
+  pt_openFix = (pt_openFix === k) ? null : k;
+  pt_render(true);
+}
+async function pt_saveFix(i){
+  const a = pt_anomList[i]; if(!a) return;
+  const d = document.getElementById('pt-fix-date').value, t = document.getElementById('pt-fix-time').value;
+  if(!d || !t){ alert('Date et heure requises.'); return; }
+  try{
+    pt_openFix = null;
+    await Promise.all([
+      pt_addEvents([{ code:a.code, iso:new Date(d + 'T' + t + ':00').toISOString(), type: a.type === 'Entrée' ? 1 : 0 }]),
+      pt_addEntryDoc({ kind:'resolved', code:a.code, dt:a.dt.toISOString(), type:a.type, reason:a.reason, resolvedAt:new Date().toISOString() })
+    ]);
+    pt_render(true);
+  }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+async function pt_delEventConfirm(id){
+  const e = pt_events.find(x=>x.id === id); if(!e) return;
+  if(!confirm('Supprimer ce pointage (' + pt_fmtDT(new Date(e.dt)) + ', ' + (e.type===0?'Entrée':'Sortie') + ') ?')) return;
+  pt_openFix = null;
+  try{ await pt_deleteEvents([id]); pt_render(true); }catch(err){ console.error(err); alert('Erreur : ' + (err.message || err)); }
+}
+async function pt_delEntry(id){ try{ await pt_entriesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); } }
+async function pt_delEntryConfirm(id, what){ if(confirm('Supprimer ' + what + ' ?')) pt_delEntry(id); }
+async function pt_clearResolved(){
+  if(!confirm('Effacer tout l’historique des corrections ?')) return;
+  await pt_commit(pt_entries.filter(e=>e.kind === 'resolved').map(e=>({ t:'del', ref:pt_entriesCol.doc(e.id) })));
+}
+
+/* ---------- onglet Paie ---------- */
+function pt_formRow(k, label){
+  const enter = `onkeydown="if(event.key==='Enter')pt_addEntry('${k}')"`;
+  return `<div class="pt-form">
+    <div class="pt-form-title"><label>${label}</label><input type="date" id="pt-f-${k}-date" class="pt-draft pt-auto" value="${todayISO()}"></div>
+    <input type="text" id="pt-f-${k}-note" class="pt-draft" placeholder="Motif" ${enter}>
+    <input type="text" inputmode="decimal" id="pt-f-${k}-amt" class="pt-draft" placeholder="Montant (DA)" ${enter}>
+    <button class="btn small" onclick="pt_addEntry('${k}')">Ajouter</button>
+  </div>`;
+}
+async function pt_addEntry(kind){
+  if(pt_sel === null) return;
+  const dEl = document.getElementById('pt-f-' + kind + '-date'), nEl = document.getElementById('pt-f-' + kind + '-note'), aEl = document.getElementById('pt-f-' + kind + '-amt');
+  const raw = aEl.value.trim();
+  if(!raw){ alert('Indique au moins le montant.'); return; }
+  const data = { kind, code:pt_sel, date:dEl.value || todayISO(), amount:pt_num(raw), note:nEl.value.trim() };
+  aEl.value = ''; nEl.value = ''; dEl.value = todayISO();
+  try{ await pt_addEntryDoc(data); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+function pt_histRows(p){
+  return [
+    ...p.bonuses.map(x=>({ ...x, cat:'Prime', cls:'pt-b-prime', sign:1 })),
+    ...p.leaves.map(x=>({ ...x, cat:'Jour Off', cls:'pt-b-off', sign:1 })),
+    ...p.advances.map(x=>({ ...x, cat:'Avance', cls:'pt-b-avance', sign:-1 }))
+  ].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+}
+function pt_tabPaie(codes, sessions){
+  if(!codes.length) return pt_empty('Pas encore de données.');
+  const c = pt_sel, p = pt_payroll(c, sessions);
+  const rows = pt_histRows(p);
+  const hist = rows.length ? rows.map(r=>`<tr>
+      <td>${fmtDateShort(r.date)}</td>
+      <td><span class="pt-badge ${r.cls}">${r.cat}</span>${r.src==='depenses' ? '<span class="pt-src">via Dépenses</span>' : ''}</td>
+      <td>${pt_e(r.note)}</td>
+      <td class="${r.sign<0?'pt-minus':'pt-plus'}">${r.sign<0?'−':'+'}${pt_fmtMoney(r.amount)}</td>
+      <td>${r.src==='depenses' ? '' : `<button class="btn ghost small" onclick="pt_delEntryConfirm('${r.id}','cette entrée')">Supprimer</button>`}</td></tr>`).join('')
+    : `<tr><td colspan="5" class="pt-muted">Aucune entrée sur cette période.</td></tr>`;
+  const unmatched = pt_unmatchedAdvances(codes);
+  const banner = unmatched.length ? `<div class="alert-banner"><b>Avances (Dépenses) non rattachées à un employé du pointage</b>${
+    unmatched.map(u=>`${pt_e(u.name)} : ${pt_fmtMoney(u.amount)}`).join(' · ')}<br><span style="opacity:.85;">Le nom doit être identique à celui saisi dans Réglages pour être repris dans la paie.</span></div>` : '';
+  const totNet = codes.reduce((s,x)=>s + pt_payroll(x, sessions).net, 0);
+  const table = codes.map(x=>{
+    const q = pt_payroll(x, sessions);
+    return `<tr><td>${pt_e(pt_label(x))}</td><td>${pt_fmtH(q.totalHours)}</td><td>${pt_fmtMoney(q.rate)}${q.mode==='daily'?'/j':'/h'}</td><td>${pt_fmtMoney(q.baseWage)}</td><td>${pt_fmtMoney(q.transportTotal)}</td><td>${pt_fmtMoney(q.bonusesTotal)}</td><td><b>${pt_fmtMoney(q.subTotal)}</b></td><td>${pt_fmtMoney(q.leavesTotal)}</td><td>${pt_fmtMoney(q.advancesTotal)}</td><td><b>${pt_fmtMoney(q.net)}</b></td></tr>`;
+  }).join('');
+  return `${banner}<div class="ticket">
+    ${pt_empSelect(codes)}
+    <div class="pt-muted">Taux : ${pt_fmtMoney(p.rate)}${p.mode==='daily'?' / jour':' / heure'} · ${p.transport.enabled ? 'Transport : ' + pt_fmtMoney(p.transport.amount) + ' / jour' : 'Transport désactivé'} · <a href="#" class="pt-link" onclick="pt_setTab('reglages');return false;">Modifier dans Réglages</a></div>
+    <div class="pt-kpis">
+      <div class="pt-kpi"><div class="n">${pt_fmtH(p.totalHours)} h</div><div class="l">Heures totales</div></div>
+      <div class="pt-kpi"><div class="n">${p.workedDays}</div><div class="l">Jours travaillés</div></div>
+      <div class="pt-kpi"><div class="n">${pt_fmtMoney(p.baseWage)}</div><div class="l">Salaire de base</div></div>
+      <div class="pt-kpi"><div class="n">${pt_fmtMoney(p.transportTotal)}</div><div class="l">Transport</div></div>
+    </div>
+    ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off')}${pt_formRow('avance','Avance')}
+    <div class="pt-muted" style="margin-top:6px;">Les avances saisies dans Dépenses (« avance salaire ») apparaissent automatiquement dans l’historique ci-dessous.</div>
+    <h2 class="section" style="margin-top:20px;">Historique</h2>
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Catégorie</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${hist}</tbody></table></div>
+    <div class="grid grid-2" style="margin-top:14px;">
+      <div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span></div><div class="value">${pt_fmtMoney(p.subTotal)}</div></div>
+      <div class="result-box final"><div class="label">Net à payer</div><div class="value">${pt_fmtMoney(p.net)}</div></div>
+    </div>
+    <div class="actions-row"><button class="btn ghost small" onclick="pt_exportPayslip()">Exporter le bulletin (CSV)</button></div>
+  </div>
+  <div class="ticket"><div class="section-label">Tableau de paie — tous les employés</div>
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Employé</th><th>Heures</th><th>Taux</th><th>Base</th><th>Transport</th><th>Primes</th><th>Sous-total</th><th>Jours off</th><th>Avances</th><th>Net</th></tr></thead><tbody>${table}
+    <tr class="pt-total"><td colspan="9">TOTAL NET À PAYER</td><td>${pt_fmtMoney(totNet)}</td></tr></tbody></table></div>
+  </div>`;
+}
+
+/* ---------- onglet Par employé (sessions + modification des pointages + sessions manuelles) ---------- */
+function pt_tabEmploye(codes, sessions, anoms){
+  if(!codes.length) return pt_empty('Aucune donnée pour l’instant.');
+  const c = pt_sel;
+  const mySess = sessions.filter(s=>s.code === c);
+  const myManual = pt_entries.filter(e=>e.kind === 'manual' && e.code === c && pt_inRange(e.date));
+  const myAn = anoms.filter(a=>a.code === c);
+  const lines = [
+    ...mySess.map(s=>({ ts:s.start.getTime(), hours:s.hours, html:`<tr><td>${fmtDateShort(pt_day(s.date))}</td><td>${pt_fmtDT(s.start)}</td><td>${pt_fmtDT(s.end)}</td><td>${pt_fmtH(s.hours)}</td><td></td></tr>` })),
+    ...myManual.map(m=>({ ts:new Date(m.date + 'T00:00:00').getTime(), hours:Number(m.hours)||0, html:`<tr class="pt-manual"><td>${fmtDateShort(m.date)}</td><td colspan="2">Session manuelle${m.note ? ' — ' + pt_e(m.note) : ''}</td><td>${pt_fmtH(m.hours)}</td><td><button class="btn ghost small" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>` }))
+  ].sort((a,b)=>a.ts - b.ts);
+  const total = lines.reduce((s,x)=>s + x.hours, 0);
+  const rawEvs = pt_events.filter(e=>e.code === c && pt_inRange(pt_day(new Date(e.dt)))).sort((a,b)=>new Date(b.dt) - new Date(a.dt));
+  const manualRows = myManual.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  return `<div class="ticket">
+    ${pt_empSelect(codes)}
+    <div class="pt-kpis">
+      <div class="pt-kpi"><div class="n">${pt_fmtH(total)} h</div><div class="l">Total période</div></div>
+      <div class="pt-kpi"><div class="n">${mySess.length}</div><div class="l">Sessions pointées</div></div>
+      <div class="pt-kpi"><div class="n">${myManual.length}</div><div class="l">Sessions manuelles</div></div>
+      <div class="pt-kpi"><div class="n">${myAn.length}</div><div class="l">Anomalies</div></div>
+    </div>
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Entrée</th><th>Sortie</th><th>Durée (h)</th><th></th></tr></thead><tbody>${
+      lines.length ? lines.map(l=>l.html).join('') + `<tr class="pt-total"><td colspan="3">Total</td><td>${pt_fmtH(total)}</td><td></td></tr>` : `<tr><td colspan="5" class="pt-muted">Aucune session sur cette période.</td></tr>`}</tbody></table></div>
+    ${myAn.length ? `<div class="pt-muted" style="margin-top:10px;">⚠️ ${myAn.length} anomalie(s) pour cette personne — à corriger dans l’onglet <a href="#" class="pt-link" onclick="pt_setTab('anomalies');return false;">Anomalies</a>.</div>` : ''}
+    <div class="actions-row"><button class="btn ghost small" onclick="pt_exportEmployeeCsv()">Exporter en CSV</button></div>
+  </div>
+  <div class="ticket"><div class="section-label">Modifier ses pointages</div>
+    <div class="pt-row">
+      <input type="date" id="pt-ne-date" class="pt-draft pt-auto"><input type="time" id="pt-ne-time" class="pt-draft pt-auto">
+      <select id="pt-ne-type" class="pt-draft pt-auto"><option value="0">Entrée</option><option value="1">Sortie</option></select>
+      <button class="btn small" onclick="pt_addEventUI()">Ajouter</button>
+    </div>
+    <div class="pt-scroll" style="margin-top:12px;"><table class="pt-table"><thead><tr><th>Date</th><th>Heure</th><th>Type</th><th></th></tr></thead><tbody>${
+      rawEvs.length ? rawEvs.map(ev=>{ const d = new Date(ev.dt); return `<tr>
+        <td><input type="date" id="pt-ev-d-${ev.id}" class="pt-draft pt-auto" value="${pt_day(d)}"></td>
+        <td><input type="time" id="pt-ev-t-${ev.id}" class="pt-draft pt-auto" value="${pt_hhmm(d)}"></td>
+        <td><select id="pt-ev-y-${ev.id}" class="pt-draft pt-auto"><option value="0" ${ev.type===0?'selected':''}>Entrée</option><option value="1" ${ev.type===1?'selected':''}>Sortie</option></select></td>
+        <td><button class="btn ghost small" onclick="pt_saveEventRow('${ev.id}')">Enregistrer</button> <button class="btn ghost small" onclick="pt_delEventConfirm('${ev.id}')">Supprimer</button></td></tr>`; }).join('')
+      : `<tr><td colspan="4" class="pt-muted">Aucun pointage sur cette période.</td></tr>`}</tbody></table></div>
+  </div>
+  <div class="ticket"><div class="section-label">Sessions manuelles</div>
+    <div class="pt-muted" style="margin-bottom:8px;">Heures ajoutées sans pointage, quand le pointage est irrécupérable (ou pour un employé géré sans pointage).</div>
+    <div class="pt-row">
+      <input type="date" id="pt-m-date" class="pt-draft pt-auto"><input type="text" inputmode="decimal" id="pt-m-hours" class="pt-draft pt-w90" placeholder="Heures">
+      <input type="text" id="pt-m-note" class="pt-draft pt-grow" placeholder="Note (optionnel)"><button class="btn small" onclick="pt_addManual()">Ajouter</button>
+    </div>
+    ${manualRows.length ? `<div class="pt-scroll" style="margin-top:10px;"><table class="pt-table"><thead><tr><th>Date</th><th>Heures</th><th>Note</th><th></th></tr></thead><tbody>${
+      manualRows.map(m=>`<tr><td>${fmtDateShort(m.date)}</td><td>${pt_fmtH(m.hours)}</td><td>${pt_e(m.note)}</td><td><button class="btn ghost small" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>`).join('')}</tbody></table></div>` : ''}
+  </div>`;
+}
+async function pt_addEventUI(){
+  const d = document.getElementById('pt-ne-date').value, t = document.getElementById('pt-ne-time').value, y = Number(document.getElementById('pt-ne-type').value);
+  if(!d || !t){ alert('Choisis une date et une heure.'); return; }
+  document.getElementById('pt-ne-date').value = ''; document.getElementById('pt-ne-time').value = '';
+  try{ await pt_addEvents([{ code:pt_sel, iso:new Date(d + 'T' + t + ':00').toISOString(), type:y }]); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_saveEventRow(id){
+  const d = document.getElementById('pt-ev-d-' + id).value, t = document.getElementById('pt-ev-t-' + id).value, y = Number(document.getElementById('pt-ev-y-' + id).value);
+  if(!d || !t){ alert('Date et heure requises.'); return; }
+  try{ await pt_updateEvent(id, { dt:new Date(d + 'T' + t + ':00').toISOString(), type:y }); pt_toast('Pointage modifié.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_addManual(){
+  const d = document.getElementById('pt-m-date').value, h = document.getElementById('pt-m-hours').value.trim(), n = document.getElementById('pt-m-note').value.trim();
+  if(!d || !h){ alert('Date et nombre d’heures requis.'); return; }
+  document.getElementById('pt-m-date').value = ''; document.getElementById('pt-m-hours').value = ''; document.getElementById('pt-m-note').value = '';
+  try{ await pt_addEntryDoc({ kind:'manual', code:pt_sel, date:d, hours:pt_num(h), note:n }); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+
+/* ---------- onglet Réglages ---------- */
+function pt_tabReglages(codes){
+  const isAdmin = !!(session && session.isAdmin);
+  let suggestion = 1; while(codes.includes(suggestion)) suggestion++;
+  const cards = codes.map(c=>{
+    const e = pt_emp[c] || {}, tr = pt_transport(c);
+    return `<div class="ticket">
+      <div class="row-between"><div style="font-weight:700;font-family:'Manrope',sans-serif;">Code ${c}</div>${isAdmin ? `<button class="btn rust small" onclick="pt_deleteEmployee(${c})">🗑️ Supprimer</button>` : ''}</div>
+      <div class="grid grid-2" style="margin-top:10px;">
+        <div class="field"><label>Nom</label><input type="text" list="pt-names" value="${pt_e(e.name || PT_DEFAULT_NAMES[c] || '')}" placeholder="Nom de l’employé" onchange="pt_setField(${c},'name',this.value)"></div>
+        <div class="field"><label>Poste</label><input type="text" value="${pt_e(e.poste || '')}" placeholder="Cuisinier, Serveur…" onchange="pt_setField(${c},'poste',this.value)"></div>
+        <div class="field"><label>Mode de salaire</label><select onchange="pt_setField(${c},'payMode',this.value)"><option value="hourly" ${pt_mode(c)==='hourly'?'selected':''}>DA / heure</option><option value="daily" ${pt_mode(c)==='daily'?'selected':''}>DA / jour travaillé</option></select></div>
+        <div class="field"><label>Taux (DA)</label><input type="text" inputmode="decimal" value="${pt_rate(c) || ''}" placeholder="0" onchange="pt_setRate(${c},this.value)"></div>
+      </div>
+      <div class="perm-row" style="margin-top:8px;"><span>Prime de transport par jour travaillé</span><label class="switch"><input type="checkbox" ${tr.enabled?'checked':''} onchange="pt_setTransport(${c},{enabled:this.checked})"><span class="slider"></span></label></div>
+      ${tr.enabled ? `<div class="field" style="margin-top:8px;max-width:220px;"><label>Montant / jour (DA)</label><input type="text" inputmode="decimal" value="${tr.amount || ''}" placeholder="0" onchange="pt_setTransport(${c},{amount:pt_num(this.value)})"></div>` : ''}
+    </div>`;
+  }).join('');
+  return `<datalist id="pt-names">${EMPLOYES_TOUS.map(n=>`<option value="${pt_e(n)}"></option>`).join('')}</datalist>
+  <div class="ticket"><div class="section-label">Ajouter un employé</div>
+    <div class="pt-muted" style="margin-bottom:8px;">Pour quelqu’un géré sans pointeur, ou dont tu saisis toujours le pointage à la main : choisis un numéro de code libre.</div>
+    <div class="pt-row"><input type="text" inputmode="numeric" id="pt-new-code" class="pt-draft pt-w90" value="${suggestion}"><button class="btn small" onclick="pt_addEmployee()">Ajouter</button></div>
+  </div>
+  <h2 class="section">Employés</h2>
+  ${cards || pt_empty('Importe un export ZKBio ou ajoute un employé ci-dessus.')}
+  <div class="ticket"><div class="section-label">Données</div>
+    <div class="actions-row" style="margin-top:0;"><button class="btn small" onclick="pt_exportExcel()">Exporter en Excel (sauvegarde complète)</button></div>
+    <div class="pt-muted" style="margin-top:6px;">Un fichier .xlsx avec toutes les données (réglages, pointages, sessions, anomalies, historique de paie) et le résumé de paie de la période affichée.</div>
+    ${isAdmin ? `<div class="section-label" style="margin-top:18px;">Reprendre les données de l’outil local</div>
+    <div class="pt-muted" style="margin-bottom:8px;">Dans l’outil de pointage local : Réglages → « Exporter pour Firebase (.json) ». Puis choisis ce fichier ici. Peut être relancé sans créer de doublons.</div>
+    <div class="pt-row"><input type="file" id="pt-mig-file" accept=".json,application/json" class="pt-filein"><button class="btn small" onclick="pt_importLocalJson()">Importer</button></div>
+    <div class="actions-row" style="margin-top:18px;"><button class="btn rust small" onclick="pt_resetEvents()">Réinitialiser tous les pointages</button></div>` : ''}
+  </div>`;
+}
+function pt_setField(c, field, v){ pt_setEmp(c, { [field]: (field === 'payMode' ? v : String(v).trim()) }).catch(e=>alert('Erreur : ' + (e.message || e))); }
+function pt_setRate(c, v){ pt_setEmp(c, { rate: pt_num(v) }).catch(e=>alert('Erreur : ' + (e.message || e))); }
+function pt_setTransport(c, patch){ pt_setEmp(c, { transport: patch }).then(()=>pt_render(true)).catch(e=>alert('Erreur : ' + (e.message || e))); }
+async function pt_addEmployee(){
+  const c = parseInt(document.getElementById('pt-new-code').value, 10);
+  if(isNaN(c)){ alert('Indique un numéro de code.'); return; }
+  if(pt_codes().includes(c)){ alert('Ce code existe déjà.'); return; }
+  try{ await pt_setEmp(c, { extra:true }); pt_sel = c; pt_toast('Employé ajouté (code ' + c + ').'); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_deleteEmployee(c){
+  if(!(session && session.isAdmin)) return;
+  if(!confirm('Supprimer définitivement ' + pt_label(c) + ' (code ' + c + ') ? Tout son historique (pointages, primes, jours off, avances saisies ici, sessions manuelles) sera effacé. Cette action est irréversible.')) return;
+  try{
+    const ids = pt_events.filter(e=>e.code === c).map(e=>e.id);
+    const ops = pt_entries.filter(e=>e.code === c).map(e=>({ t:'del', ref:pt_entriesCol.doc(e.id) }));
+    ops.push({ t:'set', ref:pt_configRef, data:{ emp:{ [c]:PT_DEL() } } });
+    await Promise.all([ ids.length ? pt_deleteEvents(ids) : null, pt_commit(ops) ]);
+  }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_resetEvents(){
+  if(!(session && session.isAdmin)) return;
+  if(!confirm('Supprimer définitivement TOUS les pointages importés ? Cette action est irréversible.')) return;
+  const months = Array.from(new Set(pt_events.map(e=>e.dt.slice(0,7))));
+  try{ await pt_commit(months.map(mk=>({ t:'del', ref:pt_monthRef(mk) }))); pt_toast('Pointages supprimés.'); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+}
+
+/* ---------- reprise des données de l'outil local (.json) ---------- */
+async function pt_importLocalJson(){
+  if(!(session && session.isAdmin)) return;
+  const f = document.getElementById('pt-mig-file').files[0];
+  if(!f){ alert('Choisis d’abord le fichier .json exporté depuis l’outil local.'); return; }
+  let data;
+  try{ data = JSON.parse(await f.text()); }catch(e){ alert('Fichier JSON invalide.'); return; }
+  if(!data || !Array.isArray(data.events)){ alert('Ce fichier ne ressemble pas à une sauvegarde de l’outil de pointage local.'); return; }
+
+  const seen = new Set(pt_events.map(e=>e.code + '|' + e.dt + '|' + e.type)), fresh = [];
+  data.events.forEach(e=>{
+    const ev = Array.isArray(e) ? { code:e[0], dt:e[1], type:e[2] } : e;
+    const d = new Date(ev && ev.dt); if(!ev || isNaN(d.getTime()) || isNaN(Number(ev.code))) return; // ligne illisible : ignorée
+    const iso = d.toISOString(), k = Number(ev.code) + '|' + iso + '|' + Number(ev.type);
+    if(!seen.has(k)){ seen.add(k); fresh.push({ code:Number(ev.code), iso, type:Number(ev.type) }); }
+  });
+  const extra = (data.extraCodes || []).map(String);
+  const codeKeys = new Set([...Object.keys(data.names||{}), ...Object.keys(data.rates||{}), ...Object.keys(data.payMode||{}), ...Object.keys(data.transport||{}), ...Object.keys(data.postes||{}), ...extra]);
+  const emp = {};
+  codeKeys.forEach(k=>{
+    const o = {};
+    if(data.names && data.names[k]) o.name = data.names[k];
+    if(data.postes && data.postes[k]) o.poste = data.postes[k];
+    if(data.rates && data.rates[k]) o.rate = Number(data.rates[k]) || 0;
+    if(data.payMode && data.payMode[k]) o.payMode = data.payMode[k];
+    if(data.transport && data.transport[k]) o.transport = { enabled:!!data.transport[k].enabled, amount:Number(data.transport[k].amount) || 0 };
+    if(extra.includes(k)) o.extra = true;
+    if(Object.keys(o).length) emp[k] = o;
+  });
+  const entryOps = [];
+  const put = (id, doc)=>entryOps.push({ t:'set', ref:pt_entriesCol.doc('imp_' + id), data:doc });
+  const money = (map, kind)=>Object.keys(map || {}).forEach(code=>(map[code] || []).forEach(x=>put(x.id, { kind, code:Number(code), date:x.date || todayISO(), amount:Number(x.amount) || 0, note:x.note || '' })));
+  money(data.bonuses, 'prime'); money(data.leaves, 'off'); money(data.advances, 'avance');
+  (data.manual || []).forEach(m=>put(m.id, { kind:'manual', code:Number(m.code), date:m.date || todayISO(), hours:Number(m.hours) || 0, note:m.note || '' }));
+  (data.resolvedAnomalies || []).forEach(r=>put(r.id, { kind:'resolved', code:Number(r.code), dt:r.dt || r.resolvedAt || new Date().toISOString(), type:r.type || '', reason:r.reason || '', resolvedAt:r.resolvedAt || new Date().toISOString() }));
+
+  const msg = 'Reprendre : ' + fresh.length + ' nouveau(x) pointage(s), ' + Object.keys(emp).length + ' employé(s) (réglages), ' + entryOps.length + ' entrée(s) (primes, jours off, avances, sessions manuelles) ?\nTu peux relancer cet import sans créer de doublons.';
+  if(!confirm(msg)) return;
+  try{
+    if(fresh.length) await pt_addEvents(fresh);
+    if(Object.keys(emp).length) await pt_configRef.set({ emp }, { merge:true });
+    if(entryOps.length) await pt_commit(entryOps);
+    document.getElementById('pt-mig-file').value = '';
+    pt_toast('Import terminé.');
+  }catch(e){ console.error(e); alert('Erreur pendant l’import : ' + (e.message || e)); }
+}
+
+/* ---------- exports ---------- */
+function pt_periodSessions(){ return pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date))); }
+function pt_exportEmployeeCsv(){
+  const c = pt_sel; if(c === null) return;
+  const sessions = pt_periodSessions().filter(s=>s.code === c);
+  const manual = pt_entries.filter(e=>e.kind === 'manual' && e.code === c && pt_inRange(e.date));
+  let csv = 'Date;Entree;Sortie;Duree (h)\n';
+  sessions.forEach(s=>{ csv += pt_day(s.date) + ';' + pt_fmtDT(s.start) + ';' + pt_fmtDT(s.end) + ';' + s.hours.toFixed(2) + '\n'; });
+  manual.forEach(m=>{ csv += m.date + ';Manuel;Manuel;' + (Number(m.hours)||0).toFixed(2) + '\n'; });
+  const total = sessions.reduce((s,x)=>s+x.hours,0) + manual.reduce((s,x)=>s+(Number(x.hours)||0),0);
+  csv += 'TOTAL;;;' + total.toFixed(2) + '\n';
+  pt_download('pointage_' + pt_name(c).replace(/[^a-z0-9]+/gi,'_') + '.csv', ['\uFEFF' + csv], 'text/csv;charset=utf-8');
+}
+function pt_exportPayslip(){
+  const c = pt_sel; if(c === null) return;
+  const p = pt_payroll(c, pt_periodSessions());
+  let csv = 'Bulletin de paie;' + pt_name(c) + '\n';
+  csv += 'Periode;' + (pt_filter.from || '…') + ' au ' + (pt_filter.to || '…') + '\n';
+  csv += 'Heures totales;' + p.totalHours.toFixed(2) + '\n';
+  csv += 'Taux (' + (p.mode === 'daily' ? 'DA/jour' : 'DA/h') + ');' + p.rate + '\n';
+  csv += 'Jours travailles;' + p.workedDays + '\n';
+  csv += 'Salaire de base;' + p.baseWage.toFixed(2) + '\n';
+  csv += 'Prime transport;' + p.transportTotal.toFixed(2) + '\n';
+  csv += 'Primes;' + p.bonusesTotal.toFixed(2) + '\n';
+  csv += 'Sous-total (base+transport+primes);' + p.subTotal.toFixed(2) + '\n';
+  csv += 'Jours off;' + p.leavesTotal.toFixed(2) + '\n';
+  csv += 'Avances;' + p.advancesTotal.toFixed(2) + '\n';
+  csv += 'NET A PAYER;' + p.net.toFixed(2) + '\n';
+  pt_download('bulletin_' + pt_name(c).replace(/[^a-z0-9]+/gi,'_') + '.csv', ['\uFEFF' + csv], 'text/csv;charset=utf-8');
+}
+function pt_exportExcel(){
+  if(typeof XLSX === 'undefined'){ alert('La bibliothèque Excel n’est pas chargée (connexion ?).'); return; }
+  const all = pt_compute(), codes = pt_codes(), fs = all.sessions.filter(s=>pt_inRange(pt_day(s.date)));
+  const wb = XLSX.utils.book_new();
+  const add = (name, header, rows)=>XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header].concat(rows)), name);
+  add('Resume paie', ['Code','Nom','Poste','Heures','Mode','Taux','Jours travailles','Salaire base','Transport','Primes','Sous-total','Jours off','Avances','Net'],
+    codes.map(c=>{ const p = pt_payroll(c, fs); return [c, pt_name(c), pt_poste(c), +p.totalHours.toFixed(2), p.mode === 'daily' ? 'Jour' : 'Heure', p.rate, p.workedDays, +p.baseWage.toFixed(2), +p.transportTotal.toFixed(2), +p.bonusesTotal.toFixed(2), +p.subTotal.toFixed(2), +p.leavesTotal.toFixed(2), +p.advancesTotal.toFixed(2), +p.net.toFixed(2)]; }));
+  const hist = [];
+  codes.forEach(c=>{
+    pt_entries.filter(e=>e.code === c && ['prime','off','avance'].includes(e.kind)).forEach(e=>hist.push([c, pt_name(c), e.kind === 'prime' ? 'Prime' : e.kind === 'off' ? 'Jour Off' : 'Avance', e.date, e.note || '', e.kind === 'avance' ? -(Number(e.amount)||0) : (Number(e.amount)||0), 'Pointage']));
+    pt_depAvances(c).forEach(a=>hist.push([c, pt_name(c), 'Avance', a.date, a.note, -a.amount, 'Dépenses']));
+  });
+  hist.sort((a,b)=>String(a[3]).localeCompare(String(b[3])));
+  add('Historique', ['Code','Nom','Categorie','Date','Motif','Montant','Source'], hist);
+  add('Sessions', ['Code','Nom','Date','Entree','Sortie','Duree h'], all.sessions.map(s=>[s.code, pt_name(s.code), pt_day(s.date), pt_fmtDT(s.start), pt_fmtDT(s.end), +s.hours.toFixed(2)]));
+  add('Sessions manuelles', ['Code','Nom','Date','Heures','Note'], pt_entries.filter(e=>e.kind === 'manual').sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(m=>[m.code, pt_name(m.code), m.date, Number(m.hours)||0, m.note || '']));
+  add('Pointages bruts', ['Code','Nom','Date heure','Type'], pt_events.slice().sort((a,b)=>new Date(a.dt) - new Date(b.dt)).map(e=>[e.code, pt_name(e.code), pt_fmtDT(new Date(e.dt)), e.type === 0 ? 'Entree' : 'Sortie']));
+  add('Anomalies', ['Code','Nom','Date heure','Type','Motif'], all.anomalies.map(a=>[a.code, pt_name(a.code), pt_fmtDT(a.dt), a.type, a.reason]));
+  add('Corrections', ['Code','Nom','Anomalie d\'origine','Motif','Corrige le'], pt_entries.filter(e=>e.kind === 'resolved').map(r=>[r.code, pt_name(r.code), pt_fmtDT(new Date(r.dt)), r.reason, String(r.resolvedAt || '').slice(0,10)]));
+  add('Reglages', ['Code','Nom','Poste','Mode','Taux','Transport actif','Montant transport'], codes.map(c=>{ const t = pt_transport(c); return [c, pt_name(c), pt_poste(c), pt_mode(c) === 'daily' ? 'DA/jour' : 'DA/heure', pt_rate(c), t.enabled ? 'Oui' : 'Non', t.amount]; }));
+  XLSX.writeFile(wb, 'pointage_allo_sushi_' + todayISO() + '.xlsx');
+}
+
 
 dp_render();
 
