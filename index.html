@@ -3047,12 +3047,16 @@ async function st_deleteArticle(id){
 const pt_eventsCol = db.collection('pointage_events');
 const pt_configRef = db.collection('pointage_config').doc('employes');
 const pt_entriesCol = db.collection('pointage_entries');
+/* pointage_config/ignores : { k:{<clé pointage>:true}, c:{<code>:true} } — pointages / employés écartés volontairement :
+   un nouvel import du fichier du pointeur (qui contient tout l'historique) ne les fait pas revenir. */
+const pt_ignoreRef = db.collection('pointage_config').doc('ignores');
 const PT_DEFAULT_NAMES = {5:'Mejdoub',8:'Fatima',10:'Kadi',15:'Sidahmed',16:'Marwa',17:'Meriem',18:'Hamid',19:'Nabil',20:'Ali'};
 
 let pt_events = [];          // [{id, code, dt(ISO), type}]
 let pt_emp = {};             // { code: {...} }
 let pt_entries = [];         // [{id, kind, code, date, amount, hours, note, ...}]
-let pt_ready = { events:false, cfg:false, entries:false };
+let pt_ign = { k:{}, c:{} };
+let pt_ready = { events:false, cfg:false, entries:false, ign:false };
 let pt_started = false, pt_error = '';
 let pt_tab = 'cloture', pt_sel = null, pt_openFix = null, pt_anomList = [];
 let pt_filter = { from:null, to:null };
@@ -3113,6 +3117,10 @@ function pt_start(){
     const data = doc.exists ? (doc.data() || {}) : {};
     pt_emp = data.emp || {}; pt_ready.cfg = true; pt_render();
   }, onErr);
+  pt_ignoreRef.onSnapshot((doc)=>{
+    const d = doc.exists ? (doc.data() || {}) : {};
+    pt_ign = { k:d.k || {}, c:d.c || {} }; pt_ready.ign = true; pt_render();
+  }, onErr);
   pt_entriesCol.onSnapshot((snap)=>{
     const list = [];
     snap.forEach(d=>list.push({ id:d.id, ...d.data() }));
@@ -3134,6 +3142,9 @@ async function pt_commit(ops){
   }
 }
 function pt_monthRef(mk){ return pt_eventsCol.doc(mk); }
+function pt_evKey(code, iso, type){ return code + '_' + String(iso).slice(0,16).replace(/\D/g, '') + '_' + type; }
+function pt_ignoreOp(evs){ const k = {}; evs.forEach(e=>{ k[pt_evKey(e.code, e.dt, e.type)] = true; }); return { t:'set', ref:pt_ignoreRef, data:{ k } }; }
+function pt_isIgnored(code, iso, type){ return !!(pt_ign.c[code] || pt_ign.k[pt_evKey(code, iso, type)]); }
 async function pt_addEvents(list){ // [{code, iso, type}]
   const byMonth = {};
   list.forEach(e=>{ const mk = e.iso.slice(0,7); (byMonth[mk] = byMonth[mk] || {})[pt_newId()] = { c:e.code, t:e.iso, y:e.type }; });
@@ -3144,14 +3155,17 @@ async function pt_updateEvent(id, patch){
   const n = { ...e, ...patch };
   const oldMk = e.dt.slice(0,7), newMk = n.dt.slice(0,7);
   const ops = [];
+  if(pt_evKey(e.code, e.dt, e.type) !== pt_evKey(n.code, n.dt, n.type)) ops.push(pt_ignoreOp([e])); // l'ancien pointage ne reviendra pas à l'import
   if(oldMk !== newMk) ops.push({ t:'set', ref:pt_monthRef(oldMk), data:{ ev:{ [id]:PT_DEL() } } });
   ops.push({ t:'set', ref:pt_monthRef(newMk), data:{ ev:{ [id]:{ c:n.code, t:n.dt, y:n.type } } } });
   await pt_commit(ops);
 }
-async function pt_deleteEvents(ids){
-  const byMonth = {};
-  ids.forEach(id=>{ const e = pt_events.find(x=>x.id===id); if(e){ const mk = e.dt.slice(0,7); (byMonth[mk] = byMonth[mk] || {})[id] = PT_DEL(); } });
-  await pt_commit(Object.keys(byMonth).map(mk=>({ t:'set', ref:pt_monthRef(mk), data:{ ev:byMonth[mk] } })));
+async function pt_deleteEvents(ids, opts){
+  const byMonth = {}, gone = [];
+  ids.forEach(id=>{ const e = pt_events.find(x=>x.id===id); if(e){ gone.push(e); const mk = e.dt.slice(0,7); (byMonth[mk] = byMonth[mk] || {})[id] = PT_DEL(); } });
+  const ops = Object.keys(byMonth).map(mk=>({ t:'set', ref:pt_monthRef(mk), data:{ ev:byMonth[mk] } }));
+  if(gone.length && !(opts && opts.noIgnore)) ops.push(pt_ignoreOp(gone)); // supprimé volontairement : ne reviendra pas à l'import
+  await pt_commit(ops);
 }
 function pt_setEmp(code, patch){ return pt_configRef.set({ emp:{ [code]: patch } }, { merge:true }); }
 function pt_addEntryDoc(data){ return pt_entriesCol.add({ ...data, creePar: (typeof currentUser!=='undefined' ? currentUser : ''), creeLe: new Date().toISOString() }); }
@@ -3200,17 +3214,17 @@ async function pt_importFile(){
   const inp = document.getElementById('pt-file');
   const f = inp && inp.files && inp.files[0];
   if(!f){ pt_status('Choisis un fichier d’abord.', 'err'); return; }
-  if(!pt_ready.events){ pt_status('Données en cours de chargement, réessaie dans un instant.', 'err'); return; }
+  if(!(pt_ready.events && pt_ready.ign)){ pt_status('Données en cours de chargement, réessaie dans un instant.', 'err'); return; }
   const parsed = pt_parseRaw(await f.text());
   if(!parsed.length){ pt_status('Aucune ligne de pointage reconnue. Formats acceptés : export ZKBio (code ⇥ jj/mm/aaaa hh:mm ⇥ 0/1) ou fichier brut du pointeur (code ⇥ aaaa-mm-jj hh:mm:ss ⇥ … ⇥ statut).', 'err'); return; }
   const seen = new Set(pt_events.map(e=>e.code + '|' + e.dt + '|' + e.type));
-  const fresh = [];
-  parsed.forEach(p=>{ const k = p.code + '|' + p.iso + '|' + p.type; if(!seen.has(k)){ seen.add(k); fresh.push(p); } });
+  const fresh = []; let skipped = 0;
+  parsed.forEach(p=>{ const k = p.code + '|' + p.iso + '|' + p.type; if(seen.has(k)) return; seen.add(k); if(pt_isIgnored(p.code, p.iso, p.type)){ skipped++; return; } fresh.push(p); });
   try{
     if(fresh.length) await pt_addEvents(fresh);
     inp.value = '';
     const ts = parsed.map(x=>x.iso).sort();
-    pt_status(fresh.length + ' nouveau(x) pointage(s) ajouté(s) (' + (parsed.length - fresh.length) + ' déjà connus ou en double, ignorés). Période du fichier : ' + fmtDateShort(toLocalISO(new Date(ts[0]))) + ' → ' + fmtDateShort(toLocalISO(new Date(ts[ts.length-1]))) + '.', 'ok');
+    pt_status(fresh.length + ' nouveau(x) pointage(s) ajouté(s) (' + (parsed.length - fresh.length - skipped) + ' déjà connus ou en double, ignorés).' + (skipped ? ' ' + skipped + ' écarté(s) car supprimés ou modifiés par toi.' : '') + ' Période du fichier : ' + fmtDateShort(toLocalISO(new Date(ts[0]))) + ' → ' + fmtDateShort(toLocalISO(new Date(ts[ts.length-1]))) + '.', 'ok');
   }catch(e){ console.error(e); pt_status('Erreur d’enregistrement : ' + (e.message || e), 'err'); }
 }
 
@@ -3359,7 +3373,7 @@ function pt_render(fresh){
   if(!pt_isAdmin() && (pt_tab === 'paie' || pt_tab === 'reglages')) pt_tab = 'cloture';
   pt_renderPeriod();
   if(pt_error){ pt_renderTabs(0); body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
-  if(!(pt_ready.events && pt_ready.cfg && pt_ready.entries)){ pt_renderTabs(0); body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  if(!(pt_ready.events && pt_ready.cfg && pt_ready.entries && pt_ready.ign)){ pt_renderTabs(0); body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
   const st = pt_saveInputs(body);
   const all = pt_compute();
   const sessions = all.sessions.filter(s=>pt_inRange(pt_day(s.date)));
@@ -3680,6 +3694,9 @@ function pt_tabReglages(codes){
   <div class="ticket"><div class="section-label">Données</div>
     <div class="actions-row" style="margin-top:0;"><button class="btn small" onclick="pt_exportExcel()">Exporter en Excel (sauvegarde complète)</button></div>
     <div class="pt-muted" style="margin-top:6px;">Un fichier .xlsx avec toutes les données (réglages, pointages, sessions, anomalies, historique de paie) et le résumé de paie de la période affichée.</div>
+    ${isAdmin && (Object.keys(pt_ign.k).length || Object.keys(pt_ign.c).length) ? `<div class="section-label" style="margin-top:18px;">Écartés à l’import</div>
+    <div class="pt-muted">${Object.keys(pt_ign.k).length} pointage(s) supprimé(s) ou modifié(s) et ${Object.keys(pt_ign.c).length} employé(s) supprimé(s) : un nouvel import du fichier du pointeur ne les fait pas revenir.</div>
+    <div class="actions-row"><button class="btn ghost small" onclick="pt_forgetIgnored()">Oublier ces suppressions (le prochain import les ramènera)</button></div>` : ''}
     ${isAdmin ? `<div class="section-label" style="margin-top:18px;">Reprendre les données de l’outil local</div>
     <div class="pt-muted" style="margin-bottom:8px;">Dans l’outil de pointage local : Réglages → « Exporter pour Firebase (.json) ». Puis choisis ce fichier ici. Peut être relancé sans créer de doublons.</div>
     <div class="pt-row"><input type="file" id="pt-mig-file" accept=".json,application/json" class="pt-filein"><button class="btn small" onclick="pt_importLocalJson()">Importer</button></div>
@@ -3693,7 +3710,7 @@ async function pt_addEmployee(){
   const c = parseInt(document.getElementById('pt-new-code').value, 10);
   if(isNaN(c)){ alert('Indique un numéro de code.'); return; }
   if(pt_codes().includes(c)){ alert('Ce code existe déjà.'); return; }
-  try{ await pt_setEmp(c, { extra:true }); pt_sel = c; pt_toast('Employé ajouté (code ' + c + ').'); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+  try{ await pt_ignoreRef.set({ c:{ [c]:PT_DEL() } }, { merge:true }); await pt_setEmp(c, { extra:true }); pt_sel = c; pt_toast('Employé ajouté (code ' + c + ').'); }catch(e){ alert('Erreur : ' + (e.message || e)); }
 }
 async function pt_deleteEmployee(c){
   if(!(session && session.isAdmin)) return;
@@ -3702,14 +3719,20 @@ async function pt_deleteEmployee(c){
     const ids = pt_events.filter(e=>e.code === c).map(e=>e.id);
     const ops = pt_entries.filter(e=>e.code === c).map(e=>({ t:'del', ref:pt_entriesCol.doc(e.id) }));
     ops.push({ t:'set', ref:pt_configRef, data:{ emp:{ [c]:PT_DEL() } } });
-    await Promise.all([ ids.length ? pt_deleteEvents(ids) : null, pt_commit(ops) ]);
+    ops.push({ t:'set', ref:pt_ignoreRef, data:{ c:{ [c]:true } } }); // employé supprimé : ses pointages ne reviendront pas à l'import
+    await Promise.all([ ids.length ? pt_deleteEvents(ids, { noIgnore:true }) : null, pt_commit(ops) ]);
   }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_forgetIgnored(){
+  if(!(session && session.isAdmin)) return;
+  if(!confirm('Au prochain import, les pointages et employés supprimés ou modifiés reviendront depuis le fichier. Continuer ?')) return;
+  try{ await pt_ignoreRef.set({ k:{}, c:{} }); pt_toast('Suppressions oubliées.'); }catch(e){ alert('Erreur : ' + (e.message || e)); }
 }
 async function pt_resetEvents(){
   if(!(session && session.isAdmin)) return;
   if(!confirm('Supprimer définitivement TOUS les pointages importés ? Cette action est irréversible.')) return;
   const months = Array.from(new Set(pt_events.map(e=>e.dt.slice(0,7))));
-  try{ await pt_commit(months.map(mk=>({ t:'del', ref:pt_monthRef(mk) }))); pt_toast('Pointages supprimés.'); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+  try{ await pt_commit(months.map(mk=>({ t:'del', ref:pt_monthRef(mk) }))); await pt_ignoreRef.set({ k:{}, c:{} }); pt_toast('Pointages supprimés.'); }catch(e){ alert('Erreur : ' + (e.message || e)); }
 }
 
 /* ---------- reprise des données de l'outil local (.json) ---------- */
@@ -3721,12 +3744,14 @@ async function pt_importLocalJson(){
   try{ data = JSON.parse(await f.text()); }catch(e){ alert('Fichier JSON invalide.'); return; }
   if(!data || !Array.isArray(data.events)){ alert('Ce fichier ne ressemble pas à une sauvegarde de l’outil de pointage local.'); return; }
 
+  const locIgn = { k:(data.ignored && data.ignored.k) || {}, c:(data.ignored && data.ignored.c) || {} };
+  const isIgn = (code, iso, type)=>!!(pt_ign.c[code] || locIgn.c[code] || pt_ign.k[pt_evKey(code, iso, type)] || locIgn.k[pt_evKey(code, iso, type)]);
   const seen = new Set(pt_events.map(e=>e.code + '|' + e.dt + '|' + e.type)), fresh = [];
   data.events.forEach(e=>{
     const ev = Array.isArray(e) ? { code:e[0], dt:e[1], type:e[2] } : e;
     const d = new Date(ev && ev.dt); if(!ev || isNaN(d.getTime()) || isNaN(Number(ev.code))) return; // ligne illisible : ignorée
     const iso = d.toISOString(), k = Number(ev.code) + '|' + iso + '|' + Number(ev.type);
-    if(!seen.has(k)){ seen.add(k); fresh.push({ code:Number(ev.code), iso, type:Number(ev.type) }); }
+    if(!seen.has(k)){ seen.add(k); if(!isIgn(Number(ev.code), iso, Number(ev.type))) fresh.push({ code:Number(ev.code), iso, type:Number(ev.type) }); }
   });
   const extra = (data.extraCodes || []).map(String);
   const codeKeys = new Set([...Object.keys(data.names||{}), ...Object.keys(data.rates||{}), ...Object.keys(data.payMode||{}), ...Object.keys(data.transport||{}), ...Object.keys(data.postes||{}), ...extra]);
@@ -3739,7 +3764,7 @@ async function pt_importLocalJson(){
     if(data.payMode && data.payMode[k]) o.payMode = data.payMode[k];
     if(data.transport && data.transport[k]) o.transport = { enabled:!!data.transport[k].enabled, amount:Number(data.transport[k].amount) || 0 };
     if(extra.includes(k)) o.extra = true;
-    if(Object.keys(o).length) emp[k] = o;
+    if(Object.keys(o).length && !(pt_ign.c[k] || locIgn.c[k])) emp[k] = o;
   });
   const entryOps = [];
   const put = (id, doc)=>entryOps.push({ t:'set', ref:pt_entriesCol.doc('imp_' + id), data:doc });
@@ -3751,6 +3776,7 @@ async function pt_importLocalJson(){
   const msg = 'Reprendre : ' + fresh.length + ' nouveau(x) pointage(s), ' + Object.keys(emp).length + ' employé(s) (réglages), ' + entryOps.length + ' entrée(s) (primes, jours off, avances, sessions manuelles) ?\nTu peux relancer cet import sans créer de doublons.';
   if(!confirm(msg)) return;
   try{
+    if(Object.keys(locIgn.k).length || Object.keys(locIgn.c).length) await pt_ignoreRef.set({ k:locIgn.k, c:locIgn.c }, { merge:true });
     if(fresh.length) await pt_addEvents(fresh);
     if(Object.keys(emp).length) await pt_configRef.set({ emp }, { merge:true });
     if(entryOps.length) await pt_commit(entryOps);
