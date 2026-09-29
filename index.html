@@ -426,7 +426,6 @@
 .pt-muted{color:var(--ink-muted);font-size:12px;line-height:1.45;}
 .pt-link{color:var(--forest-light);text-decoration:underline;}
 .pt-auto{width:auto;}
-.pt-time{width:118px;}
 .pt-w90{width:90px;}
 .pt-grow{flex:1;min-width:120px;}
 .pt-filein{width:auto;font-size:12px;padding:6px 8px;}
@@ -462,9 +461,6 @@
 .pt-an .pt-an-reason{font-size:11.5px;opacity:.85;margin-top:2px;}
 .pt-an.ok{background:var(--moss-bg);border-color:var(--moss);color:var(--moss);}
 .pt-fix{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px;margin:-2px 0 10px;}
-.pt-cl-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);}
-.pt-cl-row:last-child{border-bottom:none;}
-.pt-cl-name{flex:1;font-size:13.5px;font-weight:500;min-width:0;}
 .pt-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--surface);border:1px solid var(--moss);color:var(--moss);padding:10px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:60;}
 .pt-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 </style>
@@ -3059,9 +3055,8 @@ let pt_entries = [];         // [{id, kind, code, date, amount, hours, note, ...
 let pt_ign = { k:{}, c:{} };
 let pt_ready = { events:false, cfg:false, entries:false, ign:false };
 let pt_started = false, pt_error = '';
-let pt_tab = 'aujourdhui', pt_sel = null, pt_openFix = null, pt_anomList = [];
+let pt_tab = 'anomalies', pt_sel = null, pt_openFix = null, pt_anomList = [];
 let pt_filter = { from:null, to:null };
-let pt_cl = { date:null, checked:{}, times:{}, quick:'' };
 let pt_idn = 0;
 
 /* ---------- utilitaires ---------- */
@@ -3375,15 +3370,15 @@ function pt_selEmp(v){ pt_sel = Number(v); pt_render(true); }
 function pt_isAdmin(){ return !!(session && session.isAdmin); }
 function pt_renderTabs(nAnom){
   // Réglages (taux, salaires) : réservé aux administrateurs
-  const tabs = [['aujourdhui','Aujourd’hui'],['employes','Employés'],['reglages','Réglages']]
+  const tabs = [['anomalies','Anomalies'],['employes','Employés'],['reglages','Réglages']]
     .filter(t=>pt_isAdmin() || t[0] !== 'reglages');
   document.getElementById('pointage-tabs').innerHTML = tabs.map(([id,l])=>
-    `<button class="${pt_tab===id?'active':''}" onclick="pt_setTab('${id}')">${l}${id==='aujourdhui' && nAnom ? ` <span class="count-pill">${nAnom}</span>` : ''}</button>`).join('');
+    `<button class="${pt_tab===id?'active':''}" onclick="pt_setTab('${id}')">${l}${id==='anomalies' && nAnom ? ` <span class="count-pill">${nAnom}</span>` : ''}</button>`).join('');
 }
 function pt_render(fresh){
   if(activeModule !== 'pointage') return;
   const body = document.getElementById('pt-body'); if(!body) return;
-  if(!pt_isAdmin() && pt_tab === 'reglages') pt_tab = 'aujourdhui';
+  if(!pt_isAdmin() && pt_tab === 'reglages') pt_tab = 'anomalies';
   pt_renderPeriod();
   if(pt_error){ pt_renderTabs(0); body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
   if(!(pt_ready.events && pt_ready.cfg && pt_ready.entries && pt_ready.ign)){ pt_renderTabs(0); body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
@@ -3395,7 +3390,7 @@ function pt_render(fresh){
   if(pt_sel === null || !codes.includes(pt_sel)) pt_sel = codes.length ? codes[0] : null;
   pt_renderTabs(anoms.length);
   let html;
-  if(pt_tab === 'aujourdhui') html = pt_tabCloture(codes) + pt_tabAnomalies(anoms);
+  if(pt_tab === 'anomalies') html = pt_tabAnomalies(anoms);
   else if(pt_tab === 'employes') html = pt_tabEmployes(codes, sessions, anoms);
   else html = pt_tabReglages(codes);
   body.innerHTML = html;
@@ -3405,64 +3400,6 @@ function pt_empty(msg){ return `<div class="ticket"><div class="empty-state">${m
 function pt_empSelect(codes){
   return `<div class="field" style="margin-bottom:12px;"><label>Employé</label><select id="pt-sel" onchange="pt_selEmp(this.value)">${
     codes.map(x=>`<option value="${x}" ${x===pt_sel?'selected':''}>${pt_e(pt_label(x))} (code ${x})</option>`).join('')}</select></div>`;
-}
-
-/* ---------- onglet Clôture du soir ---------- */
-function pt_closingDT(dayStr, t){
-  const h = parseInt(t.split(':')[0], 10);
-  const d = new Date(dayStr + 'T00:00:00');
-  if(h < 6) d.setDate(d.getDate() + 1); // une sortie avant 6 h appartient au lendemain calendaire
-  return toLocalISO(d) + 'T' + t + ':00';
-}
-function pt_tabCloture(codes){
-  if(!pt_cl.date) pt_cl.date = todayISO();
-  if(!codes.length) return pt_empty('Importe un export ZKBio ou ajoute un employé dans Réglages.');
-  const rows = codes.map(c=>{
-    const on = !!pt_cl.checked[c];
-    return `<div class="pt-cl-row">
-      <label class="switch"><input type="checkbox" ${on?'checked':''} onchange="pt_clToggle(${c},this.checked)"><span class="slider"></span></label>
-      <span class="pt-cl-name">${pt_e(pt_label(c))}</span>
-      <input type="time" class="pt-time" value="${pt_e(pt_cl.times[c]||'')}" ${on?'':'disabled'} onchange="pt_clTime(${c},this.value)">
-    </div>`;
-  }).join('');
-  return `<div class="ticket">
-    <div class="section-label">Clôture du soir</div>
-    <div class="pt-muted" style="margin-bottom:12px;">Chacun a sa propre heure de sortie : coche qui était là et indique son heure. Indique la date du jour où le service a commencé — une sortie avant 6 h est rattachée à cette même nuit.</div>
-    <div class="field" style="max-width:230px;"><label>Date du service</label><input type="date" value="${pt_e(pt_cl.date)}" onchange="pt_clDate(this.value)"></div>
-    <div class="pt-row" style="margin-top:14px;">
-      <span class="pt-muted">Heure par défaut (optionnel) :</span>
-      <input type="time" class="pt-time" value="${pt_e(pt_cl.quick)}" onchange="pt_cl.quick=this.value">
-      <button class="btn ghost small" onclick="pt_clApplyAll()">Appliquer à tous les cochés</button>
-    </div>
-    <div style="margin-top:12px;">${rows}</div>
-    <button class="btn" style="margin-top:16px;" onclick="pt_clValidate()">Valider la clôture</button>
-  </div>`;
-}
-function pt_clDate(v){ pt_cl.date = v; pt_cl.checked = {}; pt_render(true); }
-function pt_clToggle(c, on){ pt_cl.checked[c] = !!on; pt_render(true); }
-function pt_clTime(c, v){ pt_cl.times[c] = v; }
-function pt_clApplyAll(){
-  if(!pt_cl.quick) return;
-  pt_codes().forEach(c=>{ if(pt_cl.checked[c]) pt_cl.times[c] = pt_cl.quick; });
-  pt_render(true);
-}
-async function pt_clValidate(){
-  const entries = [], missing = [];
-  pt_codes().forEach(c=>{
-    if(!pt_cl.checked[c]) return;
-    const t = pt_cl.times[c];
-    if(!t){ missing.push(pt_name(c)); return; }
-    entries.push({ code:c, iso:new Date(pt_closingDT(pt_cl.date, t)).toISOString(), type:1 });
-  });
-  if(missing.length){ alert('Indique une heure pour : ' + missing.join(', ')); return; }
-  if(!entries.length){ alert('Coche au moins un employé et indique son heure.'); return; }
-  try{
-    const n = entries.length;
-    pt_cl.checked = {}; pt_cl.times = {};
-    await pt_addEvents(entries);
-    pt_toast(n + ' sortie(s) enregistrée(s) pour le ' + fmtDateShort(pt_cl.date) + '.');
-    pt_render(true);
-  }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
 }
 
 /* ---------- onglet Anomalies ---------- */
