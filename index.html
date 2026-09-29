@@ -3063,7 +3063,7 @@ let pt_groups = [];           // [[code,...], ...]
 let pt_groupsSeeded = false;
 let pt_ovIgn = {};
 let pt_ready = { events:false, cfg:false, entries:false, ign:false, groups:false, ovIgn:false };
-let pt_started = false, pt_error = '';
+let pt_started = false, pt_error = '', pt_loadStartedAt = null;
 let pt_tab = 'anomalies', pt_sel = null, pt_openFix = null, pt_anomList = [];
 let pt_ovList = [], pt_ovOpen = null;
 let pt_filter = { from:null, to:null };
@@ -3106,9 +3106,15 @@ function pt_mode(c){ return (pt_emp[c] && pt_emp[c].payMode) === 'daily' ? 'dail
 function pt_transport(c){ const t=(pt_emp[c] && pt_emp[c].transport) || {}; return { enabled:!!t.enabled, amount:Number(t.amount)||0 }; }
 
 /* ---------- écoute Firestore (démarrée à la première ouverture du module) ---------- */
+/* Firestore interdit les tableaux imbriqués (un array direct dans un array) : les groupes sont donc
+   stockés comme un tableau d'objets { codes:[...] } plutôt qu'un tableau de tableaux. */
+function pt_groupsToDoc(groups){ return { groups: (groups || []).map(g=>({ codes: g || [] })) }; }
+function pt_groupsFromDoc(data){ return ((data && data.groups) || []).map(g=>Array.isArray(g) ? g : ((g && g.codes) || [])); }
 function pt_start(){
   if(pt_started) return;
   pt_started = true;
+  pt_loadStartedAt = Date.now();
+  setTimeout(()=>{ if(activeModule === 'pointage') pt_render(); }, 5000); // force un nouvel essai d'affichage même si aucune donnée n'est jamais arrivée
   try{ const raw = localStorage.getItem('pt-period'); if(raw) pt_filter = JSON.parse(raw); }catch(e){}
   const onErr = (err)=>{ console.error(err); pt_error = (err && err.message) || 'Lecture impossible'; pt_render(); };
   pt_eventsCol.onSnapshot((snap)=>{
@@ -3128,8 +3134,8 @@ function pt_start(){
     pt_ign = { k:d.k || {}, c:d.c || {} }; pt_ready.ign = true; pt_render();
   }, onErr);
   pt_groupsRef.onSnapshot((doc)=>{
-    if(doc.exists){ pt_groups = (doc.data() || {}).groups || []; }
-    else if(!pt_groupsSeeded){ pt_groupsSeeded = true; pt_groups = PT_DEFAULT_GROUPS; pt_groupsRef.set({ groups:PT_DEFAULT_GROUPS }).catch(()=>{}); }
+    if(doc.exists){ pt_groups = pt_groupsFromDoc(doc.data() || {}); }
+    else if(!pt_groupsSeeded){ pt_groupsSeeded = true; pt_groups = PT_DEFAULT_GROUPS; pt_groupsRef.set(pt_groupsToDoc(PT_DEFAULT_GROUPS)).catch(()=>{}); }
     pt_ready.groups = true; pt_render();
   }, onErr);
   pt_overlapIgnoreRef.onSnapshot((doc)=>{
@@ -3434,7 +3440,18 @@ function pt_render(fresh){
   if(!pt_isAdmin() && pt_tab === 'reglages') pt_tab = 'anomalies';
   pt_renderPeriod();
   if(pt_error){ pt_renderTabs(0); body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
-  if(!(pt_ready.events && pt_ready.cfg && pt_ready.entries && pt_ready.ign && pt_ready.groups && pt_ready.ovIgn)){ pt_renderTabs(0); body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  if(!(pt_ready.events && pt_ready.cfg && pt_ready.entries && pt_ready.ign && pt_ready.groups && pt_ready.ovIgn)){
+    pt_renderTabs(0);
+    const elapsed = pt_loadStartedAt ? (Date.now() - pt_loadStartedAt) : 0;
+    if(elapsed > 4500){
+      const labels = { events:'Pointages', cfg:'Réglages employés', entries:'Primes / jours off / avances', ign:'Historique des suppressions', groups:'Groupes de poste', ovIgn:'Chevauchements ignorés' };
+      const missing = Object.keys(pt_ready).filter(k=>!pt_ready[k]).map(k=>labels[k] || k);
+      body.innerHTML = `<div class="alert-banner"><b>Le chargement prend plus de temps que prévu</b>Ça reste bloqué sur : ${missing.join(', ')}.<br>Ouvre la console du navigateur (touche F12 → onglet « Console ») pour voir le message d'erreur exact, et vérifie que les règles Firestore autorisent la collection <code>pointage_config</code> (documents « groupes » et « chevauchements_ignores »).<br><button class="btn small" style="margin-top:10px;" onclick="location.reload()">Réessayer</button></div>`;
+    } else {
+      body.innerHTML = '<div class="empty-state">Chargement…</div>';
+    }
+    return;
+  }
   const st = pt_saveInputs(body);
   const all = pt_compute();
   const sessions = all.sessions.filter(s=>pt_inRange(pt_day(s.date)));
@@ -3769,7 +3786,7 @@ function pt_groupsSection(codes){
     ${rows || pt_empty('Aucun groupe.')}
     <div class="ticket"><button class="btn ghost small" onclick="pt_grpNew()">+ Nouveau groupe</button></div>`;
 }
-async function pt_grpSave(){ try{ await pt_groupsRef.set({ groups:pt_groups }); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); } }
+async function pt_grpSave(){ try{ await pt_groupsRef.set(pt_groupsToDoc(pt_groups)); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); } }
 function pt_grpNew(){ pt_groups = pt_groups.concat([[]]); pt_grpSave(); pt_render(true); }
 function pt_grpDelete(gi){ if(!confirm('Supprimer ce groupe ?')) return; pt_groups = pt_groups.filter((_,i)=>i !== gi); pt_grpSave(); pt_render(true); }
 function pt_grpRemove(gi, c){ pt_groups[gi] = (pt_groups[gi] || []).filter(x=>x !== c); pt_grpSave(); pt_render(true); }
