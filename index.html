@@ -536,18 +536,7 @@
   <nav class="tabs" id="pointage-tabs"></nav>
   <main id="pointage-main" style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
     <div class="ticket" id="pt-head">
-      <div class="section-label">Importer un export ZKBio</div>
-      <div class="pt-row">
-        <input type="file" id="pt-file" accept=".dat,.txt,.csv" class="pt-filein">
-        <button class="btn small" onclick="pt_importFile()">Importer</button>
-      </div>
-      <div class="pt-muted" id="pt-import-status" style="margin-top:6px;"></div>
-      <div class="section-label" style="margin-top:16px;">Période affichée <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— s’applique à tous les onglets</span></div>
-      <div class="filter-row">
-        <button class="filter-chip" onclick="pt_preset('this')">Cette semaine</button>
-        <button class="filter-chip" onclick="pt_preset('last')">Semaine dernière</button>
-        <button class="filter-chip" onclick="pt_preset('all')">Tout</button>
-      </div>
+      <div class="section-label">Période affichée <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— s’applique à tous les onglets</span></div>
       <div class="grid grid-2">
         <div class="field"><label>Du</label><input type="date" id="pt-from" onchange="pt_periodInput()"></div>
         <div class="field"><label>Au</label><input type="date" id="pt-to" onchange="pt_periodInput()"></div>
@@ -3084,7 +3073,6 @@ function pt_inRange(dk){
   if(pt_filter.to && dk > pt_filter.to) return false;
   return true;
 }
-function pt_monday(d){ const day=(d.getDay()+6)%7; const m=new Date(d); m.setDate(d.getDate()-day); m.setHours(0,0,0,0); return m; }
 function pt_download(filename, blobParts, type){
   const blob = new Blob(blobParts, { type });
   const a = document.createElement('a');
@@ -3255,18 +3243,14 @@ function pt_setFilter(from, to){
   try{ localStorage.setItem('pt-period', JSON.stringify(pt_filter)); }catch(e){}
   pt_render();
 }
-function pt_preset(kind){
-  if(kind === 'all'){ pt_setFilter(null, null); return; }
-  const mon = pt_monday(new Date());
-  if(kind === 'last') mon.setDate(mon.getDate() - 7);
-  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-  pt_setFilter(toLocalISO(mon), toLocalISO(sun));
-}
 function pt_periodInput(){ pt_setFilter(document.getElementById('pt-from').value, document.getElementById('pt-to').value); }
 function pt_renderPeriod(){
   const f = document.getElementById('pt-from'), t = document.getElementById('pt-to'), s = document.getElementById('pt-period-status');
   if(!f) return;
-  f.value = pt_filter.from || ''; t.value = pt_filter.to || '';
+  // ne jamais réécrire un champ que la personne est en train de saisir (sinon une frappe en cours est effacée
+  // au prochain rafraîchissement, par ex. déclenché par une mise à jour Firestore en arrière-plan)
+  if(document.activeElement !== f) f.value = pt_filter.from || '';
+  if(document.activeElement !== t) t.value = pt_filter.to || '';
   s.textContent = (!pt_filter.from && !pt_filter.to) ? 'Toutes les périodes affichées.'
     : 'Filtré du ' + (pt_filter.from ? fmtDateShort(pt_filter.from) : '…') + ' au ' + (pt_filter.to ? fmtDateShort(pt_filter.to) : '…') + '.';
 }
@@ -3753,6 +3737,14 @@ function pt_tabReglages(codes){
     </div>`;
   }).join('');
   return `<datalist id="pt-names">${EMPLOYES_TOUS.map(n=>`<option value="${pt_e(n)}"></option>`).join('')}</datalist>
+  <div class="ticket">
+    <div class="section-label">Importer un export ZKBio</div>
+    <div class="pt-row">
+      <input type="file" id="pt-file" accept=".dat,.txt,.csv" class="pt-filein">
+      <button class="btn small" onclick="pt_importFile()">Importer</button>
+    </div>
+    <div class="pt-muted" id="pt-import-status" style="margin-top:6px;"></div>
+  </div>
   <div class="ticket"><div class="section-label">Ajouter un employé</div>
     <div class="pt-muted" style="margin-bottom:8px;">Pour quelqu’un géré sans pointeur, ou dont tu saisis toujours le pointage à la main : choisis un numéro de code libre.</div>
     <div class="pt-row"><input type="text" inputmode="numeric" id="pt-new-code" class="pt-draft pt-w90" value="${suggestion}"><button class="btn small" onclick="pt_addEmployee()">Ajouter</button></div>
