@@ -3047,15 +3047,25 @@ const pt_entriesCol = db.collection('pointage_entries');
 /* pointage_config/ignores : { k:{<clé pointage>:true}, c:{<code>:true} } — pointages / employés écartés volontairement :
    un nouvel import du fichier du pointeur (qui contient tout l'historique) ne les fait pas revenir. */
 const pt_ignoreRef = db.collection('pointage_config').doc('ignores');
+/* pointage_config/groupes : { groups: [[code,...], ...] } — employés qui se relaient sur un même poste, pour repérer
+   quand la sortie de l'un dépasse l'entrée de l'autre (heure supplémentaire non voulue). */
+const pt_groupsRef = db.collection('pointage_config').doc('groupes');
+/* pointage_config/chevauchements_ignores : { k:{<clé chevauchement>:true} } — chevauchements examinés et volontairement gardés tels quels. */
+const pt_overlapIgnoreRef = db.collection('pointage_config').doc('chevauchements_ignores');
 const PT_DEFAULT_NAMES = {5:'Mejdoub',8:'Fatima',10:'Kadi',15:'Sidahmed',16:'Marwa',17:'Meriem',18:'Hamid',19:'Nabil',20:'Ali'};
+const PT_DEFAULT_GROUPS = [[5,20],[10,19],[16,17,18]]; // Mejdoub/Ali · Kadi/Nabil · Marwa/Meriem/Hamid
 
 let pt_events = [];          // [{id, code, dt(ISO), type}]
 let pt_emp = {};             // { code: {...} }
 let pt_entries = [];         // [{id, kind, code, date, amount, hours, note, ...}]
 let pt_ign = { k:{}, c:{} };
-let pt_ready = { events:false, cfg:false, entries:false, ign:false };
+let pt_groups = [];           // [[code,...], ...]
+let pt_groupsSeeded = false;
+let pt_ovIgn = {};
+let pt_ready = { events:false, cfg:false, entries:false, ign:false, groups:false, ovIgn:false };
 let pt_started = false, pt_error = '';
 let pt_tab = 'anomalies', pt_sel = null, pt_openFix = null, pt_anomList = [];
+let pt_ovList = [], pt_ovOpen = null;
 let pt_filter = { from:null, to:null };
 let pt_idn = 0;
 
@@ -3116,6 +3126,15 @@ function pt_start(){
   pt_ignoreRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
     pt_ign = { k:d.k || {}, c:d.c || {} }; pt_ready.ign = true; pt_render();
+  }, onErr);
+  pt_groupsRef.onSnapshot((doc)=>{
+    if(doc.exists){ pt_groups = (doc.data() || {}).groups || []; }
+    else if(!pt_groupsSeeded){ pt_groupsSeeded = true; pt_groups = PT_DEFAULT_GROUPS; pt_groupsRef.set({ groups:PT_DEFAULT_GROUPS }).catch(()=>{}); }
+    pt_ready.groups = true; pt_render();
+  }, onErr);
+  pt_overlapIgnoreRef.onSnapshot((doc)=>{
+    const d = doc.exists ? (doc.data() || {}) : {};
+    pt_ovIgn = d.k || {}; pt_ready.ovIgn = true; pt_render();
   }, onErr);
   pt_entriesCol.onSnapshot((snap)=>{
     const list = [];
@@ -3210,7 +3229,7 @@ async function pt_importFile(){
   const inp = document.getElementById('pt-file');
   const f = inp && inp.files && inp.files[0];
   if(!f){ pt_status('Choisis un fichier d’abord.', 'err'); return; }
-  if(!(pt_ready.events && pt_ready.ign)){ pt_status('Données en cours de chargement, réessaie dans un instant.', 'err'); return; }
+  if(!(pt_ready.events && pt_ready.ign && pt_ready.groups)){ pt_status('Données en cours de chargement, réessaie dans un instant.', 'err'); return; }
   const parsed = pt_parseRaw(await f.text());
   if(!parsed.length){ pt_status('Aucune ligne de pointage reconnue. Formats acceptés : export ZKBio (code ⇥ jj/mm/aaaa hh:mm ⇥ 0/1) ou fichier brut du pointeur (code ⇥ aaaa-mm-jj hh:mm:ss ⇥ … ⇥ statut).', 'err'); return; }
   const seen = new Set(pt_events.map(e=>e.code + '|' + e.dt + '|' + e.type));
@@ -3285,6 +3304,40 @@ function pt_eventsNear(code, dt){
   const from = dt.getTime() - 12*3600000, to = dt.getTime() + 12*3600000;
   return pt_events.filter(e=>e.code === code && new Date(e.dt).getTime() >= from && new Date(e.dt).getTime() <= to)
     .sort((a,b)=>new Date(a.dt) - new Date(b.dt));
+}
+
+/* ---------- chevauchements de poste (deux collègues qui se relaient) ---------- */
+function pt_overlapKey(codeA, codeB, aEndIso, bStartIso){ return codeA + '_' + codeB + '_' + String(aEndIso).slice(0,16) + '_' + String(bStartIso).slice(0,16); }
+function pt_computeOverlaps(sessions){
+  const codes = pt_codes();
+  const out = [];
+  pt_groups.forEach((group, gi)=>{
+    const members = (group || []).filter(c=>codes.includes(c));
+    for(let i=0; i<members.length; i++){
+      for(let j=i+1; j<members.length; j++){
+        const x = members[i], y = members[j];
+        const sx = sessions.filter(s=>s.code === x), sy = sessions.filter(s=>s.code === y);
+        sx.forEach(A=>{
+          sy.forEach(B=>{
+            const overlapStart = A.start > B.start ? A.start : B.start;
+            const overlapEnd = A.end < B.end ? A.end : B.end;
+            if(overlapEnd.getTime() <= overlapStart.getTime()) return; // pas de chevauchement réel
+            const hours = (overlapEnd - overlapStart) / 3600000;
+            const earlyIsX = A.start <= B.start; // celui arrivé en premier = parti trop tard ; l'autre = arrivé pendant qu'il était encore là
+            const codeA = earlyIsX ? x : y, codeB = earlyIsX ? y : x;
+            const aEnd = earlyIsX ? A.end : B.end, bStart = earlyIsX ? B.start : A.start;
+            const day = pt_day(earlyIsX ? A.date : B.date);
+            if(!pt_inRange(day)) return;
+            const key = pt_overlapKey(codeA, codeB, aEnd.toISOString(), bStart.toISOString());
+            if(pt_ovIgn[key]) return;
+            out.push({ key, groupIndex:gi, codeA, codeB, day, aEnd, bStart, hours });
+          });
+        });
+      }
+    }
+  });
+  out.sort((p,q)=>p.aEnd - q.aEnd);
+  return out;
 }
 
 /* ---------- paie ---------- */
@@ -3381,16 +3434,17 @@ function pt_render(fresh){
   if(!pt_isAdmin() && pt_tab === 'reglages') pt_tab = 'anomalies';
   pt_renderPeriod();
   if(pt_error){ pt_renderTabs(0); body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
-  if(!(pt_ready.events && pt_ready.cfg && pt_ready.entries && pt_ready.ign)){ pt_renderTabs(0); body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  if(!(pt_ready.events && pt_ready.cfg && pt_ready.entries && pt_ready.ign && pt_ready.groups && pt_ready.ovIgn)){ pt_renderTabs(0); body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
   const st = pt_saveInputs(body);
   const all = pt_compute();
   const sessions = all.sessions.filter(s=>pt_inRange(pt_day(s.date)));
   const anoms = all.anomalies.filter(a=>pt_inRange(pt_day(a.dt)));
+  const overlaps = pt_computeOverlaps(sessions);
   const codes = pt_codes();
   if(pt_sel === null || !codes.includes(pt_sel)) pt_sel = codes.length ? codes[0] : null;
-  pt_renderTabs(anoms.length);
+  pt_renderTabs(anoms.length + overlaps.length);
   let html;
-  if(pt_tab === 'anomalies') html = pt_tabAnomalies(anoms);
+  if(pt_tab === 'anomalies') html = pt_tabAnomalies(anoms) + pt_tabOverlaps(overlaps);
   else if(pt_tab === 'employes') html = pt_tabEmployes(codes, sessions, anoms);
   else html = pt_tabReglages(codes);
   body.innerHTML = html;
@@ -3442,6 +3496,52 @@ function pt_tabAnomalies(anoms){
       <button class="btn ghost small" style="margin-top:8px;" onclick="pt_clearResolved()">Vider l’historique des corrections</button></div>`;
   }
   return html;
+}
+function pt_tabOverlaps(overlaps){
+  pt_ovList = overlaps;
+  if(!overlaps.length) return '';
+  const rows = overlaps.map((o,i)=>{
+    const open = pt_ovOpen === o.key;
+    let h = `<div class="pt-an"><div><b>${pt_dm(new Date(o.day + 'T00:00:00'))}</b> — ${pt_e(pt_name(o.codeA))} sorti à ${pt_hhmm(o.aEnd)} · ${pt_e(pt_name(o.codeB))} entré à ${pt_hhmm(o.bStart)}
+        <div class="pt-an-reason">Écart : ${pt_fmtH(o.hours)} h en trop, à vérifier</div></div>
+      <button class="btn ghost small" onclick="pt_ovToggle(${i})">${open ? 'Fermer' : 'Comparer'}</button></div>`;
+    if(open){
+      h += `<div class="pt-fix">
+        <div class="pt-muted" style="margin-bottom:8px;">${pt_e(pt_name(o.codeA))} : sortie à ${pt_hhmm(o.aEnd)} — ${pt_e(pt_name(o.codeB))} : entrée à ${pt_hhmm(o.bStart)}. Retiens une heure commune pour les deux, ou garde les deux pointages tels quels.</div>
+        <div class="pt-row">
+          <input type="time" id="pt-ov-time-${i}" class="pt-draft pt-auto" value="${pt_hhmm(o.bStart)}">
+          <button class="btn small" onclick="pt_ovAlign(${i})">Retenir cette heure pour les deux</button>
+          <button class="btn ghost small" onclick="pt_ovKeep(${i})">Garder les deux tels quels</button>
+        </div>
+      </div>`;
+    }
+    return h;
+  }).join('');
+  return `<div class="ticket"><div class="section-label">Chevauchements de poste <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— une sortie après l'entrée du collègue suivant</span></div>${rows}</div>`;
+}
+function pt_ovToggle(i){
+  const o = pt_ovList[i]; if(!o) return;
+  pt_ovOpen = (pt_ovOpen === o.key) ? null : o.key;
+  pt_render(true);
+}
+async function pt_ovKeep(i){
+  const o = pt_ovList[i]; if(!o) return;
+  try{ await pt_overlapIgnoreRef.set({ k:{ [o.key]:true } }, { merge:true }); pt_ovOpen = null; pt_toast('Gardé tel quel.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_ovAlign(i){
+  const o = pt_ovList[i]; if(!o) return;
+  const t = document.getElementById('pt-ov-time-' + i).value;
+  if(!t){ alert('Indique une heure.'); return; }
+  const evA = pt_events.find(e=>e.code === o.codeA && e.type === 1 && new Date(e.dt).getTime() === o.aEnd.getTime());
+  const evB = pt_events.find(e=>e.code === o.codeB && e.type === 0 && new Date(e.dt).getTime() === o.bStart.getTime());
+  if(!evA || !evB){ pt_toast('Ce pointage a déjà changé, actualisation…'); pt_render(true); return; }
+  const iso = new Date(o.day + 'T' + t + ':00').toISOString();
+  try{
+    pt_ovOpen = null;
+    await Promise.all([ pt_updateEvent(evA.id, { dt:iso }), pt_updateEvent(evB.id, { dt:iso }) ]);
+    pt_toast('Pointages alignés à ' + t + '.');
+  }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 function pt_toggleFix(i){
   const a = pt_anomList[i]; if(!a) return;
@@ -3642,6 +3742,7 @@ function pt_tabReglages(codes){
   </div>
   <h2 class="section">Employés</h2>
   ${cards || pt_empty('Importe un export ZKBio ou ajoute un employé ci-dessus.')}
+  ${isAdmin ? pt_groupsSection(codes) : ''}
   <div class="ticket"><div class="section-label">Données</div>
     <div class="actions-row" style="margin-top:0;"><button class="btn small" onclick="pt_exportExcel()">Exporter en Excel (sauvegarde complète)</button></div>
     <div class="pt-muted" style="margin-top:6px;">Un fichier .xlsx avec toutes les données (réglages, pointages, sessions, anomalies, historique de paie) et le résumé de paie de la période affichée.</div>
@@ -3653,6 +3754,29 @@ function pt_tabReglages(codes){
     <div class="pt-row"><input type="file" id="pt-mig-file" accept=".json,application/json" class="pt-filein"><button class="btn small" onclick="pt_importLocalJson()">Importer</button></div>
     <div class="actions-row" style="margin-top:18px;"><button class="btn rust small" onclick="pt_resetEvents()">Réinitialiser tous les pointages</button></div>` : ''}
   </div>`;
+}
+function pt_groupsSection(codes){
+  const rows = pt_groups.map((g, gi)=>{
+    const chips = (g || []).map(c=>`<span class="pt-badge pt-b-prime">${pt_e(pt_name(c))} <a href="#" onclick="pt_grpRemove(${gi},${c});return false;" style="color:inherit;text-decoration:none;">✕</a></span>`).join(' ');
+    const avail = codes.filter(c=>!(g || []).includes(c));
+    const addRow = avail.length ? `<select id="pt-grp-add-${gi}" style="width:auto;display:inline-block;"><option value="">+ ajouter…</option>${avail.map(c=>`<option value="${c}">${pt_e(pt_name(c))}</option>`).join('')}</select> <button class="btn ghost small" onclick="pt_grpAdd(${gi})">Ajouter</button>` : '';
+    return `<div class="ticket">
+      <div class="row-between"><div>${chips || '<span class="pt-muted">Vide</span>'}</div><button class="btn ghost small" onclick="pt_grpDelete(${gi})">Supprimer le groupe</button></div>
+      <div style="margin-top:10px;">${addRow}</div>
+    </div>`;
+  }).join('');
+  return `<h2 class="section">Groupes de poste <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— pour repérer un dépassement quand deux ou plusieurs collègues se relaient</span></h2>
+    ${rows || pt_empty('Aucun groupe.')}
+    <div class="ticket"><button class="btn ghost small" onclick="pt_grpNew()">+ Nouveau groupe</button></div>`;
+}
+async function pt_grpSave(){ try{ await pt_groupsRef.set({ groups:pt_groups }); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); } }
+function pt_grpNew(){ pt_groups = pt_groups.concat([[]]); pt_grpSave(); pt_render(true); }
+function pt_grpDelete(gi){ if(!confirm('Supprimer ce groupe ?')) return; pt_groups = pt_groups.filter((_,i)=>i !== gi); pt_grpSave(); pt_render(true); }
+function pt_grpRemove(gi, c){ pt_groups[gi] = (pt_groups[gi] || []).filter(x=>x !== c); pt_grpSave(); pt_render(true); }
+function pt_grpAdd(gi){
+  const sel = document.getElementById('pt-grp-add-' + gi); const c = parseInt(sel.value, 10);
+  if(isNaN(c)) return;
+  pt_groups[gi] = (pt_groups[gi] || []).concat([c]); pt_grpSave(); pt_render(true);
 }
 function pt_setField(c, field, v){ pt_setEmp(c, { [field]: (field === 'payMode' ? v : String(v).trim()) }).catch(e=>alert('Erreur : ' + (e.message || e))); }
 function pt_setRate(c, v){ pt_setEmp(c, { rate: pt_num(v) }).catch(e=>alert('Erreur : ' + (e.message || e))); }
@@ -3671,7 +3795,8 @@ async function pt_deleteEmployee(c){
     const ops = pt_entries.filter(e=>e.code === c).map(e=>({ t:'del', ref:pt_entriesCol.doc(e.id) }));
     ops.push({ t:'set', ref:pt_configRef, data:{ emp:{ [c]:PT_DEL() } } });
     ops.push({ t:'set', ref:pt_ignoreRef, data:{ c:{ [c]:true } } }); // employé supprimé : ses pointages ne reviendront pas à l'import
-    await Promise.all([ ids.length ? pt_deleteEvents(ids, { noIgnore:true }) : null, pt_commit(ops) ]);
+    pt_groups = pt_groups.map(g=>(g || []).filter(x=>x !== c));
+    await Promise.all([ ids.length ? pt_deleteEvents(ids, { noIgnore:true }) : null, pt_commit(ops), pt_grpSave() ]);
   }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 async function pt_forgetIgnored(){
