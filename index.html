@@ -455,6 +455,7 @@
 .pt-b-off{background:var(--amber-bg);color:var(--amber);}
 .pt-b-avance{background:var(--rust-bg);color:var(--rust);}
 .pt-src{font-size:10px;color:var(--ink-muted);margin-left:6px;}
+.pt-chevron{font-size:13px;color:var(--ink-muted);}
 .pt-plus{color:var(--moss);font-family:'IBM Plex Mono',monospace;}
 .pt-minus{color:var(--rust);font-family:'IBM Plex Mono',monospace;}
 .pt-an{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 11px;background:var(--rust-bg);border:1px solid var(--rust);border-radius:8px;margin-bottom:6px;font-size:12.5px;color:var(--rust);}
@@ -3058,7 +3059,7 @@ let pt_entries = [];         // [{id, kind, code, date, amount, hours, note, ...
 let pt_ign = { k:{}, c:{} };
 let pt_ready = { events:false, cfg:false, entries:false, ign:false };
 let pt_started = false, pt_error = '';
-let pt_tab = 'cloture', pt_sel = null, pt_openFix = null, pt_anomList = [];
+let pt_tab = 'aujourdhui', pt_sel = null, pt_openFix = null, pt_anomList = [];
 let pt_filter = { from:null, to:null };
 let pt_cl = { date:null, checked:{}, times:{}, quick:'' };
 let pt_idn = 0;
@@ -3357,20 +3358,32 @@ function pt_restoreInputs(st, withValues){
     if(el){ el.focus(); if(st.focus.s != null && el.setSelectionRange){ try{ el.setSelectionRange(st.focus.s, st.focus.e); }catch(e){} } }
   }
 }
+let pt_open = { overview:false, pointages:true, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
+function pt_toggleSec(key){ pt_open[key] = !pt_open[key]; pt_render(true); }
+function pt_accordion(key, title, innerHtml){
+  const open = !!pt_open[key];
+  return `<div class="ticket">
+    <div class="row-between" style="cursor:pointer;" onclick="pt_toggleSec('${key}')">
+      <div style="font-weight:700;">${pt_e(title)}</div>
+      <span class="pt-chevron">${open ? '▾' : '▸'}</span>
+    </div>
+    ${open ? `<div style="margin-top:12px;">${innerHtml}</div>` : ''}
+  </div>`;
+}
 function pt_setTab(t){ pt_tab = t; pt_openFix = null; pt_render(true); window.scrollTo({ top:0 }); }
 function pt_selEmp(v){ pt_sel = Number(v); pt_render(true); }
 function pt_isAdmin(){ return !!(session && session.isAdmin); }
 function pt_renderTabs(nAnom){
-  // Paie et Réglages (salaires, taux) : réservés aux administrateurs
-  const tabs = [['cloture','Clôture du soir'],['anomalies','Anomalies'],['paie','Paie'],['employe','Par employé'],['reglages','Réglages']]
-    .filter(t=>pt_isAdmin() || (t[0] !== 'paie' && t[0] !== 'reglages'));
+  // Réglages (taux, salaires) : réservé aux administrateurs
+  const tabs = [['aujourdhui','Aujourd’hui'],['employes','Employés'],['reglages','Réglages']]
+    .filter(t=>pt_isAdmin() || t[0] !== 'reglages');
   document.getElementById('pointage-tabs').innerHTML = tabs.map(([id,l])=>
-    `<button class="${pt_tab===id?'active':''}" onclick="pt_setTab('${id}')">${l}${id==='anomalies' && nAnom ? ` <span class="count-pill">${nAnom}</span>` : ''}</button>`).join('');
+    `<button class="${pt_tab===id?'active':''}" onclick="pt_setTab('${id}')">${l}${id==='aujourdhui' && nAnom ? ` <span class="count-pill">${nAnom}</span>` : ''}</button>`).join('');
 }
 function pt_render(fresh){
   if(activeModule !== 'pointage') return;
   const body = document.getElementById('pt-body'); if(!body) return;
-  if(!pt_isAdmin() && (pt_tab === 'paie' || pt_tab === 'reglages')) pt_tab = 'cloture';
+  if(!pt_isAdmin() && pt_tab === 'reglages') pt_tab = 'aujourdhui';
   pt_renderPeriod();
   if(pt_error){ pt_renderTabs(0); body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
   if(!(pt_ready.events && pt_ready.cfg && pt_ready.entries && pt_ready.ign)){ pt_renderTabs(0); body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
@@ -3382,10 +3395,8 @@ function pt_render(fresh){
   if(pt_sel === null || !codes.includes(pt_sel)) pt_sel = codes.length ? codes[0] : null;
   pt_renderTabs(anoms.length);
   let html;
-  if(pt_tab === 'cloture') html = pt_tabCloture(codes);
-  else if(pt_tab === 'anomalies') html = pt_tabAnomalies(anoms);
-  else if(pt_tab === 'paie') html = pt_tabPaie(codes, sessions);
-  else if(pt_tab === 'employe') html = pt_tabEmploye(codes, sessions, anoms);
+  if(pt_tab === 'aujourdhui') html = pt_tabCloture(codes) + pt_tabAnomalies(anoms);
+  else if(pt_tab === 'employes') html = pt_tabEmployes(codes, sessions, anoms);
   else html = pt_tabReglages(codes);
   body.innerHTML = html;
   pt_restoreInputs(st, !fresh);
@@ -3553,9 +3564,17 @@ function pt_histRows(p){
     ...p.advances.map(x=>({ ...x, cat:'Avance', cls:'pt-b-avance', sign:-1 }))
   ].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 }
-function pt_tabPaie(codes, sessions){
-  if(!codes.length) return pt_empty('Pas encore de données.');
-  const c = pt_sel, p = pt_payroll(c, sessions);
+function pt_paieOverviewHtml(codes, sessions){
+  const totNet = codes.reduce((s,x)=>s + pt_payroll(x, sessions).net, 0);
+  const rows = codes.map(x=>{
+    const q = pt_payroll(x, sessions);
+    return `<tr><td>${pt_e(pt_label(x))}</td><td>${pt_fmtH(q.totalHours)}</td><td>${pt_fmtMoney(q.rate)}${q.mode==='daily'?'/j':'/h'}</td><td>${pt_fmtMoney(q.baseWage)}</td><td>${pt_fmtMoney(q.transportTotal)}</td><td>${pt_fmtMoney(q.bonusesTotal)}</td><td><b>${pt_fmtMoney(q.subTotal)}</b></td><td>${pt_fmtMoney(q.leavesTotal)}</td><td>${pt_fmtMoney(q.advancesTotal)}</td><td><b>${pt_fmtMoney(q.net)}</b></td></tr>`;
+  }).join('');
+  return { totNet, html: `<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Employé</th><th>Heures</th><th>Taux</th><th>Base</th><th>Transport</th><th>Primes</th><th>Sous-total</th><th>Jours off</th><th>Avances</th><th>Net</th></tr></thead><tbody>${rows}
+    <tr class="pt-total"><td colspan="9">TOTAL NET À PAYER</td><td>${pt_fmtMoney(totNet)}</td></tr></tbody></table></div>` };
+}
+function pt_paieSection(c, sessions, codes){
+  const p = pt_payroll(c, sessions);
   const rows = pt_histRows(p);
   const hist = rows.length ? rows.map(r=>`<tr>
       <td>${fmtDateShort(r.date)}</td>
@@ -3567,20 +3586,8 @@ function pt_tabPaie(codes, sessions){
   const unmatched = pt_unmatchedAdvances(codes);
   const banner = unmatched.length ? `<div class="alert-banner"><b>Avances (Dépenses) non rattachées à un employé du pointage</b>${
     unmatched.map(u=>`${pt_e(u.name)} : ${pt_fmtMoney(u.amount)}`).join(' · ')}<br><span style="opacity:.85;">Le nom doit être identique à celui saisi dans Réglages pour être repris dans la paie.</span></div>` : '';
-  const totNet = codes.reduce((s,x)=>s + pt_payroll(x, sessions).net, 0);
-  const table = codes.map(x=>{
-    const q = pt_payroll(x, sessions);
-    return `<tr><td>${pt_e(pt_label(x))}</td><td>${pt_fmtH(q.totalHours)}</td><td>${pt_fmtMoney(q.rate)}${q.mode==='daily'?'/j':'/h'}</td><td>${pt_fmtMoney(q.baseWage)}</td><td>${pt_fmtMoney(q.transportTotal)}</td><td>${pt_fmtMoney(q.bonusesTotal)}</td><td><b>${pt_fmtMoney(q.subTotal)}</b></td><td>${pt_fmtMoney(q.leavesTotal)}</td><td>${pt_fmtMoney(q.advancesTotal)}</td><td><b>${pt_fmtMoney(q.net)}</b></td></tr>`;
-  }).join('');
-  return `${banner}<div class="ticket">
-    ${pt_empSelect(codes)}
+  return `${banner}
     <div class="pt-muted">Taux : ${pt_fmtMoney(p.rate)}${p.mode==='daily'?' / jour':' / heure'} · ${p.transport.enabled ? 'Transport : ' + pt_fmtMoney(p.transport.amount) + ' / jour' : 'Transport désactivé'} · <a href="#" class="pt-link" onclick="pt_setTab('reglages');return false;">Modifier dans Réglages</a></div>
-    <div class="pt-kpis">
-      <div class="pt-kpi"><div class="n">${pt_fmtH(p.totalHours)} h</div><div class="l">Heures totales</div></div>
-      <div class="pt-kpi"><div class="n">${p.workedDays}</div><div class="l">Jours travaillés</div></div>
-      <div class="pt-kpi"><div class="n">${pt_fmtMoney(p.baseWage)}</div><div class="l">Salaire de base</div></div>
-      <div class="pt-kpi"><div class="n">${pt_fmtMoney(p.transportTotal)}</div><div class="l">Transport</div></div>
-    </div>
     ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off')}${pt_formRow('avance','Avance')}
     <div class="pt-muted" style="margin-top:6px;">Les avances saisies dans Dépenses (« avance salaire ») apparaissent automatiquement dans l’historique ci-dessous.</div>
     <h2 class="section" style="margin-top:20px;">Historique</h2>
@@ -3589,21 +3596,13 @@ function pt_tabPaie(codes, sessions){
       <div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span></div><div class="value">${pt_fmtMoney(p.subTotal)}</div></div>
       <div class="result-box final"><div class="label">Net à payer</div><div class="value">${pt_fmtMoney(p.net)}</div></div>
     </div>
-    <div class="actions-row"><button class="btn ghost small" onclick="pt_exportPayslip()">Exporter le bulletin (CSV)</button></div>
-  </div>
-  <div class="ticket"><div class="section-label">Tableau de paie — tous les employés</div>
-    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Employé</th><th>Heures</th><th>Taux</th><th>Base</th><th>Transport</th><th>Primes</th><th>Sous-total</th><th>Jours off</th><th>Avances</th><th>Net</th></tr></thead><tbody>${table}
-    <tr class="pt-total"><td colspan="9">TOTAL NET À PAYER</td><td>${pt_fmtMoney(totNet)}</td></tr></tbody></table></div>
-  </div>`;
+    <div class="actions-row"><button class="btn ghost small" onclick="pt_exportPayslip()">Exporter le bulletin (CSV)</button></div>`;
 }
 
-/* ---------- onglet Par employé (sessions + modification des pointages + sessions manuelles) ---------- */
-function pt_tabEmploye(codes, sessions, anoms){
-  if(!codes.length) return pt_empty('Aucune donnée pour l’instant.');
-  const c = pt_sel;
+/* ---------- onglet Employés (fusion Par employé + Paie, en sections repliables) ---------- */
+function pt_pointagesSection(c, sessions){
   const mySess = sessions.filter(s=>s.code === c);
   const myManual = pt_entries.filter(e=>e.kind === 'manual' && e.code === c && pt_inRange(e.date));
-  const myAn = anoms.filter(a=>a.code === c);
   const lines = [
     ...mySess.map(s=>({ ts:s.start.getTime(), hours:s.hours, html:`<tr><td>${fmtDateShort(pt_day(s.date))}</td><td>${pt_fmtDT(s.start)}</td><td>${pt_fmtDT(s.end)}</td><td>${pt_fmtH(s.hours)}</td><td></td></tr>` })),
     ...myManual.map(m=>({ ts:new Date(m.date + 'T00:00:00').getTime(), hours:Number(m.hours)||0, html:`<tr class="pt-manual"><td>${fmtDateShort(m.date)}</td><td colspan="2">Session manuelle${m.note ? ' — ' + pt_e(m.note) : ''}</td><td>${pt_fmtH(m.hours)}</td><td><button class="btn ghost small" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>` }))
@@ -3611,20 +3610,11 @@ function pt_tabEmploye(codes, sessions, anoms){
   const total = lines.reduce((s,x)=>s + x.hours, 0);
   const rawEvs = pt_events.filter(e=>e.code === c && pt_inRange(pt_day(new Date(e.dt)))).sort((a,b)=>new Date(b.dt) - new Date(a.dt));
   const manualRows = myManual.slice().sort((a,b)=>b.date.localeCompare(a.date));
-  return `<div class="ticket">
-    ${pt_empSelect(codes)}
-    <div class="pt-kpis">
-      <div class="pt-kpi"><div class="n">${pt_fmtH(total)} h</div><div class="l">Total période</div></div>
-      <div class="pt-kpi"><div class="n">${mySess.length}</div><div class="l">Sessions pointées</div></div>
-      <div class="pt-kpi"><div class="n">${myManual.length}</div><div class="l">Sessions manuelles</div></div>
-      <div class="pt-kpi"><div class="n">${myAn.length}</div><div class="l">Anomalies</div></div>
-    </div>
+  return `
     <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Entrée</th><th>Sortie</th><th>Durée (h)</th><th></th></tr></thead><tbody>${
       lines.length ? lines.map(l=>l.html).join('') + `<tr class="pt-total"><td colspan="3">Total</td><td>${pt_fmtH(total)}</td><td></td></tr>` : `<tr><td colspan="5" class="pt-muted">Aucune session sur cette période.</td></tr>`}</tbody></table></div>
-    ${myAn.length ? `<div class="pt-muted" style="margin-top:10px;">⚠️ ${myAn.length} anomalie(s) pour cette personne — à corriger dans l’onglet <a href="#" class="pt-link" onclick="pt_setTab('anomalies');return false;">Anomalies</a>.</div>` : ''}
     <div class="actions-row"><button class="btn ghost small" onclick="pt_exportEmployeeCsv()">Exporter en CSV</button></div>
-  </div>
-  <div class="ticket"><div class="section-label">Modifier ses pointages</div>
+    <h2 class="section" style="margin-top:18px;">Ajouter / corriger un pointage</h2>
     <div class="pt-row">
       <input type="date" id="pt-ne-date" class="pt-draft pt-auto"><input type="time" id="pt-ne-time" class="pt-draft pt-auto">
       <select id="pt-ne-type" class="pt-draft pt-auto"><option value="0">Entrée</option><option value="1">Sortie</option></select>
@@ -3637,16 +3627,40 @@ function pt_tabEmploye(codes, sessions, anoms){
         <td><select id="pt-ev-y-${ev.id}" class="pt-draft pt-auto"><option value="0" ${ev.type===0?'selected':''}>Entrée</option><option value="1" ${ev.type===1?'selected':''}>Sortie</option></select></td>
         <td><button class="btn ghost small" onclick="pt_saveEventRow('${ev.id}')">Enregistrer</button> <button class="btn ghost small" onclick="pt_delEventConfirm('${ev.id}')">Supprimer</button></td></tr>`; }).join('')
       : `<tr><td colspan="4" class="pt-muted">Aucun pointage sur cette période.</td></tr>`}</tbody></table></div>
-  </div>
-  <div class="ticket"><div class="section-label">Sessions manuelles</div>
+    <h2 class="section" style="margin-top:18px;">Sessions manuelles</h2>
     <div class="pt-muted" style="margin-bottom:8px;">Heures ajoutées sans pointage, quand le pointage est irrécupérable (ou pour un employé géré sans pointage).</div>
     <div class="pt-row">
       <input type="date" id="pt-m-date" class="pt-draft pt-auto"><input type="text" inputmode="decimal" id="pt-m-hours" class="pt-draft pt-w90" placeholder="Heures">
       <input type="text" id="pt-m-note" class="pt-draft pt-grow" placeholder="Note (optionnel)"><button class="btn small" onclick="pt_addManual()">Ajouter</button>
     </div>
     ${manualRows.length ? `<div class="pt-scroll" style="margin-top:10px;"><table class="pt-table"><thead><tr><th>Date</th><th>Heures</th><th>Note</th><th></th></tr></thead><tbody>${
-      manualRows.map(m=>`<tr><td>${fmtDateShort(m.date)}</td><td>${pt_fmtH(m.hours)}</td><td>${pt_e(m.note)}</td><td><button class="btn ghost small" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>`).join('')}</tbody></table></div>` : ''}
+      manualRows.map(m=>`<tr><td>${fmtDateShort(m.date)}</td><td>${pt_fmtH(m.hours)}</td><td>${pt_e(m.note)}</td><td><button class="btn ghost small" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>`).join('')}</tbody></table></div>` : ''}`;
+}
+function pt_tabEmployes(codes, sessions, anoms){
+  if(!codes.length) return pt_empty('Aucune donnée pour l’instant.');
+  const isAdmin = pt_isAdmin();
+  let html = '';
+  if(isAdmin){
+    const ov = pt_paieOverviewHtml(codes, sessions);
+    html += pt_accordion('overview', 'Tableau de paie — tous les employés (net total : ' + pt_fmtMoney(ov.totNet) + ')', ov.html);
+  }
+  const c = pt_sel, p = pt_payroll(c, sessions);
+  const myAn = anoms.filter(a=>a.code === c);
+  html += `<div class="ticket">
+    ${pt_empSelect(codes)}
+    <div class="pt-kpis">
+      <div class="pt-kpi"><div class="n">${pt_fmtH(p.totalHours)} h</div><div class="l">Heures période</div></div>
+      <div class="pt-kpi"><div class="n">${p.workedDays}</div><div class="l">Jours travaillés</div></div>
+      ${isAdmin ? `<div class="pt-kpi"><div class="n">${pt_fmtMoney(p.baseWage)}</div><div class="l">Salaire de base</div></div><div class="pt-kpi"><div class="n">${pt_fmtMoney(p.net)}</div><div class="l">Net à payer</div></div>` : ''}
+    </div>
   </div>`;
+  html += pt_accordion('pointages', 'Pointages', pt_pointagesSection(c, sessions));
+  if(myAn.length){
+    pt_anomList = myAn;
+    html += pt_accordion('anomEmp', 'Anomalies de cette personne (' + myAn.length + ')', myAn.map((a,i)=>pt_anomRow(i)).join(''));
+  }
+  if(isAdmin) html += pt_accordion('paie', 'Paie', pt_paieSection(c, sessions, codes));
+  return html;
 }
 async function pt_addEventUI(){
   const d = document.getElementById('pt-ne-date').value, t = document.getElementById('pt-ne-time').value, y = Number(document.getElementById('pt-ne-type').value);
