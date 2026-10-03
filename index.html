@@ -3981,6 +3981,21 @@ function dt_totaux(personne){
   dt_dettes.filter(d=>d.personne === personne).forEach(d=>{ t[d.type][d.devise] += Number(d.montant) || 0; });
   return t;
 }
+function dt_color(type){ return type === 'emprunt' ? 'var(--moss)' : 'var(--rust)'; }
+function dt_optionSummary(personne){
+  const t = dt_totaux(personne);
+  const parts = [];
+  if(t.dette.DZD) parts.push('Dette ' + dt_fmt(t.dette.DZD,'DZD'));
+  if(t.dette.EUR) parts.push('Dette ' + dt_fmt(t.dette.EUR,'EUR'));
+  if(t.emprunt.DZD) parts.push('Emprunt ' + dt_fmt(t.emprunt.DZD,'DZD'));
+  if(t.emprunt.EUR) parts.push('Emprunt ' + dt_fmt(t.emprunt.EUR,'EUR'));
+  return parts.length ? parts.join(' · ') : 'soldé';
+}
+function dt_onTypeChange(id){
+  const sel = document.getElementById('dt-row-type-' + id), montant = document.getElementById('dt-row-montant-' + id);
+  const color = dt_color(sel.value);
+  sel.style.color = color; montant.style.color = color;
+}
 
 function dt_render(){
   if(activeModule !== 'dettes') return;
@@ -4007,7 +4022,7 @@ function dt_render(){
     <div class="field"><label>Voir les transactions avec</label>
       <select id="dt-person-select" onchange="dt_selectPerson(this.value)">
         <option value="">— Choisir une personne —</option>
-        ${personnes.map(n=>`<option value="${dt_e(n)}" ${dt_selectedPerson===n?'selected':''}>${dt_e(n)}</option>`).join('')}
+        ${personnes.map(n=>`<option value="${dt_e(n)}" ${dt_selectedPerson===n?'selected':''}>${dt_e(n)} — ${dt_optionSummary(n)}</option>`).join('')}
       </select>
     </div>
     ${!personnes.length ? `<div class="empty-state">Aucune transaction enregistrée pour l'instant.</div>` : ''}
@@ -4019,18 +4034,18 @@ function dt_render(){
     html += `<div class="ticket">
       <div class="section-label">${dt_e(dt_selectedPerson)}</div>
       <div class="pt-kpis">
-        <div class="pt-kpi"><div class="n">${dt_fmt(t.dette.DZD,'DZD')}</div><div class="l">Total dettes (DZD)</div></div>
-        <div class="pt-kpi"><div class="n">${dt_fmt(t.dette.EUR,'EUR')}</div><div class="l">Total dettes (EUR)</div></div>
-        <div class="pt-kpi"><div class="n">${dt_fmt(t.emprunt.DZD,'DZD')}</div><div class="l">Total emprunts (DZD)</div></div>
-        <div class="pt-kpi"><div class="n">${dt_fmt(t.emprunt.EUR,'EUR')}</div><div class="l">Total emprunts (EUR)</div></div>
+        <div class="pt-kpi"><div class="n" style="color:${dt_color('dette')};">${dt_fmt(t.dette.DZD,'DZD')}</div><div class="l">Total dettes (DZD)</div></div>
+        <div class="pt-kpi"><div class="n" style="color:${dt_color('dette')};">${dt_fmt(t.dette.EUR,'EUR')}</div><div class="l">Total dettes (EUR)</div></div>
+        <div class="pt-kpi"><div class="n" style="color:${dt_color('emprunt')};">${dt_fmt(t.emprunt.DZD,'DZD')}</div><div class="l">Total emprunts (DZD)</div></div>
+        <div class="pt-kpi"><div class="n" style="color:${dt_color('emprunt')};">${dt_fmt(t.emprunt.EUR,'EUR')}</div><div class="l">Total emprunts (EUR)</div></div>
       </div>
       <div class="section-label" style="margin-top:14px;">Historique <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— modifiable, les totaux se mettent à jour automatiquement</span></div>
       <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Type</th><th>Devise</th><th>Montant</th><th>Note</th><th></th></tr></thead><tbody>${
         hist.length ? hist.map(d=>`<tr>
           <td><input type="date" id="dt-row-date-${d.id}" class="pt-draft pt-auto" value="${d.date || ''}"></td>
-          <td><select id="dt-row-type-${d.id}" class="pt-draft pt-auto"><option value="dette" ${d.type==='dette'?'selected':''}>Dette</option><option value="emprunt" ${d.type==='emprunt'?'selected':''}>Emprunt</option></select></td>
+          <td><select id="dt-row-type-${d.id}" class="pt-draft pt-auto" style="color:${dt_color(d.type)};font-weight:600;" onchange="dt_onTypeChange('${d.id}')"><option value="dette" ${d.type==='dette'?'selected':''}>Dette</option><option value="emprunt" ${d.type==='emprunt'?'selected':''}>Emprunt</option></select></td>
           <td><select id="dt-row-devise-${d.id}" class="pt-draft pt-auto"><option value="DZD" ${d.devise==='DZD'?'selected':''}>DZD</option><option value="EUR" ${d.devise==='EUR'?'selected':''}>EUR</option></select></td>
-          <td><input type="text" inputmode="decimal" id="dt-row-montant-${d.id}" class="pt-draft pt-w90" value="${d.montant}"></td>
+          <td><input type="text" inputmode="decimal" id="dt-row-montant-${d.id}" class="pt-draft pt-w90" style="color:${dt_color(d.type)};font-weight:600;" value="${d.montant}"></td>
           <td><input type="text" id="dt-row-note-${d.id}" class="pt-draft pt-grow" value="${dt_e(d.note)}" placeholder="Note"></td>
           <td><button class="btn ghost small" onclick="dt_saveRow('${d.id}')">Enregistrer</button> <button class="btn ghost small" onclick="dt_delete('${d.id}')">Supprimer</button></td>
         </tr>`).join('') : `<tr><td colspan="6" class="pt-muted">Aucune ligne.</td></tr>`
