@@ -455,6 +455,10 @@
 .pt-b-avance{background:var(--rust-bg);color:var(--rust);}
 .pt-src{font-size:10px;color:var(--ink-muted);margin-left:6px;}
 .pt-chevron{font-size:13px;color:var(--ink-muted);}
+.dt-pers-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid var(--line);cursor:pointer;}
+.dt-pers-row:last-child{border-bottom:none;}
+.dt-pers-row:hover{background:var(--paper);}
+.dt-pers-row-active{background:rgba(59,130,246,0.12);}
 .pt-plus{color:var(--moss);font-family:'IBM Plex Mono',monospace;}
 .pt-minus{color:var(--rust);font-family:'IBM Plex Mono',monospace;}
 .pt-an{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 11px;background:var(--rust-bg);border:1px solid var(--rust);border-radius:8px;margin-bottom:6px;font-size:12.5px;color:var(--rust);}
@@ -547,6 +551,11 @@
   </main>
 </div>
 
+<div id="module-dettes" class="module">
+  <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
+    <div id="dt-body"></div>
+  </main>
+</div>
 <div id="module-users" class="module">
   <main style="max-width:760px;margin:0 auto;padding:18px 16px 40px;">
     <h2 class="section" style="margin-top:4px;">Nouvel utilisateur</h2>
@@ -744,6 +753,7 @@ function buildModuleTabs(){
     if(hasAccess(m.key)) html += `<button data-mod="${m.key}" onclick="showModule('${m.key}')">${m.ic} ${m.label}</button>`;
   });
   if(session && session.isAdmin) html += `<button data-mod="users" onclick="showModule('users')">👤 Utilisateurs</button>`;
+  if(hasDettesAccess()) html += `<button data-mod="dettes" onclick="showModule('dettes')">💶 Dettes</button>`;
   nav.innerHTML = html;
 }
 
@@ -764,6 +774,13 @@ function renderHome(){
       <div class="ic">👤</div>
       <div class="lbl">Utilisateurs</div>
       <div class="desc">Comptes & autorisations</div>
+    </div>`;
+  }
+  if(hasDettesAccess()){
+    html += `<div class="home-card" onclick="showModule('dettes')">
+      <div class="ic">💶</div>
+      <div class="lbl">Dettes</div>
+      <div class="desc">Dettes & emprunts personnels</div>
     </div>`;
   }
   if(!html) html = `<div class="empty-state">Aucune rubrique ne vous a été attribuée. Contactez votre administrateur.</div>`;
@@ -911,6 +928,7 @@ let activeModule = 'home';
 function showModule(name){
   if(name!=='home' && name!=='users' && !hasAccess(name)) name = 'home';
   if(name==='users' && !(session && session.isAdmin)) name = 'home';
+  if(name==='dettes' && !hasDettesAccess()) name = 'home';
   activeModule = name;
   document.querySelectorAll('.module').forEach(m=>m.classList.remove('active'));
   document.getElementById('module-'+name).classList.add('active');
@@ -923,6 +941,7 @@ function showModule(name){
   if(name==='depenses' && typeof dp_render==='function') dp_render();
   if(name==='stock' && typeof st_render==='function') st_render();
   if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
+  if(name==='dettes'){ if(typeof dt_start==='function') dt_start(); if(typeof dt_render==='function') dt_render(); }
 }
 
 document.getElementById('today-label').textContent =
@@ -3921,6 +3940,131 @@ function pt_exportExcel(){
   add('Corrections', ['Code','Nom','Anomalie d\'origine','Motif','Corrige le'], pt_entries.filter(e=>e.kind === 'resolved').map(r=>[r.code, pt_name(r.code), pt_fmtDT(new Date(r.dt)), r.reason, String(r.resolvedAt || '').slice(0,10)]));
   add('Reglages', ['Code','Nom','Poste','Mode','Taux','Transport actif','Montant transport'], codes.map(c=>{ const t = pt_transport(c); return [c, pt_name(c), pt_poste(c), pt_mode(c) === 'daily' ? 'DA/jour' : 'DA/heure', pt_rate(c), t.enabled ? 'Oui' : 'Non', t.amount]; }));
   XLSX.writeFile(wb, 'pointage_allo_sushi_' + todayISO() + '.xlsx');
+}
+
+/* ==================== MODULE DETTES & EMPRUNTS (privé) ==================== */
+/* Visible uniquement par le compte 'lila' — jamais par les autres administrateurs.
+   Registre simple : chaque mouvement est une ligne signée (dette = je dois, emprunt = on me doit).
+   Le cumul par personne et par devise se calcule en additionnant ces lignes, sans suivi séparé de règlements —
+   un remboursement est juste une nouvelle ligne dans l'autre sens. */
+function hasDettesAccess(){ return !!(session && session.username === 'lila'); }
+const dt_dettesCol = db.collection('dettes_perso');
+
+let dt_dettes = [];
+let dt_ready = false;
+let dt_started = false;
+let dt_selectedPerson = null;
+
+function dt_e(v){ return esc(v == null ? '' : String(v)); }
+function dt_num(v){ const n = Number(String(v == null ? '' : v).replace(/[\s\u00a0]/g,'').replace(',','.')); return isNaN(n) ? 0 : n; }
+function dt_unit(devise){ return devise === 'EUR' ? '€' : 'DA'; }
+function dt_fmt(n, devise){ return Math.round(Math.abs(Number(n) || 0)).toLocaleString('fr-FR') + ' ' + dt_unit(devise); }
+
+function dt_start(){
+  if(dt_started) return; dt_started = true;
+  dt_dettesCol.onSnapshot((snap)=>{
+    const list = []; snap.forEach(d=>list.push({ id:d.id, ...d.data() })); dt_dettes = list; dt_ready = true; dt_render();
+  }, (e)=>{ console.error(e); dt_ready = true; dt_render(); });
+}
+
+function dt_personnes(){
+  return Array.from(new Set(dt_dettes.map(d=>d.personne))).sort((a,b)=>a.localeCompare(b));
+}
+function dt_solde(personne, devise){
+  return dt_dettes
+    .filter(d=>d.personne === personne && d.devise === devise)
+    .reduce((s,d)=> s + (d.type === 'emprunt' ? Number(d.montant) || 0 : -(Number(d.montant) || 0)), 0);
+}
+function dt_soldeLabel(solde, devise){
+  if(Math.abs(solde) < 0.01) return `<span class="pt-muted">Soldé en ${devise}</span>`;
+  const cls = solde > 0 ? 'pt-plus' : 'pt-minus';
+  const texte = solde > 0 ? 'te doit' : 'tu dois';
+  return `<span class="${cls}">${dt_fmt(solde, devise)} — ${texte}</span>`;
+}
+
+function dt_selectPerson(nom){ dt_selectedPerson = (dt_selectedPerson === nom) ? null : nom; dt_render(); }
+
+function dt_render(){
+  if(activeModule !== 'dettes') return;
+  const body = document.getElementById('dt-body'); if(!body) return;
+  if(!dt_ready){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+
+  let html = `<div class="ticket">
+    <div class="section-label">Ajouter</div>
+    <div class="grid grid-2">
+      <div class="field"><label>Nom</label><input type="text" id="dt-new-personne" list="dt-noms" placeholder="Rachid"></div>
+      <div class="field"><label>Montant</label><input type="text" inputmode="decimal" id="dt-new-montant" placeholder="0"></div>
+      <div class="field"><label>Unité</label><select id="dt-new-devise"><option value="DZD">Dinars (DZD)</option><option value="EUR">Euros (EUR)</option></select></div>
+      <div class="field"><label>Type</label><select id="dt-new-type"><option value="dette">Dette</option><option value="emprunt">Emprunt</option></select></div>
+    </div>
+    <datalist id="dt-noms">${dt_personnes().map(n=>`<option value="${dt_e(n)}"></option>`).join('')}</datalist>
+    <div class="actions-row" style="margin-top:4px;"><button class="btn small" onclick="dt_add()">Valider</button></div>
+  </div>`;
+
+  const personnes = dt_personnes();
+  html += `<div class="ticket"><div class="section-label">Personnes</div>`;
+  if(!personnes.length){
+    html += `<div class="empty-state">Aucune transaction enregistrée pour l'instant.</div>`;
+  } else {
+    personnes.forEach(nom=>{
+      const soldeDzd = dt_solde(nom, 'DZD'), soldeEur = dt_solde(nom, 'EUR');
+      const selected = dt_selectedPerson === nom;
+      html += `<div class="dt-pers-row ${selected ? 'dt-pers-row-active' : ''}" onclick="dt_selectPerson('${nom.replace(/'/g,"\\'")}')">
+        <div style="font-weight:600;">${dt_e(nom)}</div>
+        <div style="text-align:right;font-size:13px;">
+          ${soldeDzd !== 0 ? dt_soldeLabel(soldeDzd,'DZD') : ''}
+          ${soldeDzd !== 0 && soldeEur !== 0 ? '<br>' : ''}
+          ${soldeEur !== 0 ? dt_soldeLabel(soldeEur,'EUR') : ''}
+          ${soldeDzd === 0 && soldeEur === 0 ? '<span class="pt-muted">Soldé</span>' : ''}
+        </div>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
+  if(dt_selectedPerson){
+    const hist = dt_dettes.filter(d=>d.personne === dt_selectedPerson).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    html += `<div class="ticket">
+      <div class="section-label">Historique — ${dt_e(dt_selectedPerson)}</div>
+      <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Type</th><th>Montant</th><th>Note</th><th></th></tr></thead><tbody>${
+        hist.map(d=>`<tr>
+          <td>${fmtDateShort(d.date)}</td>
+          <td><span class="pt-badge ${d.type==='emprunt' ? 'pt-b-prime' : 'pt-b-avance'}">${d.type==='emprunt' ? 'Emprunt' : 'Dette'}</span></td>
+          <td>${dt_fmt(d.montant, d.devise)}</td>
+          <td>${dt_e(d.note)}</td>
+          <td><button class="btn ghost small" onclick="dt_delete('${d.id}')">Supprimer</button></td>
+        </tr>`).join('')
+      }</tbody></table></div>
+    </div>`;
+  }
+
+  body.innerHTML = html;
+}
+
+async function dt_add(){
+  const personne = document.getElementById('dt-new-personne').value.trim();
+  const montant = dt_num(document.getElementById('dt-new-montant').value);
+  if(!personne){ alert('Indique le nom de la personne.'); return; }
+  if(!montant){ alert('Indique un montant.'); return; }
+  const data = {
+    personne,
+    montant,
+    devise: document.getElementById('dt-new-devise').value,
+    type: document.getElementById('dt-new-type').value,
+    date: todayISO(),
+    note: '',
+    creePar: currentUser, creeLe: new Date().toISOString()
+  };
+  try{
+    await dt_dettesCol.add(data);
+    document.getElementById('dt-new-personne').value = '';
+    document.getElementById('dt-new-montant').value = '';
+    dt_selectedPerson = personne;
+  }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function dt_delete(id){
+  if(!confirm('Supprimer cette ligne ?')) return;
+  try{ await dt_dettesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 
 
