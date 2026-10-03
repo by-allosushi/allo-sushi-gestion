@@ -3975,70 +3975,85 @@ function dt_solde(personne, devise){
     .filter(d=>d.personne === personne && d.devise === devise)
     .reduce((s,d)=> s + (d.type === 'emprunt' ? Number(d.montant) || 0 : -(Number(d.montant) || 0)), 0);
 }
-function dt_soldeLabel(solde, devise){
-  if(Math.abs(solde) < 0.01) return `<span class="pt-muted">Soldé en ${devise}</span>`;
-  const cls = solde > 0 ? 'pt-plus' : 'pt-minus';
-  const texte = solde > 0 ? 'te doit' : 'tu dois';
-  return `<span class="${cls}">${dt_fmt(solde, devise)} — ${texte}</span>`;
+function dt_selectPerson(nom){ dt_selectedPerson = nom || null; dt_render(); }
+function dt_totaux(personne){
+  const t = { dette:{DZD:0,EUR:0}, emprunt:{DZD:0,EUR:0} };
+  dt_dettes.filter(d=>d.personne === personne).forEach(d=>{ t[d.type][d.devise] += Number(d.montant) || 0; });
+  return t;
 }
-
-function dt_selectPerson(nom){ dt_selectedPerson = (dt_selectedPerson === nom) ? null : nom; dt_render(); }
 
 function dt_render(){
   if(activeModule !== 'dettes') return;
   const body = document.getElementById('dt-body'); if(!body) return;
   if(!dt_ready){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  const st = pt_saveInputs(body);
+
+  const personnes = dt_personnes();
+  if(dt_selectedPerson && !personnes.includes(dt_selectedPerson)) dt_selectedPerson = null;
 
   let html = `<div class="ticket">
     <div class="section-label">Ajouter</div>
     <div class="grid grid-2">
-      <div class="field"><label>Nom</label><input type="text" id="dt-new-personne" list="dt-noms" placeholder="Rachid"></div>
-      <div class="field"><label>Montant</label><input type="text" inputmode="decimal" id="dt-new-montant" placeholder="0"></div>
-      <div class="field"><label>Unité</label><select id="dt-new-devise"><option value="DZD">Dinars (DZD)</option><option value="EUR">Euros (EUR)</option></select></div>
-      <div class="field"><label>Type</label><select id="dt-new-type"><option value="dette">Dette</option><option value="emprunt">Emprunt</option></select></div>
+      <div class="field"><label>Nom</label><input type="text" id="dt-new-personne" class="pt-draft" list="dt-noms" placeholder="Rachid"></div>
+      <div class="field"><label>Montant</label><input type="text" inputmode="decimal" id="dt-new-montant" class="pt-draft" placeholder="0"></div>
+      <div class="field"><label>Unité</label><select id="dt-new-devise" class="pt-draft"><option value="DZD">Dinars (DZD)</option><option value="EUR">Euros (EUR)</option></select></div>
+      <div class="field"><label>Type</label><select id="dt-new-type" class="pt-draft"><option value="dette">Dette</option><option value="emprunt">Emprunt</option></select></div>
     </div>
-    <datalist id="dt-noms">${dt_personnes().map(n=>`<option value="${dt_e(n)}"></option>`).join('')}</datalist>
+    <datalist id="dt-noms">${personnes.map(n=>`<option value="${dt_e(n)}"></option>`).join('')}</datalist>
     <div class="actions-row" style="margin-top:4px;"><button class="btn small" onclick="dt_add()">Valider</button></div>
   </div>`;
 
-  const personnes = dt_personnes();
-  html += `<div class="ticket"><div class="section-label">Personnes</div>`;
-  if(!personnes.length){
-    html += `<div class="empty-state">Aucune transaction enregistrée pour l'instant.</div>`;
-  } else {
-    personnes.forEach(nom=>{
-      const soldeDzd = dt_solde(nom, 'DZD'), soldeEur = dt_solde(nom, 'EUR');
-      const selected = dt_selectedPerson === nom;
-      html += `<div class="dt-pers-row ${selected ? 'dt-pers-row-active' : ''}" onclick="dt_selectPerson('${nom.replace(/'/g,"\\'")}')">
-        <div style="font-weight:600;">${dt_e(nom)}</div>
-        <div style="text-align:right;font-size:13px;">
-          ${soldeDzd !== 0 ? dt_soldeLabel(soldeDzd,'DZD') : ''}
-          ${soldeDzd !== 0 && soldeEur !== 0 ? '<br>' : ''}
-          ${soldeEur !== 0 ? dt_soldeLabel(soldeEur,'EUR') : ''}
-          ${soldeDzd === 0 && soldeEur === 0 ? '<span class="pt-muted">Soldé</span>' : ''}
-        </div>
-      </div>`;
-    });
-  }
-  html += `</div>`;
+  html += `<div class="ticket">
+    <div class="field"><label>Voir les transactions avec</label>
+      <select id="dt-person-select" onchange="dt_selectPerson(this.value)">
+        <option value="">— Choisir une personne —</option>
+        ${personnes.map(n=>`<option value="${dt_e(n)}" ${dt_selectedPerson===n?'selected':''}>${dt_e(n)}</option>`).join('')}
+      </select>
+    </div>
+    ${!personnes.length ? `<div class="empty-state">Aucune transaction enregistrée pour l'instant.</div>` : ''}
+  </div>`;
 
   if(dt_selectedPerson){
+    const t = dt_totaux(dt_selectedPerson);
     const hist = dt_dettes.filter(d=>d.personne === dt_selectedPerson).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
     html += `<div class="ticket">
-      <div class="section-label">Historique — ${dt_e(dt_selectedPerson)}</div>
-      <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Type</th><th>Montant</th><th>Note</th><th></th></tr></thead><tbody>${
-        hist.map(d=>`<tr>
-          <td>${fmtDateShort(d.date)}</td>
-          <td><span class="pt-badge ${d.type==='emprunt' ? 'pt-b-prime' : 'pt-b-avance'}">${d.type==='emprunt' ? 'Emprunt' : 'Dette'}</span></td>
-          <td>${dt_fmt(d.montant, d.devise)}</td>
-          <td>${dt_e(d.note)}</td>
-          <td><button class="btn ghost small" onclick="dt_delete('${d.id}')">Supprimer</button></td>
-        </tr>`).join('')
+      <div class="section-label">${dt_e(dt_selectedPerson)}</div>
+      <div class="pt-kpis">
+        <div class="pt-kpi"><div class="n">${dt_fmt(t.dette.DZD,'DZD')}</div><div class="l">Total dettes (DZD)</div></div>
+        <div class="pt-kpi"><div class="n">${dt_fmt(t.dette.EUR,'EUR')}</div><div class="l">Total dettes (EUR)</div></div>
+        <div class="pt-kpi"><div class="n">${dt_fmt(t.emprunt.DZD,'DZD')}</div><div class="l">Total emprunts (DZD)</div></div>
+        <div class="pt-kpi"><div class="n">${dt_fmt(t.emprunt.EUR,'EUR')}</div><div class="l">Total emprunts (EUR)</div></div>
+      </div>
+      <div class="section-label" style="margin-top:14px;">Historique <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— modifiable, les totaux se mettent à jour automatiquement</span></div>
+      <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Type</th><th>Devise</th><th>Montant</th><th>Note</th><th></th></tr></thead><tbody>${
+        hist.length ? hist.map(d=>`<tr>
+          <td><input type="date" id="dt-row-date-${d.id}" class="pt-draft pt-auto" value="${d.date || ''}"></td>
+          <td><select id="dt-row-type-${d.id}" class="pt-draft pt-auto"><option value="dette" ${d.type==='dette'?'selected':''}>Dette</option><option value="emprunt" ${d.type==='emprunt'?'selected':''}>Emprunt</option></select></td>
+          <td><select id="dt-row-devise-${d.id}" class="pt-draft pt-auto"><option value="DZD" ${d.devise==='DZD'?'selected':''}>DZD</option><option value="EUR" ${d.devise==='EUR'?'selected':''}>EUR</option></select></td>
+          <td><input type="text" inputmode="decimal" id="dt-row-montant-${d.id}" class="pt-draft pt-w90" value="${d.montant}"></td>
+          <td><input type="text" id="dt-row-note-${d.id}" class="pt-draft pt-grow" value="${dt_e(d.note)}" placeholder="Note"></td>
+          <td><button class="btn ghost small" onclick="dt_saveRow('${d.id}')">Enregistrer</button> <button class="btn ghost small" onclick="dt_delete('${d.id}')">Supprimer</button></td>
+        </tr>`).join('') : `<tr><td colspan="6" class="pt-muted">Aucune ligne.</td></tr>`
       }</tbody></table></div>
     </div>`;
   }
 
   body.innerHTML = html;
+  pt_restoreInputs(st, true);
+}
+
+async function dt_saveRow(id){
+  const montant = dt_num(document.getElementById('dt-row-montant-' + id).value);
+  if(!montant){ alert('Indique un montant.'); return; }
+  const patch = {
+    date: document.getElementById('dt-row-date-' + id).value || todayISO(),
+    type: document.getElementById('dt-row-type-' + id).value,
+    devise: document.getElementById('dt-row-devise-' + id).value,
+    montant,
+    note: document.getElementById('dt-row-note-' + id).value.trim()
+  };
+  try{ await dt_dettesCol.doc(id).update(patch); pt_toast('Ligne mise à jour.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 
 async function dt_add(){
