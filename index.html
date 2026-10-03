@@ -3947,7 +3947,7 @@ function pt_exportExcel(){
    Registre simple : chaque mouvement est une ligne signée (dette = je dois, emprunt = on me doit).
    Le cumul par personne et par devise se calcule en additionnant ces lignes, sans suivi séparé de règlements —
    un remboursement est juste une nouvelle ligne dans l'autre sens. */
-function hasDettesAccess(){ return !!(session && session.username === 'lila'); }
+function hasDettesAccess(){ return !!(session && session.username === 'soufyane'); }
 const dt_dettesCol = db.collection('dettes_perso');
 
 let dt_dettes = [];
