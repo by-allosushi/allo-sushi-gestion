@@ -524,18 +524,6 @@
   <main id="caisse-main"></main>
 </div>
 
-<div id="module-depenses" class="module">
-  <nav class="tabs" id="depenses-tabs"></nav>
-  <main id="depenses-main"></main>
-</div>
-
-<div id="module-stock" class="module">
-  <main style="max-width:760px;margin:0 auto;padding:18px 16px 40px;">
-    <div id="stock-home" class="home-grid"></div>
-    <div id="stock-section" style="display:none;"></div>
-  </main>
-</div>
-
 <div id="module-pointage" class="module">
   <nav class="tabs" id="pointage-tabs"></nav>
   <main id="pointage-main" style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
@@ -576,9 +564,7 @@
       </div>
       <div id="nu-perm-detail">
         <div class="perm-row"><span>Accès Caisse</span><label class="switch"><input type="checkbox" id="nu-perm-caisse" checked><span class="slider"></span></label></div>
-        <div class="perm-row"><span>Accès Dépenses</span><label class="switch"><input type="checkbox" id="nu-perm-depenses" checked><span class="slider"></span></label></div>
-        <div class="perm-row"><span>💵 Saisie du solde réel</span><label class="switch"><input type="checkbox" id="nu-perm-solde-reel" checked><span class="slider"></span></label></div>
-        <div class="perm-row"><span>🔎 Vérification / calcul de l'écart</span><label class="switch"><input type="checkbox" id="nu-perm-verification" checked><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Pointage</span><label class="switch"><input type="checkbox" id="nu-perm-pointage" checked><span class="slider"></span></label></div>
       </div>
       <button class="btn moss" style="margin-top:14px;" onclick="uu_createUser()">➕ Créer l'utilisateur</button>
     </div>
@@ -592,7 +578,7 @@
 </div><!-- /app-shell -->
 
 <script>
-/* ==================== SOCLE COMMUN (partagé par les modules Caisse et Dépenses) ==================== */
+/* ==================== SOCLE COMMUN (partagé par les modules) ==================== */
 const firebaseConfig = {
   apiKey: "AIzaSyAy-IYGVxejJI9uN_qJDGcY0of-vY6AwIg",
   authDomain: "allo-sushi-project.firebaseapp.com",
@@ -613,11 +599,9 @@ const appUsersCol = db.collection('app_users');
 const SESSION_KEY = 'allosushi-session';
 const MODULE_DEFS = [
   { key:'caisse',   label:'Caisse',    ic:'💰', desc:'Sessions de caisse' },
-  { key:'depenses', label:'Dépenses',  ic:'🧾', desc:'Dépenses & pointages' },
-  { key:'stock',    label:'Stock',     ic:'📦', desc:'Gestion du stock' },
   { key:'pointage', label:'Pointage',  ic:'⏱️', desc:'Heures, anomalies & paie' },
 ];
-let session = null; // { username, isAdmin, permissions:{caisse,depenses,soldeTheorique,soldeReel,ecart} }
+let session = null; // { username, isAdmin, permissions:{caisse,pointage} }
 let usersCache = [];
 let usersSetupMode = false;
 
@@ -673,7 +657,6 @@ async function initAuth(){
 }
 
 function applySession(userDoc){
-  dp_verificationResult = null;
   session = {
     username: userDoc.id,
     displayName: userDoc.username || userDoc.id,
@@ -688,7 +671,7 @@ function applySession(userDoc){
   renderUserChip();
   buildModuleTabs();
   showModule('home');
-  if(session.isAdmin){ uu_subscribeUsers(); dp_startVerificationListener(); }
+  if(session.isAdmin){ uu_subscribeUsers(); }
 }
 
 async function handleAuthSubmit(){
@@ -705,7 +688,7 @@ async function handleAuthSubmit(){
       username: uname,
       password: pwd,
       isAdmin: true,
-      permissions: { caisse:true, depenses:true, soldeTheorique:true, soldeReel:true, ecart:true },
+      permissions: { caisse:true, pointage:true },
       creeLe: new Date().toISOString()
     };
     try{
@@ -753,7 +736,7 @@ function buildModuleTabs(){
     if(hasAccess(m.key)) html += `<button data-mod="${m.key}" onclick="showModule('${m.key}')">${m.ic} ${m.label}</button>`;
   });
   if(session && session.isAdmin) html += `<button data-mod="users" onclick="showModule('users')">👤 Utilisateurs</button>`;
-  if(hasDettesAccess()) html += `<button data-mod="dettes" onclick="showModule('dettes')">💶 Dettes</button>`;
+  if(hasDettesAccess()) html += `<button data-mod="dettes" onclick="showModule('dettes')">💶 Carnet</button>`;
   nav.innerHTML = html;
 }
 
@@ -779,7 +762,7 @@ function renderHome(){
   if(hasDettesAccess()){
     html += `<div class="home-card" onclick="showModule('dettes')">
       <div class="ic">💶</div>
-      <div class="lbl">Dettes</div>
+      <div class="lbl">Carnet</div>
       <div class="desc">Dettes & emprunts personnels</div>
     </div>`;
   }
@@ -803,14 +786,9 @@ async function uu_createUser(){
     username: uname,
     password: pwd,
     isAdmin,
-    permissions: isAdmin ? { caisse:true, depenses:true, soldeTheorique:true, soldeReel:true, ecart:true, verification:true, historiqueVerification:true } : {
+    permissions: isAdmin ? { caisse:true, pointage:true } : {
       caisse: document.getElementById('nu-perm-caisse').checked,
-      depenses: document.getElementById('nu-perm-depenses').checked,
-      soldeTheorique: false,
-      soldeReel: document.getElementById('nu-perm-solde-reel').checked,
-      ecart: true,
-      verification: document.getElementById('nu-perm-verification').checked,
-      historiqueVerification: false
+      pointage: document.getElementById('nu-perm-pointage').checked
     },
     creeLe: new Date().toISOString(),
     creePar: currentUser
@@ -819,7 +797,8 @@ async function uu_createUser(){
   document.getElementById('nu-username').value = '';
   document.getElementById('nu-password').value = '';
   document.getElementById('nu-admin').checked = false;
-  document.getElementById('nu-perm-solde-reel').checked = true;
+  document.getElementById('nu-perm-caisse').checked = true;
+  document.getElementById('nu-perm-pointage').checked = true;
   uu_toggleAdminFields();
 }
 
@@ -828,7 +807,7 @@ async function uu_togglePerm(userId, key, checked){
 }
 async function uu_toggleAdmin(userId, checked){
   const patch = { isAdmin: checked };
-  if(checked) patch.permissions = { caisse:true, depenses:true, soldeTheorique:true, soldeReel:true, ecart:true, verification:true, historiqueVerification:true };
+  if(checked) patch.permissions = { caisse:true, pointage:true };
   await appUsersCol.doc(userId).set(patch, { merge:true });
 }
 async function uu_deleteUser(userId){
@@ -878,10 +857,6 @@ function uu_render(){
           <span class="slider"></span>
         </label>
       </div>`).join('');
-    const soldePermRows = `
-      <div class="perm-row"><span>💵 Saisie du solde réel</span><label class="switch"><input type="checkbox" ${perms.soldeReel!==false?'checked':''} ${u.isAdmin?'disabled':''} onchange="uu_togglePerm('${u.id}','soldeReel',this.checked)"><span class="slider"></span></label></div>
-      <div class="perm-row"><span>🔎 Vérification / calcul de l'écart</span><label class="switch"><input type="checkbox" ${perms.verification!==false?'checked':''} ${u.isAdmin?'disabled':''} onchange="uu_togglePerm('${u.id}','verification',this.checked)"><span class="slider"></span></label></div>
-      <div class="perm-row"><span>📋 Historique des vérifications (admin)</span><label class="switch"><input type="checkbox" ${perms.historiqueVerification===true?'checked':''} ${!u.isAdmin?'disabled':''} onchange="uu_togglePerm('${u.id}','historiqueVerification',this.checked)"><span class="slider"></span></label></div>`;
     return `<div class="user-card">
       <div class="uh">
         <div class="uname">${esc(u.username||u.id)}${u.isAdmin?'<span class="badge-admin">Admin</span>':''}</div>
@@ -895,7 +870,6 @@ function uu_render(){
         <label class="switch"><input type="checkbox" ${u.isAdmin?'checked':''} onchange="uu_toggleAdmin('${u.id}',this.checked)"><span class="slider"></span></label>
       </div>
       ${permRows}
-      ${soldePermRows}
     </div>`;
   }).join('') || `<div class="empty-state">Aucun utilisateur.</div>`;
 }
@@ -929,6 +903,7 @@ function showModule(name){
   if(name!=='home' && name!=='users' && !hasAccess(name)) name = 'home';
   if(name==='users' && !(session && session.isAdmin)) name = 'home';
   if(name==='dettes' && !hasDettesAccess()) name = 'home';
+  if(!document.getElementById('module-'+name)) name = 'home'; // module inexistant (ex. ancienne rubrique supprimée)
   activeModule = name;
   document.querySelectorAll('.module').forEach(m=>m.classList.remove('active'));
   document.getElementById('module-'+name).classList.add('active');
@@ -938,8 +913,6 @@ function showModule(name){
   if(name==='home') renderHome();
   if(name==='users') uu_render();
   if(name==='caisse' && typeof ca_render==='function') ca_render();
-  if(name==='depenses' && typeof dp_render==='function') dp_render();
-  if(name==='stock' && typeof st_render==='function') st_render();
   if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
   if(name==='dettes'){ if(typeof dt_start==='function') dt_start(); if(typeof dt_render==='function') dt_render(); }
 }
@@ -1348,1707 +1321,11 @@ function ca_renderHistoriqueTab(){
 
 ca_render();
 
-/* ==================== MODULE DÉPENSES (Gérant) ==================== */
-const dp_mouvCol = db.collection('depenses_mouvements');
-const dp_pointagesCol = db.collection('depenses_pointages');
-const dp_verificationsCol = db.collection('depenses_verifications');
-const dp_cloturesCol = db.collection('depenses_clotures');
-
-const EMPLOYES_PAR_SERVICE = {
-  'Cuisinier': ['Mejdoub','Ali','Kadi','Faiza','Nabil','Fatah'],
-  'Bar': ['Meriem','Marwa'],
-  'Service': ['Rahma','Hamid','Raouf'],
-  'Caisse': ['Racha','Hadil'],
-  'Ménage': ['Nacira','Fatima'],
-};
-const EMPLOYES_TOUS = Object.values(EMPLOYES_PAR_SERVICE).flat();
-
-const DP_TYPES = [
-  { id:'AppointCaisse', label:'Appoint caisse → gérant', shortLabel:'Appoint caisse', color:'var(--moss)', bg:'var(--moss-bg)', sign:+1 },
-  { id:'AppointDivers', label:'Appoint divers', shortLabel:'Appoint divers', color:'var(--cons)', bg:'var(--cons-bg)', sign:+1 },
-  { id:'AppointMoi', label:'Appoint moi → gérant', shortLabel:'Appoint moi', color:'var(--bar)', bg:'var(--bar-bg)', sign:+1 },
-  { id:'Recette', label:'Recette encaissée', shortLabel:'Recette', color:'var(--forest)', bg:'var(--moss-bg)', sign:+1 },
-  { id:'Charge', label:'Charge / Divers', shortLabel:'Charge', color:'var(--rust)', bg:'var(--rust-bg)', sign:-1 },
-  { id:'Achat', label:'Achat', shortLabel:'Achat', color:'var(--amber)', bg:'var(--amber-bg)', sign:-1 },
-  { id:'Retrait', label:'Retrait gérant → moi', shortLabel:'Retrait', color:'var(--wrap)', bg:'var(--wrap-bg)', sign:-1 },
-];
-const DP_CATEGORIES = [
-  { id:'cuisine',        label:'Cuisine',        ic:'🍳', color:'var(--amber)', bg:'var(--amber-bg)' },
-  { id:'detergents',     label:'Détergents',     ic:'🧼', color:'var(--service)', bg:'var(--service-bg)' },
-  { id:'emballage',      label:'Emballage',      ic:'📦', color:'var(--cons)', bg:'var(--cons-bg)' },
-  { id:'livraison',      label:'Livraison',      ic:'🛵', color:'var(--bar)', bg:'var(--bar-bg)' },
-  { id:'investissement', label:'Investissement', ic:'🏗️', color:'var(--rust)', bg:'var(--rust-bg)' },
-  { id:'avance',         label:'Avance salaire', ic:'👤', color:'var(--wrap)', bg:'var(--wrap-bg)' },
-];
-function dp_categoryMeta(id){ return DP_CATEGORIES.find(c=>c.id===id) || null; }
-// Types autorisés à la SAISIE d'un nouveau mouvement pour les utilisateurs non-admin.
-const DP_TYPES_NON_ADMIN = ['AppointCaisse', 'Charge'];
-// "Retrait", "Achat", "AppointDivers", "AppointMoi" et "Recette" ne sont plus proposés à la
-// création — un seul type suffit par direction (AppointCaisse pour les entrées, Charge pour
-// les sorties ; Achat est désormais géré dans le module Stock). On garde leur définition dans
-// DP_TYPES uniquement pour continuer à afficher correctement les mouvements déjà enregistrés.
-function dp_allowedTypes(){
-  const creatable = DP_TYPES.filter(t=>['AppointCaisse','Charge'].includes(t.id));
-  if(session && session.isAdmin) return creatable;
-  return creatable.filter(t=>DP_TYPES_NON_ADMIN.includes(t.id));
-}
-function dp_typeMeta(id){
-  if(id==='Appoint') id = 'AppointCaisse'; // compatibilité avec d'anciens mouvements déjà enregistrés
-  return DP_TYPES.find(t=>t.id===id) || DP_TYPES[0];
-}
-
-/* ---------------- Calcul de période (jour / semaine / mois / personnalisé) ---------------- */
-function dp_startOfWeek(dateStr){
-  const d = new Date(dateStr+'T00:00:00');
-  const day = d.getDay();
-  const diff = (day===0?-6:1-day); // lundi = premier jour
-  d.setDate(d.getDate()+diff);
-  return toLocalISO(d);
-}
-function dp_endOfWeek(dateStr){
-  const d = new Date(dp_startOfWeek(dateStr)+'T00:00:00');
-  d.setDate(d.getDate()+6);
-  return toLocalISO(d);
-}
-function dp_startOfMonth(dateStr){
-  const d = new Date(dateStr+'T00:00:00');
-  return toLocalISO(new Date(d.getFullYear(), d.getMonth(), 1));
-}
-function dp_endOfMonth(dateStr){
-  const d = new Date(dateStr+'T00:00:00');
-  return toLocalISO(new Date(d.getFullYear(), d.getMonth()+1, 0));
-}
-function dp_getPeriodRange(){
-  if(dp_dashPeriod==='jour') return [dp_dashDate, dp_dashDate];
-  if(dp_dashPeriod==='semaine') return [dp_startOfWeek(dp_dashDate), dp_endOfWeek(dp_dashDate)];
-  if(dp_dashPeriod==='mois') return [dp_startOfMonth(dp_dashDate), dp_endOfMonth(dp_dashDate)];
-  return [dp_dashCustomStart||dp_dashDate, dp_dashCustomEnd||dp_dashDate];
-}
-function dp_periodLabel(){
-  const [start,end] = dp_getPeriodRange();
-  if(start===end) return fmtDateShort(start);
-  return `${fmtDateShort(start)} → ${fmtDateShort(end)}`;
-}
-
-let dp_mouvements = [];
-let dp_pointages = [];
-let dp_currentTab = 'mouvements';
-let dp_typeFilter = 'Tous';
-let dp_dateFilterStart = '';
-let dp_dateFilterEnd = '';
-let dp_searchTerm = '';
-let dp_showMouvForm = false;
-let dp_selectedCategorie = '';
-function dp_selectCategorie(id){ dp_selectedCategorie = (dp_selectedCategorie===id) ? '' : id; dp_render(); }
-let dp_formType = 'Charge';
-let dp_showPointageForm = false;
-let dp_pointageChecks = {};
-let dp_workingDate = todayISO();
-let dp_dashPeriod = 'jour';
-let dp_dashDate = todayISO();
-let dp_dashCustomStart = todayISO();
-let dp_dashCustomEnd = todayISO();
-let dp_achatCalcMode = 'prix';
-let dp_editingMouvId = null;
-let dp_editPrefill = null;
-let dp_avanceNomFilter = 'Tous';
-let dp_avanceDateStart = '';
-let dp_avanceDateEnd = '';
-let dp_clotures = [];
-let dp_clotureStart = '';
-let dp_clotureEnd = '';
-let dp_verifications = [];
-let dp_verificationResult = null;
-let dp_verificationBusy = false;
-
-dp_mouvCol.onSnapshot((snap)=>{
-  dp_mouvements = [];
-  snap.forEach(doc=>dp_mouvements.push({ id: doc.id, ...doc.data() }));
-  dp_verificationResult = null;
-  dp_render();
-  if(typeof pt_onDepensesChanged==='function') pt_onDepensesChanged();
-}, (err)=>console.error(err));
-dp_pointagesCol.onSnapshot((snap)=>{
-  dp_pointages = [];
-  snap.forEach(doc=>dp_pointages.push({ id: doc.id, ...doc.data() }));
-  dp_render();
-}, (err)=>console.error(err));
-let dp_verificationsUnsub = null;
-function dp_startVerificationListener(){
-  if(dp_verificationsUnsub) return;
-  if(!(session && session.isAdmin)) return;
-  dp_verificationsUnsub = dp_verificationsCol.onSnapshot((snap)=>{
-    dp_verifications = [];
-    snap.forEach(doc=>dp_verifications.push({ id: doc.id, ...doc.data() }));
-    dp_render();
-  }, (err)=>console.error(err));
-}
-dp_cloturesCol.onSnapshot((snap)=>{
-  dp_clotures = [];
-  snap.forEach(doc=>dp_clotures.push({ id: doc.id, ...doc.data() }));
-  dp_render();
-}, (err)=>console.error(err));
-
-// Renvoie la clôture active couvrant une date donnée (mode simple : une seule date)
-// ou couvrant exactement une plage donnée (mode : deux dates, pour l'affichage du badge).
-function dp_closureFor(dateOrStart, end){
-  if(end===undefined){
-    return dp_clotures.find(c => c.statut==='clos' && dateOrStart>=c.dateDebut && dateOrStart<=c.dateFin) || null;
-  }
-  return dp_clotures.find(c => c.statut==='clos' && c.dateDebut===dateOrStart && c.dateFin===end) || null;
-}
-
-function dp_computeSolde(mouvements){
-  return mouvements.reduce((s,m)=> s + dp_typeMeta(m.type).sign * (Number(m.montant)||0), 0);
-}
-
-function dp_canSee(key){
-  if(session && session.isAdmin) return true;
-  return !!(session && session.permissions && session.permissions[key] !== false);
-}
-function dp_canVerify(){
-  if(session && session.isAdmin) return true;
-  return !!(session && session.permissions && session.permissions.verification !== false && session.permissions.depenses !== false);
-}
-function dp_canSeeVerificationHistory(){
-  return !!(session && session.isAdmin);
-}
-function dp_fmtDateTime(iso){
-  if(!iso) return '—';
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? esc(iso) : d.toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'medium'});
-}
-function dp_fmtTime(iso){
-  if(!iso) return '';
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-}
-async function dp_saveVerification(realAmount){
-  if(!dp_canVerify()) { alert('Vous n’avez pas l’autorisation de vérifier la caisse.'); return null; }
-  if(realAmount==null || !isFinite(realAmount)){ alert('Saisissez un solde réel valide.'); return null; }
-  const now = new Date().toISOString();
-  const soldeTheorique = dp_computeSolde(dp_mouvements);
-  const ecart = realAmount - soldeTheorique;
-  const docRef = dp_verificationsCol.doc();
-  const verification = {
-    id: docRef.id,
-    soldeReel: realAmount,
-    soldeTheorique: soldeTheorique,
-    ecart: ecart,
-    date: now.slice(0,10),
-    dateHeure: now,
-    verifiePar: currentUser,
-    creeLe: now
-  };
-  // Une nouvelle vérification utilise un nouvel ID Firestore : aucune vérification précédente n'est écrasée.
-  await docRef.set(verification);
-  return verification;
-}
-async function dp_verifierSolde(){
-  if(dp_verificationBusy) return;
-  const el = document.getElementById('dp-solde-reel-verification');
-  const raw = el ? el.value : '';
-  const real = raw==='' ? null : dp_parseNum(raw);
-  if(real==null || !isFinite(real)){ alert('Veuillez saisir le solde réel compté avant de cliquer sur Vérification.'); return; }
-  dp_verificationBusy = true;
-  try{
-    const v = await dp_saveVerification(real);
-    if(v) dp_verificationResult = v;
-    dp_render();
-  }catch(e){
-    console.error(e);
-    alert('Erreur lors de la vérification : '+e.message);
-  }finally{ dp_verificationBusy = false; }
-}
-function dp_renderVerificationBox(){
-  if(!dp_canVerify() || !dp_canSee('soldeReel')) return '';
-  const isAdmin = !!(session && session.isAdmin);
-  const v = dp_verificationResult;
-  const soldeTheorique = dp_computeSolde(dp_mouvements);
-  const helper = isAdmin
-    ? 'Vous pouvez consulter le solde théorique, saisir le solde réellement compté, puis lancer la vérification.'
-    : 'Saisissez le montant réellement compté, puis cliquez sur Vérification. Le solde théorique reste masqué.';
-  const theoreticalBox = isAdmin ? `<div class="result-box final" style="margin-top:10px;">
-      <div class="label">Solde théorique</div><div class="value">${dp_fmtMoney(soldeTheorique)}</div>
-    </div>` : '';
-  const displayedEcart = v && dp_canSee('ecart') ? `<div class="result-box ${Math.abs(Number(v.ecart))<0.01?'final':'prelim'}" style="margin:0;flex:1;min-width:220px;">
-      <div class="label">Écart constaté</div><div class="value">${v.ecart>0?'+':''}${dp_fmtMoney(v.ecart)}</div>
-    </div>` : '';
-  return `<div class="ticket" style="padding:16px;margin-bottom:14px;border-color:var(--forest);">
-    <div style="font-size:13px;font-weight:700;margin-bottom:5px;color:var(--forest);">🔎 Vérification du solde</div>
-    <div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:12px;">${helper}</div>
-    ${theoreticalBox}
-    <div class="field" style="margin-top:${isAdmin?'12px':'0'};"><label>Solde réel compté</label><input id="dp-solde-reel-verification" type="text" inputmode="decimal" placeholder="Ex. 25 000" value="${v ? esc(String(v.soldeReel)) : ''}" /></div>
-    <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap;">
-      <button class="btn" type="button" onclick="dp_verifierSolde()">✓ Vérification</button>
-      ${displayedEcart}
-    </div>
-    ${v && session && session.isAdmin ? `<div style="font-size:10.5px;color:var(--ink-muted);margin-top:8px;">Dernière vérification : ${dp_fmtDateTime(v.dateHeure)}${v.verifiePar?' · par '+esc(v.verifiePar):''}</div>` : ''}
-  </div>`;
-}
-function dp_renderVerificationHistory(){
-  if(!dp_canSeeVerificationHistory()) return '';
-  const rows = dp_verifications.slice().sort((a,b)=>(a.dateHeure||a.creeLe||'')<(b.dateHeure||b.creeLe||'')?1:-1).map(v=>`
-    <div class="ticket" style="padding:12px 14px;">
-      <div class="row-between">
-        <div>
-          <div style="font-size:13px;font-weight:700;">${dp_fmtDateTime(v.dateHeure||v.creeLe)}</div>
-          <div style="font-size:11.5px;color:var(--ink-muted);">${v.verifiePar?'Vérifié par '+esc(v.verifiePar):'Utilisateur non renseigné'}</div>
-        </div>
-        <span class="mono" style="font-weight:700;color:${Number(v.ecart)<0?'var(--rust)':'var(--moss)'};">${v.ecart>0?'+':''}${dp_fmtMoney(v.ecart)}</span>
-      </div>
-      <div class="grid grid-3" style="margin-top:10px;">
-        <div class="field"><label>Solde réel</label><div class="result-box final" style="margin:0;"><div class="value">${dp_fmtMoney(v.soldeReel)}</div></div></div>
-        <div class="field"><label>Solde théorique</label><div class="result-box final" style="margin:0;"><div class="value">${dp_fmtMoney(v.soldeTheorique)}</div></div></div>
-        <div class="field"><label>Écart</label><div class="result-box ${Math.abs(Number(v.ecart))<0.01?'final':'prelim'}" style="margin:0;"><div class="value">${v.ecart>0?'+':''}${dp_fmtMoney(v.ecart)}</div></div></div>
-      </div>
-    </div>`).join('');
-  return `<div class="ticket" style="border-color:var(--forest);background:var(--surface);">
-    <div style="font-size:13px;font-weight:700;color:var(--forest);">📋 Historique complet des vérifications</div>
-    <div style="font-size:11.5px;color:var(--ink-muted);margin-top:4px;">Chaque clic sur « Vérification » crée une nouvelle entrée. Les vérifications précédentes ne sont pas remplacées.</div>
-  </div>${rows || `<p style="font-size:12.5px;color:var(--ink-muted);">Aucune vérification enregistrée.</p>`}`;
-}
-
-async function dp_deleteMouvement(id){
-  if(!confirm('Supprimer ce mouvement ?')) return;
-  await dp_mouvCol.doc(id).delete();
-}
-async function dp_savePointage(p){
-  if(!currentUser){ askUserName(false); if(!currentUser) return; }
-  await dp_pointagesCol.doc(p.id).set(p);
-  // Marquer les mouvements cochés comme pointés
-  for(const mid of p.mouvementsValides){
-    const m = dp_mouvements.find(x=>x.id===mid);
-    if(m){
-      await dp_mouvCol.doc(mid).set({ ...m, pointe:true, pointeParEn: currentUser, pointeLe: new Date().toISOString() });
-    }
-  }
-}
-
-function dp_render(){
-  const active = document.activeElement;
-  const activeId = (active && active.id) ? active.id : null;
-  let selStart=null, selEnd=null;
-  if(active && typeof active.selectionStart === 'number'){ selStart = active.selectionStart; selEnd = active.selectionEnd; }
-
-  const isAdmin = session && session.isAdmin;
-  if(dp_currentTab==='tableau' || dp_currentTab==='pointage') dp_currentTab = 'mouvements';
-  if(dp_currentTab==='verification' && !dp_canVerify()) dp_currentTab = 'mouvements';
-  if(dp_currentTab==='historiqueVerification' && !dp_canSeeVerificationHistory()) dp_currentTab = 'mouvements';
-  if(!isAdmin && dp_currentTab==='avances') dp_currentTab = 'mouvements';
-  if(!isAdmin && dp_currentTab==='analyse') dp_currentTab = 'mouvements';
-  if(dp_currentTab==='clotures') dp_currentTab = 'mouvements';
-
-  dp_renderTabs();
-  const main = document.getElementById('depenses-main');
-  if(dp_currentTab==='mouvements') main.innerHTML = dp_renderMouvementsTab();
-  else if(dp_currentTab==='verification') main.innerHTML = dp_renderVerificationBox();
-  else if(dp_currentTab==='historiqueVerification') main.innerHTML = dp_renderVerificationHistory();
-  else if(dp_currentTab==='avances') main.innerHTML = dp_renderAvancesTab();
-  else if(dp_currentTab==='analyse') main.innerHTML = dp_renderAnalyseTab();
-  else main.innerHTML = dp_renderMouvementsTab();
-
-  if(activeId){
-    const el = document.getElementById(activeId);
-    if(el){ el.focus(); if(selStart!=null && el.setSelectionRange){ try{ el.setSelectionRange(selStart, selEnd); }catch(e){} } }
-  }
-}
-function dp_setTab(t){ dp_currentTab = t; dp_render(); }
-function dp_renderTabs(){
-  const isAdmin = session && session.isAdmin;
-  const tabs = isAdmin
-    ? [ {id:'mouvements', label:'Mouvements'}, {id:'verification', label:'🔎 Vérification'}, {id:'historiqueVerification', label:'📋 Historique'}, {id:'avances', label:'Avances salaire'}, {id:'analyse', label:'📊 Analyse'} ]
-    : [ {id:'mouvements', label:'Mouvements'}, {id:'verification', label:'🔎 Vérification'} ];
-  document.getElementById('depenses-tabs').innerHTML = tabs.map(t=>`
-    <button class="${dp_currentTab===t.id?'active':''}" onclick="dp_setTab('${t.id}')">${esc(t.label)}</button>
-  `).join('');
-}
-
-/* ---------------- Onglet Tableau de bord ---------------- */
-function dp_renderTableauTab(){
-  const [start, end] = dp_getPeriodRange();
-  const periodMouv = dp_mouvements.filter(m=>m.date>=start && m.date<=end);
-
-  const totalEntrees = periodMouv.filter(m=>dp_typeMeta(m.type).sign>0).reduce((s,m)=>s+(Number(m.montant)||0),0);
-  const totalSorties = periodMouv.filter(m=>dp_typeMeta(m.type).sign<0).reduce((s,m)=>s+(Number(m.montant)||0),0);
-  const net = totalEntrees - totalSorties;
-
-  const periodChips = `<div class="filter-row">
-    ${[['jour','Jour'],['semaine','Semaine'],['mois','Mois'],['perso','Personnalisé']].map(([id,label])=>
-      `<button class="filter-chip ${dp_dashPeriod===id?'active':''}" style="${dp_dashPeriod===id?'background:var(--forest);border-color:var(--forest);color:#fff;':''}" onclick="dp_dashPeriod='${id}';dp_render()">${label}</button>`
-    ).join('')}
-  </div>`;
-
-  const dateControls = dp_dashPeriod==='perso' ? `
-    <div class="grid grid-2" style="margin-top:8px;">
-      <div class="field"><label>Du</label><input type="date" id="dp-dash-start" value="${dp_dashCustomStart}" onchange="dp_dashCustomStart=this.value;dp_render()" /></div>
-      <div class="field"><label>Au</label><input type="date" id="dp-dash-end" value="${dp_dashCustomEnd}" onchange="dp_dashCustomEnd=this.value;dp_render()" /></div>
-    </div>
-  ` : `
-    <div class="field" style="margin-top:8px;"><label>Date de référence</label><input type="date" id="dp-dash-date" value="${dp_dashDate}" onchange="dp_dashDate=this.value;dp_render()" /></div>
-  `;
-
-  const periodBar = `<div class="ticket" style="padding:14px 16px;">
-    ${periodChips}
-    ${dateControls}
-    <div style="margin-top:10px;font-size:12.5px;color:var(--ink-muted);">Période affichée : <strong>${dp_periodLabel()}</strong> · ${periodMouv.length} mouvement(s)</div>
-  </div>`;
-
-  const summary = `<div class="grid grid-2" style="margin-bottom:12px;">
-    <div class="result-box final"><div class="label">Total entrées</div><div class="value">${dp_fmtMoney(totalEntrees)}</div></div>
-    <div class="result-box prelim" style="background:var(--rust-bg);"><div class="label" style="color:var(--rust);">Total dépenses</div><div class="value" style="color:var(--rust);">${dp_fmtMoney(totalSorties)}</div></div>
-  </div>
-  <div class="result-box ${net>=0?'final':'prelim'}" style="margin-bottom:14px;">
-    <div class="label">Solde net de la période</div>
-    <div class="value">${net>=0?'+':''}${dp_fmtMoney(net)}</div>
-  </div>`;
-
-  const byType = {};
-  periodMouv.forEach(m=>{ byType[m.type] = (byType[m.type]||0) + (Number(m.montant)||0); });
-  const typeBreakdown = DP_TYPES.filter(t=>byType[t.id]).map(t=>`
-    <div class="row-between" style="padding:6px 0;font-size:13px;">
-      <span><span class="chip" style="color:${t.color};background:${t.bg};margin-right:6px;">${esc(t.shortLabel)}</span></span>
-      <span class="mono" style="font-weight:600;">${dp_fmtMoney(byType[t.id])}</span>
-    </div>
-  `).join('');
-  const breakdownBox = `<div class="ticket" style="padding:14px 16px;">
-    <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);margin-bottom:6px;">Répartition par type</div>
-    ${typeBreakdown || '<p style="font-size:12.5px;color:var(--ink-muted);">Aucun mouvement sur cette période.</p>'}
-  </div>`;
-
-  const byDate = {};
-  periodMouv.forEach(m=>{
-    if(!byDate[m.date]) byDate[m.date] = {entrees:0, sorties:0};
-    if(dp_typeMeta(m.type).sign>0) byDate[m.date].entrees += (Number(m.montant)||0);
-    else byDate[m.date].sorties += (Number(m.montant)||0);
-  });
-  const dates = Object.keys(byDate).sort();
-  const dailyRows = dates.map(d=>`
-    <div class="movement-row">
-      <div style="font-weight:500;font-size:13px;">${fmtDateShort(d)}</div>
-      <div style="display:flex;gap:14px;">
-        <span class="mono" style="color:var(--moss);font-size:12.5px;">+${dp_fmtNum(byDate[d].entrees)}</span>
-        <span class="mono" style="color:var(--rust);font-size:12.5px;">−${dp_fmtNum(byDate[d].sorties)}</span>
-        <span class="mono" style="font-weight:700;font-size:12.5px;">${(byDate[d].entrees-byDate[d].sorties)>=0?'+':''}${dp_fmtNum(byDate[d].entrees-byDate[d].sorties)}</span>
-      </div>
-    </div>
-  `).join('');
-  const dailyBox = dates.length>1 ? `<h2 class="section">Détail par jour</h2>${dailyRows}` : '';
-
-  return periodBar + summary + breakdownBox + dailyBox;
-}
-
-function dp_exportMouvementsExcel(){
-  if(!(session && session.isAdmin)){ alert('Seule l’administratrice peut exporter les mouvements.'); return; }
-  if(typeof XLSX==='undefined'){ alert('Le module Excel n’est pas disponible. Vérifiez votre connexion puis réessayez.'); return; }
-
-  let rows = dp_mouvements.slice();
-  if(dp_dateFilterStart) rows = rows.filter(m=>m.date>=dp_dateFilterStart);
-  if(dp_dateFilterEnd) rows = rows.filter(m=>m.date<=dp_dateFilterEnd);
-  if(dp_typeFilter!=='Tous') rows = rows.filter(m => (dp_typeMeta(m.type).sign>0 ? 'in' : 'out') === dp_typeFilter);
-  if(dp_searchTerm.trim()){
-    const q=dp_searchTerm.trim().toLowerCase();
-    rows=rows.filter(m=>[m.libelle,m.articleNom,m.fournisseur,m.employeNom,m.creePar,m.modifiePar,m.type,m.unite].filter(Boolean).join(' ').toLowerCase().includes(q));
-  }
-  rows.sort((a,b)=> (a.date||'').localeCompare(b.date||'') || (a.creeLe||'').localeCompare(b.creeLe||''));
-
-  const exportRows = rows.map(m=>{
-    const sign = dp_typeMeta(m.type).sign;
-    const montant = Number(m.montant)||0;
-    return {
-      'Date': m.date || '',
-      'Type': m.type || '',
-      'Sens': sign>0 ? 'Entrée' : 'Sortie',
-      'Désignation / Motif': m.articleNom || m.libelle || '',
-      'Quantité': m.quantite ?? '',
-      'Unité': m.unite || '',
-      'Prix unitaire (DA)': (m.type==='Achat' && m.quantite) ? montant/Number(m.quantite) : '',
-      'Montant (DA)': montant,
-      'Fournisseur': m.fournisseur || '',
-      'Employé': m.employeNom || '',
-      'Avance salaire': m.estAvanceSalaire ? 'Oui' : 'Non',
-      'Saisi par': m.creePar || '',
-      'Date/heure saisie': m.creeLe || '',
-      'Modifié par': m.modifiePar || '',
-      'Date/heure modification': m.modifieLe || '',
-      'Pointé': m.pointe ? 'Oui' : 'Non',
-      'ID mouvement': m.id || ''
-    };
-  });
-
-  const ws = XLSX.utils.json_to_sheet(exportRows.length ? exportRows : [{ 'Information':'Aucun mouvement pour les critères sélectionnés.' }]);
-  ws['!cols']=[
-    {wch:12},{wch:14},{wch:10},{wch:30},{wch:12},{wch:10},{wch:18},{wch:16},{wch:24},{wch:22},{wch:16},{wch:18},{wch:24},{wch:18},{wch:26},{wch:10},{wch:30}
-  ];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Mouvements');
-
-  const filters = [];
-  if(dp_dateFilterStart) filters.push('du_'+dp_dateFilterStart);
-  if(dp_dateFilterEnd) filters.push('au_'+dp_dateFilterEnd);
-  const suffix = filters.length ? '_'+filters.join('_') : '_tous';
-  XLSX.writeFile(wb, `mouvements_depenses${suffix}.xlsx`);
-}
-
-function dp_renderMouvementsTab(){
-  const isAdmin = session && session.isAdmin;
-  let filtered = dp_typeFilter==='Tous' ? dp_mouvements : dp_mouvements.filter(m=> (dp_typeMeta(m.type).sign>0 ? 'in' : 'out') === dp_typeFilter);
-  if(isAdmin && dp_dateFilterStart) filtered = filtered.filter(m=>m.date>=dp_dateFilterStart);
-  if(isAdmin && dp_dateFilterEnd) filtered = filtered.filter(m=>m.date<=dp_dateFilterEnd);
-  if(dp_searchTerm.trim()){
-    const q = dp_searchTerm.trim().toLowerCase();
-    filtered = filtered.filter(m=>{
-      const hay = [m.libelle, m.articleNom, m.fournisseur, m.employeNom, m.creePar, m.type].filter(Boolean).join(' ').toLowerCase();
-      return hay.includes(q);
-    });
-  }
-  const sorted = filtered.slice().sort((a,b)=> a.date<b.date?1: a.date>b.date?-1: (a.creeLe<b.creeLe?1:-1));
-
-  // Le solde théorique tient compte UNIQUEMENT du filtre par date (indépendamment du type/recherche),
-  // conformément à la demande : seules les entrées/sorties des dates sélectionnées comptent.
-  // Réservé à l'admin (le filtre par date lui-même est admin-only).
-  let soldeBox = '';
-  if(isAdmin){
-    const hasDateFilterForSolde = !!(dp_dateFilterStart || dp_dateFilterEnd);
-    let mouvementsPourSolde = dp_mouvements;
-    if(dp_dateFilterStart) mouvementsPourSolde = mouvementsPourSolde.filter(m=>m.date>=dp_dateFilterStart);
-    if(dp_dateFilterEnd) mouvementsPourSolde = mouvementsPourSolde.filter(m=>m.date<=dp_dateFilterEnd);
-    const solde = dp_computeSolde(mouvementsPourSolde);
-    soldeBox = `<div class="result-box ${solde>=0?'final':'prelim'}" style="margin-bottom:14px;">
-      <div class="label">${hasDateFilterForSolde ? `Solde théorique — ${dp_dateFilterStart?fmtDateShort(dp_dateFilterStart):'…'} → ${dp_dateFilterEnd?fmtDateShort(dp_dateFilterEnd):'…'}` : 'Solde théorique enregistré'}</div>
-      <div class="value">${dp_fmtMoney(solde)}</div>
-    </div>`;
-  }
-
-  const addBar = !dp_showMouvForm ? `<div class="grid grid-2" style="gap:8px;">
-    <button class="btn rust" style="justify-content:center;padding:14px;font-size:14px;" onclick="dp_openForm('out')">↑ Sortie</button>
-    <button class="btn moss" style="justify-content:center;padding:14px;font-size:14px;" onclick="dp_openForm('in')">↓ Entrée</button>
-  </div>` : '';
-
-  const form = dp_showMouvForm ? dp_renderMouvForm() : '';
-
-
-  const hasDateFilter = dp_dateFilterStart || dp_dateFilterEnd;
-  let dateFilterSummary = '';
-  if(dp_dateFilterStart && dp_dateFilterEnd) dateFilterSummary = `du ${fmtDateShort(dp_dateFilterStart)} au ${fmtDateShort(dp_dateFilterEnd)}`;
-  else if(dp_dateFilterStart) dateFilterSummary = `à partir du ${fmtDateShort(dp_dateFilterStart)}`;
-  else if(dp_dateFilterEnd) dateFilterSummary = `jusqu'au ${fmtDateShort(dp_dateFilterEnd)}`;
-
-  const filterChips = `<h2 class="section">Mouvements déjà enregistrés</h2>
-    <div class="ticket" style="padding:10px 14px;margin-bottom:10px;">
-      <div class="search-wrap" style="${isAdmin?'margin-bottom:10px;':''}"><span class="icon">🔎</span><input type="text" id="dp-search" placeholder="Rechercher (motif, fournisseur, article, employé, saisi par…)" value="${esc(dp_searchTerm)}" oninput="dp_searchTerm=this.value;dp_render()" /></div>
-      ${isAdmin ? `<div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;">
-        <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Du</label><input type="date" id="dp-date-filter-start" value="${dp_dateFilterStart}" onchange="dp_dateFilterStart=this.value;dp_render()" /></div>
-        <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Au</label><input type="date" id="dp-date-filter-end" value="${dp_dateFilterEnd}" onchange="dp_dateFilterEnd=this.value;dp_render()" /></div>
-        <button class="btn small" style="white-space:nowrap;" onclick="dp_exportMouvementsExcel()">📊 Télécharger Excel</button>
-        ${(hasDateFilter||dp_searchTerm) ? `<button class="btn ghost small" onclick="dp_dateFilterStart='';dp_dateFilterEnd='';dp_searchTerm='';dp_render()">✕ Effacer</button>` : ''}
-      </div>` : ''}
-    </div>
-    ${((isAdmin&&hasDateFilter)||dp_searchTerm) ? `<div style="font-size:12px;color:var(--forest);margin-bottom:8px;">${isAdmin?dateFilterSummary:''}${isAdmin&&dateFilterSummary&&dp_searchTerm?' · ':''}${dp_searchTerm?`recherche « ${esc(dp_searchTerm)} »`:''} — ${sorted.length} mouvement(s)</div>` : ''}
-    <div class="filter-row">
-    <button class="filter-chip ${dp_typeFilter==='Tous'?'active':''}" style="${dp_typeFilter==='Tous'?'background:var(--forest);border-color:var(--forest);color:#fff;':''}" onclick="dp_typeFilter='Tous';dp_render()">Tous</button>
-    <button class="filter-chip ${dp_typeFilter==='in'?'active':''}" style="${dp_typeFilter==='in'?'background:var(--moss);border-color:var(--moss);color:#fff;':''}" onclick="dp_typeFilter='in';dp_render()">↓ Entrée</button>
-    <button class="filter-chip ${dp_typeFilter==='out'?'active':''}" style="${dp_typeFilter==='out'?'background:var(--rust);border-color:var(--rust);color:#fff;':''}" onclick="dp_typeFilter='out';dp_render()">↑ Sortie</button>
-  </div>`;
-
-  const list = sorted.length===0 ? `<p style="font-size:13px;color:var(--ink-muted);">Aucun mouvement.</p>` :
-    sorted.map(m=>{
-      const meta = dp_typeMeta(m.type);
-      const chipLabel = m.estAvanceSalaire ? '👤 Avance salaire' : m.type;
-      const chipColor = m.estAvanceSalaire ? 'var(--bar)' : meta.color;
-      const chipBg = m.estAvanceSalaire ? 'var(--bar-bg)' : meta.bg;
-      const catMeta = m.categorie ? dp_categoryMeta(m.categorie) : null;
-      const detail = m.type==='Achat' ? `${esc(m.articleNom||'')} · ${dp_fmtNum(m.quantite)} ${esc(m.unite||'')}` : (m.estAvanceSalaire ? `${esc(m.employeNom)}${m.libelle?' · '+esc(m.libelle):''}` : esc(m.libelle||''));
-      return `<div class="movement-row" style="${m.estAvanceSalaire?'border-color:var(--bar);':(catMeta&&catMeta.id==='investissement'?'border-color:var(--rust);':'')}">
-        <div>
-          <div style="font-weight:500;"><span class="chip" style="color:${chipColor};background:${chipBg};margin-right:5px;">${esc(chipLabel)}</span>${catMeta?`<span class="chip" style="color:${catMeta.color};background:${catMeta.bg};margin-right:5px;">${catMeta.ic} ${esc(catMeta.label)}</span>`:''}${detail}</div>
-          <div class="sub">${fmtDateShort(m.date)}${m.creeLe?' à '+dp_fmtTime(m.creeLe):''}${m.creePar?' · par '+esc(m.creePar):''}${m.modifiePar?' · modifié par '+esc(m.modifiePar):''}${m.pointe?' · ✓ pointé':''}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div class="mono" style="font-weight:600;color:${meta.color};">${meta.sign>0?'+':'−'}${dp_fmtMoney(m.montant)}</div>
-          ${session && session.isAdmin ? `<button class="x-btn" style="color:var(--forest);font-size:13px;" onclick="dp_openEditMouv('${m.id}')">✏️</button>` : ''}
-          <button class="x-btn" onclick="dp_deleteMouvement('${m.id}')">✕</button>
-        </div>
-      </div>`;
-    }).join('');
-
-  return soldeBox + addBar + form + filterChips + list;
-}
-
-function dp_openEditMouv(id){
-  if(!(session && session.isAdmin)){ alert("Seule l'administratrice peut modifier un mouvement déjà enregistré."); return; }
-  const m = dp_mouvements.find(x=>x.id===id);
-  if(!m) return;
-  dp_editingMouvId = id;
-  dp_editPrefill = m;
-  dp_formType = m.type;
-  dp_workingDate = m.date;
-  dp_selectedCategorie = m.estAvanceSalaire ? 'avance' : (m.categorie || '');
-  if(m.type==='Achat') dp_achatCalcMode = 'montant';
-  dp_showMouvForm = true;
-  dp_render();
-  const el = document.getElementById('dp-form');
-  if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
-}
-function dp_cancelEditMouv(){
-  dp_editingMouvId = null;
-  dp_editPrefill = null;
-  dp_showMouvForm = false;
-  dp_render();
-}
-
-function dp_renderMouvForm(){
-  if(!(session && session.isAdmin) && !DP_TYPES_NON_ADMIN.includes(dp_formType)) dp_formType = 'Charge';
-  const E = dp_editPrefill || {};
-  const isEditing = !!dp_editingMouvId;
-  const employeeSuggestions = EMPLOYES_TOUS.map(n=>`<option value="${esc(n)}">`).join('');
-  const direction = dp_typeMeta(dp_formType).sign > 0 ? 'in' : 'out';
-  const dirColor = direction==='in' ? 'var(--moss)' : 'var(--rust)';
-  const dirBg = direction==='in' ? 'var(--moss-bg)' : 'var(--rust-bg)';
-  return `
-    <div class="ticket" id="dp-form" style="padding:18px;border:2px solid ${isEditing?'var(--forest)':dirColor};background:${isEditing?'var(--surface)':dirBg};">
-      ${isEditing ? `<div style="font-size:12.5px;font-weight:700;color:var(--forest);margin-bottom:10px;">✏️ Modification du mouvement du ${fmtDateShort(E.date)}</div>`
-        : `<div style="font-size:13px;font-weight:800;color:${dirColor};margin-bottom:12px;">${direction==='in'?'↓ Entrée d\u2019argent':'↑ Sortie d\u2019argent'}</div>`}
-      <div class="form-section">
-        <div class="section-label"><span class="num">1</span>Date</div>
-        <div class="field"><input type="date" id="dp-working-date" value="${dp_workingDate}" onchange="dp_workingDate=this.value;dp_render()" /></div>
-      </div>
-
-      <div class="form-section">
-        ${dp_formType==='Charge' ? `
-          <div class="section-label"><span class="num">2</span>Catégorie</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-            ${DP_CATEGORIES.map(c=>`
-              <button type="button" onclick="dp_selectCategorie('${c.id}')" style="padding:9px 14px;border-radius:20px;border:2px solid ${dp_selectedCategorie===c.id?c.color:'var(--line)'};background:${dp_selectedCategorie===c.id?c.bg:'var(--surface)'};color:${dp_selectedCategorie===c.id?c.color:'var(--ink-muted)'};font-weight:700;font-size:12.5px;cursor:pointer;">${c.ic} ${esc(c.label)}</button>
-            `).join('')}
-          </div>
-          ${dp_selectedCategorie==='avance' ? `
-          <div id="dp-avance-wrap" class="field" style="margin-bottom:12px;">
-            <label>Nom de l'employé</label>
-            <input type="text" id="dp-employe" list="dp-employe-list" placeholder="Prénom de l'employé" value="${esc(E.employeNom||'')}" />
-            <datalist id="dp-employe-list">${employeeSuggestions}</datalist>
-          </div>
-          ` : `
-          <div class="section-label"><span class="num">3</span>Note</div>
-          <div class="field" style="margin-bottom:12px;">
-            <input type="text" id="dp-libelle" placeholder="Ex. Loyer, Carburant…" value="${esc(E.type==='Charge'?(E.libelle||''):'')}" />
-          </div>
-          `}
-          <div class="section-label"><span class="num">${dp_selectedCategorie==='avance'?'3':'4'}</span>Montant</div>
-          <div class="field">
-            <input type="text" inputmode="decimal" id="dp-montant" placeholder="0" value="${(E.type==='Charge'&&E.montant!=null)?esc(String(E.montant)):''}" />
-          </div>
-        ` : `
-          <div class="grid grid-2">
-            <div class="field"><label>Montant (DA)</label><input type="text" inputmode="decimal" id="dp-montant" placeholder="0" value="${(E.type&&E.type!=='Achat'&&E.type!=='Charge'&&E.montant!=null)?esc(String(E.montant)):''}" /></div>
-            <div class="field"><label>Note (optionnel)</label>
-              <input type="text" id="dp-libelle" placeholder="Ex. Appoint du matin" value="${esc(E.type&&E.type!=='Achat'&&E.type!=='Charge'?(E.libelle||''):'')}" />
-            </div>
-          </div>
-        `}
-      </div>
-      <div style="display:flex;align-items:center;gap:12px;margin-top:14px;">
-        ${isEditing ? `
-          <button class="btn" onclick="dp_submitMouv()">✓ Enregistrer les modifications</button>
-          <button class="btn ghost" onclick="dp_cancelEditMouv()">Annuler la modification</button>
-        ` : `
-          <button class="btn" style="flex:1;justify-content:center;" onclick="dp_submitMouv()">✓ Valider et enchaîner</button>
-          <button class="btn ghost small" onclick="dp_showMouvForm=false;dp_render()">Fermer</button>
-        `}
-      </div>
-    </div>
-  `;
-}
-function dp_openForm(dir){
-  dp_editingMouvId = null;
-  dp_editPrefill = null;
-  dp_selectedCategorie = '';
-  dp_showMouvForm = true;
-  dp_setDirection(dir);
-}
-function dp_setDirection(dir){
-  const allowed = dp_allowedTypes();
-  const first = allowed.find(t => dir==='in' ? t.sign>0 : t.sign<0);
-  if(!first) return;
-  dp_formType = first.id;
-  dp_render();
-}
-function dp_updateAchatCalc(){
-  const qtyEl = document.getElementById('dp-qty');
-  const previewEl = document.getElementById('dp-achat-calc-preview');
-  if(!qtyEl || !previewEl) return;
-  const qty = dp_parseNum(qtyEl.value);
-  if(dp_achatCalcMode==='prix'){
-    const prixEl = document.getElementById('dp-prix');
-    const prix = prixEl ? dp_parseNum(prixEl.value) : 0;
-    previewEl.textContent = (qty && prix) ? `= ${dp_fmtMoney(qty*prix)} au total` : '';
-  } else {
-    const montantEl = document.getElementById('dp-montant-total');
-    const montant = montantEl ? dp_parseNum(montantEl.value) : 0;
-    previewEl.textContent = (qty && montant) ? `= ${dp_fmtMoney(montant/qty)} / unité` : '';
-  }
-}
-
-async function dp_submitMouv(){
-  if(!currentUser){ askUserName(false); if(!currentUser) return; }
-  if(dp_editingMouvId && !(session && session.isAdmin)){ alert("Seule l'administratrice peut modifier un mouvement déjà enregistré."); return; }
-  const date = dp_workingDate;
-  let mouv;
-  try{
-  if(dp_formType==='Achat'){
-    const typed = document.getElementById('dp-article') ? document.getElementById('dp-article').value.trim() : '';
-    if(!typed){ alert('Merci de renseigner la désignation de l’achat.'); return; }
-    const qty = dp_parseNum(document.getElementById('dp-qty').value);
-    if(!qty){ alert('Merci de renseigner une quantité.'); return; }
-    let prix, montantTotal;
-    if(dp_achatCalcMode==='prix'){
-      prix = dp_parseNum(document.getElementById('dp-prix').value);
-      montantTotal = qty*prix;
-    } else {
-      montantTotal = dp_parseNum(document.getElementById('dp-montant-total').value);
-      prix = qty ? montantTotal/qty : 0;
-    }
-    if(!montantTotal){ alert('Merci de renseigner le montant de l’achat.'); return; }
-    const fournisseur = document.getElementById('dp-fourn').value;
-    const unite = document.getElementById('dp-unite').value.trim();
-
-    if(dp_editingMouvId){
-      const original = dp_mouvements.find(m=>m.id===dp_editingMouvId);
-      mouv = {
-        ...original, type:'Achat', date, montant: montantTotal,
-        articleNom: typed, quantite: qty, unite, fournisseur,
-        modifiePar: currentUser, modifieLe: new Date().toISOString(),
-      };
-      await dp_mouvCol.doc(dp_editingMouvId).set(mouv);
-    } else {
-      mouv = {
-        id: uid(), type:'Achat', date, montant: montantTotal,
-        articleNom: typed, quantite: qty, unite, fournisseur,
-        pointe:false, creePar: currentUser, creeLe: new Date().toISOString(),
-      };
-      await dp_mouvCol.doc(mouv.id).set(mouv);
-    }
-  } else {
-    const montant = dp_parseNum(document.getElementById('dp-montant').value);
-    if(!montant){ alert('Merci de renseigner un montant.'); return; }
-    const categorie = (dp_formType==='Charge') ? dp_selectedCategorie : '';
-    const estAvanceSalaire = categorie==='avance';
-    const employeEl = document.getElementById('dp-employe');
-    const employeNom = estAvanceSalaire && employeEl ? employeEl.value.trim() : '';
-    if(estAvanceSalaire && !employeNom){ alert("Merci de renseigner le nom de l'employé pour cette avance."); return; }
-    const libelleEl = document.getElementById('dp-libelle');
-    const libelle = (libelleEl && !estAvanceSalaire) ? libelleEl.value : '';
-
-    if(dp_editingMouvId){
-      const original = dp_mouvements.find(m=>m.id===dp_editingMouvId);
-      mouv = {
-        ...original, type: dp_formType, date, montant, libelle,
-        estAvanceSalaire, employeNom, categorie: estAvanceSalaire ? '' : categorie,
-        modifiePar: currentUser, modifieLe: new Date().toISOString(),
-      };
-      await dp_mouvCol.doc(dp_editingMouvId).set(mouv);
-    } else {
-      mouv = {
-        id: uid(), type: dp_formType, date, montant, libelle,
-        estAvanceSalaire, employeNom, categorie: estAvanceSalaire ? '' : categorie,
-        pointe:false, creePar: currentUser, creeLe: new Date().toISOString(),
-      };
-      await dp_mouvCol.doc(mouv.id).set(mouv);
-    }
-  }
-  const wasEditing = !!dp_editingMouvId;
-  if(dp_editingMouvId){
-    dp_editingMouvId = null;
-    dp_editPrefill = null;
-  }
-  if(wasEditing) dp_showMouvForm = false;
-  else dp_selectedCategorie = '';
-  dp_render();
-  }catch(e){
-    console.warn(e);
-    alert("Erreur d'enregistrement : "+e.message);
-  }
-}
-
-/* ---------------- Onglet Pointage ---------------- */
-function dp_renderPointageTab(){
-  return dp_renderVerificationBox();
-}
-
-function dp_quickFollowup(type){
-  const soldeTheorique = dp_computeSolde(dp_mouvements);
-  const compteEl = document.getElementById('dp-compte');
-  const compteRaw = compteEl ? compteEl.value : '';
-  const compte = compteRaw==='' ? null : dp_parseNum(compteRaw);
-  const suggested = compte!=null ? Math.abs(compte - soldeTheorique) : null;
-  dp_showPointageForm = false; // on quitte le pointage en cours pour saisir le mouvement (à refaire ensuite si besoin)
-  dp_formType = type;
-  dp_showMouvForm = true;
-  dp_currentTab = 'mouvements';
-  dp_render();
-  if(suggested!=null){
-    const montantEl = document.getElementById('dp-montant');
-    if(montantEl) montantEl.value = suggested;
-  }
-}
-async function dp_submitPointage(){
-  // Compatibilité avec d'anciennes sessions : la nouvelle procédure utilise Vérification.
-  return dp_verifierSolde();
-}
-
-
-/* ---------------- Onglet Avances salaire ---------------- */
-/* ---------------- Onglet Analyse (admin uniquement) ---------------- */
-let dp_analyseStart = '';
-let dp_analyseEnd = '';
-function dp_setAnalyseRange(field, val){ if(field==='start') dp_analyseStart=val; else dp_analyseEnd=val; dp_render(); }
-function dp_renderAnalyseTab(){
-  const inRange = m => (!dp_analyseStart || m.date>=dp_analyseStart) && (!dp_analyseEnd || m.date<=dp_analyseEnd);
-  const charges = dp_mouvements.filter(m=>m.type==='Charge' && !m.estAvanceSalaire && inRange(m));
-
-  const totals = {};
-  let sansCategorie = 0;
-  charges.forEach(m=>{
-    if(m.categorie){ totals[m.categorie] = (totals[m.categorie]||0) + dp_parseNum(m.montant); }
-    else { sansCategorie += dp_parseNum(m.montant); }
-  });
-  const totalGeneral = charges.reduce((s,m)=>s+dp_parseNum(m.montant),0);
-
-  const rangeBar = `<div class="ticket">
-    <div class="grid grid-2">
-      <div class="field"><label>Du</label><input type="date" value="${dp_analyseStart}" onchange="dp_setAnalyseRange('start',this.value)" /></div>
-      <div class="field"><label>Au</label><input type="date" value="${dp_analyseEnd}" onchange="dp_setAnalyseRange('end',this.value)" /></div>
-    </div>
-    <div style="font-size:11.5px;color:var(--ink-muted);margin-top:8px;">Laisse vide pour analyser toutes les dépenses. Les avances sur salaire ne sont pas comptées ici (déjà suivies dans leur propre onglet).</div>
-  </div>`;
-
-  const cards = DP_CATEGORIES.map(c=>{
-    const total = totals[c.id] || 0;
-    const pct = totalGeneral>0 ? Math.round((total/totalGeneral)*100) : 0;
-    const isInvest = c.id==='investissement';
-    return `<div class="ticket" style="${isInvest && total>0 ? 'border-color:var(--rust);' : ''}">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div style="font-weight:700;font-size:13.5px;">${c.ic} ${esc(c.label)}</div>
-        <div class="mono" style="font-weight:800;font-size:15px;color:${c.color};">${dp_fmtMoney(total)}</div>
-      </div>
-      <div style="font-size:11px;color:var(--ink-muted);margin-top:4px;">${pct}% du total des charges de la période</div>
-      ${isInvest && total>0 ? `<div style="margin-top:8px;font-size:11px;color:var(--rust);">À transférer vers le Carnet d'investissement (module à venir).</div>` : ''}
-    </div>`;
-  }).join('');
-
-  const totalBox = `<div class="result-box prelim" style="margin-top:14px;">
-    <div class="label">Total des charges de la période</div>
-    <div class="value">${dp_fmtMoney(totalGeneral)}</div>
-  </div>`;
-
-  const sansCatBox = sansCategorie > 0 ? `<div style="margin-top:10px;font-size:11.5px;color:var(--amber);">⚠ ${dp_fmtMoney(sansCategorie)} de charges sans catégorie sur cette période.</div>` : '';
-
-  return rangeBar + `<h2 class="section">Répartition par catégorie</h2>` + cards + totalBox + sansCatBox;
-}
-
-function dp_renderAvancesTab(){
-  let avances = dp_mouvements.filter(m=>m.type==='Charge' && m.estAvanceSalaire).sort((a,b)=>a.date<b.date?1:-1);
-
-  const filterBar = `<div class="ticket" style="padding:12px 14px;margin-bottom:12px;">
-    <div class="field" style="margin-bottom:10px;"><label>Employé</label>
-      <select id="dp-avance-nom-filter" onchange="dp_avanceNomFilter=this.value;dp_render()">
-        <option value="Tous" ${dp_avanceNomFilter==='Tous'?'selected':''}>Tous les employés</option>
-        ${Object.keys(EMPLOYES_PAR_SERVICE).map(service=>`
-          <optgroup label="${esc(service)}">
-            ${EMPLOYES_PAR_SERVICE[service].map(nom=>`<option value="${esc(nom)}" ${dp_avanceNomFilter===nom?'selected':''}>${esc(nom)}</option>`).join('')}
-          </optgroup>
-        `).join('')}
-      </select>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Du</label><input type="date" id="dp-avance-date-start" value="${dp_avanceDateStart}" onchange="dp_avanceDateStart=this.value;dp_render()" /></div>
-      <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Au</label><input type="date" id="dp-avance-date-end" value="${dp_avanceDateEnd}" onchange="dp_avanceDateEnd=this.value;dp_render()" /></div>
-      ${(dp_avanceNomFilter!=='Tous'||dp_avanceDateStart||dp_avanceDateEnd) ? `<button class="btn ghost small" onclick="dp_avanceNomFilter='Tous';dp_avanceDateStart='';dp_avanceDateEnd='';dp_render()">✕ Effacer</button>` : ''}
-    </div>
-  </div>`;
-
-  if(dp_avanceNomFilter!=='Tous') avances = avances.filter(a=>a.employeNom===dp_avanceNomFilter);
-  if(dp_avanceDateStart) avances = avances.filter(a=>a.date>=dp_avanceDateStart);
-  if(dp_avanceDateEnd) avances = avances.filter(a=>a.date<=dp_avanceDateEnd);
-
-  if(avances.length===0){
-    return filterBar + `<div class="empty-state">Aucune avance sur salaire ${(dp_avanceNomFilter!=='Tous'||dp_avanceDateStart||dp_avanceDateEnd)?'ne correspond à ces filtres':"enregistrée pour l'instant"}.<br/><span style="font-size:11.5px;">Coche "Ceci est une avance / un acompte sur salaire" en créant une Charge pour qu'elle apparaisse ici.</span></div>`;
-  }
-  const parEmploye = {};
-  avances.forEach(a=>{
-    const key = a.employeNom || '—';
-    parEmploye[key] = (parEmploye[key]||0) + (Number(a.montant)||0);
-  });
-  const totalGeneral = avances.reduce((s,a)=>s+(Number(a.montant)||0),0);
-
-  const summary = `<div class="ticket" style="padding:14px 16px;">
-    <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);margin-bottom:8px;">Total par employé</div>
-    ${Object.keys(parEmploye).sort().map(nom=>`
-      <div class="row-between" style="padding:4px 0;font-size:13px;">
-        <span>${esc(nom)}</span>
-        <span class="mono" style="font-weight:600;">${dp_fmtMoney(parEmploye[nom])}</span>
-      </div>
-    `).join('')}
-    <div class="row-between" style="padding:8px 0 0;margin-top:6px;border-top:1px solid var(--line);font-size:13px;font-weight:700;">
-      <span>Total ${(dp_avanceNomFilter!=='Tous'||dp_avanceDateStart||dp_avanceDateEnd)?'(filtré)':'général'}</span>
-      <span class="mono">${dp_fmtMoney(totalGeneral)}</span>
-    </div>
-  </div>`;
-
-  const list = avances.map(a=>`
-    <div class="movement-row">
-      <div>
-        <div style="font-weight:500;">${esc(a.employeNom)}</div>
-        <div class="sub">${fmtDateShort(a.date)}${a.libelle?' · '+esc(a.libelle):''}${a.creePar?' · saisi par '+esc(a.creePar):''}</div>
-      </div>
-      <div class="mono" style="font-weight:600;color:var(--rust);">${dp_fmtMoney(a.montant)}</div>
-    </div>
-  `).join('');
-
-  return filterBar + `<h2 class="section">Récapitulatif des avances sur salaire</h2>` + summary +
-    `<h2 class="section">Détail chronologique</h2>` + list;
-}
-
-/* ---------------- Petits utilitaires locaux ---------------- */
-function dp_fmtNum(n){ if(n===null||n===undefined||isNaN(n)) return '0'; return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2}); }
-function dp_fmtMoney(n){ return dp_fmtNum(n)+' DA'; }
-function dp_parseNum(v){ if(v===null||v===undefined||v==='') return 0; const n = Number(String(v).replace(',','.')); return isNaN(n)?0:n; }
-
-/* ==================== MODULE STOCK ==================== */
-const ST_SECTIONS = [
-  { key:'articles',   label:'Articles',        ic:'📋', desc:'Catalogue & seuils Min/Max' },
-  { key:'restaurant', label:'Restaurant',      ic:'🍽️', desc:'Stock au restaurant' },
-  { key:'arrivage',   label:'Arrivage Maison', ic:'🏠', desc:'Dépôt maison' },
-  { key:'france',     label:'France Achat',    ic:'🇫🇷', desc:'Achats & envoi depuis la France' },
-  { key:'achatlocal', label:'Achat local',     ic:'🛒', desc:'Achat direct Restaurant/Maison' },
-];
-let st_currentSection = null;
-function st_min2(a){ return (a && a.max1 ? a.max1 : 0) + 5; }
-const st_articlesCol = db.collection('stock_articles');
-const st_movementsCol = db.collection('stock_movements');
-let st_movements = [];
-st_movementsCol.onSnapshot((snap)=>{
-  st_movements = snap.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  if(activeModule==='stock') st_render();
-}, (err)=>console.warn(err));
-
-function st_qteAAcheter(a){
-  const q = (a.max2||0) - (a.stock2||0) - (a.stock3||0);
-  return q > 0 ? q : 0;
-}
-
-/* ---- Moteur générique d'effets sur le stock (pour édition/suppression de n'importe quel mouvement) ---- */
-function st_movementEffects(m){
-  if(m.type==='achat_france') return [{articleId:m.articleId, field:'stock3', delta:m.quantite}];
-  if(m.type==='envoi_maison') return [{articleId:m.articleId, field:'stock3', delta:-m.quantite},{articleId:m.articleId, field:'stock2', delta:m.quantite}];
-  if(m.type==='transfert_restaurant') return [{articleId:m.articleId, field:'stock2', delta:-m.quantite},{articleId:m.articleId, field:'stock1', delta:m.quantite}];
-  if(m.type==='sortie_restaurant') return [{articleId:m.articleId, field:'stock1', delta:-m.quantite}];
-  if(m.type==='achat_local') return [{articleId:m.articleId, field: m.destination==='restaurant'?'stock1':'stock2', delta:m.quantite}];
-  return [];
-}
-async function st_applyEffects(effects, sign){
-  const byArticle = {};
-  effects.forEach(e=>{
-    if(!byArticle[e.articleId]) byArticle[e.articleId] = {};
-    byArticle[e.articleId][e.field] = (byArticle[e.articleId][e.field]||0) + e.delta*sign;
-  });
-  for(const articleId in byArticle){
-    const updates = {};
-    for(const field in byArticle[articleId]) updates[field] = firebase.firestore.FieldValue.increment(byArticle[articleId][field]);
-    await st_articlesCol.doc(articleId).update(updates);
-  }
-}
-async function st_deleteMovementGeneric(id){
-  const m = st_movements.find(x=>x.id===id);
-  if(!m) return;
-  if(!confirm('Supprimer ce mouvement ? Le stock sera ajusté en conséquence.')) return;
-  try{
-    await st_applyEffects(st_movementEffects(m), -1);
-    await st_movementsCol.doc(id).delete();
-    st_render();
-  }catch(e){ console.warn(e); alert('Erreur lors de la suppression.'); }
-}
-let st_articles = [];
-st_articlesCol.onSnapshot((snap)=>{
-  st_articles = snap.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));
-  if(activeModule==='stock') st_render();
-}, (err)=>console.warn(err));
-
-function st_render(){
-  const home = document.getElementById('stock-home');
-  const section = document.getElementById('stock-section');
-  const active = document.activeElement;
-  const activeId = (active && active.id) ? active.id : null;
-  let selStart=null, selEnd=null;
-  if(active && typeof active.selectionStart === 'number'){
-    selStart = active.selectionStart; selEnd = active.selectionEnd;
-  }
-  const scrollY = window.scrollY;
-  if(!st_currentSection){
-    home.style.display = 'grid';
-    section.style.display = 'none';
-    home.innerHTML = ST_SECTIONS.map(s=>`
-      <div class="home-card" onclick="st_showSection('${s.key}')">
-        <div class="ic">${s.ic}</div>
-        <div class="lbl">${s.label}</div>
-        <div class="desc">${s.desc}</div>
-      </div>
-    `).join('');
-  } else {
-    home.style.display = 'none';
-    section.style.display = 'block';
-    section.innerHTML = st_renderSection(st_currentSection);
-    if(st_currentSection==='france' && st_franceTab==='achat') st_updateFrancePreview();
-  }
-  if(activeId){
-    const el = document.getElementById(activeId);
-    if(el){
-      el.focus();
-      if(selStart!=null && el.setSelectionRange){
-        try{ el.setSelectionRange(selStart, selEnd); }catch(e){}
-      }
-    }
-  }
-  window.scrollTo(0, scrollY);
-}
-function st_showSection(key){
-  st_currentSection = key;
-  st_render();
-}
-function st_backToStockHome(){
-  st_currentSection = null;
-  st_render();
-}
-function st_renderSection(key){
-  const s = ST_SECTIONS.find(x=>x.key===key);
-  if(key==='articles') return st_renderArticlesSection();
-  if(key==='france') return st_renderFranceSection();
-  if(key==='achatlocal') return st_renderAchatLocalSection();
-  if(key==='arrivage') return st_renderArrivageSection();
-  if(key==='restaurant') return st_renderRestaurantSection();
-  return `
-    <button class="btn small ghost" style="margin-bottom:14px;" onclick="st_backToStockHome()">← Retour</button>
-    <h2 class="section" style="margin-top:0;">${s.ic} ${esc(s.label)}</h2>
-    <div class="empty-state">Écran "${esc(s.label)}" à construire.</div>
-  `;
-}
-
-/* ---- Sous-écran : France Achat (Stock 3) ---- */
-let st_franceTab = 'apercu';
-function st_setFranceTab(t){ st_franceTab = t; st_render(); }
-function st_renderFranceSection(){
-  return `
-    <button class="btn small ghost" style="margin-bottom:14px;" onclick="st_backToStockHome()">← Retour</button>
-    <h2 class="section" style="margin-top:0;">🇫🇷 France Achat</h2>
-    <nav class="tabs" style="margin-bottom:12px;">
-      <button class="${st_franceTab==='apercu'?'active':''}" onclick="st_setFranceTab('apercu')">Aperçu</button>
-      <button class="${st_franceTab==='achat'?'active':''}" onclick="st_setFranceTab('achat')">Enregistrer un achat</button>
-      <button class="${st_franceTab==='envoi'?'active':''}" onclick="st_setFranceTab('envoi')">Envoyer vers Maison</button>
-      <button class="${st_franceTab==='historique'?'active':''}" onclick="st_setFranceTab('historique')">Historique</button>
-    </nav>
-    ${st_franceTab==='apercu' ? st_renderFranceApercu() : ''}
-    ${st_franceTab==='achat' ? st_renderFranceForm('achat') : ''}
-    ${st_franceTab==='envoi' ? st_renderFranceForm('envoi') : ''}
-    ${st_franceTab==='historique' ? st_renderFranceHistorique() : ''}
-  `;
-}
-function st_renderFranceApercu(){
-  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
-  const aAcheter = st_articles.filter(a=>(a.stock2||0) <= st_min2(a)).sort((a,b)=>st_qteAAcheter(b)-st_qteAAcheter(a));
-  if(aAcheter.length===0) return `<div class="empty-state">✓ Tous les articles sont au-dessus de leur seuil minimum — rien à acheter pour l'instant.</div>`;
-  return aAcheter.map(a=>{
-    const qte = st_qteAAcheter(a);
-    const p = st_lastPrices(a.id);
-    return `
-    <div class="ticket" style="padding:12px 14px;border-color:var(--rust);">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div>
-          <div style="font-weight:700;font-size:14px;">${esc(a.nom)}</div>
-          <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Stock France : ${a.stock3||0} ${esc(a.unite||'')}</div>
-        </div>
-        <div style="text-align:right;">
-          <div style="font-size:10.5px;color:var(--rust);">À acheter</div>
-          <div style="font-weight:800;color:var(--rust);font-size:16px;">${qte} ${esc(a.unite||'')}</div>
-        </div>
-      </div>
-      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-muted);">
-        Dernier prix local : ${p.local ? ca_fmtMoney(p.local)+' /u' : '—'} &nbsp;·&nbsp; Dernier prix France : ${p.france ? ca_fmtMoney(p.france)+' /u' : '—'}
-      </div>
-    </div>`;
-  }).join('');
-}
-function st_lastTauxChange(){
-  const last = st_movements.find(m=>m.type==='achat_france' && m.taux);
-  return last ? last.taux : '';
-}
-function st_lastPrices(articleId){
-  const lastLocal = st_movements.find(m=>m.type==='achat_local' && m.articleId===articleId && m.prixDa);
-  const lastFrance = st_movements.find(m=>m.type==='achat_france' && m.articleId===articleId && m.prixDzd);
-  return { local: lastLocal ? lastLocal.prixDa : null, france: lastFrance ? lastFrance.prixDzd : null };
-}
-function st_renderPriceCompare(articleId){
-  const p = st_lastPrices(articleId);
-  return `<div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:10px;padding:8px 10px;background:var(--paper);border-radius:6px;">
-    Dernier prix local : ${p.local ? ca_fmtMoney(p.local)+' /u' : '—'} &nbsp;·&nbsp; Dernier prix France : ${p.france ? ca_fmtMoney(p.france)+' /u' : '—'}
-  </div>`;
-}
-function st_updateFrancePreview(){
-  const prix = ca_parseNum(document.getElementById('st-fr-prix-eur').value);
-  const taux = ca_parseNum(document.getElementById('st-fr-taux').value);
-  const qte = ca_parseNum(document.getElementById('st-fr-qte').value);
-  const prixDzd = prix * taux;
-  const totalDzd = prixDzd * qte;
-  const el = document.getElementById('st-fr-preview');
-  if(el) el.textContent = 'Prix unitaire : ' + ca_fmtMoney(prixDzd) + '  ·  Total : ' + ca_fmtMoney(totalDzd);
-}
-let st_frArticleId = null;
-function st_frSelectArticle(id){ st_frArticleId = id; st_render(); }
-let st_frEditingId = null;
-function st_renderFranceForm(mode){
-  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
-  if(!st_frArticleId || !st_articles.find(a=>a.id===st_frArticleId)) st_frArticleId = st_articles[0].id;
-  return `
-    <div class="ticket">
-      <div class="field" style="margin-bottom:10px;">
-        <label>Article</label>
-        <select id="st-fr-article" onchange="st_frSelectArticle(this.value)">
-          ${st_articles.map(a=>`<option value="${a.id}" ${a.id===st_frArticleId?'selected':''}>${esc(a.nom)} (stock France: ${a.stock3||0})</option>`).join('')}
-        </select>
-      </div>
-      ${mode==='achat' ? st_renderPriceCompare(st_frArticleId) : ''}
-      <div class="field" style="margin-bottom:10px;">
-        <label>Quantité${mode==='achat' && !st_frEditingId ? ' <span style="font-weight:400;color:var(--ink-muted);">(suggestion pré-remplie, modifiable)</span>' : ''}</label>
-        <input type="text" inputmode="decimal" id="st-fr-qte" value="${mode==='achat' && !st_frEditingId ? st_qteAAcheter(st_articles.find(a=>a.id===st_frArticleId)) : ''}" placeholder="0" oninput="st_updateFrancePreview()" />
-      </div>
-      ${mode==='achat' ? `
-      <div class="grid grid-2" style="margin-bottom:6px;">
-        <div class="field">
-          <label>Prix unitaire (EUR)</label>
-          <input type="text" inputmode="decimal" id="st-fr-prix-eur" placeholder="0" oninput="st_updateFrancePreview()" />
-        </div>
-        <div class="field">
-          <label>Taux de change (1€ = ? DA)</label>
-          <input type="text" inputmode="decimal" id="st-fr-taux" value="${st_lastTauxChange()}" placeholder="0" oninput="st_updateFrancePreview()" />
-        </div>
-      </div>
-      <div id="st-fr-preview" style="font-size:12px;color:var(--ink-muted);margin-bottom:12px;">Prix unitaire : — · Total : —</div>
-      ` : ''}
-      <div class="field" style="margin-bottom:12px;">
-        <label>Note (optionnel)</label>
-        <input type="text" id="st-fr-note" placeholder="Ex: fournisseur, référence…" />
-      </div>
-      <div class="actions-row">
-        <button class="btn" onclick="st_recordFranceMovement('${mode}')">${st_frEditingId ? '✓ Enregistrer les modifications' : (mode==='achat' ? '+ Enregistrer l\u2019achat' : '↗ Envoyer vers Arrivage Maison')}</button>
-        ${st_frEditingId ? `<button class="btn ghost" onclick="st_cancelEditFrance()">Annuler</button>` : ''}
-      </div>
-    </div>
-  `;
-}
-function st_cancelEditFrance(){ st_frEditingId = null; st_render(); }
-function st_editFranceMovement(id){
-  const m = st_movements.find(x=>x.id===id);
-  if(!m) return;
-  st_frEditingId = id;
-  st_frArticleId = m.articleId;
-  st_franceTab = m.type==='achat_france' ? 'achat' : 'envoi';
-  st_render();
-  setTimeout(()=>{
-    document.getElementById('st-fr-article').value = m.articleId;
-    document.getElementById('st-fr-qte').value = m.quantite;
-    document.getElementById('st-fr-note').value = m.note||'';
-    if(m.type==='achat_france'){
-      document.getElementById('st-fr-prix-eur').value = m.prixEur||'';
-      document.getElementById('st-fr-taux').value = m.taux||'';
-      st_updateFrancePreview();
-    }
-  }, 0);
-}
-function st_renderFranceHistorique(){
-  const items = st_movements.filter(m=>m.type==='achat_france' || m.type==='envoi_maison');
-  if(items.length===0) return `<div class="empty-state">Aucun mouvement pour l'instant.</div>`;
-  return items.map(m=>`
-    <div class="ticket" style="padding:10px 14px;">
-      <div style="display:flex;justify-content:space-between;gap:10px;">
-        <div>
-          <div style="font-weight:600;font-size:13px;">${m.type==='achat_france' ? '🇫🇷 Achat' : '↗ Envoi vers Maison'} — ${esc(m.articleNom)}</div>
-          <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
-          ${m.type==='achat_france' && m.prixEur ? `<div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${m.prixEur} € × taux ${m.taux} = ${ca_fmtMoney(m.prixDzd)} /u · Total ${ca_fmtMoney(m.totalDzd)}</div>` : ''}
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-          <div class="mono" style="font-weight:700;">${m.quantite}</div>
-          <button class="btn small ghost" onclick="st_editFranceMovement('${m.id}')">✎</button>
-          <button class="btn small ghost" onclick="st_deleteMovementGeneric('${m.id}')">✕</button>
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
-async function st_recordFranceMovement(mode){
-  const articleId = document.getElementById('st-fr-article').value;
-  const qte = ca_parseNum(document.getElementById('st-fr-qte').value);
-  const note = (document.getElementById('st-fr-note').value||'').trim();
-  const article = st_articles.find(a=>a.id===articleId);
-  if(!article){ alert('Article introuvable.'); return; }
-  if(!qte || qte<=0){ alert('Entre une quantité valide.'); return; }
-  try{
-    if(mode==='achat'){
-      const prixEur = ca_parseNum(document.getElementById('st-fr-prix-eur').value);
-      const taux = ca_parseNum(document.getElementById('st-fr-taux').value);
-      if(!prixEur || prixEur<=0){ alert('Entre un prix unitaire en EUR valide.'); return; }
-      if(!taux || taux<=0){ alert('Entre un taux de change valide.'); return; }
-      const prixDzd = prixEur * taux;
-      const totalDzd = prixDzd * qte;
-      const newMove = { type:'achat_france', articleId, articleNom:article.nom, quantite:qte, prixEur, taux, prixDzd, totalDzd, note, par:currentUser, date:new Date().toISOString() };
-      if(st_frEditingId){
-        const old = st_movements.find(x=>x.id===st_frEditingId);
-        if(old) await st_applyEffects(st_movementEffects(old), -1);
-        await st_applyEffects(st_movementEffects(newMove), 1);
-        await st_movementsCol.doc(st_frEditingId).set(newMove);
-        st_frEditingId = null;
-      } else {
-        await st_applyEffects(st_movementEffects(newMove), 1);
-        await st_movementsCol.add(newMove);
-      }
-    } else {
-      const newMove = { type:'envoi_maison', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() };
-      if(st_frEditingId){
-        const old = st_movements.find(x=>x.id===st_frEditingId);
-        if(old) await st_applyEffects(st_movementEffects(old), -1);
-        await st_applyEffects(st_movementEffects(newMove), 1);
-        await st_movementsCol.doc(st_frEditingId).set(newMove);
-        st_frEditingId = null;
-      } else {
-        if(qte > (article.stock3||0)){ alert('Quantité supérieure au stock disponible en France ('+(article.stock3||0)+').'); return; }
-        await st_applyEffects(st_movementEffects(newMove), 1);
-        await st_movementsCol.add(newMove);
-      }
-    }
-    document.getElementById('st-fr-qte').value = '';
-    document.getElementById('st-fr-note').value = '';
-    if(mode==='achat'){
-      document.getElementById('st-fr-prix-eur').value = '';
-      st_updateFrancePreview();
-    }
-    st_render();
-  }catch(e){
-    console.warn(e);
-    alert('Erreur lors de l\u2019enregistrement.');
-  }
-}
-
-/* ---- Sous-écran : Achat local (direct Restaurant ou Arrivage Maison) ---- */
-let st_alTab = 'achat';
-function st_setAlTab(t){ st_alTab = t; st_render(); }
-function st_renderAchatLocalSection(){
-  return `
-    <button class="btn small ghost" style="margin-bottom:14px;" onclick="st_backToStockHome()">← Retour</button>
-    <h2 class="section" style="margin-top:0;">🛒 Achat local</h2>
-    <nav class="tabs" style="margin-bottom:12px;">
-      <button class="${st_alTab==='achat'?'active':''}" onclick="st_setAlTab('achat')">Enregistrer un achat</button>
-      <button class="${st_alTab==='historique'?'active':''}" onclick="st_setAlTab('historique')">Historique</button>
-    </nav>
-    ${st_alTab==='achat' ? st_renderAlForm() : st_renderAlHistorique()}
-  `;
-}
-let st_alArticleId = null;
-function st_alSelectArticle(id){ st_alArticleId = id; st_render(); }
-function st_renderAlForm(){
-  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
-  if(!st_alArticleId || !st_articles.find(a=>a.id===st_alArticleId)) st_alArticleId = st_articles[0].id;
-  return `
-    <div class="ticket">
-      <div class="field" style="margin-bottom:10px;">
-        <label>Destination</label>
-        <select id="st-al-dest">
-          <option value="restaurant">Restaurant</option>
-          <option value="arrivage">Arrivage Maison</option>
-        </select>
-      </div>
-      <div class="field" style="margin-bottom:10px;">
-        <label>Article</label>
-        <select id="st-al-article" onchange="st_alSelectArticle(this.value)">
-          ${st_articles.map(a=>`<option value="${a.id}" ${a.id===st_alArticleId?'selected':''}>${esc(a.nom)}</option>`).join('')}
-        </select>
-      </div>
-      ${st_renderPriceCompare(st_alArticleId)}
-      <div class="grid grid-2" style="margin-bottom:10px;">
-        <div class="field">
-          <label>Quantité</label>
-          <input type="text" inputmode="decimal" id="st-al-qte" placeholder="0" />
-        </div>
-        <div class="field">
-          <label>Prix unitaire (DA)</label>
-          <input type="text" inputmode="decimal" id="st-al-prix" placeholder="0" />
-        </div>
-      </div>
-      <div class="field" style="margin-bottom:12px;">
-        <label>Note (optionnel)</label>
-        <input type="text" id="st-al-note" placeholder="Ex: fournisseur, marché…" />
-      </div>
-      <div class="actions-row">
-        <button class="btn" onclick="st_recordAchatLocal()">${st_alEditingId ? '✓ Enregistrer les modifications' : '+ Enregistrer l\u2019achat local'}</button>
-        ${st_alEditingId ? `<button class="btn ghost" onclick="st_cancelEditAchatLocal()">Annuler</button>` : ''}
-      </div>
-    </div>
-  `;
-}
-function st_renderAlHistorique(){
-  const items = st_movements.filter(m=>m.type==='achat_local');
-  if(items.length===0) return `<div class="empty-state">Aucun achat local pour l'instant.</div>`;
-  return items.map(m=>`
-    <div class="ticket" style="padding:10px 14px;">
-      <div style="display:flex;justify-content:space-between;gap:10px;">
-        <div>
-          <div style="font-weight:600;font-size:13px;">🛒 Achat local → ${m.destination==='restaurant'?'Restaurant':'Arrivage Maison'} — ${esc(m.articleNom)}</div>
-          <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
-          ${m.prixDa ? `<div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${ca_fmtMoney(m.prixDa)} /u · Total ${ca_fmtMoney(m.prixDa*m.quantite)}</div>` : ''}
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-          <div class="mono" style="font-weight:700;">${m.quantite}</div>
-          <button class="btn small ghost" onclick="st_editAchatLocal('${m.id}')">✎</button>
-          <button class="btn small ghost" onclick="st_deleteAchatLocal('${m.id}')">✕</button>
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
-let st_alEditingId = null;
-function st_cancelEditAchatLocal(){ st_alEditingId = null; st_render(); }
-function st_editAchatLocal(id){
-  const m = st_movements.find(x=>x.id===id);
-  if(!m) return;
-  st_alEditingId = id;
-  st_alArticleId = m.articleId;
-  st_alTab = 'achat';
-  st_render();
-  setTimeout(()=>{
-    document.getElementById('st-al-dest').value = m.destination;
-    document.getElementById('st-al-article').value = m.articleId;
-    document.getElementById('st-al-qte').value = m.quantite;
-    document.getElementById('st-al-prix').value = m.prixDa||'';
-    document.getElementById('st-al-note').value = m.note||'';
-  }, 0);
-}
-async function st_deleteAchatLocal(id){
-  const m = st_movements.find(x=>x.id===id);
-  if(!m) return;
-  if(!confirm('Supprimer cet achat local de '+m.quantite+' '+m.articleNom+' ?')) return;
-  try{
-    const field = m.destination==='restaurant' ? 'stock1' : 'stock2';
-    await st_articlesCol.doc(m.articleId).update({ [field]: firebase.firestore.FieldValue.increment(-m.quantite) });
-    await st_movementsCol.doc(id).delete();
-    if(st_alEditingId===id){ st_alEditingId = null; }
-    st_render();
-  }catch(e){
-    console.warn(e);
-    alert('Erreur lors de la suppression.');
-  }
-}
-async function st_recordAchatLocal(){
-  const dest = document.getElementById('st-al-dest').value;
-  const articleId = document.getElementById('st-al-article').value;
-  const qte = ca_parseNum(document.getElementById('st-al-qte').value);
-  const prixDa = ca_parseNum(document.getElementById('st-al-prix').value);
-  const note = (document.getElementById('st-al-note').value||'').trim();
-  const article = st_articles.find(a=>a.id===articleId);
-  if(!article){ alert('Article introuvable.'); return; }
-  if(!qte || qte<=0){ alert('Entre une quantité valide.'); return; }
-  if(!prixDa || prixDa<=0){ alert('Entre un prix unitaire en DA valide.'); return; }
-  try{
-    const field = dest==='restaurant' ? 'stock1' : 'stock2';
-    if(st_alEditingId){
-      const old = st_movements.find(x=>x.id===st_alEditingId);
-      if(old){
-        const oldField = old.destination==='restaurant' ? 'stock1' : 'stock2';
-        if(oldField===field && old.articleId===articleId){
-          // même article/destination : on applique juste la différence
-          await st_articlesCol.doc(articleId).update({ [field]: firebase.firestore.FieldValue.increment(qte - old.quantite) });
-        } else {
-          // article ou destination différent : on annule l'ancien effet puis on applique le nouveau
-          await st_articlesCol.doc(old.articleId).update({ [oldField]: firebase.firestore.FieldValue.increment(-old.quantite) });
-          await st_articlesCol.doc(articleId).update({ [field]: firebase.firestore.FieldValue.increment(qte) });
-        }
-      }
-      await st_movementsCol.doc(st_alEditingId).set({ type:'achat_local', destination:dest, articleId, articleNom:article.nom, quantite:qte, prixDa, note, par:currentUser, date:new Date().toISOString() });
-      st_alEditingId = null;
-    } else {
-      await st_articlesCol.doc(articleId).update({ [field]: firebase.firestore.FieldValue.increment(qte) });
-      await st_movementsCol.add({ type:'achat_local', destination:dest, articleId, articleNom:article.nom, quantite:qte, prixDa, note, par:currentUser, date:new Date().toISOString() });
-    }
-    document.getElementById('st-al-qte').value = '';
-    document.getElementById('st-al-prix').value = '';
-    document.getElementById('st-al-note').value = '';
-    st_render();
-  }catch(e){
-    console.warn(e);
-    alert('Erreur lors de l\u2019enregistrement.');
-  }
-}
-
-/* ---- Sous-écran : Arrivage Maison (Stock 2) ---- */
-let st_arrivageTab = 'apercu';
-function st_setArrivageTab(t){ st_arrivageTab = t; st_render(); }
-function st_renderArrivageSection(){
-  return `
-    <button class="btn small ghost" style="margin-bottom:14px;" onclick="st_backToStockHome()">← Retour</button>
-    <h2 class="section" style="margin-top:0;">🏠 Arrivage Maison</h2>
-    <nav class="tabs" style="margin-bottom:12px;">
-      <button class="${st_arrivageTab==='apercu'?'active':''}" onclick="st_setArrivageTab('apercu')">Aperçu</button>
-      <button class="${st_arrivageTab==='transfert'?'active':''}" onclick="st_setArrivageTab('transfert')">Transférer vers Restaurant</button>
-      <button class="${st_arrivageTab==='historique'?'active':''}" onclick="st_setArrivageTab('historique')">Historique</button>
-    </nav>
-    ${st_arrivageTab==='apercu' ? st_renderArrivageApercu() : ''}
-    ${st_arrivageTab==='transfert' ? st_renderArrivageForm() : ''}
-    ${st_arrivageTab==='historique' ? st_renderArrivageHistorique() : ''}
-  `;
-}
-function st_renderArrivageApercu(){
-  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
-  return st_articles.map(a=>{
-    const min2 = st_min2(a);
-    const sousMin = (a.stock2||0) < min2;
-    return `
-    <div class="ticket" style="padding:12px 14px;${sousMin ? 'border-color:var(--rust);' : ''}">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div>
-          <div style="font-weight:700;font-size:14px;">${esc(a.nom)}</div>
-          <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Min: ${min2} (auto) · Max: ${a.max2||0}</div>
-        </div>
-        <div style="text-align:right;">
-          <div style="font-size:10.5px;color:${sousMin?'var(--rust)':'var(--ink-muted)'};">Stock actuel</div>
-          <div style="font-weight:800;color:${sousMin?'var(--rust)':'var(--ink)'};">${a.stock2||0} ${esc(a.unite||'')}</div>
-        </div>
-      </div>
-      ${sousMin ? `<div style="margin-top:8px;font-size:12px;font-weight:700;color:var(--rust);">Acheter ${st_qteAAcheter(a)} ${esc(a.unite||'')}</div>` : ''}
-    </div>`;
-  }).join('');
-}
-let st_amEditingId = null;
-function st_renderArrivageForm(){
-  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
-  return `
-    <div class="ticket">
-      <div class="field" style="margin-bottom:10px;">
-        <label>Article</label>
-        <select id="st-am-article">
-          ${st_articles.map(a=>`<option value="${a.id}">${esc(a.nom)} (stock Maison: ${a.stock2||0})</option>`).join('')}
-        </select>
-      </div>
-      <div class="field" style="margin-bottom:10px;">
-        <label>Quantité</label>
-        <input type="text" inputmode="decimal" id="st-am-qte" placeholder="0" />
-      </div>
-      <div class="field" style="margin-bottom:12px;">
-        <label>Note (optionnel)</label>
-        <input type="text" id="st-am-note" placeholder="Ex: motif, référence…" />
-      </div>
-      <div class="actions-row">
-        <button class="btn" onclick="st_recordArrivageTransfert()">${st_amEditingId ? '✓ Enregistrer les modifications' : '↗ Transférer vers le Restaurant'}</button>
-        ${st_amEditingId ? `<button class="btn ghost" onclick="st_cancelEditArrivage()">Annuler</button>` : ''}
-      </div>
-    </div>
-  `;
-}
-function st_cancelEditArrivage(){ st_amEditingId = null; st_render(); }
-function st_editArrivageMovement(id){
-  const m = st_movements.find(x=>x.id===id);
-  if(!m) return;
-  st_amEditingId = id;
-  st_arrivageTab = 'transfert';
-  st_render();
-  setTimeout(()=>{
-    document.getElementById('st-am-article').value = m.articleId;
-    document.getElementById('st-am-qte').value = m.quantite;
-    document.getElementById('st-am-note').value = m.note||'';
-  }, 0);
-}
-function st_renderArrivageHistorique(){
-  const items = st_movements.filter(m=>m.type==='transfert_restaurant' || m.type==='envoi_maison' || (m.type==='achat_local' && m.destination==='arrivage'));
-  if(items.length===0) return `<div class="empty-state">Aucun mouvement pour l'instant.</div>`;
-  return items.map(m=>`
-    <div class="ticket" style="padding:10px 14px;">
-      <div style="display:flex;justify-content:space-between;gap:10px;">
-        <div>
-          <div style="font-weight:600;font-size:13px;">${m.type==='envoi_maison' ? '↙ Reçu de France' : m.type==='achat_local' ? '🛒 Achat local' : '↗ Transfert vers Restaurant'} — ${esc(m.articleNom)}</div>
-          <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-          <div class="mono" style="font-weight:700;">${m.quantite}</div>
-          ${m.type==='transfert_restaurant' ? `<button class="btn small ghost" onclick="st_editArrivageMovement('${m.id}')">✎</button><button class="btn small ghost" onclick="st_deleteMovementGeneric('${m.id}')">✕</button>` : ''}
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
-async function st_recordArrivageTransfert(){
-  const articleId = document.getElementById('st-am-article').value;
-  const qte = ca_parseNum(document.getElementById('st-am-qte').value);
-  const note = (document.getElementById('st-am-note').value||'').trim();
-  const article = st_articles.find(a=>a.id===articleId);
-  if(!article){ alert('Article introuvable.'); return; }
-  if(!qte || qte<=0){ alert('Entre une quantité valide.'); return; }
-  const newMove = { type:'transfert_restaurant', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() };
-  try{
-    if(st_amEditingId){
-      const old = st_movements.find(x=>x.id===st_amEditingId);
-      if(old) await st_applyEffects(st_movementEffects(old), -1);
-      await st_applyEffects(st_movementEffects(newMove), 1);
-      await st_movementsCol.doc(st_amEditingId).set(newMove);
-      st_amEditingId = null;
-    } else {
-      if(qte > (article.stock2||0)){ alert('Quantité supérieure au stock disponible à l\u2019Arrivage Maison ('+(article.stock2||0)+').'); return; }
-      await st_applyEffects(st_movementEffects(newMove), 1);
-      await st_movementsCol.add(newMove);
-    }
-    document.getElementById('st-am-qte').value = '';
-    document.getElementById('st-am-note').value = '';
-    st_render();
-  }catch(e){
-    console.warn(e);
-    alert('Erreur lors de l\u2019enregistrement.');
-  }
-}
-
-/* ---- Sous-écran : Restaurant (Stock 1) ---- */
-let st_restaurantTab = 'apercu';
-function st_setRestaurantTab(t){ st_restaurantTab = t; st_render(); }
-function st_renderRestaurantSection(){
-  return `
-    <button class="btn small ghost" style="margin-bottom:14px;" onclick="st_backToStockHome()">← Retour</button>
-    <h2 class="section" style="margin-top:0;">🍽️ Restaurant</h2>
-    <nav class="tabs" style="margin-bottom:12px;">
-      <button class="${st_restaurantTab==='apercu'?'active':''}" onclick="st_setRestaurantTab('apercu')">Aperçu</button>
-      <button class="${st_restaurantTab==='sortie'?'active':''}" onclick="st_setRestaurantTab('sortie')">Enregistrer une sortie</button>
-      <button class="${st_restaurantTab==='historique'?'active':''}" onclick="st_setRestaurantTab('historique')">Historique</button>
-    </nav>
-    ${st_restaurantTab==='apercu' ? st_renderRestaurantApercu() : ''}
-    ${st_restaurantTab==='sortie' ? st_renderRestaurantForm() : ''}
-    ${st_restaurantTab==='historique' ? st_renderRestaurantHistorique() : ''}
-  `;
-}
-function st_renderRestaurantApercu(){
-  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
-  return st_articles.map(a=>{
-    const sousMin = (a.stock1||0) < (a.min1||0);
-    const qteTransfert = Math.max(0, (a.max1||0) - (a.stock1||0));
-    return `
-    <div class="ticket" style="padding:12px 14px;${sousMin ? 'border-color:var(--rust);' : ''}">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div>
-          <div style="font-weight:700;font-size:14px;">${esc(a.nom)}</div>
-          <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Min: ${a.min1||0} · Max: ${a.max1||0}</div>
-        </div>
-        <div style="text-align:right;">
-          <div style="font-size:10.5px;color:${sousMin?'var(--rust)':'var(--ink-muted)'};">Stock actuel</div>
-          <div style="font-weight:800;color:${sousMin?'var(--rust)':'var(--ink)'};">${a.stock1||0} ${esc(a.unite||'')}</div>
-        </div>
-      </div>
-      ${sousMin ? `<div style="margin-top:8px;font-size:12px;font-weight:700;color:var(--rust);">Acheter ${qteTransfert} ${esc(a.unite||'')}</div>` : ''}
-    </div>`;
-  }).join('');
-}
-let st_reEditingId = null;
-function st_renderRestaurantForm(){
-  if(st_articles.length===0) return `<div class="empty-state">Aucun article. Crée d'abord tes articles dans la rubrique "Articles".</div>`;
-  return `
-    <div class="ticket">
-      <div class="field" style="margin-bottom:10px;">
-        <label>Article</label>
-        <select id="st-re-article">
-          ${st_articles.map(a=>`<option value="${a.id}">${esc(a.nom)} (stock: ${a.stock1||0})</option>`).join('')}
-        </select>
-      </div>
-      <div class="field" style="margin-bottom:10px;">
-        <label>Quantité sortie</label>
-        <input type="text" inputmode="decimal" id="st-re-qte" placeholder="0" />
-      </div>
-      <div class="field" style="margin-bottom:12px;">
-        <label>Motif (optionnel)</label>
-        <input type="text" id="st-re-note" placeholder="Ex: consommation, casse, perte…" />
-      </div>
-      <div class="actions-row">
-        <button class="btn" onclick="st_recordRestaurantSortie()">${st_reEditingId ? '✓ Enregistrer les modifications' : '− Enregistrer la sortie'}</button>
-        ${st_reEditingId ? `<button class="btn ghost" onclick="st_cancelEditRestaurant()">Annuler</button>` : ''}
-      </div>
-    </div>
-  `;
-}
-function st_cancelEditRestaurant(){ st_reEditingId = null; st_render(); }
-function st_editRestaurantMovement(id){
-  const m = st_movements.find(x=>x.id===id);
-  if(!m) return;
-  st_reEditingId = id;
-  st_restaurantTab = 'sortie';
-  st_render();
-  setTimeout(()=>{
-    document.getElementById('st-re-article').value = m.articleId;
-    document.getElementById('st-re-qte').value = m.quantite;
-    document.getElementById('st-re-note').value = m.note||'';
-  }, 0);
-}
-function st_renderRestaurantHistorique(){
-  const items = st_movements.filter(m=>m.type==='sortie_restaurant' || m.type==='transfert_restaurant' || (m.type==='achat_local' && m.destination==='restaurant'));
-  if(items.length===0) return `<div class="empty-state">Aucun mouvement pour l'instant.</div>`;
-  return items.map(m=>`
-    <div class="ticket" style="padding:10px 14px;">
-      <div style="display:flex;justify-content:space-between;gap:10px;">
-        <div>
-          <div style="font-weight:600;font-size:13px;">${m.type==='transfert_restaurant' ? '↙ Reçu d\u2019Arrivage Maison' : m.type==='achat_local' ? '🛒 Achat local' : '− Sortie'} — ${esc(m.articleNom)}</div>
-          <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${fmtDateShort((m.date||'').slice(0,10))} · ${esc(m.par||'')}${m.note ? ' · '+esc(m.note) : ''}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-          <div class="mono" style="font-weight:700;">${m.quantite}</div>
-          ${m.type==='sortie_restaurant' ? `<button class="btn small ghost" onclick="st_editRestaurantMovement('${m.id}')">✎</button><button class="btn small ghost" onclick="st_deleteMovementGeneric('${m.id}')">✕</button>` : ''}
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
-async function st_recordRestaurantSortie(){
-  const articleId = document.getElementById('st-re-article').value;
-  const qte = ca_parseNum(document.getElementById('st-re-qte').value);
-  const note = (document.getElementById('st-re-note').value||'').trim();
-  const article = st_articles.find(a=>a.id===articleId);
-  if(!article){ alert('Article introuvable.'); return; }
-  if(!qte || qte<=0){ alert('Entre une quantité valide.'); return; }
-  const newMove = { type:'sortie_restaurant', articleId, articleNom:article.nom, quantite:qte, note, par:currentUser, date:new Date().toISOString() };
-  try{
-    if(st_reEditingId){
-      const old = st_movements.find(x=>x.id===st_reEditingId);
-      if(old) await st_applyEffects(st_movementEffects(old), -1);
-      await st_applyEffects(st_movementEffects(newMove), 1);
-      await st_movementsCol.doc(st_reEditingId).set(newMove);
-      st_reEditingId = null;
-    } else {
-      if(qte > (article.stock1||0)){ alert('Quantité supérieure au stock disponible au restaurant ('+(article.stock1||0)+').'); return; }
-      await st_applyEffects(st_movementEffects(newMove), 1);
-      await st_movementsCol.add(newMove);
-    }
-    document.getElementById('st-re-qte').value = '';
-    document.getElementById('st-re-note').value = '';
-    st_render();
-  }catch(e){
-    console.warn(e);
-    alert('Erreur lors de l\u2019enregistrement.');
-  }
-}
-
-/* ---- Sous-écran : Articles (catalogue + seuils) ---- */
-let st_editingArticleId = null;
-function st_renderArticlesSection(){
-  return `
-    <button class="btn small ghost" style="margin-bottom:14px;" onclick="st_backToStockHome()">← Retour</button>
-    <h2 class="section" style="margin-top:0;">📋 Articles</h2>
-
-    <div class="ticket">
-      <div class="step-label"><div class="step-title">${st_editingArticleId ? 'Modifier cet article' : 'Nouvel article'}</div></div>
-      <div class="field" style="margin-bottom:10px;">
-        <label>Nom de l'article</label>
-        <input type="text" id="st-art-nom" placeholder="Ex: Saumon, Riz, Panko…" />
-      </div>
-      <div class="field" style="margin-bottom:10px;">
-        <label>Unité</label>
-        <input type="text" id="st-art-unite" placeholder="Ex: kg, L, pièce…" />
-      </div>
-      <div class="grid grid-2" style="margin-bottom:6px;">
-        <div class="field">
-          <label>Min Restaurant</label>
-          <input type="text" inputmode="decimal" id="st-art-min1" placeholder="0" />
-        </div>
-        <div class="field">
-          <label>Max Restaurant</label>
-          <input type="text" inputmode="decimal" id="st-art-max1" placeholder="0" />
-        </div>
-      </div>
-      <div class="field" style="margin-bottom:6px;">
-        <label>Max Arrivage Maison</label>
-        <input type="text" inputmode="decimal" id="st-art-max2" placeholder="0" />
-      </div>
-      <div style="font-size:11px;color:var(--ink-muted);margin-bottom:12px;">Le Min de l'Arrivage Maison est calculé automatiquement (= Max Restaurant + 5).</div>
-      <div class="actions-row">
-        <button class="btn" onclick="st_saveArticle()">${st_editingArticleId ? '✓ Enregistrer les modifications' : '+ Ajouter cet article'}</button>
-        ${st_editingArticleId ? `<button class="btn ghost" onclick="st_cancelEditArticle()">Annuler</button>` : ''}
-      </div>
-    </div>
-
-    <h2 class="section">Articles existants (${st_articles.length})</h2>
-    <div class="field" style="margin-bottom:10px;">
-      <input type="text" id="st-art-search" placeholder="🔍 Rechercher un article…" value="${esc(st_articleSearch)}" oninput="st_setArticleSearch(this.value)" />
-    </div>
-    ${st_filteredArticles().length===0 ? `<div class="empty-state">${st_articles.length===0 ? "Aucun article pour l'instant." : "Aucun article ne correspond à la recherche."}</div>` : st_filteredArticles().map(a=>`
-      <div class="ticket" style="padding:12px 14px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
-          <div>
-            <div style="font-weight:700;font-size:14px;">${esc(a.nom)} <span style="font-weight:400;color:var(--ink-muted);font-size:12px;">(${esc(a.unite||'-')})</span></div>
-            <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">France: ${a.stock3||0} · Maison: ${a.stock2||0} · Restaurant: ${a.stock1||0} · <b>Total: ${(a.stock3||0)+(a.stock2||0)+(a.stock1||0)}</b></div>
-            <div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">${(()=>{ const p = st_lastPrices(a.id); return 'Dernier prix local : '+(p.local?ca_fmtMoney(p.local):'—')+' · Dernier prix France : '+(p.france?ca_fmtMoney(p.france):'—'); })()}</div>
-          </div>
-          <div style="display:flex;gap:6px;flex-shrink:0;">
-            <button class="btn small ghost" onclick="st_editArticle('${a.id}')">✎</button>
-            <button class="btn small ghost" onclick="st_deleteArticle('${a.id}')">✕</button>
-          </div>
-        </div>
-      </div>
-    `).join('')}
-  `;
-}
-let st_articleSearch = '';
-function st_setArticleSearch(v){ st_articleSearch = v; st_render(); }
-function st_filteredArticles(){
-  const q = st_articleSearch.trim().toLowerCase();
-  if(!q) return st_articles;
-  return st_articles.filter(a=>(a.nom||'').toLowerCase().includes(q));
-}
-function st_editArticle(id){
-  const a = st_articles.find(x=>x.id===id);
-  if(!a) return;
-  st_editingArticleId = id;
-  st_render();
-  setTimeout(()=>{
-    document.getElementById('st-art-nom').value = a.nom||'';
-    document.getElementById('st-art-unite').value = a.unite||'';
-    document.getElementById('st-art-min1').value = a.min1||'';
-    document.getElementById('st-art-max1').value = a.max1||'';
-    document.getElementById('st-art-max2').value = a.max2||'';
-  }, 0);
-}
-function st_cancelEditArticle(){
-  st_editingArticleId = null;
-  st_render();
-}
-async function st_saveArticle(){
-  const nom = (document.getElementById('st-art-nom').value||'').trim();
-  const unite = (document.getElementById('st-art-unite').value||'').trim();
-  const min1 = ca_parseNum(document.getElementById('st-art-min1').value);
-  const max1 = ca_parseNum(document.getElementById('st-art-max1').value);
-  const max2 = ca_parseNum(document.getElementById('st-art-max2').value);
-  if(!nom){ alert('Le nom est obligatoire.'); return; }
-  try{
-    if(st_editingArticleId){
-      await st_articlesCol.doc(st_editingArticleId).set({ nom, unite, min1, max1, max2 }, { merge:true });
-    } else {
-      await st_articlesCol.add({ nom, unite, min1, max1, max2, stock1:0, stock2:0, stock3:0, creeLe: new Date().toISOString() });
-    }
-    st_editingArticleId = null;
-    st_render();
-  }catch(e){
-    console.warn(e);
-    alert('Erreur lors de l\'enregistrement.');
-  }
-}
-async function st_deleteArticle(id){
-  const a = st_articles.find(x=>x.id===id);
-  if(!a) return;
-  if(!confirm('Supprimer cet article : "'+a.nom+'" ?')) return;
-  try{ await st_articlesCol.doc(id).delete(); }catch(e){ console.warn(e); }
-}
-
 /* ==================== MODULE POINTAGE & PAIE ==================== */
 /* Données Firestore :
    - pointage_events        : 1 document par mois  { ev: { <id>: { c: code, t: ISO, y: 0|1 } } }
    - pointage_config/employes : { emp: { <code>: { name, poste, payMode, rate, transport:{enabled,amount}, extra } } }
-   - pointage_entries       : primes, jours off, avances manuelles, sessions manuelles, corrections résolues
-   Les avances saisies dans Dépenses (estAvanceSalaire) sont reprises automatiquement dans la paie. */
+   - pointage_entries       : primes, jours off, avances, sessions manuelles, corrections résolues */
 const pt_eventsCol = db.collection('pointage_events');
 const pt_configRef = db.collection('pointage_config').doc('employes');
 const pt_entriesCol = db.collection('pointage_entries');
@@ -3060,7 +1337,15 @@ const pt_ignoreRef = db.collection('pointage_config').doc('ignores');
 const pt_groupsRef = db.collection('pointage_config').doc('groupes');
 /* pointage_config/chevauchements_ignores : { k:{<clé chevauchement>:true} } — chevauchements examinés et volontairement gardés tels quels. */
 const pt_overlapIgnoreRef = db.collection('pointage_config').doc('chevauchements_ignores');
+/* pointage_config/anomalies_ignorees : { k:{<clé anomalie>:true}, before:'AAAA-MM-JJ'|null } — anomalies écartées de la liste
+   (une par une, ou toutes celles datées avant une date). Les pointages eux-mêmes ne sont jamais modifiés. */
+const pt_anIgnRef = db.collection('pointage_config').doc('anomalies_ignorees');
+/* pointage_clotures : un document par période de paie clôturée (figée)
+   { from, to, createdAt, createdBy, rows:{ <code employé>:{ name, hours, rate, mode, workedDays, baseWage, transportTotal,
+     bonusesTotal, subTotal, leavesTotal, advancesTotal, net, paid } } }   (rows est une table, pas un tableau : Firestore) */
+const pt_cloturesCol = db.collection('pointage_clotures');
 const PT_DEFAULT_NAMES = {5:'Mejdoub',8:'Fatima',10:'Kadi',15:'Sidahmed',16:'Marwa',17:'Meriem',18:'Hamid',19:'Nabil',20:'Ali'};
+const PT_SUGGESTED_NAMES = ['Mejdoub','Ali','Kadi','Nabil','Meriem','Marwa','Hamid','Nacira']; // suggestions seulement : la saisie reste libre
 const PT_DEFAULT_GROUPS = [[5,20],[10,19],[16,17,18]]; // Mejdoub/Ali · Kadi/Nabil · Marwa/Meriem/Hamid
 
 let pt_events = [];          // [{id, code, dt(ISO), type}]
@@ -3070,7 +1355,10 @@ let pt_ign = { k:{}, c:{} };
 let pt_groups = [];           // [[code,...], ...]
 let pt_groupsSeeded = false;
 let pt_ovIgn = {};
-let pt_ready = { events:false, cfg:false, entries:false, ign:false, groups:false, ovIgn:false };
+let pt_anIgn = { k:{}, before:null };
+let pt_clotures = [];
+let pt_eventsVersion = 0, pt_computeCache = null; // mémoire du calcul sessions/anomalies, invalidée quand les pointages changent
+let pt_ready = { events:false, cfg:false, entries:false, ign:false, groups:false, ovIgn:false, anIgn:false, clot:false };
 let pt_started = false, pt_error = '', pt_loadStartedAt = null;
 let pt_tab = 'anomalies', pt_sel = null, pt_openFix = null, pt_anomList = [];
 let pt_ovList = [], pt_ovOpen = null;
@@ -3117,6 +1405,9 @@ function pt_transport(c){ const t=(pt_emp[c] && pt_emp[c].transport) || {}; retu
    stockés comme un tableau d'objets { codes:[...] } plutôt qu'un tableau de tableaux. */
 function pt_groupsToDoc(groups){ return { groups: (groups || []).map(g=>({ codes: g || [] })) }; }
 function pt_groupsFromDoc(data){ return ((data && data.groups) || []).map(g=>Array.isArray(g) ? g : ((g && g.codes) || [])); }
+let pt_renderQueued = false;
+// plusieurs écoutes Firestore répondent presque en même temps au chargement : on ne redessine qu'une fois
+function pt_scheduleRender(){ if(pt_renderQueued) return; pt_renderQueued = true; Promise.resolve().then(()=>{ pt_renderQueued = false; pt_render(); }); }
 function pt_start(){
   if(pt_started) return;
   pt_started = true;
@@ -3130,32 +1421,39 @@ function pt_start(){
       const ev = (d.data() || {}).ev || {};
       for(const id in ev){ const e = ev[id]; if(e) list.push({ id, code:Number(e.c), dt:e.t, type:Number(e.y) }); }
     });
-    pt_events = list; pt_ready.events = true; pt_render();
+    pt_events = list; pt_eventsVersion++; pt_ready.events = true; pt_scheduleRender();
   }, onErr);
   pt_configRef.onSnapshot((doc)=>{
     const data = doc.exists ? (doc.data() || {}) : {};
-    pt_emp = data.emp || {}; pt_ready.cfg = true; pt_render();
+    pt_emp = data.emp || {}; pt_ready.cfg = true; pt_scheduleRender();
   }, onErr);
   pt_ignoreRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
-    pt_ign = { k:d.k || {}, c:d.c || {} }; pt_ready.ign = true; pt_render();
+    pt_ign = { k:d.k || {}, c:d.c || {} }; pt_ready.ign = true; pt_scheduleRender();
   }, onErr);
   pt_groupsRef.onSnapshot((doc)=>{
     if(doc.exists){ pt_groups = pt_groupsFromDoc(doc.data() || {}); }
     else if(!pt_groupsSeeded){ pt_groupsSeeded = true; pt_groups = PT_DEFAULT_GROUPS; pt_groupsRef.set(pt_groupsToDoc(PT_DEFAULT_GROUPS)).catch(()=>{}); }
-    pt_ready.groups = true; pt_render();
+    pt_ready.groups = true; pt_scheduleRender();
   }, onErr);
   pt_overlapIgnoreRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
-    pt_ovIgn = d.k || {}; pt_ready.ovIgn = true; pt_render();
+    pt_ovIgn = d.k || {}; pt_ready.ovIgn = true; pt_scheduleRender();
+  }, onErr);
+  pt_anIgnRef.onSnapshot((doc)=>{
+    const d = doc.exists ? (doc.data() || {}) : {};
+    pt_anIgn = { k:d.k || {}, before:d.before || null }; pt_ready.anIgn = true; pt_scheduleRender();
+  }, onErr);
+  pt_cloturesCol.onSnapshot((snap)=>{
+    const list = []; snap.forEach(d=>list.push({ id:d.id, ...d.data() }));
+    pt_clotures = list; pt_ready.clot = true; pt_scheduleRender();
   }, onErr);
   pt_entriesCol.onSnapshot((snap)=>{
     const list = [];
     snap.forEach(d=>list.push({ id:d.id, ...d.data() }));
-    pt_entries = list; pt_ready.entries = true; pt_render();
+    pt_entries = list; pt_ready.entries = true; pt_scheduleRender();
   }, onErr);
 }
-function pt_onDepensesChanged(){ if(activeModule==='pointage' && pt_started) pt_render(); }
 
 /* ---------- écritures Firestore ---------- */
 const PT_DEL = ()=>firebase.firestore.FieldValue.delete();
@@ -3276,6 +1574,12 @@ function pt_renderPeriod(){
 
 /* ---------- appariement entrées/sorties ---------- */
 function pt_compute(){
+  if(pt_computeCache && pt_computeCache.v === pt_eventsVersion) return pt_computeCache.r;
+  const r = pt_computeRaw();
+  pt_computeCache = { v:pt_eventsVersion, r };
+  return r;
+}
+function pt_computeRaw(){
   const byCode = {};
   pt_events.forEach(e=>{ (byCode[e.code] = byCode[e.code] || []).push({ dt:new Date(e.dt), type:e.type }); });
   const sessions = [], anomalies = [];
@@ -3309,6 +1613,8 @@ function pt_compute(){
   return { sessions, anomalies };
 }
 function pt_anomKey(a){ return a.code + '|' + a.dt.toISOString() + '|' + a.type; }
+function pt_anomIgnKey(a){ return a.code + '_' + a.dt.toISOString().slice(0,16).replace(/\D/g,'') + '_' + (a.type === 'Entrée' ? 0 : 1); }
+function pt_anomIgnored(a){ return !!pt_anIgn.k[pt_anomIgnKey(a)] || !!(pt_anIgn.before && pt_day(a.dt) < pt_anIgn.before); }
 function pt_eventsNear(code, dt){
   const from = dt.getTime() - 12*3600000, to = dt.getTime() + 12*3600000;
   return pt_events.filter(e=>e.code === code && new Date(e.dt).getTime() >= from && new Date(e.dt).getTime() <= to)
@@ -3350,27 +1656,29 @@ function pt_computeOverlaps(sessions){
 }
 
 /* ---------- paie ---------- */
-function pt_depAvances(code){
-  if(typeof dp_mouvements === 'undefined') return [];
-  const n = pt_norm(pt_name(code));
-  return dp_mouvements
-    .filter(m=>m.type === 'Charge' && m.estAvanceSalaire && pt_norm(m.employeNom) === n)
-    .map(m=>({ id:m.id, date:m.date, amount:Number(m.montant)||0, note:m.libelle || '', src:'depenses' }));
-}
-function pt_unmatchedAdvances(codes){
-  if(typeof dp_mouvements === 'undefined') return [];
-  const known = new Set(codes.map(c=>pt_norm(pt_name(c))));
-  const out = {};
-  dp_mouvements.forEach(m=>{
-    if(m.type === 'Charge' && m.estAvanceSalaire && pt_inRange(m.date) && !known.has(pt_norm(m.employeNom))){
-      const k = m.employeNom || '(sans nom)'; out[k] = (out[k] || 0) + (Number(m.montant)||0);
-    }
-  });
-  return Object.keys(out).map(k=>({ name:k, amount:out[k] }));
-}
 function pt_entriesOf(kind, code){
   return pt_entries.filter(e=>e.kind === kind && e.code === code && pt_inRange(e.date))
     .map(e=>({ id:e.id, date:e.date, amount:Number(e.amount)||0, note:e.note || '', src:'local' }));
+}
+/* ---------- clôture de période (paie figée) ---------- */
+function pt_closureFor(from, to){ return pt_clotures.find(c=>c.from === from && c.to === to) || null; }
+function pt_currentClosure(){ return (pt_filter.from && pt_filter.to) ? pt_closureFor(pt_filter.from, pt_filter.to) : null; }
+function pt_frozenRow(code){ const c = pt_currentClosure(); return (c && c.rows && c.rows[code]) || null; }
+// paie à afficher : chiffres figés si la période affichée est exactement une période clôturée, sinon calcul en direct
+function pt_displayPayroll(code, sessions){
+  const live = pt_payroll(code, sessions), f = pt_frozenRow(code);
+  if(!f) return live;
+  return { ...live, totalHours:f.hours, rate:f.rate, mode:f.mode, workedDays:f.workedDays, baseWage:f.baseWage, transportTotal:f.transportTotal,
+           bonusesTotal:f.bonusesTotal, subTotal:f.subTotal, leavesTotal:f.leavesTotal, advancesTotal:f.advancesTotal, net:f.net, frozen:true, paid:!!f.paid };
+}
+// vrai si les données actuelles ne correspondent plus à ce qui a été figé
+function pt_closureStale(sessions){
+  const c = pt_currentClosure(); if(!c) return false;
+  return pt_codes().some(code=>{
+    const f = c.rows && c.rows[code], l = pt_payroll(code, sessions);
+    if(!f) return l.totalHours > 0.005 || Math.round(l.net) !== 0;
+    return Math.round(l.net) !== Math.round(f.net) || Math.abs(l.totalHours - f.hours) > 0.005;
+  });
 }
 function pt_payroll(code, sessions){
   const mySess = sessions.filter(s=>s.code === code);
@@ -3382,7 +1690,7 @@ function pt_payroll(code, sessions){
   const tr = pt_transport(code);
   const transportTotal = tr.enabled ? workedDays * tr.amount : 0;
   const bonuses = pt_entriesOf('prime', code), leaves = pt_entriesOf('off', code);
-  const advances = [...pt_entriesOf('avance', code), ...pt_depAvances(code).filter(a=>pt_inRange(a.date))];
+  const advances = pt_entriesOf('avance', code);
   const sum = (arr)=>arr.reduce((s,x)=>s+x.amount, 0);
   const bonusesTotal = sum(bonuses), leavesTotal = sum(leaves), advancesTotal = sum(advances);
   const subTotal = baseWage + transportTotal + bonusesTotal;
@@ -3443,13 +1751,13 @@ function pt_render(fresh){
   if(!pt_isAdmin() && pt_tab === 'reglages') pt_tab = 'anomalies';
   pt_renderPeriod();
   if(pt_error){ pt_renderTabs(0); body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
-  if(!(pt_ready.events && pt_ready.cfg && pt_ready.entries && pt_ready.ign && pt_ready.groups && pt_ready.ovIgn)){
+  if(!Object.keys(pt_ready).every(k=>pt_ready[k])){
     pt_renderTabs(0);
     const elapsed = pt_loadStartedAt ? (Date.now() - pt_loadStartedAt) : 0;
     if(elapsed > 4500){
-      const labels = { events:'Pointages', cfg:'Réglages employés', entries:'Primes / jours off / avances', ign:'Historique des suppressions', groups:'Groupes de poste', ovIgn:'Chevauchements ignorés' };
+      const labels = { events:'Pointages', cfg:'Réglages employés', entries:'Primes / jours off / avances', ign:'Historique des suppressions', groups:'Groupes de poste', ovIgn:'Chevauchements ignorés', anIgn:'Anomalies ignorées', clot:'Périodes clôturées' };
       const missing = Object.keys(pt_ready).filter(k=>!pt_ready[k]).map(k=>labels[k] || k);
-      body.innerHTML = `<div class="alert-banner"><b>Le chargement prend plus de temps que prévu</b>Ça reste bloqué sur : ${missing.join(', ')}.<br>Ouvre la console du navigateur (touche F12 → onglet « Console ») pour voir le message d'erreur exact, et vérifie que les règles Firestore autorisent la collection <code>pointage_config</code> (documents « groupes » et « chevauchements_ignores »).<br><button class="btn small" style="margin-top:10px;" onclick="location.reload()">Réessayer</button></div>`;
+      body.innerHTML = `<div class="alert-banner"><b>Le chargement prend plus de temps que prévu</b>Ça reste bloqué sur : ${missing.join(', ')}.<br>Ouvre la console du navigateur (touche F12 → onglet « Console ») pour voir le message d'erreur exact, et vérifie que les règles Firestore autorisent la collections <code>pointage_config</code> (documents « groupes », « chevauchements_ignores » et « anomalies_ignorees ») et <code>pointage_clotures</code>.<br><button class="btn small" style="margin-top:10px;" onclick="location.reload()">Réessayer</button></div>`;
     } else {
       body.innerHTML = '<div class="empty-state">Chargement…</div>';
     }
@@ -3458,13 +1766,15 @@ function pt_render(fresh){
   const st = pt_saveInputs(body);
   const all = pt_compute();
   const sessions = all.sessions.filter(s=>pt_inRange(pt_day(s.date)));
-  const anoms = all.anomalies.filter(a=>pt_inRange(pt_day(a.dt)));
+  const anomsPeriod = all.anomalies.filter(a=>pt_inRange(pt_day(a.dt)));
+  const anoms = anomsPeriod.filter(a=>!pt_anomIgnored(a));
+  const nIgnored = anomsPeriod.length - anoms.length;
   const overlaps = pt_computeOverlaps(sessions);
   const codes = pt_codes();
   if(pt_sel === null || !codes.includes(pt_sel)) pt_sel = codes.length ? codes[0] : null;
   pt_renderTabs(anoms.length + overlaps.length);
   let html;
-  if(pt_tab === 'anomalies') html = pt_tabAnomalies(anoms) + pt_tabOverlaps(overlaps);
+  if(pt_tab === 'anomalies') html = pt_tabAnomalies(anoms, nIgnored) + pt_tabOverlaps(overlaps);
   else if(pt_tab === 'employes') html = pt_tabEmployes(codes, sessions, anoms);
   else html = pt_tabReglages(codes);
   body.innerHTML = html;
@@ -3480,7 +1790,7 @@ function pt_empSelect(codes){
 function pt_anomRow(i){
   const a = pt_anomList[i], open = pt_openFix === pt_anomKey(a);
   let h = `<div class="pt-an"><div><b>${pt_fmtDT(a.dt)}</b> · ${a.type}<div class="pt-an-reason">${pt_e(a.reason)}</div></div>
-    <button class="btn ghost small" onclick="pt_toggleFix(${i})">${open ? 'Annuler' : 'Corriger'}</button></div>`;
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn ghost small" onclick="pt_toggleFix(${i})">${open ? 'Annuler' : 'Corriger'}</button><button class="btn ghost small" onclick="pt_anomIgnore(${i})">Ignorer</button></div></div>`;
   if(!open) return h;
   const corrType = a.type === 'Entrée' ? 1 : 0;
   h += `<div class="pt-fix"><div class="pt-muted" style="margin-bottom:6px;">Ajouter le pointage manquant (${corrType===0?'Entrée':'Sortie'}) :</div>
@@ -3496,9 +1806,15 @@ function pt_anomRow(i){
   }
   return h + `</div>`;
 }
-function pt_tabAnomalies(anoms){
+function pt_tabAnomalies(anoms, nIgnored){
   pt_anomList = anoms;
   let html = '';
+  if(anoms.length || nIgnored){
+    html += `<div class="ticket"><div class="section-label">Nettoyer la liste</div>
+      <div class="pt-row"><input type="date" id="pt-ign-before" class="pt-draft pt-auto"><button class="btn ghost small" onclick="pt_anomIgnoreBefore()">Ignorer toutes les anomalies avant cette date</button></div>
+      <div class="pt-muted" style="margin-top:6px;">Ignorer ne modifie jamais les pointages : l'anomalie est seulement retirée de la liste.${nIgnored ? ' ' + nIgnored + ' anomalie' + (nIgnored>1?'s':'') + ' ignorée' + (nIgnored>1?'s':'') + ' sur cette période — <a href="#" class="pt-link" onclick="pt_anomUnignoreAll();return false;">tout réafficher</a>.' : ''}</div>
+    </div>`;
+  }
   if(!anoms.length) html += pt_empty('Aucune anomalie ouverte sur cette période 🎉');
   else {
     const byCode = {};
@@ -3563,6 +1879,25 @@ async function pt_ovAlign(i){
     pt_toast('Pointages alignés à ' + t + '.');
   }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
+async function pt_anomIgnore(i){
+  const a = pt_anomList[i]; if(!a) return;
+  try{ pt_openFix = null; await pt_anIgnRef.set({ k:{ [pt_anomIgnKey(a)]:true } }, { merge:true }); pt_toast('Anomalie ignorée.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_anomIgnoreBefore(){
+  const v = document.getElementById('pt-ign-before').value;
+  if(!v){ alert('Choisis d’abord une date.'); return; }
+  const n = pt_compute().anomalies.filter(a=>pt_day(a.dt) < v && !pt_anomIgnored(a)).length;
+  if(!n){ alert('Aucune anomalie avant le ' + fmtDateShort(v) + '.'); return; }
+  if(!confirm('Ignorer ' + n + ' anomalie' + (n>1?'s':'') + ' datée' + (n>1?'s':'') + ' avant le ' + fmtDateShort(v) + ' ?\nLes pointages ne sont pas modifiés ; tu pourras tout réafficher.')) return;
+  try{ await pt_anIgnRef.set({ before:v }, { merge:true }); pt_toast(n + ' anomalie' + (n>1?'s':'') + ' ignorée' + (n>1?'s':'') + '.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_anomUnignoreAll(){
+  if(!confirm('Réafficher toutes les anomalies ignorées ?')) return;
+  try{ await pt_anIgnRef.set({ k:{}, before:null }); pt_toast('Anomalies réaffichées.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
 function pt_toggleFix(i){
   const a = pt_anomList[i]; if(!a) return;
   const k = pt_anomKey(a);
@@ -3621,32 +1956,73 @@ function pt_histRows(p){
     ...p.advances.map(x=>({ ...x, cat:'Avance', cls:'pt-b-avance', sign:-1 }))
   ].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 }
+const pt_r2 = (x)=>Math.round((Number(x) || 0) * 100) / 100;
+async function pt_closePeriod(){
+  const from = pt_filter.from, to = pt_filter.to;
+  if(!from || !to){ alert('Renseigne les dates Du et Au avant de clôturer.'); return; }
+  if(from > to){ alert('La date de début est après la date de fin.'); return; }
+  const clash = pt_clotures.find(c=>!(to < c.from || from > c.to));
+  if(clash){ alert('Cette période chevauche une période déjà clôturée (du ' + fmtDateShort(clash.from) + ' au ' + fmtDateShort(clash.to) + '). Rouvre-la d’abord, ou choisis d’autres dates.'); return; }
+  if(!confirm('Clôturer la paie du ' + fmtDateShort(from) + ' au ' + fmtDateShort(to) + ' ?\nLes montants de chaque employé seront figés (tu pourras rouvrir la période en cas d’erreur).')) return;
+  const sessions = pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)));
+  const rows = {};
+  pt_codes().forEach(code=>{
+    const p = pt_payroll(code, sessions);
+    rows[code] = { name:pt_name(code), hours:pt_r2(p.totalHours), rate:p.rate, mode:p.mode, workedDays:p.workedDays, baseWage:pt_r2(p.baseWage),
+      transportTotal:pt_r2(p.transportTotal), bonusesTotal:pt_r2(p.bonusesTotal), subTotal:pt_r2(p.subTotal), leavesTotal:pt_r2(p.leavesTotal),
+      advancesTotal:pt_r2(p.advancesTotal), net:pt_r2(p.net), paid: p.net <= 0 }; // rien à verser => déjà « payé »
+  });
+  try{ await pt_cloturesCol.add({ from, to, createdAt:new Date().toISOString(), createdBy:currentUser, rows }); pt_toast('Période clôturée.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_reopenPeriod(){
+  const c = pt_currentClosure(); if(!c) return;
+  if(!confirm('Rouvrir cette période ? Les cases « Payé » seront perdues et la paie sera de nouveau calculée en direct.')) return;
+  try{ await pt_cloturesCol.doc(c.id).delete(); pt_toast('Période rouverte.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_togglePaid(code, checked){
+  const c = pt_currentClosure(); if(!c) return;
+  try{ await pt_cloturesCol.doc(c.id).set({ rows:{ [code]:{ paid:!!checked } } }, { merge:true }); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+function pt_closureBar(sessions){
+  const c = pt_currentClosure();
+  if(!pt_filter.from || !pt_filter.to) return `<div class="pt-muted" style="margin-bottom:10px;">Renseigne les dates Du / Au (en haut) pour pouvoir clôturer une période de paie.</div>`;
+  if(!c) return `<div class="pt-row" style="margin-bottom:10px;"><button class="btn small" onclick="pt_closePeriod()">Clôturer cette période</button><span class="pt-muted">Fige la paie de chaque employé du ${fmtDateShort(pt_filter.from)} au ${fmtDateShort(pt_filter.to)}.</span></div>`;
+  const rows = Object.keys(c.rows || {}).map(k=>c.rows[k]);
+  const nPaid = rows.filter(r=>r.paid).length;
+  const stale = pt_closureStale(sessions);
+  return `<div class="pt-row" style="margin-bottom:10px;"><span class="pt-badge pt-b-prime">Clôturée</span><span class="pt-muted">le ${fmtDateShort(String(c.createdAt || '').slice(0,10))} · payé : ${nPaid} / ${rows.length}</span><button class="btn ghost small" onclick="pt_reopenPeriod()">Rouvrir</button></div>
+    ${stale ? `<div class="alert-banner" style="margin-bottom:10px;"><b>Les données ont changé depuis la clôture</b>Un pointage, une prime ou une avance de cette période a été modifié après coup. Les chiffres ci-dessous sont ceux figés à la clôture ; rouvre la période pour recalculer.</div>` : ''}`;
+}
 function pt_paieOverviewHtml(codes, sessions){
-  const totNet = codes.reduce((s,x)=>s + pt_payroll(x, sessions).net, 0);
+  const c = pt_currentClosure();
+  const totNet = codes.reduce((s,x)=>s + pt_displayPayroll(x, sessions).net, 0);
   const rows = codes.map(x=>{
-    const q = pt_payroll(x, sessions);
-    return `<tr><td>${pt_e(pt_label(x))}</td><td>${pt_fmtH(q.totalHours)}</td><td>${pt_fmtMoney(q.rate)}${q.mode==='daily'?'/j':'/h'}</td><td>${pt_fmtMoney(q.baseWage)}</td><td>${pt_fmtMoney(q.transportTotal)}</td><td>${pt_fmtMoney(q.bonusesTotal)}</td><td><b>${pt_fmtMoney(q.subTotal)}</b></td><td>${pt_fmtMoney(q.leavesTotal)}</td><td>${pt_fmtMoney(q.advancesTotal)}</td><td><b>${pt_fmtMoney(q.net)}</b></td></tr>`;
+    const q = pt_displayPayroll(x, sessions);
+    const paidCell = c ? `<td>${pt_frozenRow(x) ? `<input type="checkbox" ${q.paid ? 'checked' : ''} onchange="pt_togglePaid(${x}, this.checked)">` : ''}</td>` : '';
+    return `<tr><td>${pt_e(pt_label(x))}</td><td>${pt_fmtH(q.totalHours)}</td><td>${pt_fmtMoney(q.rate)}${q.mode==='daily'?'/j':'/h'}</td><td>${pt_fmtMoney(q.baseWage)}</td><td>${pt_fmtMoney(q.transportTotal)}</td><td>${pt_fmtMoney(q.bonusesTotal)}</td><td><b>${pt_fmtMoney(q.subTotal)}</b></td><td>${pt_fmtMoney(q.leavesTotal)}</td><td>${pt_fmtMoney(q.advancesTotal)}</td><td><b>${pt_fmtMoney(q.net)}</b></td>${paidCell}</tr>`;
   }).join('');
-  return { totNet, html: `<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Employé</th><th>Heures</th><th>Taux</th><th>Base</th><th>Transport</th><th>Primes</th><th>Sous-total</th><th>Jours off</th><th>Avances</th><th>Net</th></tr></thead><tbody>${rows}
-    <tr class="pt-total"><td colspan="9">TOTAL NET À PAYER</td><td>${pt_fmtMoney(totNet)}</td></tr></tbody></table></div>` };
+  const resteAPayer = c ? codes.reduce((s,x)=>{ const q = pt_displayPayroll(x, sessions); return s + (pt_frozenRow(x) && !q.paid && q.net > 0 ? q.net : 0); }, 0) : 0;
+  return { totNet, closed:!!c, html: `${pt_closureBar(sessions)}<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Employé</th><th>Heures</th><th>Taux</th><th>Base</th><th>Transport</th><th>Primes</th><th>Sous-total</th><th>Jours off</th><th>Avances</th><th>Net</th>${c ? '<th>Payé</th>' : ''}</tr></thead><tbody>${rows}
+    <tr class="pt-total"><td colspan="9">TOTAL NET À PAYER</td><td>${pt_fmtMoney(totNet)}</td>${c ? '<td></td>' : ''}</tr>${c ? `<tr class="pt-total"><td colspan="9">RESTE À PAYER</td><td>${pt_fmtMoney(resteAPayer)}</td><td></td></tr>` : ''}</tbody></table></div>` };
 }
 function pt_paieSection(c, sessions, codes){
-  const p = pt_payroll(c, sessions);
+  const p = pt_displayPayroll(c, sessions);
+  const live = p.frozen ? pt_payroll(c, sessions) : null;
+  const lockLine = p.frozen ? `<div class="pt-muted" style="margin-bottom:8px;">🔒 Période clôturée — chiffres figés · ${p.paid ? 'Payé ✓' : 'À payer'}${Math.round(live.net) !== Math.round(p.net) ? ` · <span style="color:var(--rust);">⚠️ données modifiées depuis (net actuel : ${pt_fmtMoney(live.net)})</span>` : ''}</div>` : '';
   const rows = pt_histRows(p);
   const hist = rows.length ? rows.map(r=>`<tr>
       <td>${fmtDateShort(r.date)}</td>
-      <td><span class="pt-badge ${r.cls}">${r.cat}</span>${r.src==='depenses' ? '<span class="pt-src">via Dépenses</span>' : ''}</td>
+      <td><span class="pt-badge ${r.cls}">${r.cat}</span></td>
       <td>${pt_e(r.note)}</td>
       <td class="${r.sign<0?'pt-minus':'pt-plus'}">${r.sign<0?'−':'+'}${pt_fmtMoney(r.amount)}</td>
-      <td>${r.src==='depenses' ? '' : `<button class="btn ghost small" onclick="pt_delEntryConfirm('${r.id}','cette entrée')">Supprimer</button>`}</td></tr>`).join('')
+      <td><button class="btn ghost small" onclick="pt_delEntryConfirm('${r.id}','cette entrée')">Supprimer</button></td></tr>`).join('')
     : `<tr><td colspan="5" class="pt-muted">Aucune entrée sur cette période.</td></tr>`;
-  const unmatched = pt_unmatchedAdvances(codes);
-  const banner = unmatched.length ? `<div class="alert-banner"><b>Avances (Dépenses) non rattachées à un employé du pointage</b>${
-    unmatched.map(u=>`${pt_e(u.name)} : ${pt_fmtMoney(u.amount)}`).join(' · ')}<br><span style="opacity:.85;">Le nom doit être identique à celui saisi dans Réglages pour être repris dans la paie.</span></div>` : '';
-  return `${banner}
+  return `${lockLine}
     <div class="pt-muted">Taux : ${pt_fmtMoney(p.rate)}${p.mode==='daily'?' / jour':' / heure'} · ${p.transport.enabled ? 'Transport : ' + pt_fmtMoney(p.transport.amount) + ' / jour' : 'Transport désactivé'} · <a href="#" class="pt-link" onclick="pt_setTab('reglages');return false;">Modifier dans Réglages</a></div>
     ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off')}${pt_formRow('avance','Avance')}
-    <div class="pt-muted" style="margin-top:6px;">Les avances saisies dans Dépenses (« avance salaire ») apparaissent automatiquement dans l’historique ci-dessous.</div>
     <h2 class="section" style="margin-top:20px;">Historique</h2>
     <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Catégorie</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${hist}</tbody></table></div>
     <div class="grid grid-2" style="margin-top:14px;">
@@ -3699,9 +2075,9 @@ function pt_tabEmployes(codes, sessions, anoms){
   let html = '';
   if(isAdmin){
     const ov = pt_paieOverviewHtml(codes, sessions);
-    html += pt_accordion('overview', 'Tableau de paie — tous les employés (net total : ' + pt_fmtMoney(ov.totNet) + ')', ov.html);
+    html += pt_accordion('overview', 'Tableau de paie — tous les employés (net total : ' + pt_fmtMoney(ov.totNet) + ')' + (ov.closed ? ' — 🔒 clôturée' : ''), ov.html);
   }
-  const c = pt_sel, p = pt_payroll(c, sessions);
+  const c = pt_sel, p = pt_displayPayroll(c, sessions);
   const myAn = anoms.filter(a=>a.code === c);
   html += `<div class="ticket">
     ${pt_empSelect(codes)}
@@ -3755,7 +2131,7 @@ function pt_tabReglages(codes){
       ${tr.enabled ? `<div class="field" style="margin-top:8px;max-width:220px;"><label>Montant / jour (DA)</label><input type="text" inputmode="decimal" value="${tr.amount || ''}" placeholder="0" onchange="pt_setTransport(${c},{amount:pt_num(this.value)})"></div>` : ''}
     </div>`;
   }).join('');
-  return `<datalist id="pt-names">${EMPLOYES_TOUS.map(n=>`<option value="${pt_e(n)}"></option>`).join('')}</datalist>
+  return `<datalist id="pt-names">${PT_SUGGESTED_NAMES.map(n=>`<option value="${pt_e(n)}"></option>`).join('')}</datalist>
   <div class="ticket">
     <div class="section-label">Importer un export ZKBio</div>
     <div class="pt-row">
@@ -3904,7 +2280,7 @@ function pt_exportEmployeeCsv(){
 }
 function pt_exportPayslip(){
   const c = pt_sel; if(c === null) return;
-  const p = pt_payroll(c, pt_periodSessions());
+  const p = pt_displayPayroll(c, pt_periodSessions());
   let csv = 'Bulletin de paie;' + pt_name(c) + '\n';
   csv += 'Periode;' + (pt_filter.from || '…') + ' au ' + (pt_filter.to || '…') + '\n';
   csv += 'Heures totales;' + p.totalHours.toFixed(2) + '\n';
@@ -3925,14 +2301,13 @@ function pt_exportExcel(){
   const wb = XLSX.utils.book_new();
   const add = (name, header, rows)=>XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header].concat(rows)), name);
   add('Resume paie', ['Code','Nom','Poste','Heures','Mode','Taux','Jours travailles','Salaire base','Transport','Primes','Sous-total','Jours off','Avances','Net'],
-    codes.map(c=>{ const p = pt_payroll(c, fs); return [c, pt_name(c), pt_poste(c), +p.totalHours.toFixed(2), p.mode === 'daily' ? 'Jour' : 'Heure', p.rate, p.workedDays, +p.baseWage.toFixed(2), +p.transportTotal.toFixed(2), +p.bonusesTotal.toFixed(2), +p.subTotal.toFixed(2), +p.leavesTotal.toFixed(2), +p.advancesTotal.toFixed(2), +p.net.toFixed(2)]; }));
+    codes.map(c=>{ const p = pt_displayPayroll(c, fs); return [c, pt_name(c), pt_poste(c), +p.totalHours.toFixed(2), p.mode === 'daily' ? 'Jour' : 'Heure', p.rate, p.workedDays, +p.baseWage.toFixed(2), +p.transportTotal.toFixed(2), +p.bonusesTotal.toFixed(2), +p.subTotal.toFixed(2), +p.leavesTotal.toFixed(2), +p.advancesTotal.toFixed(2), +p.net.toFixed(2)]; }));
   const hist = [];
   codes.forEach(c=>{
-    pt_entries.filter(e=>e.code === c && ['prime','off','avance'].includes(e.kind)).forEach(e=>hist.push([c, pt_name(c), e.kind === 'prime' ? 'Prime' : e.kind === 'off' ? 'Jour Off' : 'Avance', e.date, e.note || '', e.kind === 'avance' ? -(Number(e.amount)||0) : (Number(e.amount)||0), 'Pointage']));
-    pt_depAvances(c).forEach(a=>hist.push([c, pt_name(c), 'Avance', a.date, a.note, -a.amount, 'Dépenses']));
+    pt_entries.filter(e=>e.code === c && ['prime','off','avance'].includes(e.kind)).forEach(e=>hist.push([c, pt_name(c), e.kind === 'prime' ? 'Prime' : e.kind === 'off' ? 'Jour Off' : 'Avance', e.date, e.note || '', e.kind === 'avance' ? -(Number(e.amount)||0) : (Number(e.amount)||0)]));
   });
   hist.sort((a,b)=>String(a[3]).localeCompare(String(b[3])));
-  add('Historique', ['Code','Nom','Categorie','Date','Motif','Montant','Source'], hist);
+  add('Historique', ['Code','Nom','Categorie','Date','Motif','Montant'], hist);
   add('Sessions', ['Code','Nom','Date','Entree','Sortie','Duree h'], all.sessions.map(s=>[s.code, pt_name(s.code), pt_day(s.date), pt_fmtDT(s.start), pt_fmtDT(s.end), +s.hours.toFixed(2)]));
   add('Sessions manuelles', ['Code','Nom','Date','Heures','Note'], pt_entries.filter(e=>e.kind === 'manual').sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(m=>[m.code, pt_name(m.code), m.date, Number(m.hours)||0, m.note || '']));
   add('Pointages bruts', ['Code','Nom','Date heure','Type'], pt_events.slice().sort((a,b)=>new Date(a.dt) - new Date(b.dt)).map(e=>[e.code, pt_name(e.code), pt_fmtDT(new Date(e.dt)), e.type === 0 ? 'Entree' : 'Sortie']));
@@ -3942,8 +2317,8 @@ function pt_exportExcel(){
   XLSX.writeFile(wb, 'pointage_allo_sushi_' + todayISO() + '.xlsx');
 }
 
-/* ==================== MODULE DETTES & EMPRUNTS (privé) ==================== */
-/* Visible uniquement par le compte 'lila' — jamais par les autres administrateurs.
+/* ==================== MODULE CARNET — dettes & emprunts (privé) ==================== */
+/* Visible uniquement par le compte 'soufyane' — jamais par les autres administrateurs.
    Registre simple : chaque mouvement est une ligne signée (dette = je dois, emprunt = on me doit).
    Le cumul par personne et par devise se calcule en additionnant ces lignes, sans suivi séparé de règlements —
    un remboursement est juste une nouvelle ligne dans l'autre sens. */
@@ -3953,7 +2328,8 @@ const dt_dettesCol = db.collection('dettes_perso');
 let dt_dettes = [];
 let dt_ready = false;
 let dt_started = false;
-let dt_selectedPerson = null;
+const DT_TOTAL = '__total__'; // entrée « Total » de la liste déroulante : tous les contacts réunis
+let dt_selectedPerson = DT_TOTAL;
 
 function dt_e(v){ return esc(v == null ? '' : String(v)); }
 function dt_num(v){ const n = Number(String(v == null ? '' : v).replace(/[\s\u00a0]/g,'').replace(',','.')); return isNaN(n) ? 0 : n; }
@@ -3975,10 +2351,10 @@ function dt_solde(personne, devise){
     .filter(d=>d.personne === personne && d.devise === devise)
     .reduce((s,d)=> s + (d.type === 'emprunt' ? Number(d.montant) || 0 : -(Number(d.montant) || 0)), 0);
 }
-function dt_selectPerson(nom){ dt_selectedPerson = nom || null; dt_render(); }
+function dt_selectPerson(nom){ dt_selectedPerson = nom || DT_TOTAL; dt_render(); }
 function dt_totaux(personne){
   const t = { dette:{DZD:0,EUR:0}, emprunt:{DZD:0,EUR:0} };
-  dt_dettes.filter(d=>d.personne === personne).forEach(d=>{ t[d.type][d.devise] += Number(d.montant) || 0; });
+  dt_dettes.filter(d=>personne === DT_TOTAL || d.personne === personne).forEach(d=>{ t[d.type][d.devise] += Number(d.montant) || 0; });
   return t;
 }
 function dt_color(type){ return type === 'emprunt' ? 'var(--moss)' : 'var(--rust)'; }
@@ -3989,7 +2365,7 @@ function dt_optionSummary(personne){
   if(t.dette.EUR) parts.push('Dette ' + dt_fmt(t.dette.EUR,'EUR'));
   if(t.emprunt.DZD) parts.push('Emprunt ' + dt_fmt(t.emprunt.DZD,'DZD'));
   if(t.emprunt.EUR) parts.push('Emprunt ' + dt_fmt(t.emprunt.EUR,'EUR'));
-  return parts.length ? parts.join(' · ') : 'soldé';
+  return parts.length ? parts.join(' · ') : (personne === DT_TOTAL ? 'aucune transaction' : 'soldé');
 }
 function dt_onTypeChange(id){
   const sel = document.getElementById('dt-row-type-' + id), montant = document.getElementById('dt-row-montant-' + id);
@@ -4004,7 +2380,8 @@ function dt_render(){
   const st = pt_saveInputs(body);
 
   const personnes = dt_personnes();
-  if(dt_selectedPerson && !personnes.includes(dt_selectedPerson)) dt_selectedPerson = null;
+  if(dt_selectedPerson !== DT_TOTAL && !personnes.includes(dt_selectedPerson)) dt_selectedPerson = DT_TOTAL;
+  const isTotal = dt_selectedPerson === DT_TOTAL;
 
   let html = `<div class="ticket">
     <div class="section-label">Ajouter</div>
@@ -4021,18 +2398,18 @@ function dt_render(){
   html += `<div class="ticket">
     <div class="field"><label>Voir les transactions avec</label>
       <select id="dt-person-select" onchange="dt_selectPerson(this.value)">
-        <option value="">— Choisir une personne —</option>
+        <option value="${DT_TOTAL}" ${isTotal?'selected':''}>Total — ${dt_optionSummary(DT_TOTAL)}</option>
         ${personnes.map(n=>`<option value="${dt_e(n)}" ${dt_selectedPerson===n?'selected':''}>${dt_e(n)} — ${dt_optionSummary(n)}</option>`).join('')}
       </select>
     </div>
     ${!personnes.length ? `<div class="empty-state">Aucune transaction enregistrée pour l'instant.</div>` : ''}
   </div>`;
 
-  if(dt_selectedPerson){
+  {
     const t = dt_totaux(dt_selectedPerson);
-    const hist = dt_dettes.filter(d=>d.personne === dt_selectedPerson).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    const hist = dt_dettes.filter(d=>isTotal || d.personne === dt_selectedPerson).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
     html += `<div class="ticket">
-      <div class="section-label">${dt_e(dt_selectedPerson)}</div>
+      <div class="section-label">${isTotal ? 'Total — tous les contacts' : dt_e(dt_selectedPerson)}</div>
       <div class="pt-kpis">
         <div class="pt-kpi"><div class="n" style="color:${dt_color('dette')};">${dt_fmt(t.dette.DZD,'DZD')}</div><div class="l">Total dettes (DZD)</div></div>
         <div class="pt-kpi"><div class="n" style="color:${dt_color('dette')};">${dt_fmt(t.dette.EUR,'EUR')}</div><div class="l">Total dettes (EUR)</div></div>
@@ -4040,15 +2417,16 @@ function dt_render(){
         <div class="pt-kpi"><div class="n" style="color:${dt_color('emprunt')};">${dt_fmt(t.emprunt.EUR,'EUR')}</div><div class="l">Total emprunts (EUR)</div></div>
       </div>
       <div class="section-label" style="margin-top:14px;">Historique <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— modifiable, les totaux se mettent à jour automatiquement</span></div>
-      <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Type</th><th>Devise</th><th>Montant</th><th>Note</th><th></th></tr></thead><tbody>${
+      <div class="pt-scroll"><table class="pt-table"><thead><tr>${isTotal ? '<th>Nom</th>' : ''}<th>Date</th><th>Type</th><th>Devise</th><th>Montant</th><th>Note</th><th></th></tr></thead><tbody>${
         hist.length ? hist.map(d=>`<tr>
+          ${isTotal ? `<td style="font-weight:600;">${dt_e(d.personne)}</td>` : ''}
           <td><input type="date" id="dt-row-date-${d.id}" class="pt-draft pt-auto" value="${d.date || ''}"></td>
           <td><select id="dt-row-type-${d.id}" class="pt-draft pt-auto" style="color:${dt_color(d.type)};font-weight:600;" onchange="dt_onTypeChange('${d.id}')"><option value="dette" ${d.type==='dette'?'selected':''}>Dette</option><option value="emprunt" ${d.type==='emprunt'?'selected':''}>Emprunt</option></select></td>
           <td><select id="dt-row-devise-${d.id}" class="pt-draft pt-auto"><option value="DZD" ${d.devise==='DZD'?'selected':''}>DZD</option><option value="EUR" ${d.devise==='EUR'?'selected':''}>EUR</option></select></td>
           <td><input type="text" inputmode="decimal" id="dt-row-montant-${d.id}" class="pt-draft pt-w90" style="color:${dt_color(d.type)};font-weight:600;" value="${d.montant}"></td>
           <td><input type="text" id="dt-row-note-${d.id}" class="pt-draft pt-grow" value="${dt_e(d.note)}" placeholder="Note"></td>
           <td><button class="btn ghost small" onclick="dt_saveRow('${d.id}')">Enregistrer</button> <button class="btn ghost small" onclick="dt_delete('${d.id}')">Supprimer</button></td>
-        </tr>`).join('') : `<tr><td colspan="6" class="pt-muted">Aucune ligne.</td></tr>`
+        </tr>`).join('') : `<tr><td colspan="${isTotal ? 7 : 6}" class="pt-muted">Aucune ligne.</td></tr>`
       }</tbody></table></div>
     </div>`;
   }
@@ -4085,20 +2463,19 @@ async function dt_add(){
     note: '',
     creePar: currentUser, creeLe: new Date().toISOString()
   };
+  // sur « Total » on y reste ; sur une personne, on bascule sur celle qu'on ajoute (avant l'écriture : l'écran se rafraîchit dès qu'elle est enregistrée)
+  const previous = dt_selectedPerson;
+  if(dt_selectedPerson !== DT_TOTAL) dt_selectedPerson = personne;
   try{
     await dt_dettesCol.add(data);
     document.getElementById('dt-new-personne').value = '';
     document.getElementById('dt-new-montant').value = '';
-    dt_selectedPerson = personne;
-  }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  }catch(e){ dt_selectedPerson = previous; console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 async function dt_delete(id){
   if(!confirm('Supprimer cette ligne ?')) return;
   try{ await dt_dettesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
-
-
-dp_render();
 
 initAuth();
 </script>
