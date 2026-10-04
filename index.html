@@ -2317,30 +2317,31 @@ function pt_exportExcel(){
   XLSX.writeFile(wb, 'pointage_allo_sushi_' + todayISO() + '.xlsx');
 }
 
-/* ==================== MODULE CARNET — dettes & emprunts (privé) ==================== */
+/* ==================== MODULE CARNET — dettes, emprunts & disponible (privé) ==================== */
 /* Visible uniquement par le compte 'soufyane' — jamais par les autres administrateurs.
-   Registre simple : chaque mouvement est une ligne signée (dette = je dois, emprunt = on me doit).
-   Le cumul par personne et par devise se calcule en additionnant ces lignes, sans suivi séparé de règlements —
-   un remboursement est juste une nouvelle ligne dans l'autre sens. */
+   Une seule collection (aucune règle Firestore supplémentaire à ajouter) avec 3 sortes de documents :
+   - sans champ « kind »        : une ligne de dette / emprunt        { personne, montant, devise, type, date, note }
+   - kind:'avoir'               : un endroit où tu as de l'argent      { nom, devise, montant, maj }   (un SOLDE, pas un mouvement)
+   - kind:'avoir_histo'         : une mise à jour d'un de ces endroits { avoirId, date, ancien, montant }
+   Dette = je dois · Emprunt = on me doit · Position = disponible + emprunts − dettes (devise par devise). */
 function hasDettesAccess(){ return !!(session && session.username === 'soufyane'); }
 const dt_dettesCol = db.collection('dettes_perso');
-/* Une seule collection (aucune règle Firestore supplémentaire à ajouter) avec 3 sortes de documents :
-   - sans champ « kind »        : une ligne de dette / emprunt        { personne, montant, devise, type, date, note }
-   - kind:'avoir'               : un endroit où tu as de l'argent      { nom, devise, montant, maj }
-   - kind:'avoir_histo'         : une mise à jour d'un de ces endroits { avoirId, date, ancien, montant } */
 
 let dt_dettes = [], dt_avoirs = [], dt_avoirHisto = [];
-let dt_openAvoir = null; // endroit dont l'historique est déplié
 let dt_ready = false;
 let dt_started = false;
-const DT_TOTAL = '__total__'; // entrée « Total » de la liste déroulante : tous les contacts réunis
-let dt_selectedPerson = DT_TOTAL;
+const DT_TOTAL = '__total__';   // aucun détail : seule la situation du haut est affichée
+let dt_selected = DT_TOTAL;     // DT_TOTAL | 'p:<nom de la personne>' | 'a:<id de l'endroit>'
 
 function dt_e(v){ return esc(v == null ? '' : String(v)); }
+function dt_norm(v){ return String(v == null ? '' : v).trim().toLowerCase(); }
 function dt_num(v){ const n = Number(String(v == null ? '' : v).replace(/[\s\u00a0]/g,'').replace(',','.')); return isNaN(n) ? 0 : n; }
 function dt_unit(devise){ return devise === 'EUR' ? '€' : 'DA'; }
-function dt_fmt(n, devise){ return (Math.round(Math.abs(Number(n) || 0) * 100) / 100).toLocaleString('fr-FR', { maximumFractionDigits:2 }) + ' ' + dt_unit(devise); }
+function dt_fmtNum(n){ return (Math.round(Math.abs(Number(n) || 0) * 100) / 100).toLocaleString('fr-FR', { maximumFractionDigits:2 }); }
+function dt_fmt(n, devise){ return dt_fmtNum(n) + ' ' + dt_unit(devise); }
 function dt_fmtSigned(n, devise){ return (n < -0.005 ? '−' : '') + dt_fmt(n, devise); }
+function dt_color(type){ return type === 'emprunt' ? 'var(--moss)' : 'var(--rust)'; }
+function dt_netColor(n){ return n < -0.005 ? 'var(--rust)' : 'var(--moss)'; }
 
 function dt_start(){
   if(dt_started) return; dt_started = true;
@@ -2351,84 +2352,117 @@ function dt_start(){
   }, (e)=>{ console.error(e); dt_ready = true; dt_render(); });
 }
 
-function dt_personnes(){
-  return Array.from(new Set(dt_dettes.map(d=>d.personne))).sort((a,b)=>a.localeCompare(b));
-}
-function dt_solde(personne, devise){
-  return dt_dettes
-    .filter(d=>d.personne === personne && d.devise === devise)
-    .reduce((s,d)=> s + (d.type === 'emprunt' ? Number(d.montant) || 0 : -(Number(d.montant) || 0)), 0);
-}
-function dt_selectPerson(nom){ dt_selectedPerson = nom || DT_TOTAL; dt_render(); }
-function dt_totaux(personne){
+/* ---------- calculs ---------- */
+function dt_personnes(){ return Array.from(new Set(dt_dettes.map(d=>d.personne))).sort((a,b)=>a.localeCompare(b)); }
+function dt_totaux(personne){ // totaux bruts (non nettés) ; DT_TOTAL = tous les contacts réunis
   const t = { dette:{DZD:0,EUR:0}, emprunt:{DZD:0,EUR:0} };
   dt_dettes.filter(d=>personne === DT_TOTAL || d.personne === personne).forEach(d=>{ t[d.type][d.devise] += Number(d.montant) || 0; });
   return t;
 }
-function dt_color(type){ return type === 'emprunt' ? 'var(--moss)' : 'var(--rust)'; }
-function dt_optionSummary(personne){
-  const t = dt_totaux(personne);
-  const parts = [];
-  if(t.dette.DZD) parts.push('Dette ' + dt_fmt(t.dette.DZD,'DZD'));
-  if(t.dette.EUR) parts.push('Dette ' + dt_fmt(t.dette.EUR,'EUR'));
-  if(t.emprunt.DZD) parts.push('Emprunt ' + dt_fmt(t.emprunt.DZD,'DZD'));
-  if(t.emprunt.EUR) parts.push('Emprunt ' + dt_fmt(t.emprunt.EUR,'EUR'));
-  return parts.length ? parts.join(' · ') : (personne === DT_TOTAL ? 'aucune transaction' : 'soldé');
-}
+function dt_avoirTotals(){ const t = { DZD:0, EUR:0 }; dt_avoirs.forEach(a=>{ t[a.devise] = (t[a.devise] || 0) + (Number(a.montant) || 0); }); return t; }
+function dt_net(devise){ const tot = dt_totaux(DT_TOTAL); return dt_avoirTotals()[devise] + tot.emprunt[devise] - tot.dette[devise]; }
+function dt_avoirHistoOf(id){ return dt_avoirHisto.filter(h=>h.avoirId === id).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || String(b.creeLe||'').localeCompare(String(a.creeLe||''))); }
+
+function dt_select(key){ dt_selected = key || DT_TOTAL; dt_render(); }
 function dt_onTypeChange(id){
   const sel = document.getElementById('dt-row-type-' + id), montant = document.getElementById('dt-row-montant-' + id);
   const color = dt_color(sel.value);
   sel.style.color = color; montant.style.color = color;
 }
 
-/* ---------- disponible (argent que tu possèdes) ---------- */
-function dt_avoirTotals(){ const t = { DZD:0, EUR:0 }; dt_avoirs.forEach(a=>{ t[a.devise] = (t[a.devise] || 0) + (Number(a.montant) || 0); }); return t; }
-// position nette = disponible + ce qu'on te doit (emprunts) − ce que tu dois (dettes)
-function dt_net(devise){ const tot = dt_totaux(DT_TOTAL); return dt_avoirTotals()[devise] + tot.emprunt[devise] - tot.dette[devise]; }
-function dt_netColor(n){ return n < -0.005 ? 'var(--rust)' : 'var(--moss)'; }
-function dt_avoirHistoOf(id){ return dt_avoirHisto.filter(h=>h.avoirId === id).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || String(b.creeLe||'').localeCompare(String(a.creeLe||''))); }
-function dt_toggleAvoir(id){ dt_openAvoir = (dt_openAvoir === id) ? null : id; dt_render(); }
-
-function dt_avoirHtml(){
-  const tot = dt_avoirTotals(), netD = dt_net('DZD'), netE = dt_net('EUR');
-  const rows = dt_avoirs.slice().sort((a,b)=>String(a.devise).localeCompare(String(b.devise)) || String(a.nom).localeCompare(String(b.nom))).map(a=>{
-    const open = dt_openAvoir === a.id, histo = dt_avoirHistoOf(a.id);
-    let h = `<tr>
-      <td><input type="text" id="dt-av-nom-${a.id}" class="pt-draft pt-grow" value="${dt_e(a.nom)}"></td>
-      <td>${dt_e(a.devise)}</td>
-      <td><input type="text" inputmode="decimal" id="dt-av-montant-${a.id}" class="pt-draft pt-w90" value="${a.montant}"></td>
-      <td class="pt-muted">${a.maj ? fmtDateShort(a.maj) : ''}</td>
-      <td><button class="btn ghost small" onclick="dt_saveAvoir('${a.id}')">Enregistrer</button> <button class="btn ghost small" onclick="dt_toggleAvoir('${a.id}')">${open ? 'Masquer' : 'Historique'}</button> <button class="btn ghost small" onclick="dt_deleteAvoir('${a.id}')">Supprimer</button></td>
-    </tr>`;
-    if(open){
-      h += `<tr><td colspan="5"><div class="pt-fix" style="margin:0;"><div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Avant</th><th>Après</th><th>Écart</th></tr></thead><tbody>${
-        histo.length ? histo.map(x=>{
-          const ecart = (Number(x.montant) || 0) - (Number(x.ancien) || 0), first = x.ancien === null || x.ancien === undefined;
-          return `<tr><td>${fmtDateShort(x.date)}</td><td>${first ? '<span class="pt-muted">—</span>' : dt_fmt(x.ancien, a.devise)}</td><td>${dt_fmt(x.montant, a.devise)}</td><td>${first ? '<span class="pt-muted">création</span>' : `<span style="color:${ecart < 0 ? 'var(--rust)' : 'var(--moss)'};font-weight:600;">${ecart < 0 ? '−' : '+'}${dt_fmt(ecart, a.devise)}</span>`}</td></tr>`;
-        }).join('') : `<tr><td colspan="4" class="pt-muted">Aucun historique.</td></tr>`
-      }</tbody></table></div></div></td></tr>`;
-    }
-    return h;
-  }).join('');
+/* ---------- affichage ---------- */
+function dt_resumeHtml(){
+  const dispo = dt_avoirTotals(), tot = dt_totaux(DT_TOTAL);
+  const row = (devise, label)=>{
+    const net = dt_net(devise);
+    return `<tr><td style="font-weight:700;">${label}</td>
+      <td>${dt_fmtNum(dispo[devise])}</td>
+      <td style="color:${dt_color('dette')};">${dt_fmtNum(tot.dette[devise])}</td>
+      <td style="color:${dt_color('emprunt')};">${dt_fmtNum(tot.emprunt[devise])}</td>
+      <td style="font-weight:700;color:${dt_netColor(net)};">${(net < -0.005 ? '−' : '') + dt_fmtNum(net)}</td></tr>`;
+  };
   return `<div class="ticket">
-    <div class="section-label">Disponible</div>
+    <div class="section-label">Situation</div>
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th></th><th>Disponible</th><th>Dettes</th><th>Emprunts</th><th>Position</th></tr></thead><tbody>
+      ${row('DZD','Dinars (DA)')}${row('EUR','Euros (€)')}
+    </tbody></table></div>
+    <div class="pt-muted" style="margin-top:6px;">Position = disponible + emprunts − dettes, devise par devise.</div>
+  </div>`;
+}
+
+function dt_formHtml(){
+  const noms = Array.from(new Set([...dt_personnes(), ...dt_avoirs.map(a=>a.nom)])).sort((a,b)=>String(a).localeCompare(String(b)));
+  return `<div class="ticket">
+    <div class="section-label">Ajouter</div>
+    <div class="grid grid-2">
+      <div class="field"><label>Nom</label><input type="text" id="dt-new-personne" class="pt-draft" list="dt-noms" placeholder="Rachid, Espèces, CCP…"></div>
+      <div class="field"><label>Montant</label><input type="text" inputmode="decimal" id="dt-new-montant" class="pt-draft" placeholder="0"></div>
+      <div class="field"><label>Unité</label><select id="dt-new-devise" class="pt-draft"><option value="DZD">Dinars (DZD)</option><option value="EUR">Euros (EUR)</option></select></div>
+      <div class="field"><label>Type</label><select id="dt-new-type" class="pt-draft"><option value="dette">Dette</option><option value="emprunt">Emprunt</option><option value="disponible">Disponible</option></select></div>
+    </div>
+    <datalist id="dt-noms">${noms.map(n=>`<option value="${dt_e(n)}"></option>`).join('')}</datalist>
+    <div class="pt-muted">Dette / Emprunt : ajoute une ligne pour cette personne. Disponible : remplace le solde de cet endroit (espèces, banque, CCP…).</div>
+    <div class="actions-row" style="margin-top:6px;"><button class="btn small" onclick="dt_add()">Valider</button></div>
+  </div>`;
+}
+
+function dt_filterHtml(){
+  const avoirs = dt_avoirs.slice().sort((a,b)=>String(a.nom).localeCompare(String(b.nom)) || String(a.devise).localeCompare(String(b.devise)));
+  const personnes = dt_personnes();
+  return `<div class="ticket">
+    <div class="field"><label>Voir le détail de</label>
+      <select id="dt-person-select" onchange="dt_select(this.value)">
+        <option value="${DT_TOTAL}" ${dt_selected === DT_TOTAL ? 'selected' : ''}>Total</option>
+        ${avoirs.length ? `<optgroup label="Disponible">${avoirs.map(a=>`<option value="a:${dt_e(a.id)}" ${dt_selected === 'a:' + a.id ? 'selected' : ''}>${dt_e(a.nom)} (${dt_e(a.devise)})</option>`).join('')}</optgroup>` : ''}
+        ${personnes.length ? `<optgroup label="Personnes">${personnes.map(n=>`<option value="p:${dt_e(n)}" ${dt_selected === 'p:' + n ? 'selected' : ''}>${dt_e(n)}</option>`).join('')}</optgroup>` : ''}
+      </select>
+    </div>
+    ${(!personnes.length && !avoirs.length) ? `<div class="empty-state">Rien d'enregistré pour l'instant.</div>` : ''}
+  </div>`;
+}
+
+function dt_personHtml(nom){
+  const t = dt_totaux(nom);
+  const hist = dt_dettes.filter(d=>d.personne === nom).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  return `<div class="ticket">
+    <div class="section-label">${dt_e(nom)}</div>
     <div class="pt-kpis">
-      <div class="pt-kpi"><div class="n">${dt_fmt(tot.DZD,'DZD')}</div><div class="l">Disponible (DZD)</div></div>
-      <div class="pt-kpi"><div class="n">${dt_fmt(tot.EUR,'EUR')}</div><div class="l">Disponible (EUR)</div></div>
-      <div class="pt-kpi"><div class="n" style="color:${dt_netColor(netD)};">${dt_fmtSigned(netD,'DZD')}</div><div class="l">Position nette (DZD)</div></div>
-      <div class="pt-kpi"><div class="n" style="color:${dt_netColor(netE)};">${dt_fmtSigned(netE,'EUR')}</div><div class="l">Position nette (EUR)</div></div>
+      <div class="pt-kpi"><div class="n" style="color:${dt_color('dette')};">${dt_fmt(t.dette.DZD,'DZD')}</div><div class="l">Total dettes (DZD)</div></div>
+      <div class="pt-kpi"><div class="n" style="color:${dt_color('dette')};">${dt_fmt(t.dette.EUR,'EUR')}</div><div class="l">Total dettes (EUR)</div></div>
+      <div class="pt-kpi"><div class="n" style="color:${dt_color('emprunt')};">${dt_fmt(t.emprunt.DZD,'DZD')}</div><div class="l">Total emprunts (DZD)</div></div>
+      <div class="pt-kpi"><div class="n" style="color:${dt_color('emprunt')};">${dt_fmt(t.emprunt.EUR,'EUR')}</div><div class="l">Total emprunts (EUR)</div></div>
     </div>
-    <div class="pt-muted">Position nette = disponible + ce qu'on te doit (emprunts) − ce que tu dois (dettes), devise par devise.</div>
-    <div class="pt-scroll" style="margin-top:12px;"><table class="pt-table"><thead><tr><th>Endroit</th><th>Devise</th><th>Montant</th><th>Mis à jour</th><th></th></tr></thead><tbody>${
-      rows || `<tr><td colspan="5" class="pt-muted">Aucun endroit enregistré. Ajoute tes espèces, ton compte bancaire, ton CCP…</td></tr>`
+    <div class="section-label" style="margin-top:14px;">Historique <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— modifiable, les totaux se mettent à jour automatiquement</span></div>
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Type</th><th>Devise</th><th>Montant</th><th>Note</th><th></th></tr></thead><tbody>${
+      hist.map(d=>`<tr>
+        <td><input type="date" id="dt-row-date-${d.id}" class="pt-draft pt-auto" value="${d.date || ''}"></td>
+        <td><select id="dt-row-type-${d.id}" class="pt-draft pt-auto" style="color:${dt_color(d.type)};font-weight:600;" onchange="dt_onTypeChange('${d.id}')"><option value="dette" ${d.type==='dette'?'selected':''}>Dette</option><option value="emprunt" ${d.type==='emprunt'?'selected':''}>Emprunt</option></select></td>
+        <td><select id="dt-row-devise-${d.id}" class="pt-draft pt-auto"><option value="DZD" ${d.devise==='DZD'?'selected':''}>DZD</option><option value="EUR" ${d.devise==='EUR'?'selected':''}>EUR</option></select></td>
+        <td><input type="text" inputmode="decimal" id="dt-row-montant-${d.id}" class="pt-draft pt-w90" style="color:${dt_color(d.type)};font-weight:600;" value="${d.montant}"></td>
+        <td><input type="text" id="dt-row-note-${d.id}" class="pt-draft pt-grow" value="${dt_e(d.note)}" placeholder="Note"></td>
+        <td><button class="btn ghost small" onclick="dt_saveRow('${d.id}')">Enregistrer</button> <button class="btn ghost small" onclick="dt_delete('${d.id}')">Supprimer</button></td>
+      </tr>`).join('') || `<tr><td colspan="6" class="pt-muted">Aucune ligne.</td></tr>`
     }</tbody></table></div>
-    <div class="grid grid-2" style="margin-top:12px;">
-      <div class="field"><label>Nouvel endroit</label><input type="text" id="dt-av-new-nom" class="pt-draft" list="dt-av-noms" placeholder="Espèces, Banque, CCP…"></div>
-      <div class="field"><label>Montant</label><input type="text" inputmode="decimal" id="dt-av-new-montant" class="pt-draft" placeholder="0"></div>
-      <div class="field"><label>Unité</label><select id="dt-av-new-devise" class="pt-draft"><option value="DZD">Dinars (DZD)</option><option value="EUR">Euros (EUR)</option></select></div>
+  </div>`;
+}
+
+function dt_avoirHtml(a){
+  const histo = dt_avoirHistoOf(a.id);
+  return `<div class="ticket">
+    <div class="section-label">${dt_e(a.nom)} — disponible en ${dt_e(a.devise)}</div>
+    <div class="grid grid-2">
+      <div class="field"><label>Endroit</label><input type="text" id="dt-av-nom-${a.id}" class="pt-draft" value="${dt_e(a.nom)}"></div>
+      <div class="field"><label>Montant actuel (${dt_unit(a.devise)})</label><input type="text" inputmode="decimal" id="dt-av-montant-${a.id}" class="pt-draft" value="${a.montant}"></div>
     </div>
-    <datalist id="dt-av-noms"><option value="Espèces"></option><option value="Banque"></option><option value="CCP"></option></datalist>
-    <div class="actions-row" style="margin-top:4px;"><button class="btn small" onclick="dt_addAvoir()">Ajouter cet endroit</button></div>
+    <div class="pt-muted">${a.maj ? 'Dernière mise à jour le ' + fmtDateShort(a.maj) + '.' : ''}</div>
+    <div class="actions-row" style="margin-top:6px;"><button class="btn small" onclick="dt_saveAvoir('${a.id}')">Enregistrer</button> <button class="btn ghost small" onclick="dt_deleteAvoir('${a.id}')">Supprimer cet endroit</button></div>
+    <div class="section-label" style="margin-top:14px;">Historique des mises à jour</div>
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Avant</th><th>Après</th><th>Écart</th></tr></thead><tbody>${
+      histo.map(x=>{
+        const ecart = (Number(x.montant) || 0) - (Number(x.ancien) || 0), first = x.ancien === null || x.ancien === undefined;
+        return `<tr><td>${fmtDateShort(x.date)}</td><td>${first ? '<span class="pt-muted">—</span>' : dt_fmt(x.ancien, a.devise)}</td><td>${dt_fmt(x.montant, a.devise)}</td><td>${first ? '<span class="pt-muted">création</span>' : `<span style="color:${ecart < 0 ? 'var(--rust)' : 'var(--moss)'};font-weight:600;">${ecart < 0 ? '−' : '+'}${dt_fmt(ecart, a.devise)}</span>`}</td></tr>`;
+      }).join('') || `<tr><td colspan="4" class="pt-muted">Aucun historique.</td></tr>`
+    }</tbody></table></div>
   </div>`;
 }
 
@@ -2438,60 +2472,70 @@ function dt_render(){
   if(!dt_ready){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
   const st = pt_saveInputs(body);
 
-  const personnes = dt_personnes();
-  if(dt_selectedPerson !== DT_TOTAL && !personnes.includes(dt_selectedPerson)) dt_selectedPerson = DT_TOTAL;
-  const isTotal = dt_selectedPerson === DT_TOTAL;
+  // la sélection redevient « Total » si la personne ou l'endroit n'existe plus
+  if(dt_selected.startsWith('p:') && !dt_personnes().includes(dt_selected.slice(2))) dt_selected = DT_TOTAL;
+  if(dt_selected.startsWith('a:') && !dt_avoirs.some(a=>a.id === dt_selected.slice(2))) dt_selected = DT_TOTAL;
 
-  let html = dt_avoirHtml() + `<div class="ticket">
-    <div class="section-label">Ajouter</div>
-    <div class="grid grid-2">
-      <div class="field"><label>Nom</label><input type="text" id="dt-new-personne" class="pt-draft" list="dt-noms" placeholder="Rachid"></div>
-      <div class="field"><label>Montant</label><input type="text" inputmode="decimal" id="dt-new-montant" class="pt-draft" placeholder="0"></div>
-      <div class="field"><label>Unité</label><select id="dt-new-devise" class="pt-draft"><option value="DZD">Dinars (DZD)</option><option value="EUR">Euros (EUR)</option></select></div>
-      <div class="field"><label>Type</label><select id="dt-new-type" class="pt-draft"><option value="dette">Dette</option><option value="emprunt">Emprunt</option></select></div>
-    </div>
-    <datalist id="dt-noms">${personnes.map(n=>`<option value="${dt_e(n)}"></option>`).join('')}</datalist>
-    <div class="actions-row" style="margin-top:4px;"><button class="btn small" onclick="dt_add()">Valider</button></div>
-  </div>`;
-
-  html += `<div class="ticket">
-    <div class="field"><label>Voir les transactions avec</label>
-      <select id="dt-person-select" onchange="dt_selectPerson(this.value)">
-        <option value="${DT_TOTAL}" ${isTotal?'selected':''}>Total — ${dt_optionSummary(DT_TOTAL)}</option>
-        ${personnes.map(n=>`<option value="${dt_e(n)}" ${dt_selectedPerson===n?'selected':''}>${dt_e(n)} — ${dt_optionSummary(n)}</option>`).join('')}
-      </select>
-    </div>
-    ${!personnes.length ? `<div class="empty-state">Aucune transaction enregistrée pour l'instant.</div>` : ''}
-  </div>`;
-
-  {
-    const t = dt_totaux(dt_selectedPerson);
-    const hist = dt_dettes.filter(d=>isTotal || d.personne === dt_selectedPerson).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
-    html += `<div class="ticket">
-      <div class="section-label">${isTotal ? 'Total — tous les contacts' : dt_e(dt_selectedPerson)}</div>
-      <div class="pt-kpis">
-        <div class="pt-kpi"><div class="n" style="color:${dt_color('dette')};">${dt_fmt(t.dette.DZD,'DZD')}</div><div class="l">Total dettes (DZD)</div></div>
-        <div class="pt-kpi"><div class="n" style="color:${dt_color('dette')};">${dt_fmt(t.dette.EUR,'EUR')}</div><div class="l">Total dettes (EUR)</div></div>
-        <div class="pt-kpi"><div class="n" style="color:${dt_color('emprunt')};">${dt_fmt(t.emprunt.DZD,'DZD')}</div><div class="l">Total emprunts (DZD)</div></div>
-        <div class="pt-kpi"><div class="n" style="color:${dt_color('emprunt')};">${dt_fmt(t.emprunt.EUR,'EUR')}</div><div class="l">Total emprunts (EUR)</div></div>
-      </div>
-      <div class="section-label" style="margin-top:14px;">Historique <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— modifiable, les totaux se mettent à jour automatiquement</span></div>
-      <div class="pt-scroll"><table class="pt-table"><thead><tr>${isTotal ? '<th>Nom</th>' : ''}<th>Date</th><th>Type</th><th>Devise</th><th>Montant</th><th>Note</th><th></th></tr></thead><tbody>${
-        hist.length ? hist.map(d=>`<tr>
-          ${isTotal ? `<td style="font-weight:600;">${dt_e(d.personne)}</td>` : ''}
-          <td><input type="date" id="dt-row-date-${d.id}" class="pt-draft pt-auto" value="${d.date || ''}"></td>
-          <td><select id="dt-row-type-${d.id}" class="pt-draft pt-auto" style="color:${dt_color(d.type)};font-weight:600;" onchange="dt_onTypeChange('${d.id}')"><option value="dette" ${d.type==='dette'?'selected':''}>Dette</option><option value="emprunt" ${d.type==='emprunt'?'selected':''}>Emprunt</option></select></td>
-          <td><select id="dt-row-devise-${d.id}" class="pt-draft pt-auto"><option value="DZD" ${d.devise==='DZD'?'selected':''}>DZD</option><option value="EUR" ${d.devise==='EUR'?'selected':''}>EUR</option></select></td>
-          <td><input type="text" inputmode="decimal" id="dt-row-montant-${d.id}" class="pt-draft pt-w90" style="color:${dt_color(d.type)};font-weight:600;" value="${d.montant}"></td>
-          <td><input type="text" id="dt-row-note-${d.id}" class="pt-draft pt-grow" value="${dt_e(d.note)}" placeholder="Note"></td>
-          <td><button class="btn ghost small" onclick="dt_saveRow('${d.id}')">Enregistrer</button> <button class="btn ghost small" onclick="dt_delete('${d.id}')">Supprimer</button></td>
-        </tr>`).join('') : `<tr><td colspan="${isTotal ? 7 : 6}" class="pt-muted">Aucune ligne.</td></tr>`
-      }</tbody></table></div>
-    </div>`;
-  }
+  let html = dt_resumeHtml() + dt_formHtml() + dt_filterHtml();
+  if(dt_selected.startsWith('p:')) html += dt_personHtml(dt_selected.slice(2));
+  else if(dt_selected.startsWith('a:')) html += dt_avoirHtml(dt_avoirs.find(a=>a.id === dt_selected.slice(2)));
 
   body.innerHTML = html;
   pt_restoreInputs(st, true);
+}
+
+/* ---------- actions ---------- */
+// crée un endroit, ou met à jour son solde (avec une ligne d'historique si le montant change)
+async function dt_writeAvoir({ id, ref, nom, devise, montant }){
+  const today = todayISO(), now = new Date().toISOString();
+  const batch = db.batch();
+  if(id){
+    const a = dt_avoirs.find(x=>x.id === id); if(!a) return 'unchanged';
+    const changed = Math.abs(montant - (Number(a.montant) || 0)) > 0.0001, renamed = nom !== a.nom;
+    if(!changed && !renamed) return 'unchanged';
+    batch.update(dt_dettesCol.doc(id), changed ? { nom, montant, maj:today } : { nom });
+    if(changed) batch.set(dt_dettesCol.doc(), { kind:'avoir_histo', avoirId:id, date:today, ancien:Number(a.montant) || 0, montant, creePar:currentUser, creeLe:now });
+    await batch.commit();
+    return changed ? 'updated' : 'renamed';
+  }
+  const r = ref || dt_dettesCol.doc();
+  batch.set(r, { kind:'avoir', nom, devise, montant, maj:today, creePar:currentUser, creeLe:now });
+  batch.set(dt_dettesCol.doc(), { kind:'avoir_histo', avoirId:r.id, date:today, ancien:null, montant, creePar:currentUser, creeLe:now });
+  await batch.commit();
+  return 'created';
+}
+
+async function dt_add(){
+  const nom = document.getElementById('dt-new-personne').value.trim();
+  const raw = document.getElementById('dt-new-montant').value.trim();
+  const devise = document.getElementById('dt-new-devise').value, type = document.getElementById('dt-new-type').value;
+  if(!nom){ alert('Indique le nom (personne ou endroit).'); return; }
+  const previous = dt_selected;
+  const clear = ()=>{ document.getElementById('dt-new-personne').value = ''; document.getElementById('dt-new-montant').value = ''; };
+
+  if(type === 'disponible'){
+    if(!raw){ alert('Indique un montant (0 si vide).'); return; }
+    const montant = dt_num(raw);
+    const existing = dt_avoirs.find(a=>dt_norm(a.nom) === dt_norm(nom) && a.devise === devise);
+    const ref = existing ? null : dt_dettesCol.doc();
+    // sur « Total » on y reste ; sur un nom, on bascule sur l'endroit concerné (avant l'écriture : l'écran se rafraîchit dès qu'elle est enregistrée)
+    if(dt_selected !== DT_TOTAL) dt_selected = 'a:' + (existing ? existing.id : ref.id);
+    try{
+      const res = await dt_writeAvoir({ id: existing && existing.id, ref, nom: existing ? existing.nom : nom, devise, montant });
+      clear();
+      pt_toast(res === 'created' ? 'Endroit ajouté.' : res === 'updated' ? 'Disponible mis à jour.' : 'Déjà à ce montant.');
+    }catch(e){ dt_selected = previous; console.error(e); alert('Erreur : ' + (e.message || e)); }
+    return;
+  }
+
+  const montant = dt_num(raw);
+  if(!montant){ alert('Indique un montant.'); return; }
+  const data = { personne:nom, montant, devise, type, date:todayISO(), note:'', creePar:currentUser, creeLe:new Date().toISOString() };
+  if(dt_selected !== DT_TOTAL) dt_selected = 'p:' + nom;
+  try{
+    await dt_dettesCol.add(data);
+    clear();
+  }catch(e){ dt_selected = previous; console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 
 async function dt_saveRow(id){
@@ -2507,63 +2551,19 @@ async function dt_saveRow(id){
   try{ await dt_dettesCol.doc(id).update(patch); pt_toast('Ligne mise à jour.'); }
   catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
-
-async function dt_add(){
-  const personne = document.getElementById('dt-new-personne').value.trim();
-  const montant = dt_num(document.getElementById('dt-new-montant').value);
-  if(!personne){ alert('Indique le nom de la personne.'); return; }
-  if(!montant){ alert('Indique un montant.'); return; }
-  const data = {
-    personne,
-    montant,
-    devise: document.getElementById('dt-new-devise').value,
-    type: document.getElementById('dt-new-type').value,
-    date: todayISO(),
-    note: '',
-    creePar: currentUser, creeLe: new Date().toISOString()
-  };
-  // sur « Total » on y reste ; sur une personne, on bascule sur celle qu'on ajoute (avant l'écriture : l'écran se rafraîchit dès qu'elle est enregistrée)
-  const previous = dt_selectedPerson;
-  if(dt_selectedPerson !== DT_TOTAL) dt_selectedPerson = personne;
-  try{
-    await dt_dettesCol.add(data);
-    document.getElementById('dt-new-personne').value = '';
-    document.getElementById('dt-new-montant').value = '';
-  }catch(e){ dt_selectedPerson = previous; console.error(e); alert('Erreur : ' + (e.message || e)); }
-}
 async function dt_delete(id){
   if(!confirm('Supprimer cette ligne ?')) return;
   try{ await dt_dettesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 
-async function dt_addAvoir(){
-  const nom = document.getElementById('dt-av-new-nom').value.trim();
-  const raw = document.getElementById('dt-av-new-montant').value.trim();
-  if(!nom){ alert('Indique le nom de l’endroit (espèces, banque, CCP…).'); return; }
-  if(!raw){ alert('Indique un montant (0 si vide).'); return; }
-  const montant = dt_num(raw), devise = document.getElementById('dt-av-new-devise').value, today = todayISO(), now = new Date().toISOString();
-  try{
-    const ref = dt_dettesCol.doc(), hRef = dt_dettesCol.doc();
-    const batch = db.batch();
-    batch.set(ref, { kind:'avoir', nom, devise, montant, maj:today, creePar:currentUser, creeLe:now });
-    batch.set(hRef, { kind:'avoir_histo', avoirId:ref.id, date:today, ancien:null, montant, creePar:currentUser, creeLe:now });
-    await batch.commit();
-    document.getElementById('dt-av-new-nom').value = ''; document.getElementById('dt-av-new-montant').value = '';
-  }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
-}
 async function dt_saveAvoir(id){
   const a = dt_avoirs.find(x=>x.id === id); if(!a) return;
   const nom = document.getElementById('dt-av-nom-' + id).value.trim() || a.nom;
   const raw = document.getElementById('dt-av-montant-' + id).value.trim();
   if(!raw){ alert('Indique un montant (0 si vide).'); return; }
-  const montant = dt_num(raw), changed = Math.abs(montant - (Number(a.montant) || 0)) > 0.0001;
-  const today = todayISO(), now = new Date().toISOString();
   try{
-    const batch = db.batch();
-    batch.update(dt_dettesCol.doc(id), changed ? { nom, montant, maj:today } : { nom });
-    if(changed) batch.set(dt_dettesCol.doc(), { kind:'avoir_histo', avoirId:id, date:today, ancien:Number(a.montant) || 0, montant, creePar:currentUser, creeLe:now });
-    await batch.commit();
-    pt_toast(changed ? 'Montant mis à jour.' : 'Enregistré.');
+    const res = await dt_writeAvoir({ id, nom, montant:dt_num(raw) });
+    pt_toast(res === 'updated' ? 'Montant mis à jour.' : res === 'renamed' ? 'Nom mis à jour.' : 'Rien à enregistrer.');
   }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 async function dt_deleteAvoir(id){
@@ -2573,7 +2573,6 @@ async function dt_deleteAvoir(id){
     batch.delete(dt_dettesCol.doc(id));
     dt_avoirHisto.filter(h=>h.avoirId === id).forEach(h=>batch.delete(dt_dettesCol.doc(h.id)));
     await batch.commit();
-    if(dt_openAvoir === id) dt_openAvoir = null;
   }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 
