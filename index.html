@@ -2324,8 +2324,13 @@ function pt_exportExcel(){
    un remboursement est juste une nouvelle ligne dans l'autre sens. */
 function hasDettesAccess(){ return !!(session && session.username === 'soufyane'); }
 const dt_dettesCol = db.collection('dettes_perso');
+/* Une seule collection (aucune règle Firestore supplémentaire à ajouter) avec 3 sortes de documents :
+   - sans champ « kind »        : une ligne de dette / emprunt        { personne, montant, devise, type, date, note }
+   - kind:'avoir'               : un endroit où tu as de l'argent      { nom, devise, montant, maj }
+   - kind:'avoir_histo'         : une mise à jour d'un de ces endroits { avoirId, date, ancien, montant } */
 
-let dt_dettes = [];
+let dt_dettes = [], dt_avoirs = [], dt_avoirHisto = [];
+let dt_openAvoir = null; // endroit dont l'historique est déplié
 let dt_ready = false;
 let dt_started = false;
 const DT_TOTAL = '__total__'; // entrée « Total » de la liste déroulante : tous les contacts réunis
@@ -2334,12 +2339,15 @@ let dt_selectedPerson = DT_TOTAL;
 function dt_e(v){ return esc(v == null ? '' : String(v)); }
 function dt_num(v){ const n = Number(String(v == null ? '' : v).replace(/[\s\u00a0]/g,'').replace(',','.')); return isNaN(n) ? 0 : n; }
 function dt_unit(devise){ return devise === 'EUR' ? '€' : 'DA'; }
-function dt_fmt(n, devise){ return Math.round(Math.abs(Number(n) || 0)).toLocaleString('fr-FR') + ' ' + dt_unit(devise); }
+function dt_fmt(n, devise){ return (Math.round(Math.abs(Number(n) || 0) * 100) / 100).toLocaleString('fr-FR', { maximumFractionDigits:2 }) + ' ' + dt_unit(devise); }
+function dt_fmtSigned(n, devise){ return (n < -0.005 ? '−' : '') + dt_fmt(n, devise); }
 
 function dt_start(){
   if(dt_started) return; dt_started = true;
   dt_dettesCol.onSnapshot((snap)=>{
-    const list = []; snap.forEach(d=>list.push({ id:d.id, ...d.data() })); dt_dettes = list; dt_ready = true; dt_render();
+    const all = []; snap.forEach(d=>all.push({ id:d.id, ...d.data() }));
+    dt_dettes = all.filter(d=>!d.kind); dt_avoirs = all.filter(d=>d.kind === 'avoir'); dt_avoirHisto = all.filter(d=>d.kind === 'avoir_histo');
+    dt_ready = true; dt_render();
   }, (e)=>{ console.error(e); dt_ready = true; dt_render(); });
 }
 
@@ -2373,6 +2381,57 @@ function dt_onTypeChange(id){
   sel.style.color = color; montant.style.color = color;
 }
 
+/* ---------- disponible (argent que tu possèdes) ---------- */
+function dt_avoirTotals(){ const t = { DZD:0, EUR:0 }; dt_avoirs.forEach(a=>{ t[a.devise] = (t[a.devise] || 0) + (Number(a.montant) || 0); }); return t; }
+// position nette = disponible + ce qu'on te doit (emprunts) − ce que tu dois (dettes)
+function dt_net(devise){ const tot = dt_totaux(DT_TOTAL); return dt_avoirTotals()[devise] + tot.emprunt[devise] - tot.dette[devise]; }
+function dt_netColor(n){ return n < -0.005 ? 'var(--rust)' : 'var(--moss)'; }
+function dt_avoirHistoOf(id){ return dt_avoirHisto.filter(h=>h.avoirId === id).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || String(b.creeLe||'').localeCompare(String(a.creeLe||''))); }
+function dt_toggleAvoir(id){ dt_openAvoir = (dt_openAvoir === id) ? null : id; dt_render(); }
+
+function dt_avoirHtml(){
+  const tot = dt_avoirTotals(), netD = dt_net('DZD'), netE = dt_net('EUR');
+  const rows = dt_avoirs.slice().sort((a,b)=>String(a.devise).localeCompare(String(b.devise)) || String(a.nom).localeCompare(String(b.nom))).map(a=>{
+    const open = dt_openAvoir === a.id, histo = dt_avoirHistoOf(a.id);
+    let h = `<tr>
+      <td><input type="text" id="dt-av-nom-${a.id}" class="pt-draft pt-grow" value="${dt_e(a.nom)}"></td>
+      <td>${dt_e(a.devise)}</td>
+      <td><input type="text" inputmode="decimal" id="dt-av-montant-${a.id}" class="pt-draft pt-w90" value="${a.montant}"></td>
+      <td class="pt-muted">${a.maj ? fmtDateShort(a.maj) : ''}</td>
+      <td><button class="btn ghost small" onclick="dt_saveAvoir('${a.id}')">Enregistrer</button> <button class="btn ghost small" onclick="dt_toggleAvoir('${a.id}')">${open ? 'Masquer' : 'Historique'}</button> <button class="btn ghost small" onclick="dt_deleteAvoir('${a.id}')">Supprimer</button></td>
+    </tr>`;
+    if(open){
+      h += `<tr><td colspan="5"><div class="pt-fix" style="margin:0;"><div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Avant</th><th>Après</th><th>Écart</th></tr></thead><tbody>${
+        histo.length ? histo.map(x=>{
+          const ecart = (Number(x.montant) || 0) - (Number(x.ancien) || 0), first = x.ancien === null || x.ancien === undefined;
+          return `<tr><td>${fmtDateShort(x.date)}</td><td>${first ? '<span class="pt-muted">—</span>' : dt_fmt(x.ancien, a.devise)}</td><td>${dt_fmt(x.montant, a.devise)}</td><td>${first ? '<span class="pt-muted">création</span>' : `<span style="color:${ecart < 0 ? 'var(--rust)' : 'var(--moss)'};font-weight:600;">${ecart < 0 ? '−' : '+'}${dt_fmt(ecart, a.devise)}</span>`}</td></tr>`;
+        }).join('') : `<tr><td colspan="4" class="pt-muted">Aucun historique.</td></tr>`
+      }</tbody></table></div></div></td></tr>`;
+    }
+    return h;
+  }).join('');
+  return `<div class="ticket">
+    <div class="section-label">Disponible</div>
+    <div class="pt-kpis">
+      <div class="pt-kpi"><div class="n">${dt_fmt(tot.DZD,'DZD')}</div><div class="l">Disponible (DZD)</div></div>
+      <div class="pt-kpi"><div class="n">${dt_fmt(tot.EUR,'EUR')}</div><div class="l">Disponible (EUR)</div></div>
+      <div class="pt-kpi"><div class="n" style="color:${dt_netColor(netD)};">${dt_fmtSigned(netD,'DZD')}</div><div class="l">Position nette (DZD)</div></div>
+      <div class="pt-kpi"><div class="n" style="color:${dt_netColor(netE)};">${dt_fmtSigned(netE,'EUR')}</div><div class="l">Position nette (EUR)</div></div>
+    </div>
+    <div class="pt-muted">Position nette = disponible + ce qu'on te doit (emprunts) − ce que tu dois (dettes), devise par devise.</div>
+    <div class="pt-scroll" style="margin-top:12px;"><table class="pt-table"><thead><tr><th>Endroit</th><th>Devise</th><th>Montant</th><th>Mis à jour</th><th></th></tr></thead><tbody>${
+      rows || `<tr><td colspan="5" class="pt-muted">Aucun endroit enregistré. Ajoute tes espèces, ton compte bancaire, ton CCP…</td></tr>`
+    }</tbody></table></div>
+    <div class="grid grid-2" style="margin-top:12px;">
+      <div class="field"><label>Nouvel endroit</label><input type="text" id="dt-av-new-nom" class="pt-draft" list="dt-av-noms" placeholder="Espèces, Banque, CCP…"></div>
+      <div class="field"><label>Montant</label><input type="text" inputmode="decimal" id="dt-av-new-montant" class="pt-draft" placeholder="0"></div>
+      <div class="field"><label>Unité</label><select id="dt-av-new-devise" class="pt-draft"><option value="DZD">Dinars (DZD)</option><option value="EUR">Euros (EUR)</option></select></div>
+    </div>
+    <datalist id="dt-av-noms"><option value="Espèces"></option><option value="Banque"></option><option value="CCP"></option></datalist>
+    <div class="actions-row" style="margin-top:4px;"><button class="btn small" onclick="dt_addAvoir()">Ajouter cet endroit</button></div>
+  </div>`;
+}
+
 function dt_render(){
   if(activeModule !== 'dettes') return;
   const body = document.getElementById('dt-body'); if(!body) return;
@@ -2383,7 +2442,7 @@ function dt_render(){
   if(dt_selectedPerson !== DT_TOTAL && !personnes.includes(dt_selectedPerson)) dt_selectedPerson = DT_TOTAL;
   const isTotal = dt_selectedPerson === DT_TOTAL;
 
-  let html = `<div class="ticket">
+  let html = dt_avoirHtml() + `<div class="ticket">
     <div class="section-label">Ajouter</div>
     <div class="grid grid-2">
       <div class="field"><label>Nom</label><input type="text" id="dt-new-personne" class="pt-draft" list="dt-noms" placeholder="Rachid"></div>
@@ -2475,6 +2534,47 @@ async function dt_add(){
 async function dt_delete(id){
   if(!confirm('Supprimer cette ligne ?')) return;
   try{ await dt_dettesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+
+async function dt_addAvoir(){
+  const nom = document.getElementById('dt-av-new-nom').value.trim();
+  const raw = document.getElementById('dt-av-new-montant').value.trim();
+  if(!nom){ alert('Indique le nom de l’endroit (espèces, banque, CCP…).'); return; }
+  if(!raw){ alert('Indique un montant (0 si vide).'); return; }
+  const montant = dt_num(raw), devise = document.getElementById('dt-av-new-devise').value, today = todayISO(), now = new Date().toISOString();
+  try{
+    const ref = dt_dettesCol.doc(), hRef = dt_dettesCol.doc();
+    const batch = db.batch();
+    batch.set(ref, { kind:'avoir', nom, devise, montant, maj:today, creePar:currentUser, creeLe:now });
+    batch.set(hRef, { kind:'avoir_histo', avoirId:ref.id, date:today, ancien:null, montant, creePar:currentUser, creeLe:now });
+    await batch.commit();
+    document.getElementById('dt-av-new-nom').value = ''; document.getElementById('dt-av-new-montant').value = '';
+  }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function dt_saveAvoir(id){
+  const a = dt_avoirs.find(x=>x.id === id); if(!a) return;
+  const nom = document.getElementById('dt-av-nom-' + id).value.trim() || a.nom;
+  const raw = document.getElementById('dt-av-montant-' + id).value.trim();
+  if(!raw){ alert('Indique un montant (0 si vide).'); return; }
+  const montant = dt_num(raw), changed = Math.abs(montant - (Number(a.montant) || 0)) > 0.0001;
+  const today = todayISO(), now = new Date().toISOString();
+  try{
+    const batch = db.batch();
+    batch.update(dt_dettesCol.doc(id), changed ? { nom, montant, maj:today } : { nom });
+    if(changed) batch.set(dt_dettesCol.doc(), { kind:'avoir_histo', avoirId:id, date:today, ancien:Number(a.montant) || 0, montant, creePar:currentUser, creeLe:now });
+    await batch.commit();
+    pt_toast(changed ? 'Montant mis à jour.' : 'Enregistré.');
+  }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function dt_deleteAvoir(id){
+  if(!confirm('Supprimer cet endroit et tout son historique ?')) return;
+  try{
+    const batch = db.batch();
+    batch.delete(dt_dettesCol.doc(id));
+    dt_avoirHisto.filter(h=>h.avoirId === id).forEach(h=>batch.delete(dt_dettesCol.doc(h.id)));
+    await batch.commit();
+    if(dt_openAvoir === id) dt_openAvoir = null;
+  }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 
 initAuth();
