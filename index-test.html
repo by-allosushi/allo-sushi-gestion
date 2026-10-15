@@ -1,0 +1,2921 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Allo Sushi — TEST</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Allo Sushi" />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+
+  :root{
+    --paper:#0B0F0D; --surface:#151A17; --ink:#EAEDE9; --ink-muted:#8B958F; --line:#262E29;
+    --forest:#3B82F6; --forest-light:#60A5FA; --amber:#FBBF24; --amber-bg:#2A2410;
+    --rust:#F87171; --rust-bg:#2A0F13; --moss:#22C55E; --moss-bg:#0F2A1A;
+    --bar:#A78BFA; --bar-bg:#221B36; --wrap:#A8A29E; --wrap-bg:#242220;
+    --cons:#0D9488; --cons-bg:#F0FDFA;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .display{font-family:'Manrope',sans-serif;}
+  header.top{background:#0B0F0D;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;}
+  header.top .title{color:#FFFFFF;font-weight:700;font-size:17px;letter-spacing:-0.01em;font-family:'Manrope',sans-serif;}
+  header.top .date{color:#9CA3AF;font-size:11px;margin-top:3px;}
+  .alert-badge{background:var(--rust);color:#fff;border:none;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer;}
+  nav.tabs{background:var(--surface);border-bottom:1px solid var(--line);display:flex;overflow-x:auto;position:sticky;top:0;z-index:5;}
+  nav.tabs button{background:none;border:none;padding:13px 14px;font-size:13.5px;font-weight:500;color:var(--ink-muted);white-space:nowrap;border-bottom:2px solid transparent;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:'Inter',sans-serif;}
+  nav.tabs button.active{color:var(--forest);font-weight:700;border-bottom-color:var(--forest);}
+  .count-pill{background:var(--rust-bg);color:var(--rust);border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;}
+  main{max-width:760px;margin:0 auto;padding:18px 16px 40px;}
+  .ticket{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,0.04);padding:14px;margin-bottom:12px;}
+  .grid{display:grid;gap:10px;}
+  .grid-2{grid-template-columns:repeat(2,1fr);}
+  .grid-4{grid-template-columns:repeat(2,1fr);}
+  @media(min-width:600px){.grid-4{grid-template-columns:repeat(4,1fr);}}
+  .stat-icon{width:16px;height:16px;}
+  .stat-value{font-size:20px;font-weight:700;margin-top:6px;}
+  .stat-value.money{font-size:15px;}
+  .stat-label{font-size:11px;color:var(--ink-muted);margin-top:2px;}
+  .stat-box{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;}
+  h2.section{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-muted);margin:22px 0 8px;}
+  .cat-card{border-radius:10px;padding:12px;border:1px solid var(--line);text-align:left;cursor:pointer;display:block;width:100%;}
+  .chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:500;}
+  .btn{display:inline-flex;align-items:center;gap:6px;border-radius:6px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid var(--forest);background:var(--forest);color:#fff;font-family:'Inter',sans-serif;transition:opacity 0.15s;}
+  .btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--line);}
+  .btn.moss{background:var(--moss);border-color:var(--moss);}
+  .btn.rust{background:var(--rust);border-color:var(--rust);}
+  .btn.small{padding:6px 10px;font-size:12px;}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:13px;}
+  .form-section{margin-bottom:18px;}
+  .form-section:not(:first-child){padding-top:16px;border-top:1px solid var(--line);}
+  .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .section-label .num{width:18px;height:18px;border-radius:4px;background:var(--forest);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;}
+  .field label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);}
+  input, select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px;color:var(--ink);background:var(--surface);font-family:'IBM Plex Mono',monospace;width:100%;}
+  input[type=text], input:not([type]) {font-family:'Inter',sans-serif;}
+  .filter-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+  .filter-chip{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--ink-muted);cursor:pointer;}
+  .filter-chip.active{background:var(--forest);border-color:var(--forest);color:#fff;}
+  .top-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .search-wrap{position:relative;flex:1;min-width:150px;}
+  .search-wrap input{padding-left:30px;}
+  .search-wrap .icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--ink-muted);}
+  .lot-strip{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .lot-chip{border-radius:7px;padding:5px 8px;min-width:64px;border:1px dashed;font-family:'IBM Plex Mono',monospace;}
+  .lot-chip .q{font-size:11px;font-weight:600;display:block;}
+  .lot-chip .d{font-size:9.5px;color:var(--ink-muted);}
+  .article-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;}
+  .article-name{font-size:14px;font-weight:600;}
+  .article-meta{font-size:11px;color:var(--ink-muted);margin-top:2px;}
+  .article-stock{text-align:right;}
+  .article-stock .val{font-size:17px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+  .article-stock .money{font-size:11px;color:var(--ink-muted);}
+  .row-between{display:flex;justify-content:space-between;align-items:center;}
+  .movement-row{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;background:var(--surface);border:1px solid var(--line);border-radius:8px;font-size:12px;margin-bottom:6px;}
+  .movement-row .sub{color:var(--ink-muted);font-family:'IBM Plex Mono',monospace;font-size:11.5px;margin-top:2px;}
+  .x-btn{background:none;border:none;color:var(--ink-muted);cursor:pointer;font-size:15px;padding:2px 6px;}
+  .empty-state{text-align:center;padding:44px 20px;}
+  footer.foot{text-align:center;color:var(--ink-muted);font-size:11px;padding:20px;}
+  .mode-toggle{display:flex;gap:6px;margin-bottom:12px;}
+
+
+  :root{
+    --paper:#0B0F0D; --surface:#151A17; --ink:#EAEDE9; --ink-muted:#8B958F; --line:#262E29;
+    --forest:#3B82F6; --forest-light:#60A5FA; --amber:#FBBF24; --amber-bg:#2A2410;
+    --rust:#F87171; --rust-bg:#2A0F13; --moss:#22C55E; --moss-bg:#0F2A1A;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .display{font-family:'Manrope',sans-serif;}
+  header.top{background:#0B0F0D;padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;}
+  header.top .title{color:#FFFFFF;font-weight:700;font-size:17px;letter-spacing:-0.01em;font-family:'Manrope',sans-serif;}
+  header.top .date{color:#9CA3AF;font-size:11px;margin-top:3px;}
+  nav.tabs{background:var(--surface);border-bottom:1px solid var(--line);display:flex;overflow-x:auto;position:sticky;top:0;z-index:5;}
+  nav.tabs button{background:none;border:none;padding:13px 14px;font-size:13.5px;font-weight:500;color:var(--ink-muted);white-space:nowrap;border-bottom:2px solid transparent;cursor:pointer;font-family:'Inter',sans-serif;}
+  nav.tabs button.active{color:var(--forest);font-weight:700;border-bottom-color:var(--forest);}
+  main{max-width:720px;margin:0 auto;padding:18px 16px 50px;}
+  .ticket{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,0.04);padding:16px;margin-bottom:14px;}
+  .step-label{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .step-badge{width:24px;height:24px;border-radius:6px;background:var(--forest);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;font-family:'Manrope',sans-serif;flex-shrink:0;}
+  .step-title{font-size:14px;font-weight:600;}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:13px;}
+  .field label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);}
+  input, select{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:15px;color:var(--ink);background:var(--surface);font-family:'IBM Plex Mono',monospace;width:100%;}
+  input[type=text]{font-family:'Inter',sans-serif;}
+  .btn{display:inline-flex;align-items:center;gap:6px;border-radius:6px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid var(--forest);background:var(--forest);color:#fff;font-family:'Inter',sans-serif;transition:opacity 0.15s;}
+  .btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--line);}
+  .btn.rust{background:var(--rust);border-color:var(--rust);}
+  .btn.small{padding:6px 10px;font-size:12px;}
+  .line-row{display:flex;gap:8px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;}
+  .line-row input{background:var(--surface);}
+  .line-row .amount{width:110px;flex-shrink:0;}
+  .line-row .label-input{flex:1;}
+  .line-row .x-btn{background:none;border:none;color:var(--ink-muted);cursor:pointer;font-size:16px;padding:2px 4px;flex-shrink:0;}
+  .subtotal{display:flex;justify-content:space-between;align-items:center;padding:8px 4px 2px;font-size:13px;font-weight:600;color:var(--ink-muted);}
+  .result-box{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-radius:10px;margin-top:4px;}
+  .result-box.prelim{background:var(--amber-bg);}
+  .result-box.final{background:var(--moss-bg);}
+  .result-box .label{font-size:12.5px;font-weight:600;color:var(--ink-muted);}
+  .result-box .value{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+  .result-box.prelim .value{color:var(--amber);}
+  .result-box.final .value{color:var(--moss);}
+  .user-chip{background:rgba(255,255,255,0.12);border:none;color:#F1F3EC;font-size:11px;padding:5px 10px;border-radius:999px;cursor:pointer;font-family:'IBM Plex Mono',monospace;}
+  .hist-row{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:9px;margin-bottom:8px;cursor:pointer;}
+  .hist-row .d{font-size:13.5px;font-weight:600;}
+  .hist-row .s{font-size:11px;color:var(--ink-muted);margin-top:2px;}
+  .hist-row .e{font-size:15px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--moss);}
+  .empty-state{text-align:center;padding:40px 20px;color:var(--ink-muted);font-size:13px;}
+  footer.foot{text-align:center;color:var(--ink-muted);font-size:11px;padding:20px;}
+  .actions-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+
+
+  :root{
+    --paper:#0B0F0D; --surface:#151A17; --ink:#EAEDE9; --ink-muted:#8B958F; --line:#262E29;
+    --forest:#3B82F6; --forest-light:#60A5FA; --amber:#FBBF24; --amber-bg:#2A2410;
+    --rust:#F87171; --rust-bg:#2A0F13; --moss:#22C55E; --moss-bg:#0F2A1A;
+    --bar:#A78BFA; --bar-bg:#221B36; --service:#2DD4BF; --service-bg:#0F2A28;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .display{font-family:'Manrope',sans-serif;}
+  header.top{background:#0B0F0D;padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;}
+  header.top .title{color:#FFFFFF;font-weight:700;font-size:17px;letter-spacing:-0.01em;font-family:'Manrope',sans-serif;}
+  header.top .date{color:#9CA3AF;font-size:11px;margin-top:3px;}
+  nav.tabs{background:var(--surface);border-bottom:1px solid var(--line);display:flex;overflow-x:auto;position:sticky;top:0;z-index:5;}
+  nav.tabs button{background:none;border:none;padding:13px 14px;font-size:13.5px;font-weight:500;color:var(--ink-muted);white-space:nowrap;border-bottom:2px solid transparent;cursor:pointer;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:5px;}
+  nav.tabs button.active{color:var(--forest);font-weight:700;border-bottom-color:var(--forest);}
+  .count-pill{background:var(--rust-bg);color:var(--rust);border-radius:999px;padding:1px 7px;font-size:10px;font-weight:700;}
+  main{max-width:760px;margin:0 auto;padding:18px 16px 50px;}
+  .ticket{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 2px rgba(16,24,40,0.04);padding:14px;margin-bottom:12px;}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:13px;}
+  .field label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);}
+  input, select{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px;color:var(--ink);background:var(--surface);font-family:'IBM Plex Mono',monospace;width:100%;}
+  input[type=text]{font-family:'Inter',sans-serif;}
+  .btn{display:inline-flex;align-items:center;gap:6px;border-radius:6px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid var(--forest);background:var(--forest);color:#fff;font-family:'Inter',sans-serif;transition:opacity 0.15s;}
+  .btn.ghost{background:var(--surface);color:var(--ink);border-color:var(--line);}
+  .btn.small{padding:6px 10px;font-size:12px;}
+  .chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:500;}
+  .filter-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+  .filter-chip{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--ink-muted);cursor:pointer;}
+  .filter-chip.active{color:#fff;}
+  .grid{display:grid;gap:10px;}
+  .grid-2{grid-template-columns:repeat(2,1fr);}
+  .assign-row{display:flex;flex-direction:column;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-bottom:8px;}
+  .assign-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .assign-name{font-size:13.5px;font-weight:600;}
+  .assign-time{font-size:12px;color:var(--ink-muted);font-family:'IBM Plex Mono',monospace;}
+  .x-btn{background:none;border:none;color:var(--ink-muted);cursor:pointer;font-size:15px;padding:2px 6px;flex-shrink:0;}
+  .alert-banner{background:var(--rust-bg);border:1px solid var(--rust);border-radius:9px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;color:var(--rust);}
+  .alert-banner b{display:block;font-size:12.5px;margin-bottom:4px;}
+  .hist-row{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:9px;margin-bottom:8px;cursor:pointer;}
+  .hist-row .d{font-size:13.5px;font-weight:600;}
+  .hist-row .s{font-size:11px;color:var(--ink-muted);margin-top:2px;}
+  .empty-state{text-align:center;padding:40px 20px;color:var(--ink-muted);font-size:13px;}
+  footer.foot{text-align:center;color:var(--ink-muted);font-size:11px;padding:20px;}
+  .user-chip{background:rgba(255,255,255,0.12);border:none;color:#F1F3EC;font-size:11px;padding:5px 10px;border-radius:999px;cursor:pointer;font-family:'IBM Plex Mono',monospace;}
+  .cat-section-title{display:flex;align-items:center;gap:8px;margin:16px 0 8px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;}
+  .time-row{display:flex;gap:8px;}
+  .time-row input{width:auto;flex:1;}
+
+.module-tabs{background:var(--surface);display:flex;overflow-x:auto;border-bottom:1px solid var(--line);padding:0 8px;}
+.module-tabs button{background:none;border:none;padding:14px 16px;font-size:13.5px;font-weight:600;color:var(--ink-muted);white-space:nowrap;cursor:pointer;font-family:'Inter',sans-serif;border-bottom:2px solid transparent;display:flex;align-items:center;gap:6px;}
+.module-tabs button.active{color:var(--forest);border-bottom-color:var(--forest);}
+.module{display:none;}
+.module.active{display:block;}
+
+/* ===== Auth / Login ===== */
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--paper);}
+.login-box{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 24px;box-shadow:0 2px 10px rgba(16,24,40,0.06);}
+.login-box .brand{font-family:'Manrope',sans-serif;font-weight:800;font-size:20px;text-align:center;margin-bottom:4px;}
+.login-box .sub{text-align:center;color:var(--ink-muted);font-size:12.5px;margin-bottom:22px;}
+.login-box .field{margin-bottom:14px;}
+.login-box .error{background:var(--rust-bg);color:var(--rust);font-size:12.5px;border-radius:8px;padding:8px 10px;margin-bottom:14px;display:none;}
+.login-box .error.show{display:block;}
+.login-box .hint{font-size:11px;color:var(--ink-muted);margin-top:14px;text-align:center;line-height:1.5;}
+.login-box button.btn{width:100%;justify-content:center;margin-top:4px;}
+
+/* ===== Header user area ===== */
+.user-chip{display:flex;align-items:center;gap:8px;}
+.user-chip .who{color:#fff;font-size:11.5px;text-align:right;}
+.user-chip .who .role{display:block;color:#9CA3AF;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;margin-top:1px;}
+.user-chip button{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.16);color:#fff;font-size:11px;padding:6px 10px;border-radius:6px;cursor:pointer;font-family:'Inter',sans-serif;}
+
+/* ===== Home dashboard ===== */
+.home-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+@media(min-width:560px){.home-grid{grid-template-columns:repeat(3,1fr);}}
+.home-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 14px;text-align:center;cursor:pointer;transition:box-shadow .15s, transform .15s;}
+.home-card:hover{box-shadow:0 4px 14px rgba(16,24,40,0.08);transform:translateY(-1px);}
+.home-card .ic{font-size:26px;margin-bottom:8px;}
+.home-card .lbl{font-weight:700;font-size:13.5px;font-family:'Manrope',sans-serif;}
+.home-card .desc{font-size:11px;color:var(--ink-muted);margin-top:3px;}
+.home-card.locked{opacity:.4;cursor:not-allowed;}
+.home-card.admin{border-color:var(--forest);background:var(--forest-light);background:linear-gradient(180deg,#EEF2FF,#FFFFFF);}
+
+/* ===== User management ===== */
+.perm-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:13px;border-bottom:1px solid var(--line);}
+.perm-row:last-child{border-bottom:none;}
+.switch{position:relative;display:inline-block;width:38px;height:22px;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;}
+.switch .slider{position:absolute;cursor:pointer;inset:0;background:#D1D5DB;border-radius:999px;transition:.15s;}
+.switch .slider:before{content:"";position:absolute;height:16px;width:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s;}
+.switch input:checked + .slider{background:var(--forest);}
+.switch input:checked + .slider:before{transform:translateX(16px);}
+.user-card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px;}
+.user-card .uh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.user-card .uname{font-weight:700;font-size:14.5px;font-family:'Manrope',sans-serif;}
+.badge-admin{background:var(--bar-bg);color:var(--bar);border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-left:6px;}
+
+
+/* =========================================================
+   SMARTPHONE UX — professional responsive layer
+   Desktop styling is preserved; mobile rules activate <= 600px.
+   ========================================================= */
+@media (max-width:600px){
+  html{font-size:16px;overflow-x:hidden;}
+  body{width:100%;min-width:0;overflow-x:hidden;padding-bottom:env(safe-area-inset-bottom);}
+  *{box-sizing:border-box;}
+
+  header.top{
+    padding:12px 14px;
+    padding-top:max(12px, env(safe-area-inset-top));
+    gap:10px;
+    min-height:68px;
+    align-items:center;
+  }
+  header.top .title{font-size:16px;}
+  header.top .date{font-size:10px;}
+  header.top #sync-label{font-size:9.5px !important;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .user-chip{gap:6px;min-width:0;}
+  .user-chip .who{display:none;}
+  .user-chip button{min-height:40px;padding:8px 10px;font-size:11px;border-radius:8px;white-space:nowrap;}
+
+  .module-tabs{
+    padding:0 4px;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  .module-tabs::-webkit-scrollbar,nav.tabs::-webkit-scrollbar{display:none;}
+  .module-tabs button{
+    min-height:48px;
+    padding:12px 13px;
+    font-size:12px;
+    gap:5px;
+  }
+  nav.tabs{
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    top:48px;
+    z-index:15;
+  }
+  nav.tabs button{
+    min-height:46px;
+    padding:11px 12px;
+    font-size:12px;
+  }
+
+  main,
+  #module-home main,
+  #module-users main,
+  #caisse-main,
+  #depenses-main{
+    width:100%;
+    max-width:none !important;
+    margin:0 !important;
+    padding:14px 12px 28px !important;
+  }
+
+  h2.section{font-size:11px;margin:16px 0 8px;}
+  .ticket{
+    border-radius:12px;
+    padding:13px;
+    margin-bottom:10px;
+    box-shadow:0 1px 3px rgba(16,24,40,.05);
+  }
+
+  .grid{gap:8px;}
+  .grid-2,.grid-4{grid-template-columns:1fr;}
+  .home-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
+  .home-card{padding:16px 9px;min-height:116px;border-radius:12px;display:flex;flex-direction:column;justify-content:center;}
+  .home-card .ic{font-size:23px;margin-bottom:6px;}
+  .home-card .lbl{font-size:12.5px;}
+  .home-card .desc{font-size:10px;line-height:1.35;}
+
+  .field{gap:5px;min-width:0;}
+  .field label{font-size:10px;}
+  input,select,textarea{
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    min-height:44px;
+    padding:10px 11px;
+    font-size:16px !important;
+    border-radius:8px;
+    box-sizing:border-box;
+  }
+  textarea{min-height:88px;}
+  input[type="checkbox"],input[type="radio"]{min-height:auto;width:auto;}
+  input[type="date"]{min-width:0;padding-right:8px;}
+
+  .btn{
+    min-height:44px;
+    padding:10px 13px;
+    border-radius:8px;
+    font-size:13px;
+    justify-content:center;
+  }
+  .btn.small{min-height:40px;padding:8px 11px;font-size:12px;}
+  .actions-row{gap:7px;}
+  .actions-row .btn{flex:1 1 auto;min-width:120px;}
+
+  .top-row{gap:8px;margin-bottom:11px;align-items:stretch;}
+  .top-row > *{min-width:0;}
+  .filter-row{gap:6px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;scrollbar-width:none;}
+  .filter-row::-webkit-scrollbar{display:none;}
+  .filter-row > *{flex:0 0 auto;}
+
+  .result-box{
+    padding:12px 13px;
+    min-height:62px;
+    border-radius:10px;
+    gap:12px;
+  }
+  .result-box .label{font-size:11.5px;line-height:1.3;}
+  .result-box .value{font-size:18px;white-space:nowrap;}
+
+  .stat-value{font-size:18px;}
+  .stat-value.money{font-size:14px;}
+  .stat-label{font-size:10px;}
+
+  .line-row{
+    display:grid;
+    grid-template-columns:88px minmax(0,1fr) 32px;
+    gap:7px;
+    padding:9px;
+    align-items:center;
+  }
+  .line-row .amount{width:100%;}
+  .line-row select{width:100%;min-width:0;}
+  .movement-row,.hist-row{padding:11px 12px;gap:10px;}
+  .movement-row > *, .hist-row > *{min-width:0;}
+
+  .perm-row{
+    min-height:52px;
+    gap:12px;
+    padding:9px 0;
+    font-size:12px;
+  }
+  .perm-row span{line-height:1.35;max-width:calc(100% - 52px);}
+  .switch{width:42px;height:24px;}
+  .switch .slider:before{height:18px;width:18px;top:3px;left:3px;}
+  .switch input:checked + .slider:before{transform:translateX(18px);}
+
+  .user-card{padding:12px;border-radius:10px;}
+  .user-card .uh{gap:8px;align-items:flex-start;}
+  .user-card .uname{font-size:13.5px;}
+
+  .mode-toggle{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;scrollbar-width:none;}
+  .mode-toggle::-webkit-scrollbar{display:none;}
+  .mode-toggle > *{flex:0 0 auto;}
+
+  .time-row{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+
+  /* Prevent long labels / generated content from breaking the viewport. */
+  .article-head,.assign-top,.row-between{gap:8px;}
+  .article-head > *, .assign-top > *, .row-between > *{min-width:0;}
+  .mono{overflow-wrap:anywhere;}
+
+  /* Tables remain usable when a particular report genuinely needs columns. */
+  table{width:100%;font-size:11px;}
+  .table-wrap,.table-responsive{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+
+  /* Login */
+  #login-screen{padding:16px;align-items:center;}
+  .login-box{max-width:390px;padding:24px 18px;border-radius:14px;}
+  .login-box .brand{font-size:19px;}
+}
+
+@media (max-width:380px){
+  header.top{padding-left:11px;padding-right:11px;}
+  header.top .title{font-size:15px;}
+  .module-tabs button{padding-left:10px;padding-right:10px;font-size:11.5px;}
+  nav.tabs button{padding-left:10px;padding-right:10px;}
+  main,#module-home main,#module-users main,#caisse-main,#depenses-main{padding-left:10px !important;padding-right:10px !important;}
+  .home-grid{gap:7px;}
+  .home-card{min-height:108px;padding:13px 7px;}
+  .home-card .lbl{font-size:11.5px;}
+}
+
+/* Reduce motion for users who prefer it. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto !important;transition:none !important;animation:none !important;}
+}
+
+/* ===== Module Pointage & Paie ===== */
+.pt-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.pt-muted{color:var(--ink-muted);font-size:12px;line-height:1.45;}
+.pt-link{color:var(--forest-light);text-decoration:underline;}
+.pt-auto{width:auto;}
+.pt-w90{width:90px;}
+.pt-grow{flex:1;min-width:120px;}
+.pt-filein{width:auto;font-size:12px;padding:6px 8px;}
+.pt-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0;}
+@media(min-width:600px){.pt-kpis{grid-template-columns:repeat(4,1fr);}}
+.pt-kpi{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+.pt-kpi .n{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:var(--forest-light);}
+.pt-kpi .l{font-size:10.5px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.03em;margin-top:2px;}
+.pt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.pt-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+.pt-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-muted);padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+.pt-table td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle;}
+.pt-table input,.pt-table select{padding:6px 8px;font-size:13px;min-width:0;}
+.pt-table tr.pt-total td{background:var(--paper);font-weight:700;}
+.pt-table tr.pt-manual td{color:var(--ink-muted);font-style:italic;}
+.pt-form{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px;align-items:center;margin-top:12px;}
+.pt-form-title{display:flex;align-items:center;gap:8px;}
+.pt-form-title label{font-size:13.5px;font-weight:700;white-space:nowrap;}
+@media(max-width:600px){
+  .pt-form{grid-template-columns:1fr 1fr;}
+  .pt-form .pt-form-title{grid-column:1/-1;}
+  .pt-form .btn{grid-column:1/-1;justify-content:center;}
+}
+.pt-badge{display:inline-block;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;}
+.pt-b-prime{background:var(--moss-bg);color:var(--moss);}
+.pt-b-off{background:var(--amber-bg);color:var(--amber);}
+.pt-b-avance{background:var(--rust-bg);color:var(--rust);}
+.pt-src{font-size:10px;color:var(--ink-muted);margin-left:6px;}
+.pt-chevron{font-size:13px;color:var(--ink-muted);}
+.dt-pers-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid var(--line);cursor:pointer;}
+.dt-pers-row:last-child{border-bottom:none;}
+.dt-pers-row:hover{background:var(--paper);}
+.dt-pers-row-active{background:rgba(59,130,246,0.12);}
+.pt-plus{color:var(--moss);font-family:'IBM Plex Mono',monospace;}
+.pt-minus{color:var(--rust);font-family:'IBM Plex Mono',monospace;}
+.pt-an{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 11px;background:var(--rust-bg);border:1px solid var(--rust);border-radius:8px;margin-bottom:6px;font-size:12.5px;color:var(--rust);}
+.pt-an .pt-an-reason{font-size:11.5px;opacity:.85;margin-top:2px;}
+.pt-an.ok{background:var(--moss-bg);border-color:var(--moss);color:var(--moss);}
+.pt-fix{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px;margin:-2px 0 10px;}
+.pt-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--surface);border:1px solid var(--moss);color:var(--moss);padding:10px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:60;}
+.pt-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<!-- ===================== ECRAN DE CONNEXION ===================== -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="brand display">ALLO SUSHI</div>
+    <div class="sub" id="login-sub">Connexion à l'espace de gestion</div>
+    <div class="error" id="login-error"></div>
+    <form id="login-form" onsubmit="return false;">
+      <div class="field">
+        <label>Nom d'utilisateur</label>
+        <input type="text" id="login-username" autocomplete="username" placeholder="ex: lila">
+      </div>
+      <div class="field">
+        <label>Mot de passe</label>
+        <input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••">
+      </div>
+      <div class="field" id="login-confirm-wrap" style="display:none;">
+        <label>Confirmer le mot de passe</label>
+        <input type="password" id="login-password-confirm" placeholder="••••••••">
+      </div>
+      <button class="btn" id="login-submit-btn" onclick="handleAuthSubmit()">Se connecter</button>
+    </form>
+    <div class="hint" id="login-hint"></div>
+  </div>
+</div>
+
+<!-- ===================== APPLICATION ===================== -->
+<div id="app-shell" style="display:none;">
+<div style="background:#FBBF24;color:#1a1400;text-align:center;font-size:12px;font-weight:700;padding:6px 10px;">VERSION TEST — mêmes données que la version normale. La correction automatique est désactivée tant que vous ne l'activez pas.</div>
+<header class="top">
+  <div>
+    <div class="title display">ALLO SUSHI</div>
+    <div class="date mono" id="today-label"></div>
+    <div class="mono" id="sync-label" style="font-size:10.5px;color:#9CA3AF;margin-top:3px;">Connexion…</div>
+  </div>
+  <div class="user-chip">
+    <div class="who" id="user-who"></div>
+    <button onclick="handleLogout()">Déconnexion</button>
+  </div>
+</header>
+
+<nav class="module-tabs" id="module-tabs"></nav>
+
+<div id="module-home" class="module active">
+  <main style="max-width:760px;margin:0 auto;padding:18px 16px 40px;">
+    <h2 class="section" style="margin-top:4px;">Rubriques</h2>
+    <div class="home-grid" id="home-grid"></div>
+  </main>
+</div>
+
+<div id="module-caisse" class="module">
+  <nav class="tabs" id="caisse-tabs"></nav>
+  <main id="caisse-main"></main>
+</div>
+
+<div id="module-pointage" class="module">
+  <nav class="tabs" id="pointage-tabs"></nav>
+  <main id="pointage-main" style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
+    <div class="ticket" id="pt-head">
+      <div class="section-label">Période affichée <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— s’applique à tous les onglets</span></div>
+      <div class="grid grid-2">
+        <div class="field"><label>Du</label><input type="date" id="pt-from" onchange="pt_periodInput()"></div>
+        <div class="field"><label>Au</label><input type="date" id="pt-to" onchange="pt_periodInput()"></div>
+      </div>
+      <div class="pt-muted" id="pt-period-status" style="margin-top:8px;"></div>
+    </div>
+    <div id="pt-body"></div>
+  </main>
+</div>
+
+<div id="module-dettes" class="module">
+  <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
+    <div id="dt-body"></div>
+  </main>
+</div>
+<div id="module-users" class="module">
+  <main style="max-width:760px;margin:0 auto;padding:18px 16px 40px;">
+    <h2 class="section" style="margin-top:4px;">Nouvel utilisateur</h2>
+    <div class="ticket">
+      <div class="grid grid-2" style="margin-bottom:10px;">
+        <div class="field">
+          <label>Nom d'utilisateur</label>
+          <input type="text" id="nu-username" placeholder="ex: karim">
+        </div>
+        <div class="field">
+          <label>Mot de passe</label>
+          <input type="password" id="nu-password" placeholder="••••••••">
+        </div>
+      </div>
+      <div class="perm-row">
+        <span>Administrateur (accès total + gestion des utilisateurs)</span>
+        <label class="switch"><input type="checkbox" id="nu-admin" onchange="uu_toggleAdminFields()"><span class="slider"></span></label>
+      </div>
+      <div id="nu-perm-detail">
+        <div class="perm-row"><span>Accès Caisse</span><label class="switch"><input type="checkbox" id="nu-perm-caisse" checked><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Pointage</span><label class="switch"><input type="checkbox" id="nu-perm-pointage" checked><span class="slider"></span></label></div>
+      </div>
+      <button class="btn moss" style="margin-top:14px;" onclick="uu_createUser()">➕ Créer l'utilisateur</button>
+    </div>
+
+    <h2 class="section">Utilisateurs existants</h2>
+    <div id="users-list"></div>
+  </main>
+</div>
+
+<footer class="foot">Données synchronisées en temps réel entre tous les appareils connectés à cette app.</footer>
+</div><!-- /app-shell -->
+
+<script>
+/* ==================== SOCLE COMMUN (partagé par les modules) ==================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyAy-IYGVxejJI9uN_qJDGcY0of-vY6AwIg",
+  authDomain: "allo-sushi-project.firebaseapp.com",
+  projectId: "allo-sushi-project",
+  storageBucket: "allo-sushi-project.firebasestorage.app",
+  messagingSenderId: "1063110034519",
+  appId: "1:1063110034519:web:6bd3892757bb9ab3f9cf12"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const USER_KEY = 'allosushi-user';
+let currentUser = '';
+function askUserName(){ /* obsolète : l'utilisateur est désormais défini via la connexion */ }
+
+/* ==================== AUTHENTIFICATION & AUTORISATIONS ==================== */
+const appUsersCol = db.collection('app_users');
+const SESSION_KEY = 'allosushi-session';
+const MODULE_DEFS = [
+  { key:'caisse',   label:'Caisse',    ic:'💰', desc:'Sessions de caisse' },
+  { key:'pointage', label:'Pointage',  ic:'⏱️', desc:'Heures, anomalies & paie' },
+];
+let session = null; // { username, isAdmin, permissions:{caisse,pointage} }
+let usersCache = [];
+let usersSetupMode = false;
+
+function hasAccess(moduleKey){
+  if(!session) return false;
+  if(session.isAdmin) return true;
+  return !!(session.permissions && session.permissions[moduleKey]);
+}
+
+function showAuthError(msg){
+  const el = document.getElementById('login-error');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+function clearAuthError(){
+  document.getElementById('login-error').classList.remove('show');
+}
+
+async function initAuth(){
+  document.getElementById('sync-label').textContent = 'Connexion…';
+  let snap;
+  try{
+    snap = await appUsersCol.get();
+  }catch(e){
+    showAuthError("Impossible de contacter le serveur. Vérifiez votre connexion.");
+    return;
+  }
+  usersCache = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+
+  if(usersCache.length === 0){
+    // Premier lancement : on crée le compte administrateur
+    usersSetupMode = true;
+    document.getElementById('login-sub').textContent = "Créez votre compte administrateur";
+    document.getElementById('login-submit-btn').textContent = "Créer le compte administrateur";
+    document.getElementById('login-confirm-wrap').style.display = 'block';
+    document.getElementById('login-hint').textContent = "Ce compte aura accès à toutes les rubriques et pourra créer d'autres utilisateurs.";
+    return;
+  }
+
+  // Session déjà ouverte sur cet appareil ?
+  const saved = localStorage.getItem(SESSION_KEY);
+  if(saved){
+    try{
+      const s = JSON.parse(saved);
+      const match = usersCache.find(u=>u.id === s.username);
+      if(match){
+        applySession(match);
+        return;
+      }
+    }catch(e){}
+    localStorage.removeItem(SESSION_KEY);
+  }
+}
+
+function applySession(userDoc){
+  session = {
+    username: userDoc.id,
+    displayName: userDoc.username || userDoc.id,
+    isAdmin: !!userDoc.isAdmin,
+    permissions: userDoc.permissions || {}
+  };
+  currentUser = session.displayName;
+  localStorage.setItem(USER_KEY, currentUser);
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ username: session.username }));
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-shell').style.display = 'block';
+  renderUserChip();
+  buildModuleTabs();
+  showModule('home');
+  if(session.isAdmin){ uu_subscribeUsers(); }
+}
+
+async function handleAuthSubmit(){
+  clearAuthError();
+  const uname = (document.getElementById('login-username').value || '').trim().toLowerCase();
+  const pwd = document.getElementById('login-password').value || '';
+  if(!uname || !pwd){ showAuthError("Entrez un nom d'utilisateur et un mot de passe."); return; }
+
+  if(usersSetupMode){
+    const confirm = document.getElementById('login-password-confirm').value || '';
+    if(pwd.length < 4){ showAuthError("Le mot de passe doit contenir au moins 4 caractères."); return; }
+    if(pwd !== confirm){ showAuthError("Les mots de passe ne correspondent pas."); return; }
+    const userDoc = {
+      username: uname,
+      password: pwd,
+      isAdmin: true,
+      permissions: { caisse:true, pointage:true },
+      creeLe: new Date().toISOString()
+    };
+    try{
+      await appUsersCol.doc(uname).set(userDoc);
+    }catch(e){
+      showAuthError("Erreur lors de la création du compte. Réessayez.");
+      return;
+    }
+    usersCache = [{ id: uname, ...userDoc }];
+    usersSetupMode = false;
+    applySession({ id: uname, ...userDoc });
+    return;
+  }
+
+  const match = usersCache.find(u => u.id === uname);
+  if(!match || match.password !== pwd){
+    showAuthError("Nom d'utilisateur ou mot de passe incorrect.");
+    return;
+  }
+  applySession(match);
+}
+
+function handleLogout(){
+  if(!confirm('Se déconnecter ?')) return;
+  session = null;
+  currentUser = '';
+  localStorage.removeItem(SESSION_KEY);
+  document.getElementById('login-password').value = '';
+  document.getElementById('app-shell').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  initAuth();
+}
+
+function renderUserChip(){
+  const el = document.getElementById('user-who');
+  if(!el || !session) return;
+  el.innerHTML = `${esc(session.displayName)}<span class="role">${session.isAdmin ? 'Administrateur' : 'Employé'}</span>`;
+}
+
+/* ---- Onglets du haut, générés selon les autorisations ---- */
+function buildModuleTabs(){
+  const nav = document.getElementById('module-tabs');
+  let html = `<button data-mod="home" onclick="showModule('home')">🏠 Accueil</button>`;
+  MODULE_DEFS.forEach(m=>{
+    if(hasAccess(m.key)) html += `<button data-mod="${m.key}" onclick="showModule('${m.key}')">${m.ic} ${m.label}</button>`;
+  });
+  if(session && session.isAdmin) html += `<button data-mod="users" onclick="showModule('users')">👤 Utilisateurs</button>`;
+  if(hasDettesAccess()) html += `<button data-mod="dettes" onclick="showModule('dettes')">💶 Carnet</button>`;
+  nav.innerHTML = html;
+}
+
+function renderHome(){
+  const grid = document.getElementById('home-grid');
+  let html = '';
+  MODULE_DEFS.forEach(m=>{
+    if(hasAccess(m.key)){
+      html += `<div class="home-card" onclick="showModule('${m.key}')">
+        <div class="ic">${m.ic}</div>
+        <div class="lbl">${m.label}</div>
+        <div class="desc">${m.desc}</div>
+      </div>`;
+    }
+  });
+  if(session && session.isAdmin){
+    html += `<div class="home-card admin" onclick="showModule('users')">
+      <div class="ic">👤</div>
+      <div class="lbl">Utilisateurs</div>
+      <div class="desc">Comptes & autorisations</div>
+    </div>`;
+  }
+  if(hasDettesAccess()){
+    html += `<div class="home-card" onclick="showModule('dettes')">
+      <div class="ic">💶</div>
+      <div class="lbl">Carnet</div>
+      <div class="desc">Dettes & emprunts personnels</div>
+    </div>`;
+  }
+  if(!html) html = `<div class="empty-state">Aucune rubrique ne vous a été attribuée. Contactez votre administrateur.</div>`;
+  grid.innerHTML = html;
+}
+
+/* ---- Gestion des utilisateurs (admin) ---- */
+function uu_toggleAdminFields(){
+  document.getElementById('nu-perm-detail').style.opacity = document.getElementById('nu-admin').checked ? '0.4' : '1';
+}
+
+async function uu_createUser(){
+  const uname = (document.getElementById('nu-username').value || '').trim().toLowerCase();
+  const pwd = document.getElementById('nu-password').value || '';
+  if(!uname || !pwd){ alert("Entrez un nom d'utilisateur et un mot de passe."); return; }
+  if(pwd.length < 4){ alert("Le mot de passe doit contenir au moins 4 caractères."); return; }
+  if(usersCache.some(u=>u.id===uname)){ alert("Ce nom d'utilisateur existe déjà."); return; }
+  const isAdmin = document.getElementById('nu-admin').checked;
+  const userDoc = {
+    username: uname,
+    password: pwd,
+    isAdmin,
+    permissions: isAdmin ? { caisse:true, pointage:true } : {
+      caisse: document.getElementById('nu-perm-caisse').checked,
+      pointage: document.getElementById('nu-perm-pointage').checked
+    },
+    creeLe: new Date().toISOString(),
+    creePar: currentUser
+  };
+  await appUsersCol.doc(uname).set(userDoc);
+  document.getElementById('nu-username').value = '';
+  document.getElementById('nu-password').value = '';
+  document.getElementById('nu-admin').checked = false;
+  document.getElementById('nu-perm-caisse').checked = true;
+  document.getElementById('nu-perm-pointage').checked = true;
+  uu_toggleAdminFields();
+}
+
+async function uu_togglePerm(userId, key, checked){
+  await appUsersCol.doc(userId).set({ permissions: { [key]: checked } }, { merge:true });
+}
+async function uu_toggleAdmin(userId, checked){
+  const patch = { isAdmin: checked };
+  if(checked) patch.permissions = { caisse:true, pointage:true };
+  await appUsersCol.doc(userId).set(patch, { merge:true });
+}
+async function uu_deleteUser(userId){
+  if(userId === session.username){ alert("Vous ne pouvez pas supprimer votre propre compte."); return; }
+  if(!confirm(`Supprimer l'utilisateur "${userId}" ?`)) return;
+  await appUsersCol.doc(userId).delete();
+}
+async function uu_resetPassword(userId){
+  const pwd = prompt(`Nouveau mot de passe pour "${userId}" :`);
+  if(!pwd) return;
+  if(pwd.length < 4){ alert("Le mot de passe doit contenir au moins 4 caractères."); return; }
+  await appUsersCol.doc(userId).set({ password: pwd }, { merge:true });
+  alert("Mot de passe mis à jour.");
+}
+
+let uu_unsub = null;
+function uu_subscribeUsers(){
+  if(uu_unsub) return;
+  uu_unsub = appUsersCol.onSnapshot(snap=>{
+    usersCache = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    uu_render();
+    // Si notre propre compte a été modifié (retrait admin, permissions), on met à jour la session
+    if(session){
+      const me = usersCache.find(u=>u.id===session.username);
+      if(me){
+        session.isAdmin = !!me.isAdmin;
+        session.permissions = me.permissions || {};
+        buildModuleTabs();
+        renderUserChip();
+        if(!session.isAdmin && document.getElementById('module-users').classList.contains('active')) showModule('home');
+      }
+    }
+  });
+}
+
+function uu_render(){
+  const el = document.getElementById('users-list');
+  if(!el) return;
+  el.innerHTML = usersCache.slice().sort((a,b)=>a.id.localeCompare(b.id)).map(u=>{
+    const perms = u.permissions || {};
+    const permRows = MODULE_DEFS.map(m=>`
+      <div class="perm-row">
+        <span>${m.ic} ${m.label}</span>
+        <label class="switch">
+          <input type="checkbox" ${perms[m.key]?'checked':''} ${u.isAdmin?'disabled':''}
+            onchange="uu_togglePerm('${u.id}','${m.key}',this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>`).join('');
+    return `<div class="user-card">
+      <div class="uh">
+        <div class="uname">${esc(u.username||u.id)}${u.isAdmin?'<span class="badge-admin">Admin</span>':''}</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn ghost small" onclick="uu_resetPassword('${u.id}')">🔑 Mot de passe</button>
+          <button class="btn rust small" onclick="uu_deleteUser('${u.id}')">🗑️</button>
+        </div>
+      </div>
+      <div class="perm-row">
+        <span>Administrateur</span>
+        <label class="switch"><input type="checkbox" ${u.isAdmin?'checked':''} onchange="uu_toggleAdmin('${u.id}',this.checked)"><span class="slider"></span></label>
+      </div>
+      ${permRows}
+    </div>`;
+  }).join('') || `<div class="empty-state">Aucun utilisateur.</div>`;
+}
+
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function uid(){ return Math.random().toString(36).slice(2,10); }
+function toLocalISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function todayISO(){ return toLocalISO(new Date()); }
+function prevDateStr(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setDate(d.getDate()-1);
+  return toLocalISO(d);
+}
+function fmtDateShort(iso){
+  if(!iso) return '—';
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('fr-FR',{day:'2-digit', month:'2-digit', year:'numeric'});
+}
+function fmtDateLong(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('fr-FR',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
+}
+
+let activeModule = 'home';
+function showModule(name){
+  if(name!=='home' && name!=='users' && !hasAccess(name)) name = 'home';
+  if(name==='users' && !(session && session.isAdmin)) name = 'home';
+  if(name==='dettes' && !hasDettesAccess()) name = 'home';
+  if(!document.getElementById('module-'+name)) name = 'home'; // module inexistant (ex. ancienne rubrique supprimée)
+  activeModule = name;
+  document.querySelectorAll('.module').forEach(m=>m.classList.remove('active'));
+  document.getElementById('module-'+name).classList.add('active');
+  document.querySelectorAll('#module-tabs button').forEach(b=>{
+    b.classList.toggle('active', b.getAttribute('data-mod')===name);
+  });
+  if(name==='home') renderHome();
+  if(name==='users') uu_render();
+  if(name==='caisse' && typeof ca_render==='function') ca_render();
+  if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
+  if(name==='dettes'){ if(typeof dt_start==='function') dt_start(); if(typeof dt_render==='function') dt_render(); }
+}
+
+document.getElementById('today-label').textContent =
+  new Date().toLocaleDateString('fr-FR',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
+
+/* ==================== MODULE CAISSE ==================== */
+const ca_caisseCol = db.collection('caisse_sessions');
+
+
+function ca_setSyncLabel(text){
+  const el = document.getElementById('sync-label');
+  if(el) el.textContent = text;
+}
+
+
+/* ---------------- Helpers ---------------- */
+function ca_fmtMoney(n){
+  if(n===null||n===undefined||isNaN(n)) return '0 DA';
+  return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2}) + ' DA';
+}
+function ca_parseNum(v){
+  if(v===null||v===undefined||v==='') return 0;
+  const n = Number(String(v).replace(',','.'));
+  return isNaN(n) ? 0 : n;
+}
+
+/* ---------------- État ---------------- */
+let ca_allSessions = {};
+let ca_currentTab = 'caisse';
+let ca_workingDate = todayISO();
+let ca_session = ca_blankSession(ca_workingDate);
+let ca_detailOpen = true;
+let ca_openSections = ['entrant'];
+const CA_SECTIONS = [
+  {key:'entrant', title:'Fonds de caisse', icon:'💵'},
+  {key:'horscaisse', title:'Sorties de caisse', subtitle:'Virements, non réglé, retraits', icon:'↗'},
+  {key:'erp', title:'Total des ventes (ERP)', icon:'🧾'},
+  {key:'validation', title:'Comptage & validation', icon:'✓'}
+];
+function ca_toggleDetail(){ ca_detailOpen = !ca_detailOpen; ca_render(); }
+function ca_toggleSection(key){
+  const i = ca_openSections.indexOf(key);
+  if(i>-1) ca_openSections.splice(i,1); else ca_openSections.push(key);
+  ca_render();
+}
+function ca_sectionSubtotal(key){
+  if(key==='entrant') return ca_parseNum(ca_session.debutCaisse)+ca_totalEntreesDiverses(ca_session);
+  if(key==='horscaisse') return ca_sumLines(ca_session.sorties);
+  if(key==='erp') return ca_parseNum(ca_session.totalVentesErp);
+  return null;
+}
+
+const CA_SORTIE_MOTIFS = [
+  {value:'virement', label:'Virement', calcType:'virement'},
+  {value:'nonregle', label:'Commande non réglée', calcType:'nonregle'},
+  {value:'retrait', label:'Retrait de caisse', calcType:'retrait'}
+];
+function ca_sortieCalcType(motif){ const m = CA_SORTIE_MOTIFS.find(x=>x.value===motif); return m ? m.calcType : 'retrait'; }
+function ca_sumSortiesByType(sorties, calcType){ return (sorties||[]).filter(l=>ca_sortieCalcType(l.motif)===calcType).reduce((s,l)=>s+ca_parseNum(l.montant),0); }
+
+/* ---------------- Calculs ---------------- */
+function ca_sumLines(lines){ return (lines||[]).reduce((s,l)=>s+ca_parseNum(l.montant),0); }
+function ca_totalEntreesDiverses(s){ return ca_sumLines(s.entrees); }
+function ca_partEspecesErp(s){ return ca_parseNum(s.totalVentesErp) - ca_sumSortiesByType(s.sorties,'virement') - ca_sumSortiesByType(s.sorties,'nonregle'); }
+function ca_montantDisponible(s){ return ca_parseNum(s.debutCaisse) + ca_totalEntreesDiverses(s) + ca_partEspecesErp(s); }
+function ca_totalRetraits(s){ return ca_sumSortiesByType(s.sorties,'retrait'); }
+function ca_montantTheorique(s){ return ca_montantDisponible(s) - ca_totalRetraits(s); }
+function ca_ecart(s){
+  if(s.montantCompte===undefined || s.montantCompte===null || s.montantCompte==='') return null;
+  return ca_parseNum(s.montantCompte) - ca_montantTheorique(s);
+}
+function ca_montantPourLendemain(s){
+  if(s.montantCompte!==undefined && s.montantCompte!==null && s.montantCompte!==''){
+    return ca_parseNum(s.montantCompte);
+  }
+  return ca_montantTheorique(s);
+}
+
+function ca_normalizeSession(s, date){
+  // migration : anciennes données en listes séparées -> liste unique "sorties"
+  let sorties = Array.isArray(s.sorties) ? s.sorties : null;
+  if(!sorties){
+    sorties = [
+      ...(Array.isArray(s.virements) ? s.virements.map(l=>({...l, motif:'virement'})) : []),
+      ...(Array.isArray(s.enAttente) ? s.enAttente.map(l=>({...l, motif:'nonregle'})) : []),
+      ...(Array.isArray(s.retraitsGerant) ? s.retraitsGerant.map(l=>({...l, motif:'retrait'})) : []),
+      ...(Array.isArray(s.retraitsDivers) ? s.retraitsDivers.map(l=>({...l, motif:'retrait'})) : []),
+    ];
+  }
+  return {
+    date: date,
+    debutCaisse: s.debutCaisse!==undefined ? s.debutCaisse : '',
+    debutCaisseAuto: !!s.debutCaisseAuto,
+    debutCaisseManuel: !!s.debutCaisseManuel,
+    entrees: Array.isArray(s.entrees) ? s.entrees : [],
+    totalVentesErp: s.totalVentesErp!==undefined ? s.totalVentesErp : '',
+    sorties: sorties,
+    montantCompte: s.montantCompte!==undefined ? s.montantCompte : '',
+    noteValidation: s.noteValidation!==undefined ? s.noteValidation : '',
+    enregistreParEn: s.enregistreParEn,
+    enregistreLe: s.enregistreLe,
+  };
+}
+function ca_blankSession(date){
+  const prev = ca_allSessions[prevDateStr(date)];
+  const base = { date, entrees: [], totalVentesErp: '', sorties: [], montantCompte: '', noteValidation: '' };
+  if(prev){
+    return { ...base, debutCaisse: ca_montantPourLendemain(prev), debutCaisseAuto: true };
+  }
+  return { ...base, debutCaisse: '', debutCaisseAuto: false };
+}
+function ca_loadSessionForDate(date){
+  ca_workingDate = date;
+  const existing = ca_allSessions[date];
+  ca_session = existing ? ca_normalizeSession(existing, date) : ca_blankSession(date);
+  ca_detailOpen = !existing; // clôture déjà enregistrée -> repliée par défaut ; nouvelle saisie -> ouverte
+  ca_render();
+}
+
+/* ---------------- Firestore sync ---------------- */
+ca_caisseCol.onSnapshot((snap)=>{
+  const next = {};
+  snap.forEach(doc=>{ next[doc.id] = doc.data(); });
+  ca_allSessions = next;
+  if(!ca_allSessions[ca_workingDate] && !ca_session.debutCaisseManuel){
+    const prev = ca_allSessions[prevDateStr(ca_workingDate)];
+    if(prev){
+      ca_session.debutCaisse = ca_montantPourLendemain(prev);
+      ca_session.debutCaisseAuto = true;
+    }
+  }
+  ca_setSyncLabel('✓ Synchronisé');
+  ca_render();
+}, (err)=>{
+  console.error(err);
+  ca_setSyncLabel('⚠ Hors ligne / erreur de connexion');
+});
+
+async function ca_saveSession(){
+  if(!currentUser){ askUserName(false); if(!currentUser) return; }
+  try{
+    ca_setSyncLabel('Enregistrement…');
+    const { debutCaisseAuto, debutCaisseManuel, ...cleanSession } = ca_session;
+    const saved = { ...cleanSession, enregistreParEn: currentUser, enregistreLe: new Date().toISOString() };
+    await ca_caisseCol.doc(ca_session.date).set(saved);
+    ca_allSessions = { ...ca_allSessions, [ca_session.date]: saved };
+    ca_setSyncLabel('✓ Synchronisé');
+    ca_render();
+    alert('Clôture du '+fmtDateShort(ca_session.date)+' enregistrée.');
+  }catch(e){
+    console.warn(e);
+    ca_setSyncLabel('⚠ Échec de la sauvegarde');
+  }
+}
+async function ca_deleteSession(date){
+  if(!confirm('Supprimer définitivement la clôture du '+fmtDateShort(date)+' ?')) return;
+  try{ await ca_caisseCol.doc(date).delete(); }catch(e){ console.warn(e); }
+}
+
+/* ---------------- Render ---------------- */
+function ca_render(){
+  const active = document.activeElement;
+  const activeId = (active && active.id) ? active.id : null;
+  let selStart=null, selEnd=null;
+  if(active && typeof active.selectionStart === 'number'){
+    selStart = active.selectionStart; selEnd = active.selectionEnd;
+  }
+  const scrollY = window.scrollY;
+  ca_renderTabs();
+  const main = document.getElementById('caisse-main');
+  if(ca_currentTab==='caisse') main.innerHTML = ca_renderCaisseTab();
+  else main.innerHTML = ca_renderHistoriqueTab();
+  if(activeId){
+    const el = document.getElementById(activeId);
+    if(el){
+      el.focus();
+      if(selStart!=null && el.setSelectionRange){
+        try{ el.setSelectionRange(selStart, selEnd); }catch(e){}
+      }
+    }
+  }
+  window.scrollTo(0, scrollY);
+}
+function ca_setTab(t){ ca_currentTab = t; ca_render(); }
+
+function ca_renderTabs(){
+  const tabs = [
+    {id:'caisse', label:'Caisse du jour'},
+    {id:'historique', label:'Historique'},
+  ];
+  document.getElementById('caisse-tabs').innerHTML = tabs.map(t=>`
+    <button class="${ca_currentTab===t.id?'active':''}" onclick="ca_setTab('${t.id}')">${esc(t.label)}</button>
+  `).join('');
+}
+
+function ca_renderStatusBanner(existing, ecart){
+  const compte = ca_session.montantCompte !== '' && ca_session.montantCompte !== undefined && ca_session.montantCompte !== null;
+  let statusColor = 'var(--ink-muted)', statusBg = 'var(--paper)', statusText = '⏳ Comptage non renseigné', statusIcon = '⏳';
+  if(compte){
+    if(ecart !== null && Math.abs(ecart) < 0.01){ statusColor='#22C55E'; statusBg='#0F2A1A'; statusText='Caisse correcte — aucun écart'; statusIcon='✓'; }
+    else { statusColor='#F87171'; statusBg='#2A0F13'; statusText='Écart détecté — à vérifier avec le caissier'; statusIcon='⚠'; }
+  }
+  const mutedColor = compte ? 'rgba(255,255,255,0.55)' : 'var(--ink-muted)';
+  return `
+    <div class="ticket" style="background:${statusBg};border:1.5px solid ${statusColor};">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:20px;color:${statusColor};font-weight:700;">${statusIcon}</span>
+          <div>
+            <div style="font-weight:700;font-size:14px;color:${statusColor};">${statusText}</div>
+            <div style="font-size:11.5px;color:${mutedColor};margin-top:2px;">${fmtDateShort(ca_session.date)}${existing && existing.enregistreParEn ? ' · enregistrée par '+esc(existing.enregistreParEn) : ''}</div>
+          </div>
+        </div>
+        ${compte && ecart!==null ? `<div style="text-align:right;"><div style="font-size:11px;color:${mutedColor};">Écart</div><div style="font-weight:800;font-size:18px;color:${statusColor};">${ecart>0?'+':''}${ca_fmtMoney(ecart)}</div></div>` : ''}
+      </div>
+      <div class="grid grid-2" style="margin-top:14px;gap:10px;">
+        <div class="stat-box"><div class="stat-label">Montant théorique</div><div style="font-weight:700;font-size:15px;">${ca_fmtMoney(ca_montantTheorique(ca_session))}</div></div>
+        <div class="stat-box"><div class="stat-label">Montant compté</div><div style="font-weight:700;font-size:15px;">${compte ? ca_fmtMoney(ca_session.montantCompte) : '—'}</div></div>
+        <div class="stat-box"><div class="stat-label">Total ventes ERP</div><div style="font-weight:700;font-size:15px;">${ca_fmtMoney(ca_session.totalVentesErp)}</div></div>
+        <div class="stat-box"><div class="stat-label">Retenu pour demain</div><div style="font-weight:700;font-size:15px;">${ca_fmtMoney(ca_montantPourLendemain(ca_session))}</div></div>
+      </div>
+      <button class="btn small ghost" style="margin-top:12px;${compte ? 'background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.25);color:#fff;' : ''}" onclick="ca_toggleDetail()">${ca_detailOpen ? '▲ Masquer le détail de la saisie' : '▼ Voir le détail de la saisie'}</button>
+    </div>
+  `;
+}
+
+function ca_renderStepDots(){
+  return `
+    <div style="display:flex;align-items:center;gap:4px;margin:14px 0;overflow-x:auto;padding-bottom:4px;">
+      ${CA_STEPS.map((s,i)=>`
+        <button onclick="ca_wizardGoTo(${i})" title="${esc(s.title)}" style="flex-shrink:0;width:${i===ca_wizardStep?'28px':'22px'};height:22px;border-radius:11px;border:1.5px solid ${i===ca_wizardStep?'var(--forest)':'var(--line)'};background:${i<ca_wizardStep?'var(--forest)':(i===ca_wizardStep?'var(--forest)':'var(--surface)')};color:${i<=ca_wizardStep?'#fff':'var(--ink-muted)'};font-size:10.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;">${i<ca_wizardStep?'✓':s.badge}</button>
+      `).join('')}
+    </div>
+    <div style="font-size:12px;color:var(--ink-muted);margin-bottom:10px;">Étape ${ca_wizardStep+1} / ${CA_STEPS.length} — ${esc(CA_STEPS[ca_wizardStep].title)}</div>
+  `;
+}
+
+function ca_renderSectionBody(key, ecart){
+  if(key==='entrant') return `
+    <div class="field">
+      <label>Début de caisse — Montant (DA)</label>
+      <input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="debut-input" value="${ca_session.debutCaisse}" oninput="ca_session.debutCaisse=this.value;ca_session.debutCaisseAuto=false;ca_session.debutCaisseManuel=true;ca_render()" placeholder="0" />
+    </div>
+    ${ca_session.debutCaisseAuto ? `<div style="margin-top:8px;font-size:11.5px;color:var(--moss);">↺ Repris automatiquement de la clôture d'hier. Modifiable si besoin.</div>` : ''}
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);">
+      <div class="section-label">Entrées de caisse (divers)</div>
+      <div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:8px;">Ex. monnaie apportée, vente d'huile… — tout ajout d'espèces hors ventes ERP.</div>
+      ${ca_linesEditor(ca_session.entrees, 'entrees', 'Description (ex. monnaie, vente huile…)')}
+      <button class="btn small ghost" onclick="ca_addLine('entrees')">+ Ajouter une entrée</button>
+      <div class="subtotal"><span>Total entrées diverses</span><span class="mono">${ca_fmtMoney(ca_totalEntreesDiverses(ca_session))}</span></div>
+    </div>`;
+
+  if(key==='horscaisse') return `
+    ${ca_sortiesEditor(ca_session.sorties)}
+    <button class="btn small ghost" onclick="ca_addSortie()">+ Ajouter une sortie</button>
+    <div class="subtotal"><span>Total sorties de caisse</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.sorties))}</span></div>`;
+
+  if(key==='erp') return `
+    <div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:8px;">Toutes les commandes, tous modes de paiement confondus (le chiffre affiché par l'ERP).</div>
+    <div class="field"><input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="erp-input" value="${ca_session.totalVentesErp}" oninput="ca_session.totalVentesErp=this.value;ca_render()" placeholder="0" /></div>`;
+
+  // validation
+  return `
+    <div class="result-box prelim">
+      <div><div class="label">Montant théorique de clôture</div></div>
+      <div class="value">${ca_fmtMoney(ca_montantTheorique(ca_session))}</div>
+    </div>
+    <div class="grid grid-2" style="margin-top:14px;">
+      <div class="field"><label>Montant compté (comptage réel)</label><input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="compte-input" value="${ca_session.montantCompte}" oninput="ca_session.montantCompte=this.value;ca_render()" placeholder="Si vous comptez le liquide" /></div>
+      <div class="field"><label>Note (optionnel)</label><input type="text" id="note-validation-input" value="${esc(ca_session.noteValidation||'')}" oninput="ca_session.noteValidation=this.value" placeholder="Remarques" /></div>
+    </div>
+    ${ecart!==null ? `<div style="margin-top:10px;font-size:13px;font-weight:700;color:${Math.abs(ecart)<0.01?'var(--moss)':'var(--rust)'};">Écart : ${ecart>0?'+':''}${ca_fmtMoney(ecart)}</div>` : ''}
+    <div class="result-box final" style="margin-top:14px;">
+      <div><div class="label">Montant retenu pour demain</div></div>
+      <div class="value">${ca_fmtMoney(ca_montantPourLendemain(ca_session))}</div>
+    </div>`;
+}
+
+function ca_renderAccordion(ecart){
+  return CA_SECTIONS.map(s=>{
+    const open = ca_openSections.includes(s.key);
+    const subtotal = ca_sectionSubtotal(s.key);
+    return `
+    <div class="ticket" style="padding:0;overflow:hidden;">
+      <button onclick="ca_toggleSection('${s.key}')" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;background:none;border:none;padding:14px 16px;cursor:pointer;text-align:left;font-family:'Inter',sans-serif;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:16px;">${s.icon}</span>
+          <div>
+            <div style="font-weight:600;font-size:13.5px;">${esc(s.title)}</div>
+            ${s.subtitle ? `<div style="font-size:10.5px;color:var(--ink-muted);margin-top:1px;">${esc(s.subtitle)}</div>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          ${subtotal!==null ? `<span class="mono" style="font-size:13px;color:var(--ink-muted);">${ca_fmtMoney(subtotal)}</span>` : ''}
+          <span style="color:var(--ink-muted);">${open?'▲':'▼'}</span>
+        </div>
+      </button>
+      ${open ? `<div style="padding:0 16px 16px;border-top:1px solid var(--line);padding-top:14px;">${ca_renderSectionBody(s.key, ecart)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function ca_renderCaisseTab(){
+  const existing = ca_allSessions[ca_workingDate];
+  const ecart = ca_ecart(ca_session);
+  return `
+    <div class="ticket">
+      <div class="field">
+        <label>Date de la caisse</label>
+        <div style="overflow:hidden;border-radius:8px;">
+          <input type="date" id="caisse-date-input" value="${ca_session.date}" onchange="ca_loadSessionForDate(this.value)" style="display:block;box-sizing:border-box;width:100%;" />
+        </div>
+      </div>
+      ${existing ? `<div style="margin-top:8px;font-size:11.5px;color:var(--amber);">⚠ Une clôture existe déjà pour cette date. L'enregistrer à nouveau la remplacera.</div>` : ''}
+    </div>
+
+    ${ca_renderStatusBanner(existing, ecart)}
+
+    ${!ca_detailOpen ? '' : `
+    ${ca_renderAccordion(ecart)}
+    <div class="actions-row" style="margin-top:14px;">
+      <button class="btn" onclick="ca_saveSession()">✓ Enregistrer la clôture du ${fmtDateShort(ca_session.date)}</button>
+    </div>
+    `}
+
+    ${!ca_detailOpen ? `
+    <div class="actions-row">
+      <button class="btn ghost" onclick="ca_loadSessionForDate(todayISO())">↺ Réinitialiser (aujourd'hui)</button>
+    </div>` : ''}
+  `;
+}
+
+function ca_linesEditor(lines, key, placeholder){
+  if(!lines || lines.length===0){
+    return `<p style="font-size:12px;color:var(--ink-muted);margin:4px 0 10px;">Aucune ligne pour l'instant.</p>`;
+  }
+  return lines.map((l,i)=>`
+    <div class="line-row">
+      <input class="amount" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" id="amt-${l.id}" value="${l.montant}" placeholder="Montant" oninput="ca_updateLine('${key}','${l.id}','montant',this.value)" />
+      <input class="label-input" type="text" id="lbl-${l.id}" value="${esc(l.libelle||'')}" placeholder="${placeholder}" oninput="ca_updateLine('${key}','${l.id}','libelle',this.value)" />
+      <button class="x-btn" onclick="ca_removeLine('${key}','${l.id}')">✕</button>
+    </div>
+  `).join('');
+}
+function ca_addLine(key){
+  if(!Array.isArray(ca_session[key])) ca_session[key] = [];
+  ca_session[key].push({ id: uid(), montant: '', libelle: '' });
+  ca_render();
+}
+function ca_updateLine(key, id, field, value){
+  if(!Array.isArray(ca_session[key])) ca_session[key] = [];
+  const line = ca_session[key].find(l=>l.id===id);
+  if(line) line[field] = value;
+  ca_render();
+}
+function ca_removeLine(key, id){
+  if(!Array.isArray(ca_session[key])) ca_session[key] = [];
+  ca_session[key] = ca_session[key].filter(l=>l.id!==id);
+  ca_render();
+}
+
+function ca_sortiesEditor(sorties){
+  if(!sorties || sorties.length===0){
+    return `<p style="font-size:12px;color:var(--ink-muted);margin:4px 0 10px;">Aucune sortie pour l'instant.</p>`;
+  }
+  return sorties.map(l=>`
+    <div class="line-row" style="align-items:flex-start;flex-wrap:wrap;${l.motif==='retrait' ? 'grid-template-rows:auto auto;' : ''}">
+      <input class="amount" id="amt-${l.id}" type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="${l.montant}" placeholder="Montant" oninput="ca_updateLine('sorties','${l.id}','montant',this.value)" />
+      <select id="motif-${l.id}" style="flex:1;min-width:0;" onchange="ca_updateLine('sorties','${l.id}','motif',this.value)">
+        ${CA_SORTIE_MOTIFS.map(m=>`<option value="${m.value}" ${l.motif===m.value?'selected':''}>${esc(m.label)}</option>`).join('')}
+      </select>
+      <button class="x-btn" onclick="ca_removeLine('sorties','${l.id}')">✕</button>
+      ${l.motif==='retrait' ? `<input type="text" id="note-${l.id}" style="grid-column:1/3;flex-basis:100%;margin-top:6px;" value="${esc(l.note||'')}" placeholder="Note (ex. gérant, fournisseur…)" oninput="ca_updateLine('sorties','${l.id}','note',this.value)" />` : ''}
+    </div>
+  `).join('');
+}
+function ca_addSortie(){
+  if(!Array.isArray(ca_session.sorties)) ca_session.sorties = [];
+  ca_session.sorties.push({ id: uid(), montant: '', motif: CA_SORTIE_MOTIFS[0].value });
+  ca_render();
+}
+
+function ca_renderHistoriqueTab(){
+  const dates = Object.keys(ca_allSessions).sort((a,b)=>a<b?1:-1);
+  if(dates.length===0){
+    return `<div class="empty-state">Aucune clôture enregistrée pour l'instant.</div>`;
+  }
+  return dates.map(date=>{
+    const s = ca_allSessions[date];
+    const theorique = ca_montantTheorique(s);
+    const ecart = ca_ecart(s);
+    return `<div class="hist-row" onclick="ca_setTab('caisse');ca_loadSessionForDate('${date}')">
+      <div>
+        <div class="d">${fmtDateShort(date)}</div>
+        <div class="s">Début : ${ca_fmtMoney(s.debutCaisse)} · ERP : ${ca_fmtMoney(s.totalVentesErp)} · Virement : ${ca_fmtMoney(ca_sumSortiesByType(s.sorties,'virement'))} · Non réglé : ${ca_fmtMoney(ca_sumSortiesByType(s.sorties,'nonregle'))} · Retraits : ${ca_fmtMoney(ca_totalRetraits(s))}${ecart!==null?` · Écart : ${ecart>0?'+':''}${ca_fmtMoney(ecart)}`:''}${s.enregistreParEn?' · par '+esc(s.enregistreParEn):''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="e">${ca_fmtMoney(theorique)}</div>
+        <button class="x-btn" style="background:none;border:none;color:var(--ink-muted);font-size:15px;" onclick="event.stopPropagation();ca_deleteSession('${date}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+ca_render();
+
+/* ==================== MODULE POINTAGE & PAIE ==================== */
+/* Données Firestore :
+   - pointage_events        : 1 document par mois  { ev: { <id>: { c: code, t: ISO, y: 0|1 } } }
+   - pointage_config/employes : { emp: { <code>: { name, poste, payMode, rate, transport:{enabled,amount}, extra } } }
+   - pointage_entries       : primes, jours off, avances, sessions manuelles, corrections résolues */
+const pt_eventsCol = db.collection('pointage_events');
+const pt_configRef = db.collection('pointage_config').doc('employes');
+const pt_entriesCol = db.collection('pointage_entries');
+/* pointage_config/ignores : { k:{<clé pointage>:true}, c:{<code>:true} } — pointages / employés écartés volontairement :
+   un nouvel import du fichier du pointeur (qui contient tout l'historique) ne les fait pas revenir. */
+const pt_ignoreRef = db.collection('pointage_config').doc('ignores');
+/* pointage_config/groupes : { groups: [[code,...], ...] } — employés qui se relaient sur un même poste, pour repérer
+   quand la sortie de l'un dépasse l'entrée de l'autre (heure supplémentaire non voulue). */
+const pt_groupsRef = db.collection('pointage_config').doc('groupes');
+/* pointage_config/chevauchements_ignores : { k:{<clé chevauchement>:true} } — chevauchements examinés et volontairement gardés tels quels. */
+const pt_overlapIgnoreRef = db.collection('pointage_config').doc('chevauchements_ignores');
+/* pointage_config/anomalies_ignorees : { k:{<clé anomalie>:true}, before:'AAAA-MM-JJ'|null } — anomalies écartées de la liste
+   (une par une, ou toutes celles datées avant une date). Les pointages eux-mêmes ne sont jamais modifiés. */
+const pt_anIgnRef = db.collection('pointage_config').doc('anomalies_ignorees');
+/* pointage_clotures : un document par période de paie clôturée (figée)
+   { from, to, createdAt, createdBy, rows:{ <code employé>:{ name, hours, rate, mode, workedDays, baseWage, transportTotal,
+     bonusesTotal, subTotal, leavesTotal, advancesTotal, net, paid } } }   (rows est une table, pas un tableau : Firestore) */
+const pt_cloturesCol = db.collection('pointage_clotures');
+const PT_DEFAULT_NAMES = {5:'Mejdoub',8:'Fatima',10:'Kadi',15:'Sidahmed',16:'Marwa',17:'Meriem',18:'Hamid',19:'Nabil',20:'Ali'};
+const PT_SUGGESTED_NAMES = ['Mejdoub','Ali','Kadi','Nabil','Meriem','Marwa','Hamid','Nacira']; // suggestions seulement : la saisie reste libre
+const PT_DEFAULT_GROUPS = [[5,20],[10,19],[16,17,18]]; // Mejdoub/Ali · Kadi/Nabil · Marwa/Meriem/Hamid
+
+let pt_events = [];          // [{id, code, dt(ISO), type}]
+let pt_emp = {};             // { code: {...} }
+let pt_entries = [];         // [{id, kind, code, date, amount, hours, note, ...}]
+let pt_ign = { k:{}, c:{} };
+let pt_groups = [];           // [[code,...], ...]
+let pt_groupsSeeded = false;
+let pt_ovIgn = {};
+let pt_anIgn = { k:{}, before:null };
+let pt_clotures = [];
+let pt_eventsVersion = 0, pt_computeCache = null; // mémoire du calcul sessions/anomalies, invalidée quand les pointages changent
+let pt_ready = { events:false, cfg:false, entries:false, ign:false, groups:false, ovIgn:false, anIgn:false, clot:false };
+let pt_started = false, pt_error = '', pt_loadStartedAt = null;
+let pt_tab = 'anomalies', pt_sel = null, pt_openFix = null, pt_anomList = [];
+let pt_ovList = [], pt_ovOpen = null;
+let pt_filter = { from:null, to:null };
+let pt_idn = 0;
+
+/* ---------- utilitaires ---------- */
+function pt_e(v){ return esc(v==null ? '' : String(v)); }
+function pt_norm(s){ return (s||'').toString().trim().toLowerCase(); }
+function pt_fmtMoney(n){ return Math.round(Number(n)||0).toLocaleString('fr-FR') + ' DA'; }
+function pt_fmtH(h){ return (Number(h)||0).toFixed(2).replace('.',','); }
+function pt_hhmm(d){ return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
+function pt_dm(d){ return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0'); }
+function pt_fmtDT(d){ return pt_dm(d) + ' ' + pt_hhmm(d); }
+function pt_day(d){ return toLocalISO(d); }
+function pt_newId(){ pt_idn++; return Date.now().toString(36) + Math.random().toString(36).slice(2,7) + pt_idn.toString(36); }
+function pt_inRange(dk){
+  if(pt_filter.from && dk < pt_filter.from) return false;
+  if(pt_filter.to && dk > pt_filter.to) return false;
+  return true;
+}
+function pt_download(filename, blobParts, type){
+  const blob = new Blob(blobParts, { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+
+/* ---------- employés ---------- */
+function pt_codes(){
+  const s = new Set(pt_events.map(e=>e.code));
+  Object.keys(pt_emp).forEach(k=>s.add(Number(k)));
+  return Array.from(s).filter(c=>!isNaN(c)).sort((a,b)=>a-b);
+}
+function pt_name(c){ const e=pt_emp[c]; if(e && e.name) return e.name; if(PT_DEFAULT_NAMES[c]) return PT_DEFAULT_NAMES[c]; return 'Code ' + c + ' (à identifier)'; }
+function pt_poste(c){ return (pt_emp[c] && pt_emp[c].poste) || ''; }
+function pt_label(c){ const p=pt_poste(c); return pt_name(c) + (p ? ' — ' + p : ''); }
+function pt_rate(c){ return Number(pt_emp[c] && pt_emp[c].rate) || 0; }
+function pt_mode(c){ return (pt_emp[c] && pt_emp[c].payMode) === 'daily' ? 'daily' : 'hourly'; }
+function pt_transport(c){ const t=(pt_emp[c] && pt_emp[c].transport) || {}; return { enabled:!!t.enabled, amount:Number(t.amount)||0 }; }
+
+/* ---------- écoute Firestore (démarrée à la première ouverture du module) ---------- */
+/* Firestore interdit les tableaux imbriqués (un array direct dans un array) : les groupes sont donc
+   stockés comme un tableau d'objets { codes:[...] } plutôt qu'un tableau de tableaux. */
+function pt_groupsToDoc(groups){ return { groups: (groups || []).map(g=>({ codes: g || [] })) }; }
+function pt_groupsFromDoc(data){ return ((data && data.groups) || []).map(g=>Array.isArray(g) ? g : ((g && g.codes) || [])); }
+let pt_renderQueued = false;
+// plusieurs écoutes Firestore répondent presque en même temps au chargement : on ne redessine qu'une fois
+function pt_scheduleRender(){ if(pt_renderQueued) return; pt_renderQueued = true; Promise.resolve().then(()=>{ pt_renderQueued = false; pt_render(); }); }
+function pt_start(){
+  if(pt_started) return;
+  pt_started = true;
+  pt_loadStartedAt = Date.now();
+  setTimeout(()=>{ if(activeModule === 'pointage') pt_render(); }, 5000); // force un nouvel essai d'affichage même si aucune donnée n'est jamais arrivée
+  try{ const raw = localStorage.getItem('pt-period'); if(raw) pt_filter = JSON.parse(raw); }catch(e){}
+  const onErr = (err)=>{ console.error(err); pt_error = (err && err.message) || 'Lecture impossible'; pt_render(); };
+  pt_eventsCol.onSnapshot((snap)=>{
+    const list = [];
+    snap.forEach(d=>{
+      const ev = (d.data() || {}).ev || {};
+      for(const id in ev){ const e = ev[id]; if(e) list.push({ id, code:Number(e.c), dt:e.t, type:Number(e.y) }); }
+    });
+    pt_events = list; pt_eventsVersion++; pt_ready.events = true; pt_scheduleRender();
+  }, onErr);
+  pt_configRef.onSnapshot((doc)=>{
+    const data = doc.exists ? (doc.data() || {}) : {};
+    pt_emp = data.emp || {}; pt_ready.cfg = true; pt_scheduleRender();
+  }, onErr);
+  pt_ignoreRef.onSnapshot((doc)=>{
+    const d = doc.exists ? (doc.data() || {}) : {};
+    pt_ign = { k:d.k || {}, c:d.c || {} }; pt_ready.ign = true; pt_scheduleRender();
+  }, onErr);
+  pt_groupsRef.onSnapshot((doc)=>{
+    if(doc.exists){ pt_groups = pt_groupsFromDoc(doc.data() || {}); }
+    else if(!pt_groupsSeeded){ pt_groupsSeeded = true; pt_groups = PT_DEFAULT_GROUPS; pt_groupsRef.set(pt_groupsToDoc(PT_DEFAULT_GROUPS)).catch(()=>{}); }
+    pt_ready.groups = true; pt_scheduleRender();
+  }, onErr);
+  pt_overlapIgnoreRef.onSnapshot((doc)=>{
+    const d = doc.exists ? (doc.data() || {}) : {};
+    pt_ovIgn = d.k || {}; pt_ready.ovIgn = true; pt_scheduleRender();
+  }, onErr);
+  pt_anIgnRef.onSnapshot((doc)=>{
+    const d = doc.exists ? (doc.data() || {}) : {};
+    pt_anIgn = { k:d.k || {}, before:d.before || null }; pt_ready.anIgn = true; pt_scheduleRender();
+  }, onErr);
+  pt_cloturesCol.onSnapshot((snap)=>{
+    const list = []; snap.forEach(d=>list.push({ id:d.id, ...d.data() }));
+    pt_clotures = list; pt_ready.clot = true; pt_scheduleRender();
+  }, onErr);
+  pt_entriesCol.onSnapshot((snap)=>{
+    const list = [];
+    snap.forEach(d=>list.push({ id:d.id, ...d.data() }));
+    pt_entries = list; pt_ready.entries = true; pt_scheduleRender();
+  }, onErr);
+}
+
+/* ---------- écritures Firestore ---------- */
+const PT_DEL = ()=>firebase.firestore.FieldValue.delete();
+async function pt_commit(ops){
+  for(let i=0; i<ops.length; i+=400){
+    const batch = db.batch();
+    ops.slice(i, i+400).forEach(op=>{
+      if(op.t==='set') batch.set(op.ref, op.data, { merge:true });
+      else if(op.t==='del') batch.delete(op.ref);
+    });
+    await batch.commit();
+  }
+}
+function pt_monthRef(mk){ return pt_eventsCol.doc(mk); }
+function pt_evKey(code, iso, type){ return code + '_' + String(iso).slice(0,16).replace(/\D/g, '') + '_' + type; }
+function pt_ignoreOp(evs){ const k = {}; evs.forEach(e=>{ k[pt_evKey(e.code, e.dt, e.type)] = true; }); return { t:'set', ref:pt_ignoreRef, data:{ k } }; }
+function pt_isIgnored(code, iso, type){ return !!(pt_ign.c[code] || pt_ign.k[pt_evKey(code, iso, type)]); }
+async function pt_addEvents(list){ // [{code, iso, type}]
+  const byMonth = {};
+  list.forEach(e=>{ const mk = e.iso.slice(0,7); (byMonth[mk] = byMonth[mk] || {})[pt_newId()] = { c:e.code, t:e.iso, y:e.type }; });
+  await pt_commit(Object.keys(byMonth).map(mk=>({ t:'set', ref:pt_monthRef(mk), data:{ ev:byMonth[mk] } })));
+}
+async function pt_updateEvent(id, patch){
+  const e = pt_events.find(x=>x.id===id); if(!e) return;
+  const n = { ...e, ...patch };
+  const oldMk = e.dt.slice(0,7), newMk = n.dt.slice(0,7);
+  const ops = [];
+  if(pt_evKey(e.code, e.dt, e.type) !== pt_evKey(n.code, n.dt, n.type)) ops.push(pt_ignoreOp([e])); // l'ancien pointage ne reviendra pas à l'import
+  if(oldMk !== newMk) ops.push({ t:'set', ref:pt_monthRef(oldMk), data:{ ev:{ [id]:PT_DEL() } } });
+  ops.push({ t:'set', ref:pt_monthRef(newMk), data:{ ev:{ [id]:{ c:n.code, t:n.dt, y:n.type } } } });
+  await pt_commit(ops);
+}
+async function pt_deleteEvents(ids, opts){
+  const byMonth = {}, gone = [];
+  ids.forEach(id=>{ const e = pt_events.find(x=>x.id===id); if(e){ gone.push(e); const mk = e.dt.slice(0,7); (byMonth[mk] = byMonth[mk] || {})[id] = PT_DEL(); } });
+  const ops = Object.keys(byMonth).map(mk=>({ t:'set', ref:pt_monthRef(mk), data:{ ev:byMonth[mk] } }));
+  if(gone.length && !(opts && opts.noIgnore)) ops.push(pt_ignoreOp(gone)); // supprimé volontairement : ne reviendra pas à l'import
+  await pt_commit(ops);
+}
+function pt_setEmp(code, patch){ return pt_configRef.set({ emp:{ [code]: patch } }, { merge:true }); }
+function pt_addEntryDoc(data){ return pt_entriesCol.add({ ...data, creePar: (typeof currentUser!=='undefined' ? currentUser : ''), creeLe: new Date().toISOString() }); }
+
+/* ---------- import ZKBio ---------- */
+function pt_parseRaw(text){
+  // Formats acceptés :
+  //  1) export ZKBio       : code <TAB> jj/mm/aaaa hh:mm        <TAB> 0|1
+  //  2) fichier brut appareil : code <TAB> aaaa-mm-jj hh:mm:ss  <TAB> vérif <TAB> statut <TAB> ...
+  //     statut : 0 Entrée · 1 Sortie · 2 Sortie pause · 3 Entrée pause · 4 Entrée heures sup. · 5 Sortie heures sup.
+  const STATUS = { 0:0, 1:1, 2:1, 3:0, 4:0, 5:1 };
+  const lines = text.split(/\r?\n/);
+  const out = [];
+  for (const raw of lines){
+    const line = raw.trim();
+    if (!line) continue;
+    const parts = line.split("\t").length >= 3 ? line.split("\t") : line.split(/\s{2,}|,|;/);
+    if (parts.length < 3) continue;
+    const code = parseInt(parts[0], 10);
+    if (isNaN(code)) continue; // ligne d'en-tête ou déchet
+    const dtStr = parts[1].trim();
+    let dt = null, type = NaN;
+    let m = dtStr.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+    if (m){ // fichier brut de l'appareil : le statut est en 4e colonne
+      dt = new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], 0);
+      const st = parseInt((parts.length >= 4 ? parts[3] : parts[2]).trim(), 10);
+      type = (st in STATUS) ? STATUS[st] : NaN;
+    } else {
+      m = dtStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
+      if (m){
+        dt = new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], 0);
+        type = parseInt(parts[2].trim(), 10);
+      }
+    }
+    if (!dt || isNaN(dt.getTime()) || (type !== 0 && type !== 1)) continue;
+    out.push({ code, iso: dt.toISOString(), type }); // secondes ignorées : deux pointages dans la même minute n'en font qu'un
+  }
+  return out;
+}
+/* ---------- import ZKBio ---------- */
+function pt_status(msg, cls){
+  const el = document.getElementById('pt-import-status');
+  if(el){ el.textContent = msg; el.style.color = cls==='err' ? 'var(--rust)' : 'var(--moss)'; }
+}
+async function pt_importFile(){
+  const inp = document.getElementById('pt-file');
+  const f = inp && inp.files && inp.files[0];
+  if(!f){ pt_status('Choisis un fichier d’abord.', 'err'); return; }
+  if(!(pt_ready.events && pt_ready.ign && pt_ready.groups)){ pt_status('Données en cours de chargement, réessaie dans un instant.', 'err'); return; }
+  const parsed = pt_parseRaw(await f.text());
+  if(!parsed.length){ pt_status('Aucune ligne de pointage reconnue. Formats acceptés : export ZKBio (code ⇥ jj/mm/aaaa hh:mm ⇥ 0/1) ou fichier brut du pointeur (code ⇥ aaaa-mm-jj hh:mm:ss ⇥ … ⇥ statut).', 'err'); return; }
+  const seen = new Set(pt_events.map(e=>e.code + '|' + e.dt + '|' + e.type));
+  const fresh = []; let skipped = 0;
+  parsed.forEach(p=>{ const k = p.code + '|' + p.iso + '|' + p.type; if(seen.has(k)) return; seen.add(k); if(pt_isIgnored(p.code, p.iso, p.type)){ skipped++; return; } fresh.push(p); });
+  try{
+    if(fresh.length) await pt_addEvents(fresh);
+    inp.value = '';
+    const ts = parsed.map(x=>x.iso).sort();
+    pt_status(fresh.length + ' nouveau(x) pointage(s) ajouté(s) (' + (parsed.length - fresh.length - skipped) + ' déjà connus ou en double, ignorés).' + (skipped ? ' ' + skipped + ' écarté(s) car supprimés ou modifiés par toi.' : '') + ' Période du fichier : ' + fmtDateShort(toLocalISO(new Date(ts[0]))) + ' → ' + fmtDateShort(toLocalISO(new Date(ts[ts.length-1]))) + '.', 'ok');
+  }catch(e){ console.error(e); pt_status('Erreur d’enregistrement : ' + (e.message || e), 'err'); }
+}
+
+/* ---------- filtre de période ---------- */
+function pt_setFilter(from, to){
+  pt_filter = { from: from || null, to: to || null };
+  try{ localStorage.setItem('pt-period', JSON.stringify(pt_filter)); }catch(e){}
+  pt_render();
+}
+function pt_periodInput(){ pt_setFilter(document.getElementById('pt-from').value, document.getElementById('pt-to').value); }
+function pt_renderPeriod(){
+  const f = document.getElementById('pt-from'), t = document.getElementById('pt-to'), s = document.getElementById('pt-period-status');
+  if(!f) return;
+  // ne jamais réécrire un champ que la personne est en train de saisir (sinon une frappe en cours est effacée
+  // au prochain rafraîchissement, par ex. déclenché par une mise à jour Firestore en arrière-plan)
+  if(document.activeElement !== f) f.value = pt_filter.from || '';
+  if(document.activeElement !== t) t.value = pt_filter.to || '';
+  s.textContent = (!pt_filter.from && !pt_filter.to) ? 'Toutes les périodes affichées.'
+    : 'Filtré du ' + (pt_filter.from ? fmtDateShort(pt_filter.from) : '…') + ' au ' + (pt_filter.to ? fmtDateShort(pt_filter.to) : '…') + '.';
+}
+
+/* ---------- appariement entrées/sorties ---------- */
+function pt_compute(){
+  if(pt_computeCache && pt_computeCache.v === pt_eventsVersion) return pt_computeCache.r;
+  const r = pt_computeRaw();
+  pt_computeCache = { v:pt_eventsVersion, r };
+  return r;
+}
+function pt_computeRaw(src){
+  const byCode = {};
+  (src || pt_events).forEach(e=>{ (byCode[e.code] = byCode[e.code] || []).push({ dt:new Date(e.dt), type:e.type }); });
+  const sessions = [], anomalies = [];
+  Object.keys(byCode).forEach(k=>{
+    const code = Number(k);
+    const evs = byCode[k].sort((a,b)=>a.dt - b.dt || a.type - b.type);
+    let open = null;
+    for(const ev of evs){
+      if(ev.type === 0){
+        if(open === null) open = ev.dt;
+        else { anomalies.push({ code, dt:open, type:'Entrée', reason:'Sortie manquante (nouvelle entrée avant clôture)' }); open = ev.dt; }
+      } else if(open !== null){
+        const start = open, end = ev.dt, hours = (end - start) / 3600000;
+        if(hours > 15){
+          anomalies.push({ code, dt:start, type:'Entrée', reason:'Sortie manquante (écart trop long avec le pointage suivant)' });
+          const b2 = new Date(end); if(end.getHours() < 6) b2.setDate(b2.getDate() - 1);
+          anomalies.push({ code, dt:end, type:'Sortie', reason:'Entrée manquante (jour rattaché ' + pt_dm(b2) + ')' });
+        } else {
+          sessions.push({ code, date:new Date(start.getFullYear(), start.getMonth(), start.getDate()), start, end, hours });
+        }
+        open = null;
+      } else {
+        const b = new Date(ev.dt); if(ev.dt.getHours() < 6) b.setDate(b.getDate() - 1);
+        anomalies.push({ code, dt:ev.dt, type:'Sortie', reason:'Entrée manquante (jour rattaché ' + pt_dm(b) + ')' });
+      }
+    }
+    if(open !== null) anomalies.push({ code, dt:open, type:'Entrée', reason:'Sortie manquante (fin de période)' });
+  });
+  sessions.sort((a,b)=>a.date - b.date || a.code - b.code);
+  anomalies.sort((a,b)=>a.dt - b.dt || a.code - b.code);
+  return { sessions, anomalies };
+}
+function pt_anomKey(a){ return a.code + '|' + a.dt.toISOString() + '|' + a.type; }
+function pt_anomIgnKey(a){ return a.code + '_' + a.dt.toISOString().slice(0,16).replace(/\D/g,'') + '_' + (a.type === 'Entrée' ? 0 : 1); }
+function pt_anomIgnored(a){ return !!pt_anIgn.k[pt_anomIgnKey(a)] || !!(pt_anIgn.before && pt_day(a.dt) < pt_anIgn.before); }
+function pt_eventsNear(code, dt){
+  const from = dt.getTime() - 12*3600000, to = dt.getTime() + 12*3600000;
+  return pt_events.filter(e=>e.code === code && new Date(e.dt).getTime() >= from && new Date(e.dt).getTime() <= to)
+    .sort((a,b)=>new Date(a.dt) - new Date(b.dt));
+}
+
+/* ---------- chevauchements de poste (deux collègues qui se relaient) ---------- */
+function pt_overlapKey(codeA, codeB, aEndIso, bStartIso){ return codeA + '_' + codeB + '_' + String(aEndIso).slice(0,16) + '_' + String(bStartIso).slice(0,16); }
+function pt_computeOverlaps(sessions, all){
+  const codes = pt_codes();
+  const out = [];
+  pt_groups.forEach((group, gi)=>{
+    const members = (group || []).filter(c=>codes.includes(c));
+    for(let i=0; i<members.length; i++){
+      for(let j=i+1; j<members.length; j++){
+        const x = members[i], y = members[j];
+        const sx = sessions.filter(s=>s.code === x), sy = sessions.filter(s=>s.code === y);
+        sx.forEach(A=>{
+          sy.forEach(B=>{
+            const overlapStart = A.start > B.start ? A.start : B.start;
+            const overlapEnd = A.end < B.end ? A.end : B.end;
+            if(overlapEnd.getTime() <= overlapStart.getTime()) return; // pas de chevauchement réel
+            const hours = (overlapEnd - overlapStart) / 3600000;
+            const earlyIsX = A.start <= B.start; // celui arrivé en premier = parti trop tard ; l'autre = arrivé pendant qu'il était encore là
+            const codeA = earlyIsX ? x : y, codeB = earlyIsX ? y : x;
+            const aEnd = earlyIsX ? A.end : B.end, bStart = earlyIsX ? B.start : A.start;
+            const day = pt_day(earlyIsX ? A.date : B.date);
+            if(!all && !pt_inRange(day)) return;
+            const key = pt_overlapKey(codeA, codeB, aEnd.toISOString(), bStart.toISOString());
+            if(pt_ovIgn[key]) return;
+            out.push({ key, groupIndex:gi, codeA, codeB, day, aEnd, bStart, hours });
+          });
+        });
+      }
+    }
+  });
+  out.sort((p,q)=>p.aEnd - q.aEnd);
+  return out;
+}
+
+/* ---------- paie ---------- */
+function pt_entriesOf(kind, code){
+  return pt_entries.filter(e=>e.kind === kind && e.code === code && pt_inRange(e.date))
+    .map(e=>({ id:e.id, date:e.date, amount:Number(e.amount)||0, note:e.note || '', src:'local' }));
+}
+/* ---------- clôture de période (paie figée) ---------- */
+function pt_closureFor(from, to){ return pt_clotures.find(c=>c.from === from && c.to === to) || null; }
+function pt_currentClosure(){ return (pt_filter.from && pt_filter.to) ? pt_closureFor(pt_filter.from, pt_filter.to) : null; }
+function pt_frozenRow(code){ const c = pt_currentClosure(); return (c && c.rows && c.rows[code]) || null; }
+// paie à afficher : chiffres figés si la période affichée est exactement une période clôturée, sinon calcul en direct
+function pt_displayPayroll(code, sessions){
+  const live = pt_payroll(code, sessions), f = pt_frozenRow(code);
+  if(!f) return live;
+  return { ...live, totalHours:f.hours, rate:f.rate, mode:f.mode, workedDays:f.workedDays, baseWage:f.baseWage, transportTotal:f.transportTotal,
+           bonusesTotal:f.bonusesTotal, subTotal:f.subTotal, leavesTotal:f.leavesTotal, advancesTotal:f.advancesTotal, net:f.net, frozen:true, paid:!!f.paid };
+}
+// vrai si les données actuelles ne correspondent plus à ce qui a été figé
+function pt_closureStale(sessions){
+  const c = pt_currentClosure(); if(!c) return false;
+  return pt_codes().some(code=>{
+    const f = c.rows && c.rows[code], l = pt_payroll(code, sessions);
+    if(!f) return l.totalHours > 0.005 || Math.round(l.net) !== 0;
+    return Math.round(l.net) !== Math.round(f.net) || Math.abs(l.totalHours - f.hours) > 0.005;
+  });
+}
+function pt_payroll(code, sessions){
+  const mySess = sessions.filter(s=>s.code === code);
+  const myManual = pt_entries.filter(e=>e.kind === 'manual' && e.code === code && pt_inRange(e.date));
+  const totalHours = mySess.reduce((s,x)=>s+x.hours, 0) + myManual.reduce((s,x)=>s+(Number(x.hours)||0), 0);
+  const rate = pt_rate(code), mode = pt_mode(code);
+  const workedDays = new Set([...mySess.map(s=>pt_day(s.date)), ...myManual.map(m=>m.date)]).size;
+  const baseWage = mode === 'daily' ? workedDays * rate : totalHours * rate;
+  const tr = pt_transport(code);
+  const transportTotal = tr.enabled ? workedDays * tr.amount : 0;
+  const bonuses = pt_entriesOf('prime', code), leaves = pt_entriesOf('off', code);
+  const advances = pt_entriesOf('avance', code);
+  const sum = (arr)=>arr.reduce((s,x)=>s+x.amount, 0);
+  const bonusesTotal = sum(bonuses), leavesTotal = sum(leaves), advancesTotal = sum(advances);
+  const subTotal = baseWage + transportTotal + bonusesTotal;
+  const net = subTotal + leavesTotal - advancesTotal;
+  return { totalHours, rate, mode, workedDays, baseWage, transport:tr, transportTotal, bonuses, leaves, advances, bonusesTotal, leavesTotal, advancesTotal, subTotal, net };
+}
+
+/* ==================== ANALYSE & CORRECTION AUTOMATIQUE DES POINTAGES ==================== */
+/* Réglages et journal sont stockés dans pointage_entries (collection déjà utilisée) : aucune règle Firestore à ajouter.
+   - doc 'autocfg'   (kind:'autocfg') : réglages de l'analyse automatique
+   - docs 'af_…'     (kind:'autofix') : une correction appliquée, avec de quoi l'annuler
+   Principe : chaque correction est déterministe (même identifiant si deux appareils la calculent en même temps),
+   journalisée, annulable, et une correction annulée n'est jamais refaite. Les périodes de paie clôturées ne sont jamais touchées. */
+const PT_AUTO_DEFAULTS = { enabled:true, dupMin:10, estimate:true, overlapMin:30 };
+const PT_AUTO_MAX_RUN = 400;
+let pt_autoBusy = false, pt_autoKey = '', pt_autoRuns = 0;
+
+function pt_autoCfg(){
+  const c = pt_entries.find(e=>e.kind === 'autocfg') || {};
+  const n = (v, d)=>{ const x = Number(v); return (v !== undefined && v !== null && v !== '' && isFinite(x) && x >= 0) ? x : d; };
+  return { enabled: c.enabled === true, dupMin: n(c.dupMin, PT_AUTO_DEFAULTS.dupMin), estimate: c.estimate !== false, overlapMin: n(c.overlapMin, PT_AUTO_DEFAULTS.overlapMin) };
+}
+function pt_autoSetCfg(field, value){
+  const patch = (field === 'enabled' || field === 'estimate') ? { [field]: !!value } : { [field]: Math.max(0, pt_num(value)) };
+  return pt_entriesCol.doc('autocfg').set({ kind:'autocfg', ...patch }, { merge:true }).then(()=>pt_toast('Réglage enregistré.')).catch(e=>alert('Erreur : ' + (e.message || e)));
+}
+
+/* ---------- outils ---------- */
+const pt_tod = (ms)=>{ const d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); };
+const pt_cdist = (a, b)=>{ const x = Math.abs(a - b) % 1440; return Math.min(x, 1440 - x); };
+function pt_circMean(arr){
+  let s = 0, c = 0;
+  arr.forEach(a=>{ const t = a / 1440 * 2 * Math.PI; s += Math.sin(t); c += Math.cos(t); });
+  let m = Math.atan2(s, c) / (2 * Math.PI) * 1440; if(m < 0) m += 1440;
+  return m;
+}
+function pt_median(a){ if(!a.length) return 0; const s = a.slice().sort((x,y)=>x-y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2; }
+
+/* Profil habituel d'un employé : durée médiane de présence, heure moyenne d'arrivée et de départ (sur ses sessions saines). */
+function pt_autoProfile(L){
+  const dur = [], st = [], en = [];
+  for(let i = 0; i + 1 < L.length; i++){
+    if(L[i].type === 0 && L[i+1].type === 1){
+      const h = (L[i+1].ms - L[i].ms) / 3600000;
+      if(h >= 2 && h <= 14){ dur.push(h); st.push(pt_tod(L[i].ms)); en.push(pt_tod(L[i+1].ms)); i++; }
+    }
+  }
+  const n = dur.length, medDur = pt_median(dur), mad = pt_median(dur.map(x=>Math.abs(x - medDur)));
+  const sM = n ? pt_circMean(st) : 0, eM = n ? pt_circMean(en) : 0;
+  const sSp = n ? st.reduce((s,x)=>s + pt_cdist(x, sM), 0) / n : 0, eSp = n ? en.reduce((s,x)=>s + pt_cdist(x, eM), 0) / n : 0;
+  return { n, medDur, mad, sM, eM, ok: n >= 4 && sSp <= 120 && eSp <= 120, estOK: n >= 6 && mad <= 1 };
+}
+
+/* ---------- moteur : plan de correction pour UN employé ---------- */
+/* evs : [{ id, dt(ISO), type }] — retourne { acts, final, unresolved } sans rien écrire. */
+function pt_autoPlanEmployee(code, evs, cfg, ctx){
+  const L = evs.map(e=>({ id:e.id, code, ms:new Date(e.dt).getTime(), type:e.type })).sort((a,b)=>a.ms - b.ms || a.type - b.type);
+  const prof = pt_autoProfile(L), acts = [];
+  const iso = (ms)=>new Date(ms).toISOString();
+  const k16 = (ms)=>iso(ms).slice(0,16).replace(/\D/g, '');
+  const lid = (rule, ms, extra)=>'af_' + rule + '_' + code + '_' + k16(ms) + (extra || '');
+  const T = (t)=>t === 0 ? 'Entrée' : 'Sortie';
+  const hm = (ms)=>pt_hhmm(new Date(ms));
+  const ok = (id, ms)=>!ctx.seen(id) && !ctx.locked(ms);
+  const dur = Math.round(prof.medDur * 60) * 60000, canEst = cfg.estimate && prof.estOK;
+  const near = (ms, a, b)=>pt_cdist(pt_tod(ms), a) < pt_cdist(pt_tod(ms), b);
+  const canToExit = (ev, g)=>g >= 2 && g <= 14 && (prof.ok ? near(ev.ms, prof.eM, prof.sM) : (g >= 4 && g <= 13));
+  const canToEntry = (ev, g)=>g >= 2 && g <= 14 && (prof.ok ? near(ev.ms, prof.sM, prof.eM) : (g >= 4 && g <= 13));
+  const evInfo = (ev)=>({ id:ev.id, c:code, t:iso(ev.ms), y:ev.type });
+  const del = (ev, rule, text)=>{ acts.push({ logId:lid(rule, ev.ms, '_' + ev.type), type:'del', rule, code, ev:evInfo(ev), text }); };
+  const flip = (ev, to, text)=>{ acts.push({ logId:lid('flip', ev.ms), type:'flip', rule:'flip', code, ev:evInfo(ev), to, text }); ev.type = to; ev.mod = true; };
+  const addEv = (type, ms, text)=>{
+    const lg = lid('add', ms, '_' + type); if(!ok(lg, ms)) return null;
+    const ev = { id:'auto_' + code + '_' + k16(ms) + '_' + type, code, ms, type, mod:true };
+    acts.push({ logId:lg, type:'add', rule:'add', code, ev:evInfo(ev), text }); return ev;
+  };
+  let unresolved = 0;
+
+  // 1) doublons : même type deux fois en quelques minutes (double appui sur le pointeur)
+  const dupMs = cfg.dupMin * 60000;
+  for(let i = 1; i < L.length;){
+    const a = L[i-1], b = L[i];
+    if(b.type === a.type && b.ms - a.ms <= dupMs && ok(lid('dup', b.ms, '_' + b.type), b.ms)){
+      del(b, 'dup', 'Doublon : 2e ' + T(b.type).toLowerCase() + ' à ' + hm(b.ms) + ', ' + Math.round((b.ms - a.ms) / 60000) + ' min après la 1re (' + hm(a.ms) + ')');
+      L.splice(i, 1);
+    } else i++;
+  }
+
+  // 2) parcours chronologique : appariement entrée → sortie, avec réparation des cas courants
+  let open = null, i = 0;
+  while(i < L.length){
+    const ev = L[i];
+    if(ev.type === 0){
+      if(open === null){ open = ev; i++; continue; }
+      const g = (ev.ms - open.ms) / 3600000, nxt = L[i+1];
+      // a) entrée suivie d'une sortie quasi immédiate : rebond, la vraie sortie est la suivante
+      if(nxt && nxt.type === 1 && nxt.ms - ev.ms < 600000 && (nxt.ms - open.ms) / 3600000 <= 14 && ok(lid('rebond', ev.ms, '_0'), ev.ms)){
+        del(ev, 'rebond', 'Entrée parasite à ' + hm(ev.ms) + ' (sortie ' + Math.round((nxt.ms - ev.ms) / 60000) + ' min après) : la session ' + hm(open.ms) + ' → ' + hm(nxt.ms) + ' est conservée');
+        L.splice(i, 1); continue;
+      }
+      // b) deuxième « entrée » en réalité une sortie (type inversé)
+      const idF = lid('flip', ev.ms);
+      if(ctx.seen(idF)){ unresolved++; open = ev; i++; continue; } // correction annulée par l'utilisateur : on n'insiste pas
+      if(canToExit(ev, g) && ok(idF, ev.ms)){
+        flip(ev, 1, 'Entrée de ' + hm(ev.ms) + ' corrigée en Sortie : une entrée était déjà ouverte à ' + hm(open.ms) + ' (' + pt_fmtH(g) + ' h de présence)');
+        continue;
+      }
+      // c) sortie oubliée : on l'estime avec la durée habituelle
+      const msE = open.ms + dur;
+      const ne = (canEst && msE <= ev.ms - 1800000) ? addEv(1, msE, 'Sortie manquante estimée à ' + hm(msE) + ' (entrée de ' + hm(open.ms) + ' + durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
+      if(ne){ ne.type = 1; L.splice(i, 0, ne); continue; }
+      unresolved++; open = ev; i++; continue;
+    }
+    // ev est une Sortie
+    if(open !== null){
+      const h = (ev.ms - open.ms) / 3600000;
+      if(h <= 15){ open = null; i++; continue; }
+      const msE = open.ms + dur;
+      const ne = (canEst && msE <= ev.ms - 1800000) ? addEv(1, msE, 'Sortie manquante estimée à ' + hm(msE) + ' (entrée de ' + hm(open.ms) + ' + durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
+      if(ne){ L.splice(i, 0, ne); continue; }
+      unresolved++; open = null; // la sortie devient orpheline : traitée ci-dessous
+    }
+    const p1 = L[i-1], p2 = L[i-2];
+    // d) sortie parasite juste après une entrée, suivie de la vraie sortie
+    if(p1 && p2 && p2.type === 0 && p1.type === 1 && !p1.mod && p1.ms - p2.ms < 600000 && ev.ms - p2.ms >= 2 * 3600000 && ev.ms - p2.ms <= 14 * 3600000 && ok(lid('tiny', p1.ms, '_1'), p1.ms)){
+      del(p1, 'tiny', 'Sortie parasite à ' + hm(p1.ms) + ' (session de ' + Math.round((p1.ms - p2.ms) / 60000) + ' min) : la vraie sortie est à ' + hm(ev.ms));
+      L.splice(i - 1, 1); open = p2; i = i - 1; continue;
+    }
+    // e) première « sortie » en réalité une entrée, suivie d'une vraie sortie
+    const nx = L[i+1], idF = lid('flip', ev.ms);
+    if(nx && nx.type === 1){
+      if(ctx.seen(idF)){ unresolved++; i++; continue; }
+      const gS = (nx.ms - ev.ms) / 3600000;
+      if(canToEntry(ev, gS) && ok(idF, ev.ms)){
+        flip(ev, 0, 'Sortie de ' + hm(ev.ms) + ' corrigée en Entrée : aucune entrée avant, et une sortie suit à ' + hm(nx.ms) + ' (' + pt_fmtH(gS) + ' h de présence)');
+        continue;
+      }
+    }
+    // f) entrée oubliée : on l'estime avec la durée habituelle
+    const msS = ev.ms - dur, prevMs = p1 ? p1.ms : -Infinity;
+    const ne = (canEst && msS >= prevMs + 1800000) ? addEv(0, msS, 'Entrée manquante estimée à ' + hm(msS) + ' (sortie de ' + hm(ev.ms) + ' − durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
+    if(ne){ L.splice(i, 0, ne); continue; }
+    unresolved++; i++;
+  }
+  // g) dernière entrée jamais fermée depuis plus de 16 h (une entrée récente = employé encore en service : on n'y touche pas)
+  if(open !== null && (ctx.now - open.ms) / 3600000 > 16){
+    const msE = open.ms + dur;
+    const ne = (canEst && msE <= ctx.now) ? addEv(1, msE, 'Sortie manquante estimée à ' + hm(msE) + ' (entrée de ' + hm(open.ms) + ' + durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
+    if(ne) L.push(ne); else unresolved++;
+  }
+  return { acts, final:L, unresolved };
+}
+
+/* ---------- moteur : plan global (tous les employés + chevauchements de poste) ---------- */
+function pt_autoPlan(){
+  const cfg = pt_autoCfg();
+  const seenIds = new Set(pt_entries.filter(e=>e.kind === 'autofix').map(e=>e.id));
+  const locks = pt_clotures.map(c=>[c.from, c.to]);
+  const ctx = {
+    now: Date.now(),
+    seen: (id)=>seenIds.has(id),
+    locked: (ms)=>{ const d = pt_day(new Date(ms)); return locks.some(l=>d >= l[0] && d <= l[1]); }
+  };
+  const byCode = {};
+  pt_events.forEach(e=>{ (byCode[e.code] = byCode[e.code] || []).push(e); });
+  let acts = [], unresolved = 0;
+  const finalEvents = [];
+  Object.keys(byCode).forEach(k=>{
+    const r = pt_autoPlanEmployee(Number(k), byCode[k], cfg, ctx);
+    acts = acts.concat(r.acts); unresolved += r.unresolved;
+    r.final.forEach(e=>finalEvents.push({ id:e.id, code:e.code, dt:new Date(e.ms).toISOString(), type:e.type, mod:!!e.mod }));
+  });
+  // chevauchements de poste (deux collègues qui se relaient) : petit dépassement → la sortie est ramenée à l'entrée du collègue
+  if(cfg.overlapMin > 0 && pt_groups.length){
+    const sessions = pt_computeRaw(finalEvents).sessions;
+    pt_computeOverlaps(sessions, true).forEach(o=>{
+      if(o.hours * 60 > cfg.overlapMin) return;
+      const evA = finalEvents.find(e=>e.code === o.codeA && e.type === 1 && new Date(e.dt).getTime() === o.aEnd.getTime());
+      if(!evA || evA.mod || String(evA.id).startsWith('auto_')) return;
+      const logId = 'af_ovl_' + o.codeA + '_' + o.aEnd.toISOString().slice(0,16).replace(/\D/g, '');
+      if(ctx.seen(logId) || ctx.locked(o.aEnd.getTime()) || ctx.locked(o.bStart.getTime())) return;
+      const toT = o.bStart.toISOString();
+      acts.push({ logId, type:'time', rule:'ovl', code:o.codeA, changes:[{ id:evA.id, c:o.codeA, y:1, fromT:o.aEnd.toISOString(), toT }],
+        text:'Chevauchement de ' + Math.round(o.hours * 60) + ' min : sortie de ' + pt_name(o.codeA) + ' ramenée de ' + pt_hhmm(o.aEnd) + ' à ' + pt_hhmm(o.bStart) + ' (entrée de ' + pt_name(o.codeB) + ')' });
+    });
+  }
+  return { acts, unresolved };
+}
+
+/* ---------- application des corrections ---------- */
+async function pt_autoApply(acts){
+  const at = new Date().toISOString(), ops = [];
+  const mset = (iso, id, val)=>({ t:'set', ref:pt_monthRef(iso.slice(0,7)), data:{ ev:{ [id]:val } } });
+  acts.forEach(a=>{
+    const doc = { kind:'autofix', rule:a.rule, type:a.type, code:a.code, text:a.text, runId:at, at, undone:false, creePar:'auto' };
+    if(a.type === 'del'){
+      ops.push(mset(a.ev.t, a.ev.id, PT_DEL()));
+      ops.push(pt_ignoreOp([{ code:a.ev.c, dt:a.ev.t, type:a.ev.y }])); // supprimé : ne reviendra pas à l'import
+      doc.ev = a.ev;
+    } else if(a.type === 'flip'){
+      ops.push(mset(a.ev.t, a.ev.id, { c:a.ev.c, t:a.ev.t, y:a.to }));
+      ops.push(pt_ignoreOp([{ code:a.ev.c, dt:a.ev.t, type:a.ev.y }]));
+      doc.ev = a.ev; doc.to = a.to;
+    } else if(a.type === 'add'){
+      ops.push(mset(a.ev.t, a.ev.id, { c:a.ev.c, t:a.ev.t, y:a.ev.y }));
+      doc.ev = a.ev;
+    } else if(a.type === 'time'){
+      a.changes.forEach(ch=>{
+        if(ch.fromT.slice(0,7) !== ch.toT.slice(0,7)) ops.push(mset(ch.fromT, ch.id, PT_DEL()));
+        ops.push(mset(ch.toT, ch.id, { c:ch.c, t:ch.toT, y:ch.y }));
+        ops.push(pt_ignoreOp([{ code:ch.c, dt:ch.fromT, type:ch.y }]));
+      });
+      doc.changes = a.changes;
+    }
+    ops.push({ t:'set', ref:pt_entriesCol.doc(a.logId), data:doc });
+  });
+  await pt_commit(ops);
+  pt_toast(acts.length + ' correction' + (acts.length > 1 ? 's' : '') + ' automatique' + (acts.length > 1 ? 's' : '') + ' appliquée' + (acts.length > 1 ? 's' : '') + '.');
+}
+
+/* ---------- déclenchement ---------- */
+function pt_autoMaybeRun(force){
+  if(pt_autoBusy || !pt_isAdmin()) return;
+  if(!Object.keys(pt_ready).every(k=>pt_ready[k])) return;
+  const cfg = pt_autoCfg();
+  if(!cfg.enabled && !force) return;
+  const key = pt_eventsVersion + '|' + pt_clotures.length + '|' + JSON.stringify(cfg) + '|' + pt_entries.filter(e=>e.kind === 'autofix').length + '|' + pt_groups.length;
+  if(!force && (key === pt_autoKey || pt_autoRuns >= 20)) return; // garde-fou contre toute boucle
+  pt_autoKey = key;
+  const plan = pt_autoPlan();
+  if(!plan.acts.length){ if(force) pt_toast(plan.unresolved ? 'Rien de plus à corriger tout seul — ' + plan.unresolved + ' cas à voir à la main.' : 'Tout est déjà propre.'); return; }
+  pt_autoBusy = true; pt_autoRuns++;
+  pt_autoApply(plan.acts.slice(0, PT_AUTO_MAX_RUN))
+    .catch(e=>{ console.error(e); pt_autoRuns = 99; alert('Correction automatique interrompue : ' + (e.message || e)); })
+    .then(()=>{ pt_autoBusy = false; });
+}
+function pt_autoRunNow(){ pt_autoRuns = 0; pt_autoMaybeRun(true); }
+/* Aperçu : calcule les corrections sans rien écrire, puis laisse choisir de les appliquer. */
+let pt_autoPreviewList = null;
+function pt_autoPreview(){
+  const plan = pt_autoPlan();
+  pt_autoPreviewList = plan.acts;
+  if(!plan.acts.length) pt_toast(plan.unresolved ? 'Rien à corriger tout seul — ' + plan.unresolved + ' cas à voir à la main.' : 'Tout est déjà propre.');
+  pt_render(true);
+}
+function pt_autoPreviewClose(){ pt_autoPreviewList = null; pt_render(true); }
+async function pt_autoPreviewApply(){
+  const list = pt_autoPreviewList; if(!list || !list.length || pt_autoBusy) return;
+  pt_autoBusy = true;
+  try{ await pt_autoApply(list.slice(0, PT_AUTO_MAX_RUN)); pt_autoPreviewList = null; }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  pt_autoBusy = false; pt_render(true);
+}
+function pt_autoPreviewHtml(){
+  const list = pt_autoPreviewList; if(!list || !list.length) return '';
+  const when = (a)=>{ const t = a.ev ? a.ev.t : a.changes[0].fromT; return pt_fmtDT(new Date(t)); };
+  const rows = list.slice().sort((a,b)=>String(a.ev ? a.ev.t : a.changes[0].fromT).localeCompare(String(b.ev ? b.ev.t : b.changes[0].fromT))).map(a=>{
+    const r = PT_AUTO_RULES[a.rule] || [a.rule, 'pt-b-off'];
+    return `<tr><td>${when(a)}</td><td>${pt_e(pt_name(a.code))}</td><td><span class="pt-badge ${r[1]}">${pt_e(r[0])}</span></td><td style="white-space:normal;min-width:220px;">${pt_e(a.text)}</td></tr>`;
+  }).join('');
+  return `<div class="ticket"><div class="section-label">Aperçu — ${list.length} correction${list.length>1?'s':''} proposée${list.length>1?'s':''} <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">(rien n’est encore modifié)</span></div>
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Pointage</th><th>Employé</th><th>Règle</th><th>Correction</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="pt-row" style="margin-top:10px;"><button class="btn small" onclick="pt_autoPreviewApply()">Appliquer ces ${list.length} correction${list.length>1?'s':''}</button><button class="btn ghost small" onclick="pt_autoPreviewClose()">Fermer</button></div></div>`;
+}
+
+/* ---------- annulation ---------- */
+async function pt_autoUndo(ids){
+  const list = ids.map(id=>pt_entries.find(e=>e.id === id)).filter(l=>l && l.kind === 'autofix' && !l.undone);
+  if(!list.length) return;
+  const ops = [], now = new Date().toISOString();
+  const mset = (iso, id, val)=>({ t:'set', ref:pt_monthRef(iso.slice(0,7)), data:{ ev:{ [id]:val } } });
+  const ign = (c, iso, y)=>({ t:'set', ref:pt_ignoreRef, data:{ k:{ [pt_evKey(c, iso, y)]:PT_DEL() } } });
+  let skipped = 0;
+  list.forEach(l=>{
+    if(l.type === 'del'){
+      ops.push(mset(l.ev.t, l.ev.id, { c:l.ev.c, t:l.ev.t, y:l.ev.y })); ops.push(ign(l.ev.c, l.ev.t, l.ev.y));
+    } else if(l.type === 'flip'){
+      if(pt_events.some(e=>e.id === l.ev.id)){ ops.push(mset(l.ev.t, l.ev.id, { c:l.ev.c, t:l.ev.t, y:l.ev.y })); ops.push(ign(l.ev.c, l.ev.t, l.ev.y)); } else skipped++;
+    } else if(l.type === 'add'){
+      ops.push(mset(l.ev.t, l.ev.id, PT_DEL()));
+    } else if(l.type === 'time'){
+      (l.changes || []).forEach(ch=>{
+        const cur = pt_events.find(e=>e.id === ch.id); if(!cur){ skipped++; return; }
+        if(cur.dt.slice(0,7) !== ch.fromT.slice(0,7)) ops.push(mset(cur.dt, ch.id, PT_DEL()));
+        ops.push(mset(ch.fromT, ch.id, { c:ch.c, t:ch.fromT, y:ch.y })); ops.push(ign(ch.c, ch.fromT, ch.y));
+      });
+    }
+    ops.push({ t:'set', ref:pt_entriesCol.doc(l.id), data:{ undone:true, undoneAt:now } });
+  });
+  try{ await pt_commit(ops); pt_toast(list.length + ' correction' + (list.length > 1 ? 's' : '') + ' annulée' + (list.length > 1 ? 's' : '') + (skipped ? ' (' + skipped + ' pointage' + (skipped > 1 ? 's' : '') + ' déjà modifié' + (skipped > 1 ? 's' : '') + ' depuis)' : '') + '.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+function pt_autoUndoRun(runId){
+  const ids = pt_entries.filter(e=>e.kind === 'autofix' && e.runId === runId && !e.undone).map(e=>e.id);
+  if(!ids.length) return;
+  if(confirm('Annuler les ' + ids.length + ' correction(s) de ce passage ?\nLes pointages reviennent à leur état d’origine, et ces corrections ne seront pas refaites automatiquement.')) pt_autoUndo(ids);
+}
+
+/* ---------- affichage : carte (onglet Anomalies), journal, réglages ---------- */
+const PT_AUTO_RULES = { dup:['Doublon','pt-b-prime'], rebond:['Rebond','pt-b-prime'], tiny:['Parasite','pt-b-prime'], flip:['Type inversé','pt-b-prime'], add:['Estimé','pt-b-off'], ovl:['Chevauchement','pt-b-prime'] };
+function pt_autoLogs(){ return pt_entries.filter(e=>e.kind === 'autofix').sort((a,b)=>String(b.at || '').localeCompare(String(a.at || ''))); }
+function pt_autoCard(){
+  if(!pt_isAdmin()) return '';
+  const cfg = pt_autoCfg(), logs = pt_autoLogs(), active = logs.filter(l=>!l.undone), est = active.filter(l=>l.rule === 'add').length;
+  return `<div class="ticket"><div class="section-label">Correction automatique ${cfg.enabled ? '<span class="pt-badge pt-b-prime">activée</span>' : '<span class="pt-badge pt-b-off">désactivée</span>'}</div>
+    <div class="pt-muted">Doublons, entrées/sorties inversées, pointages parasites, oublis et petits chevauchements sont corrigés tout seuls ; il ne reste ici que les cas qui demandent vraiment ton avis. Tout est tracé dans le journal et annulable.</div>
+    <div class="pt-row" style="margin-top:10px;"><button class="btn small" onclick="pt_autoPreview()">Voir ce qui serait corrigé</button><button class="btn ghost small" onclick="pt_autoRunNow()">Corriger maintenant</button><button class="btn ghost small" onclick="pt_setTab('journal')">Journal (${active.length})</button></div>
+    ${est ? `<div class="pt-muted" style="margin-top:8px;">${est} pointage${est>1?'s':''} estimé${est>1?'s':''} à l’horaire habituel — à vérifier dans le journal si besoin.</div>` : ''}
+  </div>${pt_autoPreviewHtml()}`;
+}
+function pt_tabJournal(){
+  const logs = pt_autoLogs().slice(0, 400);
+  if(!logs.length) return pt_empty('Aucune correction automatique pour l’instant.');
+  const runs = []; const map = {};
+  logs.forEach(l=>{ const r = l.runId || l.at || ''; if(!map[r]){ map[r] = { runId:r, items:[] }; runs.push(map[r]); } map[r].items.push(l); });
+  const when = (l)=>{ const t = l.ev ? l.ev.t : (l.changes && l.changes[0] ? l.changes[0].fromT : null); return t ? pt_fmtDT(new Date(t)) : ''; };
+  return runs.map(r=>{
+    const d = new Date(r.runId), left = r.items.filter(x=>!x.undone).length;
+    const head = isNaN(d.getTime()) ? 'Passage' : 'Passage du ' + fmtDateShort(pt_day(d)) + ' à ' + pt_hhmm(d);
+    const rows = r.items.sort((a,b)=>String(a.text).localeCompare(String(b.text))).map(l=>{
+      const rule = PT_AUTO_RULES[l.rule] || [l.rule || '', 'pt-b-off'];
+      return `<tr${l.undone ? ' class="pt-manual"' : ''}><td>${when(l)}</td><td>${pt_e(pt_name(l.code))}</td><td><span class="pt-badge ${rule[1]}">${pt_e(rule[0])}</span></td><td style="white-space:normal;min-width:220px;">${pt_e(l.text)}</td>
+        <td>${l.undone ? '<span class="pt-muted">annulée</span>' : `<button class="btn ghost small" onclick="pt_autoUndo(['${l.id}'])">Annuler</button>`}</td></tr>`;
+    }).join('');
+    return `<div class="ticket"><div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;">${head} <span class="pt-muted">— ${r.items.length} correction${r.items.length>1?'s':''}</span></div>
+      ${left ? `<button class="btn ghost small" onclick="pt_autoUndoRun('${r.runId}')">Tout annuler</button>` : ''}</div>
+      <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Pointage</th><th>Employé</th><th>Règle</th><th>Correction</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }).join('');
+}
+function pt_autoSettingsCard(){
+  const c = pt_autoCfg();
+  return `<div class="ticket"><div class="section-label">Correction automatique des pointages</div>
+    <div class="perm-row"><span>Analyser et corriger automatiquement (à l’ouverture de Pointage et après chaque import)</span><label class="switch"><input type="checkbox" ${c.enabled ? 'checked' : ''} onchange="pt_autoSetCfg('enabled', this.checked)"><span class="slider"></span></label></div>
+    <div class="perm-row"><span>Estimer un pointage oublié avec l’horaire habituel de l’employé</span><label class="switch"><input type="checkbox" ${c.estimate ? 'checked' : ''} onchange="pt_autoSetCfg('estimate', this.checked)"><span class="slider"></span></label></div>
+    <div class="grid grid-2" style="margin-top:10px;">
+      <div class="field"><label>Doublon : même pointage en moins de (min)</label><input type="text" inputmode="numeric" value="${c.dupMin}" onchange="pt_autoSetCfg('dupMin', this.value)"></div>
+      <div class="field"><label>Chevauchement corrigé jusqu’à (min)</label><input type="text" inputmode="numeric" value="${c.overlapMin}" onchange="pt_autoSetCfg('overlapMin', this.value)"></div>
+    </div>
+    <div class="pt-muted" style="margin-top:8px;">L’estimation n’a lieu que si l’employé a au moins 6 sessions régulières. Les périodes de paie clôturées ne sont jamais modifiées.</div>
+  </div>`;
+}
+
+/* ==================== rendu ==================== */
+function pt_num(v){ const n = Number(String(v==null?'':v).replace(/[\s\u00a0]/g,'').replace(',','.')); return isNaN(n) ? 0 : n; }
+function pt_toast(msg){
+  let t = document.getElementById('pt-toast');
+  if(!t){ t = document.createElement('div'); t.id = 'pt-toast'; t.className = 'pt-toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(pt_toast._t); pt_toast._t = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function pt_saveInputs(body){
+  const saved = {};
+  body.querySelectorAll('.pt-draft').forEach(el=>{ if(el.id) saved[el.id] = el.value; });
+  const a = document.activeElement; let focus = null;
+  if(a && a.id && body.contains(a)){
+    focus = { id:a.id };
+    if(typeof a.selectionStart === 'number'){ try{ focus.s = a.selectionStart; focus.e = a.selectionEnd; }catch(e){} }
+  }
+  return { saved, focus };
+}
+function pt_restoreInputs(st, withValues){
+  if(withValues) for(const id in st.saved){ const el = document.getElementById(id); if(el && el.value !== st.saved[id]) el.value = st.saved[id]; }
+  if(st.focus){
+    const el = document.getElementById(st.focus.id);
+    if(el){ el.focus(); if(st.focus.s != null && el.setSelectionRange){ try{ el.setSelectionRange(st.focus.s, st.focus.e); }catch(e){} } }
+  }
+}
+let pt_open = { overview:false, pointages:true, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
+function pt_toggleSec(key){ pt_open[key] = !pt_open[key]; pt_render(true); }
+function pt_accordion(key, title, innerHtml){
+  const open = !!pt_open[key];
+  return `<div class="ticket">
+    <div class="row-between" style="cursor:pointer;" onclick="pt_toggleSec('${key}')">
+      <div style="font-weight:700;">${pt_e(title)}</div>
+      <span class="pt-chevron">${open ? '▾' : '▸'}</span>
+    </div>
+    ${open ? `<div style="margin-top:12px;">${innerHtml}</div>` : ''}
+  </div>`;
+}
+function pt_setTab(t){ pt_tab = t; pt_openFix = null; pt_render(true); window.scrollTo({ top:0 }); }
+function pt_selEmp(v){ pt_sel = Number(v); pt_render(true); }
+function pt_isAdmin(){ return !!(session && session.isAdmin); }
+function pt_renderTabs(nAnom){
+  // Réglages (taux, salaires) : réservé aux administrateurs
+  const tabs = [['anomalies','Anomalies'],['employes','Employés'],['journal','Journal auto'],['reglages','Réglages']]
+    .filter(t=>pt_isAdmin() || (t[0] !== 'reglages' && t[0] !== 'journal'));
+  document.getElementById('pointage-tabs').innerHTML = tabs.map(([id,l])=>
+    `<button class="${pt_tab===id?'active':''}" onclick="pt_setTab('${id}')">${l}${id==='anomalies' && nAnom ? ` <span class="count-pill">${nAnom}</span>` : ''}</button>`).join('');
+}
+function pt_render(fresh){
+  if(activeModule !== 'pointage') return;
+  const body = document.getElementById('pt-body'); if(!body) return;
+  if(!pt_isAdmin() && (pt_tab === 'reglages' || pt_tab === 'journal')) pt_tab = 'anomalies';
+  pt_renderPeriod();
+  if(pt_error){ pt_renderTabs(0); body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
+  if(!Object.keys(pt_ready).every(k=>pt_ready[k])){
+    pt_renderTabs(0);
+    const elapsed = pt_loadStartedAt ? (Date.now() - pt_loadStartedAt) : 0;
+    if(elapsed > 4500){
+      const labels = { events:'Pointages', cfg:'Réglages employés', entries:'Primes / jours off / avances', ign:'Historique des suppressions', groups:'Groupes de poste', ovIgn:'Chevauchements ignorés', anIgn:'Anomalies ignorées', clot:'Périodes clôturées' };
+      const missing = Object.keys(pt_ready).filter(k=>!pt_ready[k]).map(k=>labels[k] || k);
+      body.innerHTML = `<div class="alert-banner"><b>Le chargement prend plus de temps que prévu</b>Ça reste bloqué sur : ${missing.join(', ')}.<br>Ouvre la console du navigateur (touche F12 → onglet « Console ») pour voir le message d'erreur exact, et vérifie que les règles Firestore autorisent la collections <code>pointage_config</code> (documents « groupes », « chevauchements_ignores » et « anomalies_ignorees ») et <code>pointage_clotures</code>.<br><button class="btn small" style="margin-top:10px;" onclick="location.reload()">Réessayer</button></div>`;
+    } else {
+      body.innerHTML = '<div class="empty-state">Chargement…</div>';
+    }
+    return;
+  }
+  const st = pt_saveInputs(body);
+  const all = pt_compute();
+  const sessions = all.sessions.filter(s=>pt_inRange(pt_day(s.date)));
+  const anomsPeriod = all.anomalies.filter(a=>pt_inRange(pt_day(a.dt)));
+  const anoms = anomsPeriod.filter(a=>!pt_anomIgnored(a));
+  const nIgnored = anomsPeriod.length - anoms.length;
+  const overlaps = pt_computeOverlaps(sessions);
+  const codes = pt_codes();
+  if(pt_sel === null || !codes.includes(pt_sel)) pt_sel = codes.length ? codes[0] : null;
+  pt_renderTabs(anoms.length + overlaps.length);
+  let html;
+  if(pt_tab === 'anomalies') html = pt_tabAnomalies(anoms, nIgnored) + pt_tabOverlaps(overlaps);
+  else if(pt_tab === 'employes') html = pt_tabEmployes(codes, sessions, anoms);
+  else if(pt_tab === 'journal') html = pt_tabJournal();
+  else html = pt_tabReglages(codes);
+  body.innerHTML = html;
+  pt_restoreInputs(st, !fresh);
+  setTimeout(()=>pt_autoMaybeRun(), 0); // analyse automatique (administrateur) quand les données ont changé
+}
+function pt_empty(msg){ return `<div class="ticket"><div class="empty-state">${msg}</div></div>`; }
+function pt_empSelect(codes){
+  return `<div class="field" style="margin-bottom:12px;"><label>Employé</label><select id="pt-sel" onchange="pt_selEmp(this.value)">${
+    codes.map(x=>`<option value="${x}" ${x===pt_sel?'selected':''}>${pt_e(pt_label(x))} (code ${x})</option>`).join('')}</select></div>`;
+}
+
+/* ---------- onglet Anomalies ---------- */
+function pt_anomRow(i){
+  const a = pt_anomList[i], open = pt_openFix === pt_anomKey(a);
+  let h = `<div class="pt-an"><div><b>${pt_fmtDT(a.dt)}</b> · ${a.type}<div class="pt-an-reason">${pt_e(a.reason)}</div></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn ghost small" onclick="pt_toggleFix(${i})">${open ? 'Annuler' : 'Corriger'}</button><button class="btn ghost small" onclick="pt_anomIgnore(${i})">Ignorer</button></div></div>`;
+  if(!open) return h;
+  const corrType = a.type === 'Entrée' ? 1 : 0;
+  h += `<div class="pt-fix"><div class="pt-muted" style="margin-bottom:6px;">Ajouter le pointage manquant (${corrType===0?'Entrée':'Sortie'}) :</div>
+    <div class="pt-row"><input type="date" id="pt-fix-date" class="pt-draft pt-auto" value="${pt_day(a.dt)}"><input type="time" id="pt-fix-time" class="pt-draft pt-auto" value="${pt_hhmm(a.dt)}"><button class="btn small" onclick="pt_saveFix(${i})">Enregistrer</button></div>`;
+  const near = pt_eventsNear(a.code, a.dt);
+  if(near.length > 1){
+    h += `<div class="pt-muted" style="margin:14px 0 4px;">Ou compare les pointages de ${pt_e(pt_name(a.code))} autour de ce moment — utile si c’est un doublon à supprimer :</div>
+      <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date / heure</th><th>Type</th><th></th></tr></thead><tbody>${
+      near.map(ev=>{
+        const d = new Date(ev.dt), isThis = d.getTime() === a.dt.getTime() && (ev.type === 0 ? 'Entrée' : 'Sortie') === a.type;
+        return `<tr><td>${pt_fmtDT(d)}${isThis ? ' ⚠️' : ''}</td><td>${ev.type===0?'Entrée':'Sortie'}</td><td><button class="btn ghost small" onclick="pt_delEventConfirm('${ev.id}')">Supprimer</button></td></tr>`;
+      }).join('')}</tbody></table></div>`;
+  }
+  return h + `</div>`;
+}
+function pt_tabAnomalies(anoms, nIgnored){
+  pt_anomList = anoms;
+  let html = pt_autoCard();
+  if(anoms.length || nIgnored){
+    html += `<div class="ticket"><div class="section-label">Nettoyer la liste</div>
+      <div class="pt-row"><input type="date" id="pt-ign-before" class="pt-draft pt-auto"><button class="btn ghost small" onclick="pt_anomIgnoreBefore()">Ignorer toutes les anomalies avant cette date</button></div>
+      <div class="pt-muted" style="margin-top:6px;">Ignorer ne modifie jamais les pointages : l'anomalie est seulement retirée de la liste.${nIgnored ? ' ' + nIgnored + ' anomalie' + (nIgnored>1?'s':'') + ' ignorée' + (nIgnored>1?'s':'') + ' sur cette période — <a href="#" class="pt-link" onclick="pt_anomUnignoreAll();return false;">tout réafficher</a>.' : ''}</div>
+    </div>`;
+  }
+  if(!anoms.length) html += pt_empty('Aucune anomalie ouverte sur cette période 🎉');
+  else {
+    const byCode = {};
+    anoms.forEach((a,i)=>{ (byCode[a.code] = byCode[a.code] || []).push(i); });
+    Object.keys(byCode).map(Number).sort((a,b)=>a-b).forEach(code=>{
+      const idxs = byCode[code];
+      html += `<div class="ticket"><div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;">${pt_e(pt_label(code))}</div><span class="pt-muted">${idxs.length} anomalie${idxs.length>1?'s':''}</span></div>${idxs.map(pt_anomRow).join('')}</div>`;
+    });
+  }
+  const resolved = pt_entries.filter(e=>e.kind === 'resolved').sort((a,b)=>(b.resolvedAt||'').localeCompare(a.resolvedAt||''));
+  if(resolved.length){
+    html += `<div class="ticket"><div class="section-label">Corrigées — historique</div>${
+      resolved.map(r=>`<div class="pt-an ok"><div><b>${pt_fmtDT(new Date(r.dt))}</b> · ${pt_e(pt_name(r.code))}<div class="pt-an-reason">${pt_e(r.reason)} — corrigé le ${fmtDateShort(String(r.resolvedAt||'').slice(0,10))}</div></div>
+        <button class="btn ghost small" onclick="pt_delEntry('${r.id}')">Effacer</button></div>`).join('')}
+      <button class="btn ghost small" style="margin-top:8px;" onclick="pt_clearResolved()">Vider l’historique des corrections</button></div>`;
+  }
+  return html;
+}
+function pt_tabOverlaps(overlaps){
+  pt_ovList = overlaps;
+  if(!overlaps.length) return '';
+  const rows = overlaps.map((o,i)=>{
+    const open = pt_ovOpen === o.key;
+    let h = `<div class="pt-an"><div><b>${pt_dm(new Date(o.day + 'T00:00:00'))}</b> — ${pt_e(pt_name(o.codeA))} sorti à ${pt_hhmm(o.aEnd)} · ${pt_e(pt_name(o.codeB))} entré à ${pt_hhmm(o.bStart)}
+        <div class="pt-an-reason">Écart : ${pt_fmtH(o.hours)} h en trop, à vérifier</div></div>
+      <button class="btn ghost small" onclick="pt_ovToggle(${i})">${open ? 'Fermer' : 'Comparer'}</button></div>`;
+    if(open){
+      h += `<div class="pt-fix">
+        <div class="pt-muted" style="margin-bottom:8px;">${pt_e(pt_name(o.codeA))} : sortie à ${pt_hhmm(o.aEnd)} — ${pt_e(pt_name(o.codeB))} : entrée à ${pt_hhmm(o.bStart)}. Retiens une heure commune pour les deux, ou garde les deux pointages tels quels.</div>
+        <div class="pt-row">
+          <input type="time" id="pt-ov-time-${i}" class="pt-draft pt-auto" value="${pt_hhmm(o.bStart)}">
+          <button class="btn small" onclick="pt_ovAlign(${i})">Retenir cette heure pour les deux</button>
+          <button class="btn ghost small" onclick="pt_ovKeep(${i})">Garder les deux tels quels</button>
+        </div>
+      </div>`;
+    }
+    return h;
+  }).join('');
+  return `<div class="ticket"><div class="section-label">Chevauchements de poste <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— une sortie après l'entrée du collègue suivant</span></div>${rows}</div>`;
+}
+function pt_ovToggle(i){
+  const o = pt_ovList[i]; if(!o) return;
+  pt_ovOpen = (pt_ovOpen === o.key) ? null : o.key;
+  pt_render(true);
+}
+async function pt_ovKeep(i){
+  const o = pt_ovList[i]; if(!o) return;
+  try{ await pt_overlapIgnoreRef.set({ k:{ [o.key]:true } }, { merge:true }); pt_ovOpen = null; pt_toast('Gardé tel quel.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_ovAlign(i){
+  const o = pt_ovList[i]; if(!o) return;
+  const t = document.getElementById('pt-ov-time-' + i).value;
+  if(!t){ alert('Indique une heure.'); return; }
+  const evA = pt_events.find(e=>e.code === o.codeA && e.type === 1 && new Date(e.dt).getTime() === o.aEnd.getTime());
+  const evB = pt_events.find(e=>e.code === o.codeB && e.type === 0 && new Date(e.dt).getTime() === o.bStart.getTime());
+  if(!evA || !evB){ pt_toast('Ce pointage a déjà changé, actualisation…'); pt_render(true); return; }
+  const iso = new Date(o.day + 'T' + t + ':00').toISOString();
+  try{
+    pt_ovOpen = null;
+    await Promise.all([ pt_updateEvent(evA.id, { dt:iso }), pt_updateEvent(evB.id, { dt:iso }) ]);
+    pt_toast('Pointages alignés à ' + t + '.');
+  }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_anomIgnore(i){
+  const a = pt_anomList[i]; if(!a) return;
+  try{ pt_openFix = null; await pt_anIgnRef.set({ k:{ [pt_anomIgnKey(a)]:true } }, { merge:true }); pt_toast('Anomalie ignorée.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_anomIgnoreBefore(){
+  const v = document.getElementById('pt-ign-before').value;
+  if(!v){ alert('Choisis d’abord une date.'); return; }
+  const n = pt_compute().anomalies.filter(a=>pt_day(a.dt) < v && !pt_anomIgnored(a)).length;
+  if(!n){ alert('Aucune anomalie avant le ' + fmtDateShort(v) + '.'); return; }
+  if(!confirm('Ignorer ' + n + ' anomalie' + (n>1?'s':'') + ' datée' + (n>1?'s':'') + ' avant le ' + fmtDateShort(v) + ' ?\nLes pointages ne sont pas modifiés ; tu pourras tout réafficher.')) return;
+  try{ await pt_anIgnRef.set({ before:v }, { merge:true }); pt_toast(n + ' anomalie' + (n>1?'s':'') + ' ignorée' + (n>1?'s':'') + '.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_anomUnignoreAll(){
+  if(!confirm('Réafficher toutes les anomalies ignorées ?')) return;
+  try{ await pt_anIgnRef.set({ k:{}, before:null }); pt_toast('Anomalies réaffichées.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+function pt_toggleFix(i){
+  const a = pt_anomList[i]; if(!a) return;
+  const k = pt_anomKey(a);
+  pt_openFix = (pt_openFix === k) ? null : k;
+  pt_render(true);
+}
+async function pt_saveFix(i){
+  const a = pt_anomList[i]; if(!a) return;
+  const d = document.getElementById('pt-fix-date').value, t = document.getElementById('pt-fix-time').value;
+  if(!d || !t){ alert('Date et heure requises.'); return; }
+  try{
+    pt_openFix = null;
+    await Promise.all([
+      pt_addEvents([{ code:a.code, iso:new Date(d + 'T' + t + ':00').toISOString(), type: a.type === 'Entrée' ? 1 : 0 }]),
+      pt_addEntryDoc({ kind:'resolved', code:a.code, dt:a.dt.toISOString(), type:a.type, reason:a.reason, resolvedAt:new Date().toISOString() })
+    ]);
+    pt_render(true);
+  }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+async function pt_delEventConfirm(id){
+  const e = pt_events.find(x=>x.id === id); if(!e) return;
+  if(!confirm('Supprimer ce pointage (' + pt_fmtDT(new Date(e.dt)) + ', ' + (e.type===0?'Entrée':'Sortie') + ') ?')) return;
+  pt_openFix = null;
+  try{ await pt_deleteEvents([id]); pt_render(true); }catch(err){ console.error(err); alert('Erreur : ' + (err.message || err)); }
+}
+async function pt_delEntry(id){ try{ await pt_entriesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); } }
+async function pt_delEntryConfirm(id, what){ if(confirm('Supprimer ' + what + ' ?')) pt_delEntry(id); }
+async function pt_clearResolved(){
+  if(!confirm('Effacer tout l’historique des corrections ?')) return;
+  await pt_commit(pt_entries.filter(e=>e.kind === 'resolved').map(e=>({ t:'del', ref:pt_entriesCol.doc(e.id) })));
+}
+
+/* ---------- onglet Paie ---------- */
+function pt_formRow(k, label){
+  const enter = `onkeydown="if(event.key==='Enter')pt_addEntry('${k}')"`;
+  return `<div class="pt-form">
+    <div class="pt-form-title"><label>${label}</label><input type="date" id="pt-f-${k}-date" class="pt-draft pt-auto" value="${todayISO()}"></div>
+    <input type="text" id="pt-f-${k}-note" class="pt-draft" placeholder="Motif" ${enter}>
+    <input type="text" inputmode="decimal" id="pt-f-${k}-amt" class="pt-draft" placeholder="Montant (DA)" ${enter}>
+    <button class="btn small" onclick="pt_addEntry('${k}')">Ajouter</button>
+  </div>`;
+}
+async function pt_addEntry(kind){
+  if(pt_sel === null) return;
+  const dEl = document.getElementById('pt-f-' + kind + '-date'), nEl = document.getElementById('pt-f-' + kind + '-note'), aEl = document.getElementById('pt-f-' + kind + '-amt');
+  const raw = aEl.value.trim();
+  if(!raw){ alert('Indique au moins le montant.'); return; }
+  const data = { kind, code:pt_sel, date:dEl.value || todayISO(), amount:pt_num(raw), note:nEl.value.trim() };
+  aEl.value = ''; nEl.value = ''; dEl.value = todayISO();
+  try{ await pt_addEntryDoc(data); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+function pt_histRows(p){
+  return [
+    ...p.bonuses.map(x=>({ ...x, cat:'Prime', cls:'pt-b-prime', sign:1 })),
+    ...p.leaves.map(x=>({ ...x, cat:'Jour Off', cls:'pt-b-off', sign:1 })),
+    ...p.advances.map(x=>({ ...x, cat:'Avance', cls:'pt-b-avance', sign:-1 }))
+  ].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+}
+const pt_r2 = (x)=>Math.round((Number(x) || 0) * 100) / 100;
+async function pt_closePeriod(){
+  const from = pt_filter.from, to = pt_filter.to;
+  if(!from || !to){ alert('Renseigne les dates Du et Au avant de clôturer.'); return; }
+  if(from > to){ alert('La date de début est après la date de fin.'); return; }
+  const clash = pt_clotures.find(c=>!(to < c.from || from > c.to));
+  if(clash){ alert('Cette période chevauche une période déjà clôturée (du ' + fmtDateShort(clash.from) + ' au ' + fmtDateShort(clash.to) + '). Rouvre-la d’abord, ou choisis d’autres dates.'); return; }
+  if(!confirm('Clôturer la paie du ' + fmtDateShort(from) + ' au ' + fmtDateShort(to) + ' ?\nLes montants de chaque employé seront figés (tu pourras rouvrir la période en cas d’erreur).')) return;
+  const sessions = pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)));
+  const rows = {};
+  pt_codes().forEach(code=>{
+    const p = pt_payroll(code, sessions);
+    rows[code] = { name:pt_name(code), hours:pt_r2(p.totalHours), rate:p.rate, mode:p.mode, workedDays:p.workedDays, baseWage:pt_r2(p.baseWage),
+      transportTotal:pt_r2(p.transportTotal), bonusesTotal:pt_r2(p.bonusesTotal), subTotal:pt_r2(p.subTotal), leavesTotal:pt_r2(p.leavesTotal),
+      advancesTotal:pt_r2(p.advancesTotal), net:pt_r2(p.net), paid: p.net <= 0 }; // rien à verser => déjà « payé »
+  });
+  try{ await pt_cloturesCol.add({ from, to, createdAt:new Date().toISOString(), createdBy:currentUser, rows }); pt_toast('Période clôturée.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_reopenPeriod(){
+  const c = pt_currentClosure(); if(!c) return;
+  if(!confirm('Rouvrir cette période ? Les cases « Payé » seront perdues et la paie sera de nouveau calculée en direct.')) return;
+  try{ await pt_cloturesCol.doc(c.id).delete(); pt_toast('Période rouverte.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_togglePaid(code, checked){
+  const c = pt_currentClosure(); if(!c) return;
+  try{ await pt_cloturesCol.doc(c.id).set({ rows:{ [code]:{ paid:!!checked } } }, { merge:true }); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+function pt_closureBar(sessions){
+  const c = pt_currentClosure();
+  if(!pt_filter.from || !pt_filter.to) return `<div class="pt-muted" style="margin-bottom:10px;">Renseigne les dates Du / Au (en haut) pour pouvoir clôturer une période de paie.</div>`;
+  if(!c) return `<div class="pt-row" style="margin-bottom:10px;"><button class="btn small" onclick="pt_closePeriod()">Clôturer cette période</button><span class="pt-muted">Fige la paie de chaque employé du ${fmtDateShort(pt_filter.from)} au ${fmtDateShort(pt_filter.to)}.</span></div>`;
+  const rows = Object.keys(c.rows || {}).map(k=>c.rows[k]);
+  const nPaid = rows.filter(r=>r.paid).length;
+  const stale = pt_closureStale(sessions);
+  return `<div class="pt-row" style="margin-bottom:10px;"><span class="pt-badge pt-b-prime">Clôturée</span><span class="pt-muted">le ${fmtDateShort(String(c.createdAt || '').slice(0,10))} · payé : ${nPaid} / ${rows.length}</span><button class="btn ghost small" onclick="pt_reopenPeriod()">Rouvrir</button></div>
+    ${stale ? `<div class="alert-banner" style="margin-bottom:10px;"><b>Les données ont changé depuis la clôture</b>Un pointage, une prime ou une avance de cette période a été modifié après coup. Les chiffres ci-dessous sont ceux figés à la clôture ; rouvre la période pour recalculer.</div>` : ''}`;
+}
+function pt_paieOverviewHtml(codes, sessions){
+  const c = pt_currentClosure();
+  const totNet = codes.reduce((s,x)=>s + pt_displayPayroll(x, sessions).net, 0);
+  const rows = codes.map(x=>{
+    const q = pt_displayPayroll(x, sessions);
+    const paidCell = c ? `<td>${pt_frozenRow(x) ? `<input type="checkbox" ${q.paid ? 'checked' : ''} onchange="pt_togglePaid(${x}, this.checked)">` : ''}</td>` : '';
+    return `<tr><td>${pt_e(pt_label(x))}</td><td>${pt_fmtH(q.totalHours)}</td><td>${pt_fmtMoney(q.rate)}${q.mode==='daily'?'/j':'/h'}</td><td>${pt_fmtMoney(q.baseWage)}</td><td>${pt_fmtMoney(q.transportTotal)}</td><td>${pt_fmtMoney(q.bonusesTotal)}</td><td><b>${pt_fmtMoney(q.subTotal)}</b></td><td>${pt_fmtMoney(q.leavesTotal)}</td><td>${pt_fmtMoney(q.advancesTotal)}</td><td><b>${pt_fmtMoney(q.net)}</b></td>${paidCell}</tr>`;
+  }).join('');
+  const resteAPayer = c ? codes.reduce((s,x)=>{ const q = pt_displayPayroll(x, sessions); return s + (pt_frozenRow(x) && !q.paid && q.net > 0 ? q.net : 0); }, 0) : 0;
+  return { totNet, closed:!!c, html: `${pt_closureBar(sessions)}<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Employé</th><th>Heures</th><th>Taux</th><th>Base</th><th>Transport</th><th>Primes</th><th>Sous-total</th><th>Jours off</th><th>Avances</th><th>Net</th>${c ? '<th>Payé</th>' : ''}</tr></thead><tbody>${rows}
+    <tr class="pt-total"><td colspan="9">TOTAL NET À PAYER</td><td>${pt_fmtMoney(totNet)}</td>${c ? '<td></td>' : ''}</tr>${c ? `<tr class="pt-total"><td colspan="9">RESTE À PAYER</td><td>${pt_fmtMoney(resteAPayer)}</td><td></td></tr>` : ''}</tbody></table></div>` };
+}
+function pt_paieSection(c, sessions, codes){
+  const p = pt_displayPayroll(c, sessions);
+  const live = p.frozen ? pt_payroll(c, sessions) : null;
+  const lockLine = p.frozen ? `<div class="pt-muted" style="margin-bottom:8px;">🔒 Période clôturée — chiffres figés · ${p.paid ? 'Payé ✓' : 'À payer'}${Math.round(live.net) !== Math.round(p.net) ? ` · <span style="color:var(--rust);">⚠️ données modifiées depuis (net actuel : ${pt_fmtMoney(live.net)})</span>` : ''}</div>` : '';
+  const rows = pt_histRows(p);
+  const hist = rows.length ? rows.map(r=>`<tr>
+      <td>${fmtDateShort(r.date)}</td>
+      <td><span class="pt-badge ${r.cls}">${r.cat}</span></td>
+      <td>${pt_e(r.note)}</td>
+      <td class="${r.sign<0?'pt-minus':'pt-plus'}">${r.sign<0?'−':'+'}${pt_fmtMoney(r.amount)}</td>
+      <td><button class="btn ghost small" onclick="pt_delEntryConfirm('${r.id}','cette entrée')">Supprimer</button></td></tr>`).join('')
+    : `<tr><td colspan="5" class="pt-muted">Aucune entrée sur cette période.</td></tr>`;
+  return `${lockLine}
+    <div class="pt-muted">Taux : ${pt_fmtMoney(p.rate)}${p.mode==='daily'?' / jour':' / heure'} · ${p.transport.enabled ? 'Transport : ' + pt_fmtMoney(p.transport.amount) + ' / jour' : 'Transport désactivé'} · <a href="#" class="pt-link" onclick="pt_setTab('reglages');return false;">Modifier dans Réglages</a></div>
+    ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off')}${pt_formRow('avance','Avance')}
+    <h2 class="section" style="margin-top:20px;">Historique</h2>
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Catégorie</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${hist}</tbody></table></div>
+    <div class="grid grid-2" style="margin-top:14px;">
+      <div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span></div><div class="value">${pt_fmtMoney(p.subTotal)}</div></div>
+      <div class="result-box final"><div class="label">Net à payer</div><div class="value">${pt_fmtMoney(p.net)}</div></div>
+    </div>
+    <div class="actions-row"><button class="btn ghost small" onclick="pt_exportPayslip()">Exporter le bulletin (CSV)</button></div>`;
+}
+
+/* ---------- onglet Employés (fusion Par employé + Paie, en sections repliables) ---------- */
+function pt_pointagesSection(c, sessions){
+  const mySess = sessions.filter(s=>s.code === c);
+  const myManual = pt_entries.filter(e=>e.kind === 'manual' && e.code === c && pt_inRange(e.date));
+  const lines = [
+    ...mySess.map(s=>({ ts:s.start.getTime(), hours:s.hours, html:`<tr><td>${fmtDateShort(pt_day(s.date))}</td><td>${pt_fmtDT(s.start)}</td><td>${pt_fmtDT(s.end)}</td><td>${pt_fmtH(s.hours)}</td><td></td></tr>` })),
+    ...myManual.map(m=>({ ts:new Date(m.date + 'T00:00:00').getTime(), hours:Number(m.hours)||0, html:`<tr class="pt-manual"><td>${fmtDateShort(m.date)}</td><td colspan="2">Session manuelle${m.note ? ' — ' + pt_e(m.note) : ''}</td><td>${pt_fmtH(m.hours)}</td><td><button class="btn ghost small" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>` }))
+  ].sort((a,b)=>a.ts - b.ts);
+  const total = lines.reduce((s,x)=>s + x.hours, 0);
+  const rawEvs = pt_events.filter(e=>e.code === c && pt_inRange(pt_day(new Date(e.dt)))).sort((a,b)=>new Date(b.dt) - new Date(a.dt));
+  const manualRows = myManual.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  return `
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Entrée</th><th>Sortie</th><th>Durée (h)</th><th></th></tr></thead><tbody>${
+      lines.length ? lines.map(l=>l.html).join('') + `<tr class="pt-total"><td colspan="3">Total</td><td>${pt_fmtH(total)}</td><td></td></tr>` : `<tr><td colspan="5" class="pt-muted">Aucune session sur cette période.</td></tr>`}</tbody></table></div>
+    <div class="actions-row"><button class="btn ghost small" onclick="pt_exportEmployeeCsv()">Exporter en CSV</button></div>
+    <h2 class="section" style="margin-top:18px;">Ajouter / corriger un pointage</h2>
+    <div class="pt-row">
+      <input type="date" id="pt-ne-date" class="pt-draft pt-auto"><input type="time" id="pt-ne-time" class="pt-draft pt-auto">
+      <select id="pt-ne-type" class="pt-draft pt-auto"><option value="0">Entrée</option><option value="1">Sortie</option></select>
+      <button class="btn small" onclick="pt_addEventUI()">Ajouter</button>
+    </div>
+    <div class="pt-scroll" style="margin-top:12px;"><table class="pt-table"><thead><tr><th>Date</th><th>Heure</th><th>Type</th><th></th></tr></thead><tbody>${
+      rawEvs.length ? rawEvs.map(ev=>{ const d = new Date(ev.dt); return `<tr>
+        <td><input type="date" id="pt-ev-d-${ev.id}" class="pt-draft pt-auto" value="${pt_day(d)}"></td>
+        <td><input type="time" id="pt-ev-t-${ev.id}" class="pt-draft pt-auto" value="${pt_hhmm(d)}"></td>
+        <td><select id="pt-ev-y-${ev.id}" class="pt-draft pt-auto"><option value="0" ${ev.type===0?'selected':''}>Entrée</option><option value="1" ${ev.type===1?'selected':''}>Sortie</option></select></td>
+        <td><button class="btn ghost small" onclick="pt_saveEventRow('${ev.id}')">Enregistrer</button> <button class="btn ghost small" onclick="pt_delEventConfirm('${ev.id}')">Supprimer</button></td></tr>`; }).join('')
+      : `<tr><td colspan="4" class="pt-muted">Aucun pointage sur cette période.</td></tr>`}</tbody></table></div>
+    <h2 class="section" style="margin-top:18px;">Sessions manuelles</h2>
+    <div class="pt-muted" style="margin-bottom:8px;">Heures ajoutées sans pointage, quand le pointage est irrécupérable (ou pour un employé géré sans pointage).</div>
+    <div class="pt-row">
+      <input type="date" id="pt-m-date" class="pt-draft pt-auto"><input type="text" inputmode="decimal" id="pt-m-hours" class="pt-draft pt-w90" placeholder="Heures">
+      <input type="text" id="pt-m-note" class="pt-draft pt-grow" placeholder="Note (optionnel)"><button class="btn small" onclick="pt_addManual()">Ajouter</button>
+    </div>
+    ${manualRows.length ? `<div class="pt-scroll" style="margin-top:10px;"><table class="pt-table"><thead><tr><th>Date</th><th>Heures</th><th>Note</th><th></th></tr></thead><tbody>${
+      manualRows.map(m=>`<tr><td>${fmtDateShort(m.date)}</td><td>${pt_fmtH(m.hours)}</td><td>${pt_e(m.note)}</td><td><button class="btn ghost small" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>`).join('')}</tbody></table></div>` : ''}`;
+}
+function pt_tabEmployes(codes, sessions, anoms){
+  if(!codes.length) return pt_empty('Aucune donnée pour l’instant.');
+  const isAdmin = pt_isAdmin();
+  let html = '';
+  if(isAdmin){
+    const ov = pt_paieOverviewHtml(codes, sessions);
+    html += pt_accordion('overview', 'Tableau de paie — tous les employés (net total : ' + pt_fmtMoney(ov.totNet) + ')' + (ov.closed ? ' — 🔒 clôturée' : ''), ov.html);
+  }
+  const c = pt_sel, p = pt_displayPayroll(c, sessions);
+  const myAn = anoms.filter(a=>a.code === c);
+  html += `<div class="ticket">
+    ${pt_empSelect(codes)}
+    <div class="pt-kpis">
+      <div class="pt-kpi"><div class="n">${pt_fmtH(p.totalHours)} h</div><div class="l">Heures période</div></div>
+      <div class="pt-kpi"><div class="n">${p.workedDays}</div><div class="l">Jours travaillés</div></div>
+      ${isAdmin ? `<div class="pt-kpi"><div class="n">${pt_fmtMoney(p.baseWage)}</div><div class="l">Salaire de base</div></div><div class="pt-kpi"><div class="n">${pt_fmtMoney(p.net)}</div><div class="l">Net à payer</div></div>` : ''}
+    </div>
+  </div>`;
+  html += pt_accordion('pointages', 'Pointages', pt_pointagesSection(c, sessions));
+  if(myAn.length){
+    pt_anomList = myAn;
+    html += pt_accordion('anomEmp', 'Anomalies de cette personne (' + myAn.length + ')', myAn.map((a,i)=>pt_anomRow(i)).join(''));
+  }
+  if(isAdmin) html += pt_accordion('paie', 'Paie', pt_paieSection(c, sessions, codes));
+  return html;
+}
+async function pt_addEventUI(){
+  const d = document.getElementById('pt-ne-date').value, t = document.getElementById('pt-ne-time').value, y = Number(document.getElementById('pt-ne-type').value);
+  if(!d || !t){ alert('Choisis une date et une heure.'); return; }
+  document.getElementById('pt-ne-date').value = ''; document.getElementById('pt-ne-time').value = '';
+  try{ await pt_addEvents([{ code:pt_sel, iso:new Date(d + 'T' + t + ':00').toISOString(), type:y }]); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_saveEventRow(id){
+  const d = document.getElementById('pt-ev-d-' + id).value, t = document.getElementById('pt-ev-t-' + id).value, y = Number(document.getElementById('pt-ev-y-' + id).value);
+  if(!d || !t){ alert('Date et heure requises.'); return; }
+  try{ await pt_updateEvent(id, { dt:new Date(d + 'T' + t + ':00').toISOString(), type:y }); pt_toast('Pointage modifié.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_addManual(){
+  const d = document.getElementById('pt-m-date').value, h = document.getElementById('pt-m-hours').value.trim(), n = document.getElementById('pt-m-note').value.trim();
+  if(!d || !h){ alert('Date et nombre d’heures requis.'); return; }
+  document.getElementById('pt-m-date').value = ''; document.getElementById('pt-m-hours').value = ''; document.getElementById('pt-m-note').value = '';
+  try{ await pt_addEntryDoc({ kind:'manual', code:pt_sel, date:d, hours:pt_num(h), note:n }); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+
+/* ---------- onglet Réglages ---------- */
+function pt_tabReglages(codes){
+  const isAdmin = !!(session && session.isAdmin);
+  let suggestion = 1; while(codes.includes(suggestion)) suggestion++;
+  const cards = codes.map(c=>{
+    const e = pt_emp[c] || {}, tr = pt_transport(c);
+    return `<div class="ticket">
+      <div class="row-between"><div style="font-weight:700;font-family:'Manrope',sans-serif;">Code ${c}</div>${isAdmin ? `<button class="btn rust small" onclick="pt_deleteEmployee(${c})">🗑️ Supprimer</button>` : ''}</div>
+      <div class="grid grid-2" style="margin-top:10px;">
+        <div class="field"><label>Nom</label><input type="text" list="pt-names" value="${pt_e(e.name || PT_DEFAULT_NAMES[c] || '')}" placeholder="Nom de l’employé" onchange="pt_setField(${c},'name',this.value)"></div>
+        <div class="field"><label>Poste</label><input type="text" value="${pt_e(e.poste || '')}" placeholder="Cuisinier, Serveur…" onchange="pt_setField(${c},'poste',this.value)"></div>
+        <div class="field"><label>Mode de salaire</label><select onchange="pt_setField(${c},'payMode',this.value)"><option value="hourly" ${pt_mode(c)==='hourly'?'selected':''}>DA / heure</option><option value="daily" ${pt_mode(c)==='daily'?'selected':''}>DA / jour travaillé</option></select></div>
+        <div class="field"><label>Taux (DA)</label><input type="text" inputmode="decimal" value="${pt_rate(c) || ''}" placeholder="0" onchange="pt_setRate(${c},this.value)"></div>
+      </div>
+      <div class="perm-row" style="margin-top:8px;"><span>Prime de transport par jour travaillé</span><label class="switch"><input type="checkbox" ${tr.enabled?'checked':''} onchange="pt_setTransport(${c},{enabled:this.checked})"><span class="slider"></span></label></div>
+      ${tr.enabled ? `<div class="field" style="margin-top:8px;max-width:220px;"><label>Montant / jour (DA)</label><input type="text" inputmode="decimal" value="${tr.amount || ''}" placeholder="0" onchange="pt_setTransport(${c},{amount:pt_num(this.value)})"></div>` : ''}
+    </div>`;
+  }).join('');
+  return `<datalist id="pt-names">${PT_SUGGESTED_NAMES.map(n=>`<option value="${pt_e(n)}"></option>`).join('')}</datalist>
+  <div class="ticket">
+    <div class="section-label">Importer un export ZKBio</div>
+    <div class="pt-row">
+      <input type="file" id="pt-file" accept=".dat,.txt,.csv" class="pt-filein">
+      <button class="btn small" onclick="pt_importFile()">Importer</button>
+    </div>
+    <div class="pt-muted" id="pt-import-status" style="margin-top:6px;"></div>
+  </div>
+  <div class="ticket"><div class="section-label">Ajouter un employé</div>
+    <div class="pt-muted" style="margin-bottom:8px;">Pour quelqu’un géré sans pointeur, ou dont tu saisis toujours le pointage à la main : choisis un numéro de code libre.</div>
+    <div class="pt-row"><input type="text" inputmode="numeric" id="pt-new-code" class="pt-draft pt-w90" value="${suggestion}"><button class="btn small" onclick="pt_addEmployee()">Ajouter</button></div>
+  </div>
+  <h2 class="section">Employés</h2>
+  ${cards || pt_empty('Importe un export ZKBio ou ajoute un employé ci-dessus.')}
+  ${isAdmin ? pt_autoSettingsCard() : ''}
+  ${isAdmin ? pt_groupsSection(codes) : ''}
+  <div class="ticket"><div class="section-label">Données</div>
+    <div class="actions-row" style="margin-top:0;"><button class="btn small" onclick="pt_exportExcel()">Exporter en Excel (sauvegarde complète)</button></div>
+    <div class="pt-muted" style="margin-top:6px;">Un fichier .xlsx avec toutes les données (réglages, pointages, sessions, anomalies, historique de paie) et le résumé de paie de la période affichée.</div>
+    ${isAdmin && (Object.keys(pt_ign.k).length || Object.keys(pt_ign.c).length) ? `<div class="section-label" style="margin-top:18px;">Écartés à l’import</div>
+    <div class="pt-muted">${Object.keys(pt_ign.k).length} pointage(s) supprimé(s) ou modifié(s) et ${Object.keys(pt_ign.c).length} employé(s) supprimé(s) : un nouvel import du fichier du pointeur ne les fait pas revenir.</div>
+    <div class="actions-row"><button class="btn ghost small" onclick="pt_forgetIgnored()">Oublier ces suppressions (le prochain import les ramènera)</button></div>` : ''}
+    ${isAdmin ? `<div class="section-label" style="margin-top:18px;">Reprendre les données de l’outil local</div>
+    <div class="pt-muted" style="margin-bottom:8px;">Dans l’outil de pointage local : Réglages → « Exporter pour Firebase (.json) ». Puis choisis ce fichier ici. Peut être relancé sans créer de doublons.</div>
+    <div class="pt-row"><input type="file" id="pt-mig-file" accept=".json,application/json" class="pt-filein"><button class="btn small" onclick="pt_importLocalJson()">Importer</button></div>
+    <div class="actions-row" style="margin-top:18px;"><button class="btn rust small" onclick="pt_resetEvents()">Réinitialiser tous les pointages</button></div>` : ''}
+  </div>`;
+}
+function pt_groupsSection(codes){
+  const rows = pt_groups.map((g, gi)=>{
+    const chips = (g || []).map(c=>`<span class="pt-badge pt-b-prime">${pt_e(pt_name(c))} <a href="#" onclick="pt_grpRemove(${gi},${c});return false;" style="color:inherit;text-decoration:none;">✕</a></span>`).join(' ');
+    const avail = codes.filter(c=>!(g || []).includes(c));
+    const addRow = avail.length ? `<select id="pt-grp-add-${gi}" style="width:auto;display:inline-block;"><option value="">+ ajouter…</option>${avail.map(c=>`<option value="${c}">${pt_e(pt_name(c))}</option>`).join('')}</select> <button class="btn ghost small" onclick="pt_grpAdd(${gi})">Ajouter</button>` : '';
+    return `<div class="ticket">
+      <div class="row-between"><div>${chips || '<span class="pt-muted">Vide</span>'}</div><button class="btn ghost small" onclick="pt_grpDelete(${gi})">Supprimer le groupe</button></div>
+      <div style="margin-top:10px;">${addRow}</div>
+    </div>`;
+  }).join('');
+  return `<h2 class="section">Groupes de poste <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— pour repérer un dépassement quand deux ou plusieurs collègues se relaient</span></h2>
+    ${rows || pt_empty('Aucun groupe.')}
+    <div class="ticket"><button class="btn ghost small" onclick="pt_grpNew()">+ Nouveau groupe</button></div>`;
+}
+async function pt_grpSave(){ try{ await pt_groupsRef.set(pt_groupsToDoc(pt_groups)); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); } }
+function pt_grpNew(){ pt_groups = pt_groups.concat([[]]); pt_grpSave(); pt_render(true); }
+function pt_grpDelete(gi){ if(!confirm('Supprimer ce groupe ?')) return; pt_groups = pt_groups.filter((_,i)=>i !== gi); pt_grpSave(); pt_render(true); }
+function pt_grpRemove(gi, c){ pt_groups[gi] = (pt_groups[gi] || []).filter(x=>x !== c); pt_grpSave(); pt_render(true); }
+function pt_grpAdd(gi){
+  const sel = document.getElementById('pt-grp-add-' + gi); const c = parseInt(sel.value, 10);
+  if(isNaN(c)) return;
+  pt_groups[gi] = (pt_groups[gi] || []).concat([c]); pt_grpSave(); pt_render(true);
+}
+function pt_setField(c, field, v){ pt_setEmp(c, { [field]: (field === 'payMode' ? v : String(v).trim()) }).catch(e=>alert('Erreur : ' + (e.message || e))); }
+function pt_setRate(c, v){ pt_setEmp(c, { rate: pt_num(v) }).catch(e=>alert('Erreur : ' + (e.message || e))); }
+function pt_setTransport(c, patch){ pt_setEmp(c, { transport: patch }).then(()=>pt_render(true)).catch(e=>alert('Erreur : ' + (e.message || e))); }
+async function pt_addEmployee(){
+  const c = parseInt(document.getElementById('pt-new-code').value, 10);
+  if(isNaN(c)){ alert('Indique un numéro de code.'); return; }
+  if(pt_codes().includes(c)){ alert('Ce code existe déjà.'); return; }
+  try{ await pt_ignoreRef.set({ c:{ [c]:PT_DEL() } }, { merge:true }); await pt_setEmp(c, { extra:true }); pt_sel = c; pt_toast('Employé ajouté (code ' + c + ').'); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_deleteEmployee(c){
+  if(!(session && session.isAdmin)) return;
+  if(!confirm('Supprimer définitivement ' + pt_label(c) + ' (code ' + c + ') ? Tout son historique (pointages, primes, jours off, avances saisies ici, sessions manuelles) sera effacé. Cette action est irréversible.')) return;
+  try{
+    const ids = pt_events.filter(e=>e.code === c).map(e=>e.id);
+    const ops = pt_entries.filter(e=>e.code === c).map(e=>({ t:'del', ref:pt_entriesCol.doc(e.id) }));
+    ops.push({ t:'set', ref:pt_configRef, data:{ emp:{ [c]:PT_DEL() } } });
+    ops.push({ t:'set', ref:pt_ignoreRef, data:{ c:{ [c]:true } } }); // employé supprimé : ses pointages ne reviendront pas à l'import
+    pt_groups = pt_groups.map(g=>(g || []).filter(x=>x !== c));
+    await Promise.all([ ids.length ? pt_deleteEvents(ids, { noIgnore:true }) : null, pt_commit(ops), pt_grpSave() ]);
+  }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_forgetIgnored(){
+  if(!(session && session.isAdmin)) return;
+  if(!confirm('Au prochain import, les pointages et employés supprimés ou modifiés reviendront depuis le fichier. Continuer ?')) return;
+  try{ await pt_ignoreRef.set({ k:{}, c:{} }); pt_toast('Suppressions oubliées.'); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_resetEvents(){
+  if(!(session && session.isAdmin)) return;
+  if(!confirm('Supprimer définitivement TOUS les pointages importés ? Cette action est irréversible.')) return;
+  const months = Array.from(new Set(pt_events.map(e=>e.dt.slice(0,7))));
+  try{ await pt_commit(months.map(mk=>({ t:'del', ref:pt_monthRef(mk) }))); await pt_ignoreRef.set({ k:{}, c:{} }); pt_toast('Pointages supprimés.'); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+}
+
+/* ---------- reprise des données de l'outil local (.json) ---------- */
+async function pt_importLocalJson(){
+  if(!(session && session.isAdmin)) return;
+  const f = document.getElementById('pt-mig-file').files[0];
+  if(!f){ alert('Choisis d’abord le fichier .json exporté depuis l’outil local.'); return; }
+  let data;
+  try{ data = JSON.parse(await f.text()); }catch(e){ alert('Fichier JSON invalide.'); return; }
+  if(!data || !Array.isArray(data.events)){ alert('Ce fichier ne ressemble pas à une sauvegarde de l’outil de pointage local.'); return; }
+
+  const locIgn = { k:(data.ignored && data.ignored.k) || {}, c:(data.ignored && data.ignored.c) || {} };
+  const isIgn = (code, iso, type)=>!!(pt_ign.c[code] || locIgn.c[code] || pt_ign.k[pt_evKey(code, iso, type)] || locIgn.k[pt_evKey(code, iso, type)]);
+  const seen = new Set(pt_events.map(e=>e.code + '|' + e.dt + '|' + e.type)), fresh = [];
+  data.events.forEach(e=>{
+    const ev = Array.isArray(e) ? { code:e[0], dt:e[1], type:e[2] } : e;
+    const d = new Date(ev && ev.dt); if(!ev || isNaN(d.getTime()) || isNaN(Number(ev.code))) return; // ligne illisible : ignorée
+    const iso = d.toISOString(), k = Number(ev.code) + '|' + iso + '|' + Number(ev.type);
+    if(!seen.has(k)){ seen.add(k); if(!isIgn(Number(ev.code), iso, Number(ev.type))) fresh.push({ code:Number(ev.code), iso, type:Number(ev.type) }); }
+  });
+  const extra = (data.extraCodes || []).map(String);
+  const codeKeys = new Set([...Object.keys(data.names||{}), ...Object.keys(data.rates||{}), ...Object.keys(data.payMode||{}), ...Object.keys(data.transport||{}), ...Object.keys(data.postes||{}), ...extra]);
+  const emp = {};
+  codeKeys.forEach(k=>{
+    const o = {};
+    if(data.names && data.names[k]) o.name = data.names[k];
+    if(data.postes && data.postes[k]) o.poste = data.postes[k];
+    if(data.rates && data.rates[k]) o.rate = Number(data.rates[k]) || 0;
+    if(data.payMode && data.payMode[k]) o.payMode = data.payMode[k];
+    if(data.transport && data.transport[k]) o.transport = { enabled:!!data.transport[k].enabled, amount:Number(data.transport[k].amount) || 0 };
+    if(extra.includes(k)) o.extra = true;
+    if(Object.keys(o).length && !(pt_ign.c[k] || locIgn.c[k])) emp[k] = o;
+  });
+  const entryOps = [];
+  const put = (id, doc)=>entryOps.push({ t:'set', ref:pt_entriesCol.doc('imp_' + id), data:doc });
+  const money = (map, kind)=>Object.keys(map || {}).forEach(code=>(map[code] || []).forEach(x=>put(x.id, { kind, code:Number(code), date:x.date || todayISO(), amount:Number(x.amount) || 0, note:x.note || '' })));
+  money(data.bonuses, 'prime'); money(data.leaves, 'off'); money(data.advances, 'avance');
+  (data.manual || []).forEach(m=>put(m.id, { kind:'manual', code:Number(m.code), date:m.date || todayISO(), hours:Number(m.hours) || 0, note:m.note || '' }));
+  (data.resolvedAnomalies || []).forEach(r=>put(r.id, { kind:'resolved', code:Number(r.code), dt:r.dt || r.resolvedAt || new Date().toISOString(), type:r.type || '', reason:r.reason || '', resolvedAt:r.resolvedAt || new Date().toISOString() }));
+
+  const msg = 'Reprendre : ' + fresh.length + ' nouveau(x) pointage(s), ' + Object.keys(emp).length + ' employé(s) (réglages), ' + entryOps.length + ' entrée(s) (primes, jours off, avances, sessions manuelles) ?\nTu peux relancer cet import sans créer de doublons.';
+  if(!confirm(msg)) return;
+  try{
+    if(Object.keys(locIgn.k).length || Object.keys(locIgn.c).length) await pt_ignoreRef.set({ k:locIgn.k, c:locIgn.c }, { merge:true });
+    if(fresh.length) await pt_addEvents(fresh);
+    if(Object.keys(emp).length) await pt_configRef.set({ emp }, { merge:true });
+    if(entryOps.length) await pt_commit(entryOps);
+    document.getElementById('pt-mig-file').value = '';
+    pt_toast('Import terminé.');
+  }catch(e){ console.error(e); alert('Erreur pendant l’import : ' + (e.message || e)); }
+}
+
+/* ---------- exports ---------- */
+function pt_periodSessions(){ return pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date))); }
+function pt_exportEmployeeCsv(){
+  const c = pt_sel; if(c === null) return;
+  const sessions = pt_periodSessions().filter(s=>s.code === c);
+  const manual = pt_entries.filter(e=>e.kind === 'manual' && e.code === c && pt_inRange(e.date));
+  let csv = 'Date;Entree;Sortie;Duree (h)\n';
+  sessions.forEach(s=>{ csv += pt_day(s.date) + ';' + pt_fmtDT(s.start) + ';' + pt_fmtDT(s.end) + ';' + s.hours.toFixed(2) + '\n'; });
+  manual.forEach(m=>{ csv += m.date + ';Manuel;Manuel;' + (Number(m.hours)||0).toFixed(2) + '\n'; });
+  const total = sessions.reduce((s,x)=>s+x.hours,0) + manual.reduce((s,x)=>s+(Number(x.hours)||0),0);
+  csv += 'TOTAL;;;' + total.toFixed(2) + '\n';
+  pt_download('pointage_' + pt_name(c).replace(/[^a-z0-9]+/gi,'_') + '.csv', ['\uFEFF' + csv], 'text/csv;charset=utf-8');
+}
+function pt_exportPayslip(){
+  const c = pt_sel; if(c === null) return;
+  const p = pt_displayPayroll(c, pt_periodSessions());
+  let csv = 'Bulletin de paie;' + pt_name(c) + '\n';
+  csv += 'Periode;' + (pt_filter.from || '…') + ' au ' + (pt_filter.to || '…') + '\n';
+  csv += 'Heures totales;' + p.totalHours.toFixed(2) + '\n';
+  csv += 'Taux (' + (p.mode === 'daily' ? 'DA/jour' : 'DA/h') + ');' + p.rate + '\n';
+  csv += 'Jours travailles;' + p.workedDays + '\n';
+  csv += 'Salaire de base;' + p.baseWage.toFixed(2) + '\n';
+  csv += 'Prime transport;' + p.transportTotal.toFixed(2) + '\n';
+  csv += 'Primes;' + p.bonusesTotal.toFixed(2) + '\n';
+  csv += 'Sous-total (base+transport+primes);' + p.subTotal.toFixed(2) + '\n';
+  csv += 'Jours off;' + p.leavesTotal.toFixed(2) + '\n';
+  csv += 'Avances;' + p.advancesTotal.toFixed(2) + '\n';
+  csv += 'NET A PAYER;' + p.net.toFixed(2) + '\n';
+  pt_download('bulletin_' + pt_name(c).replace(/[^a-z0-9]+/gi,'_') + '.csv', ['\uFEFF' + csv], 'text/csv;charset=utf-8');
+}
+function pt_exportExcel(){
+  if(typeof XLSX === 'undefined'){ alert('La bibliothèque Excel n’est pas chargée (connexion ?).'); return; }
+  const all = pt_compute(), codes = pt_codes(), fs = all.sessions.filter(s=>pt_inRange(pt_day(s.date)));
+  const wb = XLSX.utils.book_new();
+  const add = (name, header, rows)=>XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header].concat(rows)), name);
+  add('Resume paie', ['Code','Nom','Poste','Heures','Mode','Taux','Jours travailles','Salaire base','Transport','Primes','Sous-total','Jours off','Avances','Net'],
+    codes.map(c=>{ const p = pt_displayPayroll(c, fs); return [c, pt_name(c), pt_poste(c), +p.totalHours.toFixed(2), p.mode === 'daily' ? 'Jour' : 'Heure', p.rate, p.workedDays, +p.baseWage.toFixed(2), +p.transportTotal.toFixed(2), +p.bonusesTotal.toFixed(2), +p.subTotal.toFixed(2), +p.leavesTotal.toFixed(2), +p.advancesTotal.toFixed(2), +p.net.toFixed(2)]; }));
+  const hist = [];
+  codes.forEach(c=>{
+    pt_entries.filter(e=>e.code === c && ['prime','off','avance'].includes(e.kind)).forEach(e=>hist.push([c, pt_name(c), e.kind === 'prime' ? 'Prime' : e.kind === 'off' ? 'Jour Off' : 'Avance', e.date, e.note || '', e.kind === 'avance' ? -(Number(e.amount)||0) : (Number(e.amount)||0)]));
+  });
+  hist.sort((a,b)=>String(a[3]).localeCompare(String(b[3])));
+  add('Historique', ['Code','Nom','Categorie','Date','Motif','Montant'], hist);
+  add('Sessions', ['Code','Nom','Date','Entree','Sortie','Duree h'], all.sessions.map(s=>[s.code, pt_name(s.code), pt_day(s.date), pt_fmtDT(s.start), pt_fmtDT(s.end), +s.hours.toFixed(2)]));
+  add('Sessions manuelles', ['Code','Nom','Date','Heures','Note'], pt_entries.filter(e=>e.kind === 'manual').sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(m=>[m.code, pt_name(m.code), m.date, Number(m.hours)||0, m.note || '']));
+  add('Pointages bruts', ['Code','Nom','Date heure','Type'], pt_events.slice().sort((a,b)=>new Date(a.dt) - new Date(b.dt)).map(e=>[e.code, pt_name(e.code), pt_fmtDT(new Date(e.dt)), e.type === 0 ? 'Entree' : 'Sortie']));
+  add('Anomalies', ['Code','Nom','Date heure','Type','Motif'], all.anomalies.map(a=>[a.code, pt_name(a.code), pt_fmtDT(a.dt), a.type, a.reason]));
+  add('Corrections', ['Code','Nom','Anomalie d\'origine','Motif','Corrige le'], pt_entries.filter(e=>e.kind === 'resolved').map(r=>[r.code, pt_name(r.code), pt_fmtDT(new Date(r.dt)), r.reason, String(r.resolvedAt || '').slice(0,10)]));
+  add('Reglages', ['Code','Nom','Poste','Mode','Taux','Transport actif','Montant transport'], codes.map(c=>{ const t = pt_transport(c); return [c, pt_name(c), pt_poste(c), pt_mode(c) === 'daily' ? 'DA/jour' : 'DA/heure', pt_rate(c), t.enabled ? 'Oui' : 'Non', t.amount]; }));
+  XLSX.writeFile(wb, 'pointage_allo_sushi_' + todayISO() + '.xlsx');
+}
+
+/* ==================== MODULE CARNET — dettes, emprunts & disponible (privé) ==================== */
+/* Visible uniquement par le compte 'soufyane' — jamais par les autres administrateurs.
+   Une seule collection (aucune règle Firestore supplémentaire à ajouter) avec 3 sortes de documents :
+   - sans champ « kind »        : une ligne de dette / emprunt        { personne, montant, devise, type, date, note }
+   - kind:'avoir'               : un endroit où tu as de l'argent      { nom, devise, montant, maj }   (un SOLDE, pas un mouvement)
+   - kind:'avoir_histo'         : une mise à jour d'un de ces endroits { avoirId, date, ancien, montant }
+   Dette = je dois · Emprunt = on me doit · Position = disponible + emprunts − dettes (devise par devise). */
+function hasDettesAccess(){ return !!(session && session.username === 'soufyane'); }
+const dt_dettesCol = db.collection('dettes_perso');
+
+let dt_dettes = [], dt_avoirs = [], dt_avoirHisto = [];
+let dt_ready = false;
+let dt_started = false;
+const DT_TOTAL = '__total__';   // aucun détail : seule la situation du haut est affichée
+let dt_selected = DT_TOTAL;     // DT_TOTAL | 'p:<nom de la personne>' | 'a:<id de l'endroit>'
+
+function dt_e(v){ return esc(v == null ? '' : String(v)); }
+function dt_norm(v){ return String(v == null ? '' : v).trim().toLowerCase(); }
+function dt_num(v){ const n = Number(String(v == null ? '' : v).replace(/[\s\u00a0]/g,'').replace(',','.')); return isNaN(n) ? 0 : n; }
+function dt_unit(devise){ return devise === 'EUR' ? '€' : 'DA'; }
+function dt_fmtNum(n){ return (Math.round(Math.abs(Number(n) || 0) * 100) / 100).toLocaleString('fr-FR', { maximumFractionDigits:2 }); }
+function dt_fmt(n, devise){ return dt_fmtNum(n) + ' ' + dt_unit(devise); }
+function dt_fmtSigned(n, devise){ return (n < -0.005 ? '−' : '') + dt_fmt(n, devise); }
+function dt_color(type){ return type === 'emprunt' ? 'var(--moss)' : 'var(--rust)'; }
+function dt_netColor(n){ return n < -0.005 ? 'var(--rust)' : 'var(--moss)'; }
+
+function dt_start(){
+  if(dt_started) return; dt_started = true;
+  dt_dettesCol.onSnapshot((snap)=>{
+    const all = []; snap.forEach(d=>all.push({ id:d.id, ...d.data() }));
+    dt_dettes = all.filter(d=>!d.kind); dt_avoirs = all.filter(d=>d.kind === 'avoir'); dt_avoirHisto = all.filter(d=>d.kind === 'avoir_histo');
+    dt_ready = true; dt_render();
+  }, (e)=>{ console.error(e); dt_ready = true; dt_render(); });
+}
+
+/* ---------- calculs ---------- */
+function dt_personnes(){ return Array.from(new Set(dt_dettes.map(d=>d.personne))).sort((a,b)=>a.localeCompare(b)); }
+function dt_totaux(personne){ // totaux bruts (non nettés) ; DT_TOTAL = tous les contacts réunis
+  const t = { dette:{DZD:0,EUR:0}, emprunt:{DZD:0,EUR:0} };
+  dt_dettes.filter(d=>personne === DT_TOTAL || d.personne === personne).forEach(d=>{ t[d.type][d.devise] += Number(d.montant) || 0; });
+  return t;
+}
+function dt_avoirTotals(){ const t = { DZD:0, EUR:0 }; dt_avoirs.forEach(a=>{ t[a.devise] = (t[a.devise] || 0) + (Number(a.montant) || 0); }); return t; }
+function dt_net(devise){ const tot = dt_totaux(DT_TOTAL); return dt_avoirTotals()[devise] + tot.emprunt[devise] - tot.dette[devise]; }
+function dt_avoirHistoOf(id){ return dt_avoirHisto.filter(h=>h.avoirId === id).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || String(b.creeLe||'').localeCompare(String(a.creeLe||''))); }
+
+function dt_select(key){ dt_selected = key || DT_TOTAL; dt_render(); }
+function dt_onTypeChange(id){
+  const sel = document.getElementById('dt-row-type-' + id), montant = document.getElementById('dt-row-montant-' + id);
+  const color = dt_color(sel.value);
+  sel.style.color = color; montant.style.color = color;
+}
+
+/* ---------- affichage ---------- */
+function dt_resumeHtml(){
+  const dispo = dt_avoirTotals(), tot = dt_totaux(DT_TOTAL);
+  const row = (devise, label)=>{
+    const net = dt_net(devise);
+    return `<tr><td style="font-weight:700;">${label}</td>
+      <td>${dt_fmtNum(dispo[devise])}</td>
+      <td style="color:${dt_color('dette')};">${dt_fmtNum(tot.dette[devise])}</td>
+      <td style="color:${dt_color('emprunt')};">${dt_fmtNum(tot.emprunt[devise])}</td>
+      <td style="font-weight:700;color:${dt_netColor(net)};">${(net < -0.005 ? '−' : '') + dt_fmtNum(net)}</td></tr>`;
+  };
+  return `<div class="ticket">
+    <div class="section-label">Situation</div>
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th></th><th>Disponible</th><th>Dettes</th><th>Emprunts</th><th>Position</th></tr></thead><tbody>
+      ${row('DZD','Dinars (DA)')}${row('EUR','Euros (€)')}
+    </tbody></table></div>
+    <div class="pt-muted" style="margin-top:6px;">Position = disponible + emprunts − dettes, devise par devise.</div>
+  </div>`;
+}
+
+function dt_formHtml(){
+  const noms = Array.from(new Set([...dt_personnes(), ...dt_avoirs.map(a=>a.nom)])).sort((a,b)=>String(a).localeCompare(String(b)));
+  return `<div class="ticket">
+    <div class="section-label">Ajouter</div>
+    <div class="grid grid-2">
+      <div class="field"><label>Nom</label><input type="text" id="dt-new-personne" class="pt-draft" list="dt-noms" placeholder="Rachid, Espèces, CCP…"></div>
+      <div class="field"><label>Montant</label><input type="text" inputmode="decimal" id="dt-new-montant" class="pt-draft" placeholder="0"></div>
+      <div class="field"><label>Unité</label><select id="dt-new-devise" class="pt-draft"><option value="DZD">Dinars (DZD)</option><option value="EUR">Euros (EUR)</option></select></div>
+      <div class="field"><label>Type</label><select id="dt-new-type" class="pt-draft"><option value="dette">Dette</option><option value="emprunt">Emprunt</option><option value="disponible">Disponible</option></select></div>
+    </div>
+    <datalist id="dt-noms">${noms.map(n=>`<option value="${dt_e(n)}"></option>`).join('')}</datalist>
+    <div class="pt-muted">Dette / Emprunt : ajoute une ligne pour cette personne. Disponible : remplace le solde de cet endroit (espèces, banque, CCP…).</div>
+    <div class="actions-row" style="margin-top:6px;"><button class="btn small" onclick="dt_add()">Valider</button></div>
+  </div>`;
+}
+
+function dt_filterHtml(){
+  const avoirs = dt_avoirs.slice().sort((a,b)=>String(a.nom).localeCompare(String(b.nom)) || String(a.devise).localeCompare(String(b.devise)));
+  const personnes = dt_personnes();
+  return `<div class="ticket">
+    <div class="field"><label>Voir le détail de</label>
+      <select id="dt-person-select" onchange="dt_select(this.value)">
+        <option value="${DT_TOTAL}" ${dt_selected === DT_TOTAL ? 'selected' : ''}>Total</option>
+        ${avoirs.length ? `<optgroup label="Disponible">${avoirs.map(a=>`<option value="a:${dt_e(a.id)}" ${dt_selected === 'a:' + a.id ? 'selected' : ''}>${dt_e(a.nom)} (${dt_e(a.devise)})</option>`).join('')}</optgroup>` : ''}
+        ${personnes.length ? `<optgroup label="Personnes">${personnes.map(n=>`<option value="p:${dt_e(n)}" ${dt_selected === 'p:' + n ? 'selected' : ''}>${dt_e(n)}</option>`).join('')}</optgroup>` : ''}
+      </select>
+    </div>
+    ${(!personnes.length && !avoirs.length) ? `<div class="empty-state">Rien d'enregistré pour l'instant.</div>` : ''}
+  </div>`;
+}
+
+function dt_personHtml(nom){
+  const t = dt_totaux(nom);
+  const hist = dt_dettes.filter(d=>d.personne === nom).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  return `<div class="ticket">
+    <div class="section-label">${dt_e(nom)}</div>
+    <div class="pt-kpis">
+      <div class="pt-kpi"><div class="n" style="color:${dt_color('dette')};">${dt_fmt(t.dette.DZD,'DZD')}</div><div class="l">Total dettes (DZD)</div></div>
+      <div class="pt-kpi"><div class="n" style="color:${dt_color('dette')};">${dt_fmt(t.dette.EUR,'EUR')}</div><div class="l">Total dettes (EUR)</div></div>
+      <div class="pt-kpi"><div class="n" style="color:${dt_color('emprunt')};">${dt_fmt(t.emprunt.DZD,'DZD')}</div><div class="l">Total emprunts (DZD)</div></div>
+      <div class="pt-kpi"><div class="n" style="color:${dt_color('emprunt')};">${dt_fmt(t.emprunt.EUR,'EUR')}</div><div class="l">Total emprunts (EUR)</div></div>
+    </div>
+    <div class="section-label" style="margin-top:14px;">Historique <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— modifiable, les totaux se mettent à jour automatiquement</span></div>
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Type</th><th>Devise</th><th>Montant</th><th>Note</th><th></th></tr></thead><tbody>${
+      hist.map(d=>`<tr>
+        <td><input type="date" id="dt-row-date-${d.id}" class="pt-draft pt-auto" value="${d.date || ''}"></td>
+        <td><select id="dt-row-type-${d.id}" class="pt-draft pt-auto" style="color:${dt_color(d.type)};font-weight:600;" onchange="dt_onTypeChange('${d.id}')"><option value="dette" ${d.type==='dette'?'selected':''}>Dette</option><option value="emprunt" ${d.type==='emprunt'?'selected':''}>Emprunt</option></select></td>
+        <td><select id="dt-row-devise-${d.id}" class="pt-draft pt-auto"><option value="DZD" ${d.devise==='DZD'?'selected':''}>DZD</option><option value="EUR" ${d.devise==='EUR'?'selected':''}>EUR</option></select></td>
+        <td><input type="text" inputmode="decimal" id="dt-row-montant-${d.id}" class="pt-draft pt-w90" style="color:${dt_color(d.type)};font-weight:600;" value="${d.montant}"></td>
+        <td><input type="text" id="dt-row-note-${d.id}" class="pt-draft pt-grow" value="${dt_e(d.note)}" placeholder="Note"></td>
+        <td><button class="btn ghost small" onclick="dt_saveRow('${d.id}')">Enregistrer</button> <button class="btn ghost small" onclick="dt_delete('${d.id}')">Supprimer</button></td>
+      </tr>`).join('') || `<tr><td colspan="6" class="pt-muted">Aucune ligne.</td></tr>`
+    }</tbody></table></div>
+  </div>`;
+}
+
+function dt_avoirHtml(a){
+  const histo = dt_avoirHistoOf(a.id);
+  return `<div class="ticket">
+    <div class="section-label">${dt_e(a.nom)} — disponible en ${dt_e(a.devise)}</div>
+    <div class="grid grid-2">
+      <div class="field"><label>Endroit</label><input type="text" id="dt-av-nom-${a.id}" class="pt-draft" value="${dt_e(a.nom)}"></div>
+      <div class="field"><label>Montant actuel (${dt_unit(a.devise)})</label><input type="text" inputmode="decimal" id="dt-av-montant-${a.id}" class="pt-draft" value="${a.montant}"></div>
+    </div>
+    <div class="pt-muted">${a.maj ? 'Dernière mise à jour le ' + fmtDateShort(a.maj) + '.' : ''}</div>
+    <div class="actions-row" style="margin-top:6px;"><button class="btn small" onclick="dt_saveAvoir('${a.id}')">Enregistrer</button> <button class="btn ghost small" onclick="dt_deleteAvoir('${a.id}')">Supprimer cet endroit</button></div>
+    <div class="section-label" style="margin-top:14px;">Historique des mises à jour</div>
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Avant</th><th>Après</th><th>Écart</th></tr></thead><tbody>${
+      histo.map(x=>{
+        const ecart = (Number(x.montant) || 0) - (Number(x.ancien) || 0), first = x.ancien === null || x.ancien === undefined;
+        return `<tr><td>${fmtDateShort(x.date)}</td><td>${first ? '<span class="pt-muted">—</span>' : dt_fmt(x.ancien, a.devise)}</td><td>${dt_fmt(x.montant, a.devise)}</td><td>${first ? '<span class="pt-muted">création</span>' : `<span style="color:${ecart < 0 ? 'var(--rust)' : 'var(--moss)'};font-weight:600;">${ecart < 0 ? '−' : '+'}${dt_fmt(ecart, a.devise)}</span>`}</td></tr>`;
+      }).join('') || `<tr><td colspan="4" class="pt-muted">Aucun historique.</td></tr>`
+    }</tbody></table></div>
+  </div>`;
+}
+
+function dt_render(){
+  if(activeModule !== 'dettes') return;
+  const body = document.getElementById('dt-body'); if(!body) return;
+  if(!dt_ready){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  const st = pt_saveInputs(body);
+
+  // la sélection redevient « Total » si la personne ou l'endroit n'existe plus
+  if(dt_selected.startsWith('p:') && !dt_personnes().includes(dt_selected.slice(2))) dt_selected = DT_TOTAL;
+  if(dt_selected.startsWith('a:') && !dt_avoirs.some(a=>a.id === dt_selected.slice(2))) dt_selected = DT_TOTAL;
+
+  let html = dt_resumeHtml() + dt_formHtml() + dt_filterHtml();
+  if(dt_selected.startsWith('p:')) html += dt_personHtml(dt_selected.slice(2));
+  else if(dt_selected.startsWith('a:')) html += dt_avoirHtml(dt_avoirs.find(a=>a.id === dt_selected.slice(2)));
+
+  body.innerHTML = html;
+  pt_restoreInputs(st, true);
+}
+
+/* ---------- actions ---------- */
+// crée un endroit, ou met à jour son solde (avec une ligne d'historique si le montant change)
+async function dt_writeAvoir({ id, ref, nom, devise, montant }){
+  const today = todayISO(), now = new Date().toISOString();
+  const batch = db.batch();
+  if(id){
+    const a = dt_avoirs.find(x=>x.id === id); if(!a) return 'unchanged';
+    const changed = Math.abs(montant - (Number(a.montant) || 0)) > 0.0001, renamed = nom !== a.nom;
+    if(!changed && !renamed) return 'unchanged';
+    batch.update(dt_dettesCol.doc(id), changed ? { nom, montant, maj:today } : { nom });
+    if(changed) batch.set(dt_dettesCol.doc(), { kind:'avoir_histo', avoirId:id, date:today, ancien:Number(a.montant) || 0, montant, creePar:currentUser, creeLe:now });
+    await batch.commit();
+    return changed ? 'updated' : 'renamed';
+  }
+  const r = ref || dt_dettesCol.doc();
+  batch.set(r, { kind:'avoir', nom, devise, montant, maj:today, creePar:currentUser, creeLe:now });
+  batch.set(dt_dettesCol.doc(), { kind:'avoir_histo', avoirId:r.id, date:today, ancien:null, montant, creePar:currentUser, creeLe:now });
+  await batch.commit();
+  return 'created';
+}
+
+async function dt_add(){
+  const nom = document.getElementById('dt-new-personne').value.trim();
+  const raw = document.getElementById('dt-new-montant').value.trim();
+  const devise = document.getElementById('dt-new-devise').value, type = document.getElementById('dt-new-type').value;
+  if(!nom){ alert('Indique le nom (personne ou endroit).'); return; }
+  const previous = dt_selected;
+  const clear = ()=>{ document.getElementById('dt-new-personne').value = ''; document.getElementById('dt-new-montant').value = ''; };
+
+  if(type === 'disponible'){
+    if(!raw){ alert('Indique un montant (0 si vide).'); return; }
+    const montant = dt_num(raw);
+    const existing = dt_avoirs.find(a=>dt_norm(a.nom) === dt_norm(nom) && a.devise === devise);
+    const ref = existing ? null : dt_dettesCol.doc();
+    // sur « Total » on y reste ; sur un nom, on bascule sur l'endroit concerné (avant l'écriture : l'écran se rafraîchit dès qu'elle est enregistrée)
+    if(dt_selected !== DT_TOTAL) dt_selected = 'a:' + (existing ? existing.id : ref.id);
+    try{
+      const res = await dt_writeAvoir({ id: existing && existing.id, ref, nom: existing ? existing.nom : nom, devise, montant });
+      clear();
+      pt_toast(res === 'created' ? 'Endroit ajouté.' : res === 'updated' ? 'Disponible mis à jour.' : 'Déjà à ce montant.');
+    }catch(e){ dt_selected = previous; console.error(e); alert('Erreur : ' + (e.message || e)); }
+    return;
+  }
+
+  const montant = dt_num(raw);
+  if(!montant){ alert('Indique un montant.'); return; }
+  const data = { personne:nom, montant, devise, type, date:todayISO(), note:'', creePar:currentUser, creeLe:new Date().toISOString() };
+  if(dt_selected !== DT_TOTAL) dt_selected = 'p:' + nom;
+  try{
+    await dt_dettesCol.add(data);
+    clear();
+  }catch(e){ dt_selected = previous; console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+
+async function dt_saveRow(id){
+  const montant = dt_num(document.getElementById('dt-row-montant-' + id).value);
+  if(!montant){ alert('Indique un montant.'); return; }
+  const patch = {
+    date: document.getElementById('dt-row-date-' + id).value || todayISO(),
+    type: document.getElementById('dt-row-type-' + id).value,
+    devise: document.getElementById('dt-row-devise-' + id).value,
+    montant,
+    note: document.getElementById('dt-row-note-' + id).value.trim()
+  };
+  try{ await dt_dettesCol.doc(id).update(patch); pt_toast('Ligne mise à jour.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function dt_delete(id){
+  if(!confirm('Supprimer cette ligne ?')) return;
+  try{ await dt_dettesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+
+async function dt_saveAvoir(id){
+  const a = dt_avoirs.find(x=>x.id === id); if(!a) return;
+  const nom = document.getElementById('dt-av-nom-' + id).value.trim() || a.nom;
+  const raw = document.getElementById('dt-av-montant-' + id).value.trim();
+  if(!raw){ alert('Indique un montant (0 si vide).'); return; }
+  try{
+    const res = await dt_writeAvoir({ id, nom, montant:dt_num(raw) });
+    pt_toast(res === 'updated' ? 'Montant mis à jour.' : res === 'renamed' ? 'Nom mis à jour.' : 'Rien à enregistrer.');
+  }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function dt_deleteAvoir(id){
+  if(!confirm('Supprimer cet endroit et tout son historique ?')) return;
+  try{
+    const batch = db.batch();
+    batch.delete(dt_dettesCol.doc(id));
+    dt_avoirHisto.filter(h=>h.avoirId === id).forEach(h=>batch.delete(dt_dettesCol.doc(h.id)));
+    await batch.commit();
+  }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+
+initAuth();
+</script>
+</body>
+</html>
