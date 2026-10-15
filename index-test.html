@@ -1794,14 +1794,14 @@ function pt_autoPlanEmployee(code, evs, cfg, ctx){
       }
       // b) deuxième « entrée » en réalité une sortie (type inversé)
       const idF = lid('flip', ev.ms);
-      if(ctx.seen(idF)){ unresolved++; open = ev; i++; continue; } // correction annulée par l'utilisateur : on n'insiste pas
+      if(ctx.seen(idF)){ unresolved++; open.hold = true; ev.hold = true; open = ev; i++; continue; } // correction refusée/annulée par l'utilisateur : on n'insiste pas, ni par une autre correction
       if(canToExit(ev, g) && ok(idF, ev.ms)){
         flip(ev, 1, 'Entrée de ' + hm(ev.ms) + ' corrigée en Sortie : une entrée était déjà ouverte à ' + hm(open.ms) + ' (' + pt_fmtH(g) + ' h de présence)');
         continue;
       }
       // c) sortie oubliée : on l'estime avec la durée habituelle
       const msE = open.ms + dur;
-      const ne = (canEst && msE <= ev.ms - 1800000) ? addEv(1, msE, 'Sortie manquante estimée à ' + hm(msE) + ' (entrée de ' + hm(open.ms) + ' + durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
+      const ne = (canEst && !open.hold && msE <= ev.ms - 1800000) ? addEv(1, msE, 'Sortie manquante estimée à ' + hm(msE) + ' (entrée de ' + hm(open.ms) + ' + durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
       if(ne){ ne.type = 1; L.splice(i, 0, ne); continue; }
       unresolved++; open = ev; i++; continue;
     }
@@ -1810,7 +1810,7 @@ function pt_autoPlanEmployee(code, evs, cfg, ctx){
       const h = (ev.ms - open.ms) / 3600000;
       if(h <= 15){ open = null; i++; continue; }
       const msE = open.ms + dur;
-      const ne = (canEst && msE <= ev.ms - 1800000) ? addEv(1, msE, 'Sortie manquante estimée à ' + hm(msE) + ' (entrée de ' + hm(open.ms) + ' + durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
+      const ne = (canEst && !open.hold && msE <= ev.ms - 1800000) ? addEv(1, msE, 'Sortie manquante estimée à ' + hm(msE) + ' (entrée de ' + hm(open.ms) + ' + durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
       if(ne){ L.splice(i, 0, ne); continue; }
       unresolved++; open = null; // la sortie devient orpheline : traitée ci-dessous
     }
@@ -1823,7 +1823,7 @@ function pt_autoPlanEmployee(code, evs, cfg, ctx){
     // e) première « sortie » en réalité une entrée, suivie d'une vraie sortie
     const nx = L[i+1], idF = lid('flip', ev.ms);
     if(nx && nx.type === 1){
-      if(ctx.seen(idF)){ unresolved++; i++; continue; }
+      if(ctx.seen(idF)){ unresolved++; ev.hold = true; nx.hold = true; i++; continue; }
       const gS = (nx.ms - ev.ms) / 3600000;
       if(canToEntry(ev, gS) && ok(idF, ev.ms)){
         flip(ev, 0, 'Sortie de ' + hm(ev.ms) + ' corrigée en Entrée : aucune entrée avant, et une sortie suit à ' + hm(nx.ms) + ' (' + pt_fmtH(gS) + ' h de présence)');
@@ -1832,14 +1832,14 @@ function pt_autoPlanEmployee(code, evs, cfg, ctx){
     }
     // f) entrée oubliée : on l'estime avec la durée habituelle
     const msS = ev.ms - dur, prevMs = p1 ? p1.ms : -Infinity;
-    const ne = (canEst && msS >= prevMs + 1800000) ? addEv(0, msS, 'Entrée manquante estimée à ' + hm(msS) + ' (sortie de ' + hm(ev.ms) + ' − durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
+    const ne = (canEst && !ev.hold && msS >= prevMs + 1800000) ? addEv(0, msS, 'Entrée manquante estimée à ' + hm(msS) + ' (sortie de ' + hm(ev.ms) + ' − durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
     if(ne){ L.splice(i, 0, ne); continue; }
     unresolved++; i++;
   }
   // g) dernière entrée jamais fermée depuis plus de 16 h (une entrée récente = employé encore en service : on n'y touche pas)
   if(open !== null && (ctx.now - open.ms) / 3600000 > 16){
     const msE = open.ms + dur;
-    const ne = (canEst && msE <= ctx.now) ? addEv(1, msE, 'Sortie manquante estimée à ' + hm(msE) + ' (entrée de ' + hm(open.ms) + ' + durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
+    const ne = (canEst && !open.hold && msE <= ctx.now) ? addEv(1, msE, 'Sortie manquante estimée à ' + hm(msE) + ' (entrée de ' + hm(open.ms) + ' + durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
     if(ne) L.push(ne); else unresolved++;
   }
   return { acts, final:L, unresolved };
@@ -1929,32 +1929,67 @@ function pt_autoMaybeRun(force){
     .then(()=>{ pt_autoBusy = false; });
 }
 function pt_autoRunNow(){ pt_autoRuns = 0; pt_autoMaybeRun(true); }
-/* Aperçu : calcule les corrections sans rien écrire, puis laisse choisir de les appliquer. */
-let pt_autoPreviewList = null;
-function pt_autoPreview(){
-  const plan = pt_autoPlan();
-  pt_autoPreviewList = plan.acts;
-  if(!plan.acts.length) pt_toast(plan.unresolved ? 'Rien à corriger tout seul — ' + plan.unresolved + ' cas à voir à la main.' : 'Tout est déjà propre.');
-  pt_render(true);
+/* Aperçu : liste des corrections proposées sur la période choisie ; chacune se valide ou se refuse une par une.
+   Une correction refusée est enregistrée dans le journal comme « refusée » et n'est plus jamais reproposée (bouton « Reproposer »). */
+let pt_autoPrev = { open:false, from:null, to:null };
+let pt_autoPlanCache = { key:'', plan:null };
+function pt_autoPlanCached(){
+  const key = [pt_eventsVersion, pt_clotures.length, pt_groups.length, Object.keys(pt_ovIgn).length, pt_entries.filter(e=>e.kind === 'autofix').length, JSON.stringify(pt_autoCfg())].join('|');
+  if(pt_autoPlanCache.key !== key) pt_autoPlanCache = { key, plan:pt_autoPlan() };
+  return pt_autoPlanCache.plan;
 }
-function pt_autoPreviewClose(){ pt_autoPreviewList = null; pt_render(true); }
-async function pt_autoPreviewApply(){
-  const list = pt_autoPreviewList; if(!list || !list.length || pt_autoBusy) return;
+function pt_autoActIso(a){ return a.ev ? a.ev.t : a.changes[0].fromT; }
+function pt_autoPeriodPlan(){
+  const f = pt_autoPrev.from, t = pt_autoPrev.to;
+  const acts = pt_autoPlanCached().acts.filter(a=>{ const d = pt_day(new Date(pt_autoActIso(a))); return (!f || d >= f) && (!t || d <= t); })
+    .sort((x,y)=>pt_autoActIso(x).localeCompare(pt_autoActIso(y)));
+  return { acts };
+}
+function pt_autoPrevToggle(){ pt_autoPrev.open = !pt_autoPrev.open; pt_render(true); }
+function pt_autoSetPeriod(field, v){ pt_autoPrev[field] = v || ''; pt_render(true); }
+function pt_autoPeriodLabel(){
+  const f = pt_autoPrev.from, t = pt_autoPrev.to;
+  return (!f && !t) ? 'tout l’historique' : 'du ' + (f ? fmtDateShort(f) : '…') + ' au ' + (t ? fmtDateShort(t) : '…');
+}
+async function pt_autoValidate(logId){
+  const a = pt_autoPeriodPlan().acts.find(x=>x.logId === logId); if(!a || pt_autoBusy) return;
   pt_autoBusy = true;
-  try{ await pt_autoApply(list.slice(0, PT_AUTO_MAX_RUN)); pt_autoPreviewList = null; }
-  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  try{ await pt_autoApply([a]); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
   pt_autoBusy = false; pt_render(true);
 }
+async function pt_autoValidateAll(){
+  const list = pt_autoPeriodPlan().acts; if(!list.length || pt_autoBusy) return;
+  if(!confirm('Appliquer les ' + list.length + ' correction' + (list.length > 1 ? 's' : '') + ' proposée' + (list.length > 1 ? 's' : '') + ' (' + pt_autoPeriodLabel() + ') ?\nTout reste annulable depuis le journal.')) return;
+  pt_autoBusy = true;
+  try{ await pt_autoApply(list.slice(0, PT_AUTO_MAX_RUN)); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  pt_autoBusy = false; pt_render(true);
+}
+async function pt_autoReject(logId){
+  const a = pt_autoPeriodPlan().acts.find(x=>x.logId === logId); if(!a) return;
+  const at = new Date().toISOString();
+  const doc = { kind:'autofix', rule:a.rule, type:a.type, code:a.code, text:a.text, runId:at, at, undone:true, rejected:true, creePar:'refus',
+    ev:a.ev || null, to:(a.to === undefined ? null : a.to), changes:a.changes || null };
+  try{ await pt_entriesCol.doc(a.logId).set(doc); pt_toast('Correction refusée — elle ne sera plus proposée.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_autoUnreject(id){
+  const l = pt_entries.find(e=>e.id === id); if(!l || !l.rejected) return;
+  try{ await pt_entriesCol.doc(id).delete(); pt_toast('Correction à nouveau proposée.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
 function pt_autoPreviewHtml(){
-  const list = pt_autoPreviewList; if(!list || !list.length) return '';
-  const when = (a)=>{ const t = a.ev ? a.ev.t : a.changes[0].fromT; return pt_fmtDT(new Date(t)); };
-  const rows = list.slice().sort((a,b)=>String(a.ev ? a.ev.t : a.changes[0].fromT).localeCompare(String(b.ev ? b.ev.t : b.changes[0].fromT))).map(a=>{
+  if(!pt_autoPrev.open) return '';
+  const list = pt_autoPeriodPlan().acts;
+  if(!list.length) return `<div class="ticket"><div class="section-label">Aperçu — ${pt_e(pt_autoPeriodLabel())}</div><div class="pt-muted">Rien à corriger automatiquement sur cette période. Les cas restants se traitent à la main dans la liste ci-dessous.</div>
+    <div class="pt-row" style="margin-top:10px;"><button class="btn ghost small" onclick="pt_autoPrevToggle()">Fermer</button></div></div>`;
+  const rows = list.map(a=>{
     const r = PT_AUTO_RULES[a.rule] || [a.rule, 'pt-b-off'];
-    return `<tr><td>${when(a)}</td><td>${pt_e(pt_name(a.code))}</td><td><span class="pt-badge ${r[1]}">${pt_e(r[0])}</span></td><td style="white-space:normal;min-width:220px;">${pt_e(a.text)}</td></tr>`;
+    return `<tr><td>${pt_fmtDT(new Date(pt_autoActIso(a)))}</td><td>${pt_e(pt_name(a.code))}</td><td><span class="pt-badge ${r[1]}">${pt_e(r[0])}</span></td><td style="white-space:normal;min-width:220px;">${pt_e(a.text)}</td>
+      <td><button class="btn small" onclick="pt_autoValidate('${a.logId}')">Valider</button> <button class="btn ghost small" onclick="pt_autoReject('${a.logId}')">Refuser</button></td></tr>`;
   }).join('');
-  return `<div class="ticket"><div class="section-label">Aperçu — ${list.length} correction${list.length>1?'s':''} proposée${list.length>1?'s':''} <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">(rien n’est encore modifié)</span></div>
-    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Pointage</th><th>Employé</th><th>Règle</th><th>Correction</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="pt-row" style="margin-top:10px;"><button class="btn small" onclick="pt_autoPreviewApply()">Appliquer ces ${list.length} correction${list.length>1?'s':''}</button><button class="btn ghost small" onclick="pt_autoPreviewClose()">Fermer</button></div></div>`;
+  return `<div class="ticket"><div class="section-label">Aperçu — ${pt_e(pt_autoPeriodLabel())} · ${list.length} correction${list.length>1?'s':''} proposée${list.length>1?'s':''} <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">(rien n’est modifié tant que tu ne valides pas)</span></div>
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Pointage</th><th>Employé</th><th>Règle</th><th>Correction</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="pt-row" style="margin-top:10px;"><button class="btn small" onclick="pt_autoValidateAll()">Tout valider (${list.length})</button><button class="btn ghost small" onclick="pt_autoPrevToggle()">Fermer</button></div></div>`;
 }
 
 /* ---------- annulation ---------- */
@@ -1995,10 +2030,16 @@ const PT_AUTO_RULES = { dup:['Doublon','pt-b-prime'], rebond:['Rebond','pt-b-pri
 function pt_autoLogs(){ return pt_entries.filter(e=>e.kind === 'autofix').sort((a,b)=>String(b.at || '').localeCompare(String(a.at || ''))); }
 function pt_autoCard(){
   if(!pt_isAdmin()) return '';
+  if(pt_autoPrev.from === null){ pt_autoPrev.from = pt_filter.from || ''; pt_autoPrev.to = pt_filter.to || ''; } // au départ : la période affichée en haut
   const cfg = pt_autoCfg(), logs = pt_autoLogs(), active = logs.filter(l=>!l.undone), est = active.filter(l=>l.rule === 'add').length;
   return `<div class="ticket"><div class="section-label">Correction automatique ${cfg.enabled ? '<span class="pt-badge pt-b-prime">activée</span>' : '<span class="pt-badge pt-b-off">désactivée</span>'}</div>
-    <div class="pt-muted">Doublons, entrées/sorties inversées, pointages parasites, oublis et petits chevauchements sont corrigés tout seuls ; il ne reste ici que les cas qui demandent vraiment ton avis. Tout est tracé dans le journal et annulable.</div>
-    <div class="pt-row" style="margin-top:10px;"><button class="btn small" onclick="pt_autoPreview()">Voir ce qui serait corrigé</button><button class="btn ghost small" onclick="pt_autoRunNow()">Corriger maintenant</button><button class="btn ghost small" onclick="pt_setTab('journal')">Journal (${active.length})</button></div>
+    <div class="pt-muted">Doublons, entrées/sorties inversées, pointages parasites, oublis et petits chevauchements sont proposés ici ; tu valides ou refuses chaque correction. Tout est tracé dans le journal et annulable.</div>
+    <div class="grid grid-2" style="margin-top:10px;">
+      <div class="field"><label>Analyser du</label><input type="date" value="${pt_e(pt_autoPrev.from)}" onchange="pt_autoSetPeriod('from', this.value)"></div>
+      <div class="field"><label>Au</label><input type="date" value="${pt_e(pt_autoPrev.to)}" onchange="pt_autoSetPeriod('to', this.value)"></div>
+    </div>
+    <div class="pt-muted" style="margin-top:4px;">Laisse vide pour tout l’historique. Cette période ne concerne que l’aperçu et « Tout valider » ; elle est indépendante de la période affichée en haut.${cfg.enabled ? ' Quand la correction automatique est activée (Réglages), elle s’applique, elle, à toutes les dates.' : ''}</div>
+    <div class="pt-row" style="margin-top:10px;"><button class="btn small" onclick="pt_autoPrevToggle()">${pt_autoPrev.open ? 'Masquer l’aperçu' : 'Voir ce qui serait corrigé'}</button><button class="btn ghost small" onclick="pt_setTab('journal')">Journal (${active.length})</button></div>
     ${est ? `<div class="pt-muted" style="margin-top:8px;">${est} pointage${est>1?'s':''} estimé${est>1?'s':''} à l’horaire habituel — à vérifier dans le journal si besoin.</div>` : ''}
   </div>${pt_autoPreviewHtml()}`;
 }
@@ -2014,7 +2055,7 @@ function pt_tabJournal(){
     const rows = r.items.sort((a,b)=>String(a.text).localeCompare(String(b.text))).map(l=>{
       const rule = PT_AUTO_RULES[l.rule] || [l.rule || '', 'pt-b-off'];
       return `<tr${l.undone ? ' class="pt-manual"' : ''}><td>${when(l)}</td><td>${pt_e(pt_name(l.code))}</td><td><span class="pt-badge ${rule[1]}">${pt_e(rule[0])}</span></td><td style="white-space:normal;min-width:220px;">${pt_e(l.text)}</td>
-        <td>${l.undone ? '<span class="pt-muted">annulée</span>' : `<button class="btn ghost small" onclick="pt_autoUndo(['${l.id}'])">Annuler</button>`}</td></tr>`;
+        <td>${l.rejected ? `<span class="pt-muted">refusée</span> <button class="btn ghost small" onclick="pt_autoUnreject('${l.id}')">Reproposer</button>` : l.undone ? '<span class="pt-muted">annulée</span>' : `<button class="btn ghost small" onclick="pt_autoUndo(['${l.id}'])">Annuler</button>`}</td></tr>`;
     }).join('');
     return `<div class="ticket"><div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;">${head} <span class="pt-muted">— ${r.items.length} correction${r.items.length>1?'s':''}</span></div>
       ${left ? `<button class="btn ghost small" onclick="pt_autoUndoRun('${r.runId}')">Tout annuler</button>` : ''}</div>
