@@ -1765,8 +1765,8 @@ function pt_baseOf(code, sessions){
 }
 /* ---- prêts : emprunts { kind:'pret', code, date, amount, note } ; remboursements { kind:'pretrembt', code, date, amount, note, mode:'salaire'|'direct' }.
    Un seul solde cumulé par employé : total emprunté − total remboursé. Un remboursement « sur salaire » est déduit de la paie de la période qui contient sa date. ---- */
-function pt_loansOf(code){ return pt_entries.filter(e=>e.kind === 'pret' && e.code === code); }
-function pt_repaysOf(code){ return pt_entries.filter(e=>e.kind === 'pretrembt' && e.code === code); }
+function pt_loansOf(code){ return pt_entries.filter(e=>e.kind === 'pret' && String(e.code) === String(code)); }
+function pt_repaysOf(code){ return pt_entries.filter(e=>e.kind === 'pretrembt' && String(e.code) === String(code)); }
 function pt_loanDues(code){
   return pt_repaysOf(code).filter(r=>r.mode !== 'direct' && r.date && pt_inRange(r.date)).map(r=>({ id:r.id, date:r.date, amount:Number(r.amount) || 0, note:r.note || 'Prêt' }));
 }
@@ -2396,6 +2396,7 @@ function pt_paieOverviewHtml(codes, sessions){
 }
 /* ---------- prêts ---------- */
 async function pt_loanAdd(code){
+  code = Number(code);
   const g = (id)=>document.getElementById(id), date = g('pt-ln-date').value || todayISO(), raw = g('pt-ln-amt').value.trim(), note = g('pt-ln-note').value.trim();
   if(!raw){ alert('Indique le montant du prêt.'); return; }
   const amt = pt_num(raw); if(!(amt > 0)){ alert('Le montant doit être positif.'); return; }
@@ -2407,6 +2408,7 @@ function pt_closuresCovering(day, code){
   return pt_clotures.filter(c=>day >= c.from && day <= c.to && (pt_isGlobalCl(c) || String(c.code) === String(code)));
 }
 async function pt_repayAdd(code){
+  code = Number(code);
   const g = (id)=>document.getElementById(id), date = g('pt-rb-date').value || todayISO(), raw = g('pt-rb-amt').value.trim(), note = g('pt-rb-note').value.trim();
   const mode = g('pt-rb-mode').value === 'direct' ? 'direct' : 'salaire';
   if(!raw){ alert('Indique le montant remboursé.'); return; }
@@ -2447,10 +2449,10 @@ function pt_pretsHtml(code){
     <div class="pt-cards" style="margin-top:10px;">${card('c-days', 'Total emprunté', pt_fmtMoney(b.lent))}${card('c-transport', 'Total remboursé', pt_fmtMoney(b.repaid))}${card(b.due > 0.004 ? 'c-loan' : 'c-transport', 'Reste dû', b.due > 0.004 ? pt_fmtMoney(b.due) : (b.due < -0.004 ? pt_money2(b.due) : '0'))}</div>
     <div class="pt-muted">Remboursé : ${pt_fmtMoney(b.sal)} sur salaire · ${pt_fmtMoney(b.dir)} en versement direct ${state}</div>
     <h2 class="section" style="margin-top:16px;">Prêts accordés</h2>
-    <div class="pt-row"><input type="date" id="pt-ln-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-ln-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-ln-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small" onclick="pt_loanAdd('${code}')">Ajouter le prêt</button></div>
+    <div class="pt-row"><input type="date" id="pt-ln-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-ln-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-ln-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small" onclick="pt_loanAdd(${code})">Ajouter le prêt</button></div>
     <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date d’emprunt</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${lrows || '<tr><td colspan="4" class="pt-muted">Aucun prêt.</td></tr>'}</tbody></table></div>
     <h2 class="section" style="margin-top:16px;">Remboursements</h2>
-    <div class="pt-row"><input type="date" id="pt-rb-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-rb-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><select id="pt-rb-mode" class="pt-draft"><option value="salaire">Sur salaire</option><option value="direct">Versement direct</option></select><input type="text" id="pt-rb-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small" onclick="pt_repayAdd('${code}')">Ajouter le remboursement</button></div>
+    <div class="pt-row"><input type="date" id="pt-rb-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-rb-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><select id="pt-rb-mode" class="pt-draft"><option value="salaire">Sur salaire</option><option value="direct">Versement direct</option></select><input type="text" id="pt-rb-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small" onclick="pt_repayAdd(${code})">Ajouter le remboursement</button></div>
     <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date</th><th>Motif</th><th>Mode</th><th>Montant</th><th></th></tr></thead><tbody>${rrows || '<tr><td colspan="5" class="pt-muted">Aucun remboursement.</td></tr>'}</tbody></table></div>`;
 }
 function pt_pretsAllHtml(codes){
