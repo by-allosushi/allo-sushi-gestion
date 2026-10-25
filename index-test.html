@@ -441,6 +441,9 @@
 .pt-table input,.pt-table select{padding:6px 8px;font-size:13px;min-width:0;}
 .pt-table tr.pt-total td{background:var(--paper);font-weight:700;}
 .pt-table tr.pt-manual td{color:var(--ink-muted);font-style:italic;}
+.pt-table tr.pt-cl-day td:first-child{padding-left:22px;}
+.pt-chk{display:flex;align-items:center;gap:8px;font-size:12.5px;margin-top:8px;cursor:pointer;}
+.pt-chk input{width:auto;margin:0;}
 .pt-form{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px;align-items:center;margin-top:12px;}
 .pt-form-title{display:flex;align-items:center;gap:8px;}
 .pt-form-title label{font-size:13.5px;font-weight:700;white-space:nowrap;}
@@ -535,6 +538,7 @@
         <div class="field"><label>Au</label><input type="date" id="pt-to" onchange="pt_periodInput()"></div>
       </div>
       <div class="pt-muted" id="pt-period-status" style="margin-top:8px;"></div>
+      <label class="pt-chk"><input type="checkbox" id="pt-showclosed" onchange="pt_toggleShowClosed(this.checked)"> Afficher aussi les jours clôturés dans les listes <span class="pt-muted" id="pt-closed-hint"></span></label>
     </div>
     <div id="pt-body"></div>
   </main>
@@ -1364,6 +1368,7 @@ let pt_started = false, pt_error = '', pt_loadStartedAt = null;
 let pt_tab = 'anomalies', pt_sel = null, pt_openFix = null, pt_anomList = [];
 let pt_ovList = [], pt_ovOpen = null;
 let pt_filter = { from:null, to:null };
+let pt_showClosed = false; // false : les jours clôturés sont masqués des listes de travail (anomalies, pointages…)
 let pt_idn = 0;
 
 /* ---------- utilitaires ---------- */
@@ -1415,6 +1420,7 @@ function pt_start(){
   pt_loadStartedAt = Date.now();
   setTimeout(()=>{ if(activeModule === 'pointage') pt_render(); }, 5000); // force un nouvel essai d'affichage même si aucune donnée n'est jamais arrivée
   try{ const raw = localStorage.getItem('pt-period'); if(raw) pt_filter = JSON.parse(raw); }catch(e){}
+  try{ pt_showClosed = localStorage.getItem('pt-show-closed') === '1'; }catch(e){}
   const onErr = (err)=>{ console.error(err); pt_error = (err && err.message) || 'Lecture impossible'; pt_render(); };
   pt_eventsCol.onSnapshot((snap)=>{
     const list = [];
@@ -1545,13 +1551,13 @@ async function pt_importFile(){
   const parsed = pt_parseRaw(await f.text());
   if(!parsed.length){ pt_status('Aucune ligne de pointage reconnue. Formats acceptés : export ZKBio (code ⇥ jj/mm/aaaa hh:mm ⇥ 0/1) ou fichier brut du pointeur (code ⇥ aaaa-mm-jj hh:mm:ss ⇥ … ⇥ statut).', 'err'); return; }
   const seen = new Set(pt_events.map(e=>e.code + '|' + e.dt + '|' + e.type));
-  const fresh = []; let skipped = 0;
-  parsed.forEach(p=>{ const k = p.code + '|' + p.iso + '|' + p.type; if(seen.has(k)) return; seen.add(k); if(pt_isIgnored(p.code, p.iso, p.type)){ skipped++; return; } fresh.push(p); });
+  const fresh = []; let skipped = 0, closedSkipped = 0;
+  parsed.forEach(p=>{ if(pt_dayClosed(pt_day(new Date(p.iso)))){ closedSkipped++; return; } const k = p.code + '|' + p.iso + '|' + p.type; if(seen.has(k)) return; seen.add(k); if(pt_isIgnored(p.code, p.iso, p.type)){ skipped++; return; } fresh.push(p); });
   try{
     if(fresh.length) await pt_addEvents(fresh);
     inp.value = '';
     const ts = parsed.map(x=>x.iso).sort();
-    pt_status(fresh.length + ' nouveau(x) pointage(s) ajouté(s) (' + (parsed.length - fresh.length - skipped) + ' déjà connus ou en double, ignorés).' + (skipped ? ' ' + skipped + ' écarté(s) car supprimés ou modifiés par toi.' : '') + ' Période du fichier : ' + fmtDateShort(toLocalISO(new Date(ts[0]))) + ' → ' + fmtDateShort(toLocalISO(new Date(ts[ts.length-1]))) + '.', 'ok');
+    pt_status(fresh.length + ' nouveau(x) pointage(s) ajouté(s) (' + (parsed.length - fresh.length - skipped - closedSkipped) + ' déjà connus ou en double, ignorés).' + (closedSkipped ? ' ' + closedSkipped + ' ignoré(s) car dans une période clôturée.' : '') + (skipped ? ' ' + skipped + ' écarté(s) car supprimés ou modifiés par toi.' : '') + ' Période du fichier : ' + fmtDateShort(toLocalISO(new Date(ts[0]))) + ' → ' + fmtDateShort(toLocalISO(new Date(ts[ts.length-1]))) + '.', 'ok');
   }catch(e){ console.error(e); pt_status('Erreur d’enregistrement : ' + (e.message || e), 'err'); }
 }
 
@@ -1571,6 +1577,17 @@ function pt_renderPeriod(){
   if(document.activeElement !== t) t.value = pt_filter.to || '';
   s.textContent = (!pt_filter.from && !pt_filter.to) ? 'Toutes les périodes affichées.'
     : 'Filtré du ' + (pt_filter.from ? fmtDateShort(pt_filter.from) : '…') + ' au ' + (pt_filter.to ? fmtDateShort(pt_filter.to) : '…') + '.';
+  const chk = document.getElementById('pt-showclosed'), hint = document.getElementById('pt-closed-hint');
+  if(chk) chk.checked = pt_showClosed;
+  if(hint){
+    const nCl = pt_clotures.length;
+    hint.textContent = nCl ? '(' + nCl + ' clôture' + (nCl > 1 ? 's' : '') + ')' : '';
+  }
+}
+function pt_toggleShowClosed(v){
+  pt_showClosed = !!v;
+  try{ localStorage.setItem('pt-show-closed', v ? '1' : '0'); }catch(e){}
+  pt_render(true);
 }
 
 /* ---------- appariement entrées/sorties ---------- */
@@ -1661,6 +1678,33 @@ function pt_entriesOf(kind, code){
   return pt_entries.filter(e=>e.kind === kind && e.code === code && pt_inRange(e.date))
     .map(e=>({ id:e.id, date:e.date, amount:Number(e.amount)||0, note:e.note || '', src:'local' }));
 }
+/* ---------- verrou des jours clôturés ---------- */
+function pt_addDays(iso, n){ const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return toLocalISO(d); }
+function pt_dayDiff(a, b){ return Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000); }
+function pt_weekRange(iso){ const d = new Date(iso + 'T12:00:00'), dow = (d.getDay() + 6) % 7; const from = pt_addDays(iso, -dow); return { from, to:pt_addDays(from, 6) }; } // lundi → dimanche
+function pt_monthRange(mk){ const y = Number(mk.slice(0,4)), m = Number(mk.slice(5,7)); return { from:mk + '-01', to:mk + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0') }; }
+function pt_isoWeek(iso){ const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7)); const w1 = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - w1) / 86400000 - 3 + ((w1.getDay() + 6) % 7)) / 7); }
+function pt_mergeRanges(list){
+  const r = list.filter(c=>c && c.from && c.to).map(c=>({ from:c.from, to:c.to })).sort((a,b)=>a.from.localeCompare(b.from));
+  const out = [];
+  r.forEach(x=>{ const last = out[out.length - 1]; if(last && x.from <= pt_addDays(last.to, 1)){ if(x.to > last.to) last.to = x.to; } else out.push({ from:x.from, to:x.to }); });
+  return out;
+}
+let pt_lockMemo = { ref:null, ranges:[] };
+function pt_lockRanges(){ if(pt_lockMemo.ref !== pt_clotures){ pt_lockMemo = { ref:pt_clotures, ranges:pt_mergeRanges(pt_clotures) }; } return pt_lockMemo.ranges; }
+function pt_dayClosed(day){ if(!day) return false; return pt_lockRanges().some(r=>day >= r.from && day <= r.to); }
+// nombre de jours de [from,to] couverts par une liste de clôtures (par défaut : toutes)
+function pt_coveredDays(from, to, list){
+  let n = 0;
+  (list ? pt_mergeRanges(list) : pt_lockRanges()).forEach(r=>{ const a = r.from > from ? r.from : from, b = r.to < to ? r.to : to; if(a <= b) n += pt_dayDiff(a, b) + 1; });
+  return n;
+}
+function pt_guardDay(day, what){
+  if(day && pt_dayClosed(day)){ alert((what || 'Cette modification') + ' concerne un jour clôturé (' + fmtDateShort(day) + ').\nRouvre-le d’abord dans l’onglet Clôtures.'); return true; }
+  return false;
+}
+function pt_withFilter(from, to, fn){ const keep = pt_filter; pt_filter = { from, to }; try{ return fn(); } finally { pt_filter = keep; } }
+
 /* ---------- clôture de période (paie figée) ---------- */
 function pt_closureFor(from, to){ return pt_clotures.find(c=>c.from === from && c.to === to) || null; }
 function pt_currentClosure(){ return (pt_filter.from && pt_filter.to) ? pt_closureFor(pt_filter.from, pt_filter.to) : null; }
@@ -2117,15 +2161,15 @@ function pt_selEmp(v){ pt_sel = Number(v); pt_render(true); }
 function pt_isAdmin(){ return !!(session && session.isAdmin); }
 function pt_renderTabs(nAnom){
   // Réglages (taux, salaires) : réservé aux administrateurs
-  const tabs = [['anomalies','Anomalies'],['employes','Employés'],['journal','Journal auto'],['reglages','Réglages']]
-    .filter(t=>pt_isAdmin() || (t[0] !== 'reglages' && t[0] !== 'journal'));
+  const tabs = [['anomalies','Anomalies'],['employes','Employés'],['clotures','Clôtures'],['journal','Journal auto'],['reglages','Réglages']]
+    .filter(t=>pt_isAdmin() || (t[0] !== 'reglages' && t[0] !== 'journal' && t[0] !== 'clotures'));
   document.getElementById('pointage-tabs').innerHTML = tabs.map(([id,l])=>
     `<button class="${pt_tab===id?'active':''}" onclick="pt_setTab('${id}')">${l}${id==='anomalies' && nAnom ? ` <span class="count-pill">${nAnom}</span>` : ''}</button>`).join('');
 }
 function pt_render(fresh){
   if(activeModule !== 'pointage') return;
   const body = document.getElementById('pt-body'); if(!body) return;
-  if(!pt_isAdmin() && (pt_tab === 'reglages' || pt_tab === 'journal')) pt_tab = 'anomalies';
+  if(!pt_isAdmin() && (pt_tab === 'reglages' || pt_tab === 'journal' || pt_tab === 'clotures')) pt_tab = 'anomalies';
   pt_renderPeriod();
   if(pt_error){ pt_renderTabs(0); body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
   if(!Object.keys(pt_ready).every(k=>pt_ready[k])){
@@ -2143,10 +2187,10 @@ function pt_render(fresh){
   const st = pt_saveInputs(body);
   const all = pt_compute();
   const sessions = all.sessions.filter(s=>pt_inRange(pt_day(s.date)));
-  const anomsPeriod = all.anomalies.filter(a=>pt_inRange(pt_day(a.dt)));
+  const anomsPeriod = all.anomalies.filter(a=>pt_inRange(pt_day(a.dt)) && (pt_showClosed || !pt_dayClosed(pt_day(a.dt))));
   const anoms = anomsPeriod.filter(a=>!pt_anomIgnored(a));
   const nIgnored = anomsPeriod.length - anoms.length;
-  const overlaps = pt_computeOverlaps(sessions);
+  const overlaps = pt_computeOverlaps(sessions).filter(o=>pt_showClosed || !pt_dayClosed(o.day));
   const codes = pt_codes();
   if(pt_sel === null || !codes.includes(pt_sel)) pt_sel = codes.length ? codes[0] : null;
   pt_renderTabs(anoms.length + overlaps.length);
@@ -2154,6 +2198,7 @@ function pt_render(fresh){
   if(pt_tab === 'anomalies') html = pt_tabAnomalies(anoms, nIgnored) + pt_tabOverlaps(overlaps);
   else if(pt_tab === 'employes') html = pt_tabEmployes(codes, sessions, anoms);
   else if(pt_tab === 'journal') html = pt_tabJournal();
+  else if(pt_tab === 'clotures') html = pt_tabClotures();
   else html = pt_tabReglages(codes);
   body.innerHTML = html;
   pt_restoreInputs(st, !fresh);
@@ -2248,6 +2293,7 @@ async function pt_ovAlign(i){
   const o = pt_ovList[i]; if(!o) return;
   const t = document.getElementById('pt-ov-time-' + i).value;
   if(!t){ alert('Indique une heure.'); return; }
+  if(pt_guardDay(o.day, 'Cet alignement')) return;
   const evA = pt_events.find(e=>e.code === o.codeA && e.type === 1 && new Date(e.dt).getTime() === o.aEnd.getTime());
   const evB = pt_events.find(e=>e.code === o.codeB && e.type === 0 && new Date(e.dt).getTime() === o.bStart.getTime());
   if(!evA || !evB){ pt_toast('Ce pointage a déjà changé, actualisation…'); pt_render(true); return; }
@@ -2287,6 +2333,7 @@ async function pt_saveFix(i){
   const a = pt_anomList[i]; if(!a) return;
   const d = document.getElementById('pt-fix-date').value, t = document.getElementById('pt-fix-time').value;
   if(!d || !t){ alert('Date et heure requises.'); return; }
+  if(pt_guardDay(d, 'Cette correction') || pt_guardDay(pt_day(a.dt), 'Cette correction')) return;
   try{
     pt_openFix = null;
     await Promise.all([
@@ -2298,15 +2345,87 @@ async function pt_saveFix(i){
 }
 async function pt_delEventConfirm(id){
   const e = pt_events.find(x=>x.id === id); if(!e) return;
+  if(pt_guardDay(pt_day(new Date(e.dt)), 'Cette suppression')) return;
   if(!confirm('Supprimer ce pointage (' + pt_fmtDT(new Date(e.dt)) + ', ' + (e.type===0?'Entrée':'Sortie') + ') ?')) return;
   pt_openFix = null;
   try{ await pt_deleteEvents([id]); pt_render(true); }catch(err){ console.error(err); alert('Erreur : ' + (err.message || err)); }
 }
 async function pt_delEntry(id){ try{ await pt_entriesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); } }
-async function pt_delEntryConfirm(id, what){ if(confirm('Supprimer ' + what + ' ?')) pt_delEntry(id); }
+async function pt_delEntryConfirm(id, what){ const en = pt_entries.find(x=>x.id === id); if(en && pt_guardDay(en.date, 'Cette suppression')) return; if(confirm('Supprimer ' + what + ' ?')) pt_delEntry(id); }
 async function pt_clearResolved(){
   if(!confirm('Effacer tout l’historique des corrections ?')) return;
   await pt_commit(pt_entries.filter(e=>e.kind === 'resolved').map(e=>({ t:'del', ref:pt_entriesCol.doc(e.id) })));
+}
+
+/* ---------- onglet Clôtures ---------- */
+let pt_clMonth = null;
+function pt_clNav(delta){ const y = Number(pt_clMonth.slice(0,4)), m = Number(pt_clMonth.slice(5,7)); pt_clMonth = toLocalISO(new Date(y, m - 1 + delta, 1)).slice(0,7); pt_render(true); }
+function pt_clSetMonth(v){ if(/^\d{4}-\d{2}$/.test(v || '')){ pt_clMonth = v; pt_render(true); } }
+function pt_monthLabel(mk){ return new Date(Number(mk.slice(0,4)), Number(mk.slice(5,7)) - 1, 1).toLocaleDateString('fr-FR', { month:'long', year:'numeric' }); }
+const PT_DOW = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+function pt_clAction(from, to, kind, big){
+  const exact = pt_closureFor(from, to), total = pt_dayDiff(from, to) + 1, cov = pt_coveredDays(from, to);
+  const closeBtn = (title)=>`<button class="btn ${big ? '' : 'ghost '}small" ${title ? `title="${pt_e(title)}"` : ''} onclick="pt_closeRange('${from}','${to}','${kind}')">Clôturer</button>`;
+  if(exact) return { badge:`<span class="pt-badge pt-b-prime">🔒 Clôturé</span>`, btn:`<button class="btn ghost small" onclick="pt_reopenRange('${exact.id}')">Rouvrir</button>` };
+  if(cov >= total) return { badge:`<span class="pt-badge pt-b-off">🔒 Verrouillé</span>`, btn:closeBtn('Tous les jours sont déjà verrouillés par d’autres clôtures ; clôturer ici fige aussi la paie de cette période.') };
+  if(cov > 0) return { badge:`<span class="pt-badge pt-b-off">Partiel ${cov}/${total} j</span>`, btn:closeBtn('') };
+  return { badge:`<span class="pt-muted">Ouvert</span>`, btn:closeBtn('') };
+}
+function pt_closeFreeRange(){
+  const f = document.getElementById('pt-cl-from').value, t = document.getElementById('pt-cl-to').value;
+  pt_closeRange(f, t, 'period');
+}
+function pt_tabClotures(){
+  if(!pt_clMonth) pt_clMonth = (pt_filter.to || pt_filter.from || todayISO()).slice(0,7);
+  const mr = pt_monthRange(pt_clMonth);
+  const evByDay = {}, anByDay = {};
+  pt_events.forEach(e=>{ const d = pt_day(new Date(e.dt)); evByDay[d] = (evByDay[d] || 0) + 1; });
+  pt_compute().anomalies.forEach(a=>{ if(pt_anomIgnored(a)) return; const d = pt_day(a.dt); anByDay[d] = (anByDay[d] || 0) + 1; });
+  const sum = (map, from, to)=>{ let n = 0; for(let d = from; d <= to; d = pt_addDays(d, 1)) n += map[d] || 0; return n; };
+  const anCell = (n)=>n ? `<span class="pt-badge pt-b-avance">${n}</span>` : `<span class="pt-muted">0</span>`;
+  const weeks = []; let cur = null;
+  for(let d = mr.from; d <= mr.to; d = pt_addDays(d, 1)){
+    const w = pt_weekRange(d);
+    if(!cur || cur.from !== w.from){ cur = { from:w.from, to:w.to, days:[] }; weeks.push(cur); }
+    cur.days.push(d);
+  }
+  const dm = (iso)=>pt_dm(new Date(iso + 'T12:00:00'));
+  const rows = weeks.map(w=>{
+    const act = pt_clAction(w.from, w.to, 'week', false);
+    let h = `<tr class="pt-total"><td>Semaine ${pt_isoWeek(w.from)} · ${dm(w.from)} → ${dm(w.to)}</td><td>${sum(evByDay, w.from, w.to)}</td><td>${anCell(sum(anByDay, w.from, w.to))}</td><td>${act.badge}</td><td>${act.btn}</td></tr>`;
+    w.days.forEach(d=>{
+      const a2 = pt_clAction(d, d, 'day', false);
+      h += `<tr class="pt-cl-day"><td>${PT_DOW[new Date(d + 'T12:00:00').getDay()]} ${dm(d)}</td><td>${evByDay[d] || 0}</td><td>${anCell(anByDay[d] || 0)}</td><td>${a2.badge}</td><td>${a2.btn}</td></tr>`;
+    });
+    return h;
+  }).join('');
+  const mAct = pt_clAction(mr.from, mr.to, 'month', true);
+  const list = pt_clotures.slice().sort((a,b)=>(b.from || '').localeCompare(a.from || '') || (b.to || '').localeCompare(a.to || ''));
+  const listRows = list.map(c=>{
+    const r = Object.keys(c.rows || {}).map(k=>c.rows[k]), nPaid = r.filter(x=>x.paid).length;
+    return `<tr><td>${PT_KIND_LABEL[c.kind] || 'Période'}</td><td>${pt_e(pt_rangeLabel(c.from, c.to))}</td><td>${fmtDateShort(String(c.createdAt || '').slice(0,10))}</td><td>${nPaid} / ${r.length}</td><td>${c.mailedAt ? '<span class="pt-muted">✉️ ' + fmtDateShort(String(c.mailedAt).slice(0,10)) + '</span> ' : ''}<button class="btn ghost small" onclick="pt_mailClosure('${c.id}')">${c.mailedAt ? 'Renvoyer' : 'Envoyer'}</button></td><td><button class="btn ghost small" onclick="pt_reopenRange('${c.id}')">Rouvrir</button></td></tr>`;
+  }).join('');
+  return `<div class="ticket">
+      <div class="section-label">Clôtures — jours, semaines, mois</div>
+      <div class="pt-muted">Clôturer fige la paie et verrouille les jours : ils ne sont plus réimportés (même si tu retélécharges tout l’historique du pointeur), ni corrigés automatiquement, ni modifiables, et ils disparaissent des listes de travail (interrupteur « Afficher aussi les jours clôturés » en haut). Les semaines vont du lundi au dimanche. Rouvre pour modifier à nouveau.</div>
+    </div>
+    <div class="ticket">
+      <div class="row-between" style="margin-bottom:10px;gap:8px;">
+        <button class="btn ghost small" onclick="pt_clNav(-1)">◀</button>
+        <div class="pt-row" style="justify-content:center;"><div style="font-weight:700;text-transform:capitalize;">${pt_e(pt_monthLabel(pt_clMonth))}</div><input type="month" class="pt-auto" value="${pt_clMonth}" onchange="pt_clSetMonth(this.value)"></div>
+        <button class="btn ghost small" onclick="pt_clNav(1)">▶</button>
+      </div>
+      <div class="pt-row" style="margin-bottom:12px;"><span class="pt-muted">Mois entier :</span>${mAct.badge}${mAct.btn}</div>
+      <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Période</th><th>Pointages</th><th>Anomalies</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    </div>
+    <div class="ticket"><div class="section-label">Période libre</div>
+      <div class="pt-row"><input type="date" id="pt-cl-from" class="pt-draft pt-auto"><input type="date" id="pt-cl-to" class="pt-draft pt-auto"><button class="btn small" onclick="pt_closeFreeRange()">Clôturer cette période</button></div>
+      <div class="pt-muted" style="margin-top:6px;">Utile pour clôturer d’un coup tout l’historique déjà traité (par ex. depuis le début jusqu’à la fin du dernier mois payé).</div>
+    </div>
+    ${pt_mailCfgCard()}
+    <div class="ticket"><div class="section-label">Clôtures enregistrées</div>
+      ${list.length ? `<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Type</th><th>Période</th><th>Créée le</th><th>Payé</th><th>Mail</th><th></th></tr></thead><tbody>${listRows}</tbody></table></div>` : `<div class="pt-muted">Aucune clôture pour l’instant.</div>`}
+    </div>`;
 }
 
 /* ---------- onglet Paie ---------- */
@@ -2325,6 +2444,7 @@ async function pt_addEntry(kind){
   const raw = aEl.value.trim();
   if(!raw){ alert('Indique au moins le montant.'); return; }
   const data = { kind, code:pt_sel, date:dEl.value || todayISO(), amount:pt_num(raw), note:nEl.value.trim() };
+  if(pt_guardDay(data.date, 'Cette entrée')) return;
   aEl.value = ''; nEl.value = ''; dEl.value = todayISO();
   try{ await pt_addEntryDoc(data); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
 }
@@ -2336,30 +2456,157 @@ function pt_histRows(p){
   ].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 }
 const pt_r2 = (x)=>Math.round((Number(x) || 0) * 100) / 100;
-async function pt_closePeriod(){
-  const from = pt_filter.from, to = pt_filter.to;
+/* Une clôture = une plage de dates { from, to, kind:'day'|'week'|'month'|'period', rows } : les jours qu'elle couvre sont verrouillés
+   (plus d'import, ni de correction automatique, ni de modification à la main) et la paie de la plage est figée.
+   Les plages peuvent se recouper (ex. une semaine, puis le mois qui la contient). Rouvrir une clôture ne rouvre pas les jours
+   qu'une autre clôture couvre encore. */
+const PT_KIND_LABEL = { day:'Jour', week:'Semaine', month:'Mois', period:'Période' };
+function pt_closureRows(from, to){
+  return pt_withFilter(from, to, ()=>{
+    const sessions = pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)));
+    const rows = {};
+    pt_codes().forEach(code=>{
+      const p = pt_payroll(code, sessions);
+      rows[code] = { name:pt_name(code), hours:pt_r2(p.totalHours), rate:p.rate, mode:p.mode, workedDays:p.workedDays, baseWage:pt_r2(p.baseWage),
+        transportTotal:pt_r2(p.transportTotal), bonusesTotal:pt_r2(p.bonusesTotal), subTotal:pt_r2(p.subTotal), leavesTotal:pt_r2(p.leavesTotal),
+        advancesTotal:pt_r2(p.advancesTotal), net:pt_r2(p.net), paid: p.net <= 0 }; // rien à verser => déjà « payé »
+    });
+    return rows;
+  });
+}
+function pt_rangeLabel(from, to){ return from === to ? 'le ' + fmtDateShort(from) : 'du ' + fmtDateShort(from) + ' au ' + fmtDateShort(to); }
+async function pt_closeRange(from, to, kind){
   if(!from || !to){ alert('Renseigne les dates Du et Au avant de clôturer.'); return; }
   if(from > to){ alert('La date de début est après la date de fin.'); return; }
-  const clash = pt_clotures.find(c=>!(to < c.from || from > c.to));
-  if(clash){ alert('Cette période chevauche une période déjà clôturée (du ' + fmtDateShort(clash.from) + ' au ' + fmtDateShort(clash.to) + '). Rouvre-la d’abord, ou choisis d’autres dates.'); return; }
-  if(!confirm('Clôturer la paie du ' + fmtDateShort(from) + ' au ' + fmtDateShort(to) + ' ?\nLes montants de chaque employé seront figés (tu pourras rouvrir la période en cas d’erreur).')) return;
-  const sessions = pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)));
-  const rows = {};
-  pt_codes().forEach(code=>{
-    const p = pt_payroll(code, sessions);
-    rows[code] = { name:pt_name(code), hours:pt_r2(p.totalHours), rate:p.rate, mode:p.mode, workedDays:p.workedDays, baseWage:pt_r2(p.baseWage),
-      transportTotal:pt_r2(p.transportTotal), bonusesTotal:pt_r2(p.bonusesTotal), subTotal:pt_r2(p.subTotal), leavesTotal:pt_r2(p.leavesTotal),
-      advancesTotal:pt_r2(p.advancesTotal), net:pt_r2(p.net), paid: p.net <= 0 }; // rien à verser => déjà « payé »
+  if(pt_closureFor(from, to)){ alert('Cette période est déjà clôturée.'); return; }
+  const total = pt_dayDiff(from, to) + 1, already = pt_coveredDays(from, to);
+  const anom = pt_compute().anomalies.filter(a=>{ const d = pt_day(a.dt); return d >= from && d <= to && !pt_anomIgnored(a) && !pt_dayClosed(d); }).length;
+  let msg = 'Clôturer ' + pt_rangeLabel(from, to) + ' ?\nLa paie de chaque employé sera figée et ces jours ne pourront plus être modifiés ni réimportés (tu pourras les rouvrir).';
+  if(anom) msg += '\n\n⚠️ ' + anom + ' anomalie' + (anom > 1 ? 's' : '') + ' non traitée' + (anom > 1 ? 's' : '') + ' sur cette période.';
+  if(to >= todayISO()) msg += '\n\n⚠️ La période n’est pas terminée : des pointages peuvent encore arriver.';
+  if(already) msg += '\n\n' + (already >= total ? 'Tous les jours sont déjà verrouillés par d’autres clôtures : celle-ci fige seulement la paie de cette période.' : already + ' jour' + (already > 1 ? 's' : '') + ' déjà clôturé' + (already > 1 ? 's' : '') + '.');
+  if(!confirm(msg)) return;
+  const doc = { from, to, kind:kind || 'period', createdAt:new Date().toISOString(), createdBy:currentUser, rows:pt_closureRows(from, to) };
+  let ref;
+  try{ ref = await pt_cloturesCol.add(doc); pt_toast('Clôturé.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); return; }
+  const wk = pt_weekRange(from), isWeek = doc.kind === 'week' || (doc.kind === 'period' && wk.from === from && wk.to === to);
+  const cfg = pt_mailCfg();
+  if(isWeek && cfg.auto && cfg.publicKey){
+    try{ await pt_mailClosureSend({ ...doc, kind:'week' }, ref && ref.id); }
+    catch(e){ console.error(e); alert('La semaine est clôturée, mais le mail n’a pas pu être envoyé :\n' + (e.message || e) + '\n\nTu pourras le renvoyer depuis la liste « Clôtures enregistrées ».'); }
+  }
+}
+async function pt_reopenRange(id){
+  const c = pt_clotures.find(x=>x.id === id); if(!c) return;
+  const keep = pt_coveredDays(c.from, c.to, pt_clotures.filter(x=>x.id !== id));
+  let msg = 'Rouvrir ' + pt_rangeLabel(c.from, c.to) + ' ?\nLes cases « Payé » de cette clôture seront perdues et la paie sera de nouveau calculée en direct.';
+  if(keep) msg += '\n\n' + keep + ' jour' + (keep > 1 ? 's' : '') + ' reste' + (keep > 1 ? 'nt' : '') + ' verrouillé' + (keep > 1 ? 's' : '') + ' par d’autres clôtures (semaine, mois…) : rouvre-les aussi si besoin.';
+  if(!confirm(msg)) return;
+  try{ await pt_cloturesCol.doc(id).delete(); pt_toast('Rouvert.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+/* ---------- récapitulatif par mail (EmailJS) ---------- */
+/* Envoi depuis le navigateur vers l'API EmailJS : { service_id, template_id, user_id (clé publique), template_params:{ semaine, tableau_html } }.
+   Le modèle EmailJS contient seulement {{{tableau_html}}} ; l'adresse de réception est écrite dans le modèle lui-même.
+   Réglages stockés dans pointage_entries/mailcfg (aucune règle Firestore à ajouter). */
+function pt_mailCfg(){
+  const c = pt_entries.find(e=>e.kind === 'mailcfg') || {};
+  const t = (v, d)=>(typeof v === 'string' && v.trim()) ? v.trim() : d;
+  return { auto: c.auto !== false, serviceId: t(c.serviceId, 'service_p5hjqyl'), templateId: t(c.templateId, 'template_cxkmgk3'), publicKey: t(c.publicKey, 'pD6IrRlZE71MXv6bO') };
+}
+function pt_mailSet(field, value){
+  const v = typeof value === 'boolean' ? value : String(value || '').trim();
+  return pt_entriesCol.doc('mailcfg').set({ kind:'mailcfg', [field]: v }, { merge:true }).then(()=>{ pt_toast('Réglage enregistré.'); pt_render(true); }).catch(e=>alert('Erreur : ' + (e.message || e)));
+}
+async function pt_mailSend(params){
+  const cfg = pt_mailCfg();
+  if(!cfg.publicKey) throw new Error('La clé publique EmailJS n’est pas renseignée (onglet Clôtures → Récapitulatif par mail).');
+  const r = await fetch('https://api.emailjs.com/api/v1.0/email/send', { method:'POST', headers:{ 'Content-Type':'application/json' },
+    body:JSON.stringify({ service_id:cfg.serviceId, template_id:cfg.templateId, user_id:cfg.publicKey, template_params:params }) });
+  if(!r.ok){ let t = ''; try{ t = await r.text(); }catch(e){} throw new Error('EmailJS a refusé l’envoi (' + r.status + ') ' + t); }
+}
+const PT_TD = (v, right, bold)=>'<td' + (right ? ' align="right"' : '') + '>' + (bold ? '<b>' + v + '</b>' : v) + '</td>';
+function pt_recapHtml(from, to, closure){
+  return pt_withFilter(from, to, ()=>{
+    const sessions = pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)));
+    const money = (n)=>n ? pt_fmtMoney(n) : '';
+    const dayLabel = (d)=>PT_DOW[new Date(d + 'T12:00:00').getDay()] + ' ' + pt_dm(new Date(d + 'T12:00:00'));
+    const emps = [];
+    pt_codes().forEach(code=>{
+      const p = pt_payroll(code, sessions), fz = closure && closure.rows && closure.rows[code];
+      const tot = fz ? { hours:fz.hours, transport:fz.transportTotal, bonuses:fz.bonusesTotal, leaves:fz.leavesTotal, advances:fz.advancesTotal, net:fz.net }
+                     : { hours:p.totalHours, transport:p.transportTotal, bonuses:p.bonusesTotal, leaves:p.leavesTotal, advances:p.advancesTotal, net:p.net };
+      const days = {}, get = (d)=>(days[d] = days[d] || { sess:[], manual:[], prime:0, off:0, avance:0 });
+      sessions.filter(s=>s.code === code).forEach(s=>get(pt_day(s.date)).sess.push(s));
+      pt_entries.filter(e=>e.kind === 'manual' && e.code === code && pt_inRange(e.date)).forEach(m=>get(m.date).manual.push(m));
+      p.bonuses.forEach(x=>{ get(x.date).prime += x.amount; }); p.leaves.forEach(x=>{ get(x.date).off += x.amount; }); p.advances.forEach(x=>{ get(x.date).avance += x.amount; });
+      if(!Object.keys(days).length && !tot.net) return;
+      emps.push({ code, name:pt_e(pt_name(code)), rate:p.rate, mode:p.mode, tr:p.transport, days, tot });
+    });
+    const G = { hours:0, transport:0, bonuses:0, leaves:0, advances:0, net:0 };
+    let body = '';
+    emps.forEach(e=>{
+      const price = pt_fmtMoney(e.rate) + (e.mode === 'daily' ? '/j' : '/h');
+      Object.keys(e.days).sort().forEach(d=>{
+        const x = e.days[d];
+        const lines = x.sess.map(s=>({ a:pt_hhmm(s.start), b:pt_hhmm(s.end) + (pt_day(s.end) !== pt_day(s.start) ? ' (+1)' : ''), h:s.hours }))
+          .concat(x.manual.map(m=>({ a:'Manuel', b:'Manuel', h:Number(m.hours) || 0 })));
+        if(!lines.length) lines.push({ a:'', b:'', h:0 });
+        lines.forEach((l, i)=>{
+          const first = i === 0, worked = x.sess.length + x.manual.length > 0;
+          body += '<tr>' + PT_TD(dayLabel(d)) + PT_TD(e.name) + PT_TD(l.a) + PT_TD(l.b) + PT_TD(l.h ? pt_fmtH(l.h) : '', true) + PT_TD(first ? price : '', true)
+            + PT_TD(first && worked && e.tr.enabled ? pt_fmtMoney(e.tr.amount) : '', true) + PT_TD(first ? money(x.prime) : '', true) + PT_TD(first ? money(x.off) : '', true)
+            + PT_TD(first && x.avance ? '−' + pt_fmtMoney(x.avance) : '', true) + '<td></td></tr>';
+        });
+      });
+      const t = e.tot;
+      body += '<tr bgcolor="#e8efe8">' + PT_TD('TOTAL', false, true) + PT_TD(e.name, false, true) + '<td></td><td></td>' + PT_TD(pt_fmtH(t.hours), true, true) + PT_TD(price, true, true)
+        + PT_TD(money(t.transport), true, true) + PT_TD(money(t.bonuses), true, true) + PT_TD(money(t.leaves), true, true) + PT_TD(t.advances ? '−' + pt_fmtMoney(t.advances) : '', true, true) + PT_TD(pt_fmtMoney(t.net), true, true) + '</tr>';
+      Object.keys(G).forEach(k=>{ G[k] += Number(t[k]) || 0; });
+    });
+    if(!emps.length) body = '<tr><td colspan="11">Aucune activité sur cette période.</td></tr>';
+    else body += '<tr bgcolor="#cfe0cf">' + PT_TD('TOTAL GÉNÉRAL', false, true) + '<td></td><td></td><td></td>' + PT_TD(pt_fmtH(G.hours), true, true) + '<td></td>'
+      + PT_TD(money(G.transport), true, true) + PT_TD(money(G.bonuses), true, true) + PT_TD(money(G.leaves), true, true) + PT_TD(G.advances ? '−' + pt_fmtMoney(G.advances) : '', true, true) + PT_TD(pt_fmtMoney(G.net), true, true) + '</tr>';
+    const html = '<div style="font-family:Arial,sans-serif;font-size:13px;color:#222;">'
+      + '<p>Récapitulatif ' + pt_e(pt_rangeLabel(from, to)) + (closure && closure.createdAt ? ' — clôturé le ' + fmtDateShort(String(closure.createdAt).slice(0,10)) : '') + '.</p>'
+      + '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;font-size:12px;border-color:#bbb;"><tr bgcolor="#2d4a35" style="color:#fff;"><th align="left">Date</th><th align="left">Employé</th><th>Entrée</th><th>Sortie</th><th>Heures</th><th>Prix unitaire</th><th>Transport</th><th>Prime</th><th>Jour off</th><th>Avance</th><th>Total</th></tr>'
+      + body + '</table><p style="color:#666;font-size:11px;">Total = base + transport + primes + jours off − avances.</p></div>';
+    return { html, totals:G, count:emps.length };
   });
-  try{ await pt_cloturesCol.add({ from, to, createdAt:new Date().toISOString(), createdBy:currentUser, rows }); pt_toast('Période clôturée.'); }
-  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
-async function pt_reopenPeriod(){
-  const c = pt_currentClosure(); if(!c) return;
-  if(!confirm('Rouvrir cette période ? Les cases « Payé » seront perdues et la paie sera de nouveau calculée en direct.')) return;
-  try{ await pt_cloturesCol.doc(c.id).delete(); pt_toast('Période rouverte.'); }
-  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+async function pt_mailClosureSend(c, id){
+  const r = pt_recapHtml(c.from, c.to, c);
+  if(r.html.length > 48000) throw new Error('Le récapitulatif est trop volumineux pour un seul envoi (' + Math.round(r.html.length / 1000) + ' Ko, limite EmailJS gratuite : 50 Ko). Envoie une période plus courte.');
+  const wk = pt_weekRange(c.from), isWeek = c.kind === 'week' || (wk.from === c.from && wk.to === c.to);
+  const label = (isWeek ? 'Semaine ' + pt_isoWeek(c.from) + ' · ' : '') + pt_dm(new Date(c.from + 'T12:00:00')) + ' → ' + fmtDateShort(c.to);
+  await pt_mailSend({ semaine:label, tableau_html:r.html });
+  if(id) pt_cloturesCol.doc(id).set({ mailedAt:new Date().toISOString() }, { merge:true }).catch(()=>{});
+  pt_toast('Récapitulatif envoyé par mail.');
 }
+async function pt_mailClosure(id){
+  const c = pt_clotures.find(x=>x.id === id); if(!c) return;
+  try{ await pt_mailClosureSend(c, id); }catch(e){ console.error(e); alert('Envoi impossible : ' + (e.message || e)); }
+}
+async function pt_mailTest(){
+  try{ await pt_mailSend({ semaine:'TEST', tableau_html:'<p style="font-family:Arial,sans-serif;">Ceci est un mail de test envoyé par l’application Allo Sushi. Si tu le lis, l’envoi des récapitulatifs fonctionne ✅</p>' }); pt_toast('Mail de test envoyé — vérifie ta boîte de réception.'); }
+  catch(e){ console.error(e); alert('Envoi impossible : ' + (e.message || e)); }
+}
+function pt_mailCfgCard(){
+  const c = pt_mailCfg();
+  return `<div class="ticket"><div class="section-label">Récapitulatif par mail (EmailJS) ${c.publicKey ? '<span class="pt-badge pt-b-prime">configuré</span>' : '<span class="pt-badge pt-b-off">clé publique manquante</span>'}</div>
+    <div class="pt-muted">Quand tu clôtures une semaine, un tableau (date, employé, entrée, sortie, prix unitaire, transport, primes, jours off, avances, total) est envoyé par mail à l’adresse indiquée dans le modèle EmailJS. Tu peux aussi renvoyer le récapitulatif de n’importe quelle clôture depuis la liste ci-dessous.</div>
+    <div class="grid grid-2" style="margin-top:10px;">
+      <div class="field"><label>Service ID</label><input type="text" value="${pt_e(c.serviceId)}" onchange="pt_mailSet('serviceId', this.value)"></div>
+      <div class="field"><label>Template ID</label><input type="text" value="${pt_e(c.templateId)}" onchange="pt_mailSet('templateId', this.value)"></div>
+    </div>
+    <div class="field" style="margin-top:8px;"><label>Public Key</label><input type="text" value="${pt_e(c.publicKey)}" placeholder="Colle ici la clé publique EmailJS" onchange="pt_mailSet('publicKey', this.value)"></div>
+    <div class="perm-row" style="margin-top:8px;"><span>Envoyer automatiquement quand je clôture une semaine</span><label class="switch"><input type="checkbox" ${c.auto ? 'checked' : ''} onchange="pt_mailSet('auto', this.checked)"><span class="slider"></span></label></div>
+    <div class="pt-row" style="margin-top:10px;"><button class="btn small" onclick="pt_mailTest()">Envoyer un mail de test</button></div>
+  </div>`;
+}
+function pt_closePeriod(){ return pt_closeRange(pt_filter.from, pt_filter.to, 'period'); }
+function pt_reopenPeriod(){ const c = pt_currentClosure(); if(c) return pt_reopenRange(c.id); }
 async function pt_togglePaid(code, checked){
   const c = pt_currentClosure(); if(!c) return;
   try{ await pt_cloturesCol.doc(c.id).set({ rows:{ [code]:{ paid:!!checked } } }, { merge:true }); }
@@ -2375,17 +2622,40 @@ function pt_closureBar(sessions){
   return `<div class="pt-row" style="margin-bottom:10px;"><span class="pt-badge pt-b-prime">Clôturée</span><span class="pt-muted">le ${fmtDateShort(String(c.createdAt || '').slice(0,10))} · payé : ${nPaid} / ${rows.length}</span><button class="btn ghost small" onclick="pt_reopenPeriod()">Rouvrir</button></div>
     ${stale ? `<div class="alert-banner" style="margin-bottom:10px;"><b>Les données ont changé depuis la clôture</b>Un pointage, une prime ou une avance de cette période a été modifié après coup. Les chiffres ci-dessous sont ceux figés à la clôture ; rouvre la période pour recalculer.</div>` : ''}`;
 }
+function pt_paieTotals(codes, sessions){
+  const qs = codes.map(x=>pt_displayPayroll(x, sessions));
+  const S = (k)=>qs.reduce((s,q)=>s + (Number(q[k]) || 0), 0);
+  return { hours:S('totalHours'), base:S('baseWage'), transport:S('transportTotal'), bonuses:S('bonusesTotal'), sub:S('subTotal'), leaves:S('leavesTotal'), advances:S('advancesTotal'), net:S('net') };
+}
 function pt_paieOverviewHtml(codes, sessions){
   const c = pt_currentClosure();
-  const totNet = codes.reduce((s,x)=>s + pt_displayPayroll(x, sessions).net, 0);
+  const T = pt_paieTotals(codes, sessions), totNet = T.net;
   const rows = codes.map(x=>{
     const q = pt_displayPayroll(x, sessions);
     const paidCell = c ? `<td>${pt_frozenRow(x) ? `<input type="checkbox" ${q.paid ? 'checked' : ''} onchange="pt_togglePaid(${x}, this.checked)">` : ''}</td>` : '';
     return `<tr><td>${pt_e(pt_label(x))}</td><td>${pt_fmtH(q.totalHours)}</td><td>${pt_fmtMoney(q.rate)}${q.mode==='daily'?'/j':'/h'}</td><td>${pt_fmtMoney(q.baseWage)}</td><td>${pt_fmtMoney(q.transportTotal)}</td><td>${pt_fmtMoney(q.bonusesTotal)}</td><td><b>${pt_fmtMoney(q.subTotal)}</b></td><td>${pt_fmtMoney(q.leavesTotal)}</td><td>${pt_fmtMoney(q.advancesTotal)}</td><td><b>${pt_fmtMoney(q.net)}</b></td>${paidCell}</tr>`;
   }).join('');
   const resteAPayer = c ? codes.reduce((s,x)=>{ const q = pt_displayPayroll(x, sessions); return s + (pt_frozenRow(x) && !q.paid && q.net > 0 ? q.net : 0); }, 0) : 0;
+  const totalRow = `<tr class="pt-total"><td>TOTAL</td><td>${pt_fmtH(T.hours)}</td><td></td><td>${pt_fmtMoney(T.base)}</td><td>${pt_fmtMoney(T.transport)}</td><td>${pt_fmtMoney(T.bonuses)}</td><td>${pt_fmtMoney(T.sub)}</td><td>${pt_fmtMoney(T.leaves)}</td><td>${pt_fmtMoney(T.advances)}</td><td>${pt_fmtMoney(T.net)}</td>${c ? '<td></td>' : ''}</tr>`;
   return { totNet, closed:!!c, html: `${pt_closureBar(sessions)}<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Employé</th><th>Heures</th><th>Taux</th><th>Base</th><th>Transport</th><th>Primes</th><th>Sous-total</th><th>Jours off</th><th>Avances</th><th>Net</th>${c ? '<th>Payé</th>' : ''}</tr></thead><tbody>${rows}
-    <tr class="pt-total"><td colspan="9">TOTAL NET À PAYER</td><td>${pt_fmtMoney(totNet)}</td>${c ? '<td></td>' : ''}</tr>${c ? `<tr class="pt-total"><td colspan="9">RESTE À PAYER</td><td>${pt_fmtMoney(resteAPayer)}</td><td></td></tr>` : ''}</tbody></table></div>` };
+    ${totalRow}${c ? `<tr class="pt-total"><td colspan="9">RESTE À PAYER</td><td>${pt_fmtMoney(resteAPayer)}</td><td></td></tr>` : ''}</tbody></table></div>
+    <div class="pt-muted" style="margin-top:6px;">Total net à payer : <b>${pt_fmtMoney(T.net)}</b> (sous-total + jours off − avances).</div>` };
+}
+function pt_histTotalsHtml(p, codes){
+  const sum = (arr)=>arr.reduce((s,x)=>s + (Number(x.amount) || 0), 0);
+  const nP = p.bonuses.length, nO = p.leaves.length, nA = p.advances.length;
+  const tP = sum(p.bonuses), tO = sum(p.leaves), tA = sum(p.advances), tG = tP + tO - tA;
+  const all = { p:0, o:0, a:0 };
+  (codes || []).forEach(x=>{ all.p += sum(pt_entriesOf('prime', x)); all.o += sum(pt_entriesOf('off', x)); all.a += sum(pt_entriesOf('avance', x)); });
+  const per = (pt_filter.from || pt_filter.to) ? 'du ' + (pt_filter.from ? fmtDateShort(pt_filter.from) : '…') + ' au ' + (pt_filter.to ? fmtDateShort(pt_filter.to) : '…') : 'toutes périodes';
+  return `<div class="section-label" style="margin-top:16px;">Totaux de l’historique — ${pt_e(per)}</div>
+    <div class="pt-kpis">
+      <div class="pt-kpi"><div class="n">+${pt_fmtMoney(tP)}</div><div class="l">Primes (${nP})</div></div>
+      <div class="pt-kpi"><div class="n">+${pt_fmtMoney(tO)}</div><div class="l">Jours off (${nO})</div></div>
+      <div class="pt-kpi"><div class="n">−${pt_fmtMoney(tA)}</div><div class="l">Avances (${nA})</div></div>
+      <div class="pt-kpi"><div class="n">${tG < 0 ? '−' : '+'}${pt_fmtMoney(Math.abs(tG))}</div><div class="l">Total global</div></div>
+    </div>
+    <div class="pt-muted">Total global = primes + jours off − avances, pour cet employé. Tous les employés sur la même période : primes ${pt_fmtMoney(all.p)} · jours off ${pt_fmtMoney(all.o)} · avances ${pt_fmtMoney(all.a)} · global ${pt_fmtMoney(all.p + all.o - all.a)}.</div>`;
 }
 function pt_paieSection(c, sessions, codes){
   const p = pt_displayPayroll(c, sessions);
@@ -2404,6 +2674,7 @@ function pt_paieSection(c, sessions, codes){
     ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off')}${pt_formRow('avance','Avance')}
     <h2 class="section" style="margin-top:20px;">Historique</h2>
     <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Catégorie</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${hist}</tbody></table></div>
+    ${pt_histTotalsHtml(p, codes)}
     <div class="grid grid-2" style="margin-top:14px;">
       <div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span></div><div class="value">${pt_fmtMoney(p.subTotal)}</div></div>
       <div class="result-box final"><div class="label">Net à payer</div><div class="value">${pt_fmtMoney(p.net)}</div></div>
@@ -2413,16 +2684,21 @@ function pt_paieSection(c, sessions, codes){
 
 /* ---------- onglet Employés (fusion Par employé + Paie, en sections repliables) ---------- */
 function pt_pointagesSection(c, sessions){
-  const mySess = sessions.filter(s=>s.code === c);
-  const myManual = pt_entries.filter(e=>e.kind === 'manual' && e.code === c && pt_inRange(e.date));
+  const openDay = (dk)=>pt_showClosed || !pt_dayClosed(dk);
+  const mySessAll = sessions.filter(s=>s.code === c);
+  const mySess = mySessAll.filter(s=>openDay(pt_day(s.date)));
+  const myManualAll = pt_entries.filter(e=>e.kind === 'manual' && e.code === c && pt_inRange(e.date));
+  const myManual = myManualAll.filter(m=>openDay(m.date));
+  const hiddenDays = new Set([...mySessAll.filter(s=>!openDay(pt_day(s.date))).map(s=>pt_day(s.date)), ...myManualAll.filter(m=>!openDay(m.date)).map(m=>m.date)]).size;
   const lines = [
     ...mySess.map(s=>({ ts:s.start.getTime(), hours:s.hours, html:`<tr><td>${fmtDateShort(pt_day(s.date))}</td><td>${pt_fmtDT(s.start)}</td><td>${pt_fmtDT(s.end)}</td><td>${pt_fmtH(s.hours)}</td><td></td></tr>` })),
     ...myManual.map(m=>({ ts:new Date(m.date + 'T00:00:00').getTime(), hours:Number(m.hours)||0, html:`<tr class="pt-manual"><td>${fmtDateShort(m.date)}</td><td colspan="2">Session manuelle${m.note ? ' — ' + pt_e(m.note) : ''}</td><td>${pt_fmtH(m.hours)}</td><td><button class="btn ghost small" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>` }))
   ].sort((a,b)=>a.ts - b.ts);
   const total = lines.reduce((s,x)=>s + x.hours, 0);
-  const rawEvs = pt_events.filter(e=>e.code === c && pt_inRange(pt_day(new Date(e.dt)))).sort((a,b)=>new Date(b.dt) - new Date(a.dt));
+  const rawEvs = pt_events.filter(e=>e.code === c && pt_inRange(pt_day(new Date(e.dt))) && openDay(pt_day(new Date(e.dt)))).sort((a,b)=>new Date(b.dt) - new Date(a.dt));
   const manualRows = myManual.slice().sort((a,b)=>b.date.localeCompare(a.date));
-  return `
+  const hiddenNote = hiddenDays ? `<div class="pt-muted" style="margin-bottom:8px;">🔒 ${hiddenDays} jour${hiddenDays>1?'s':''} clôturé${hiddenDays>1?'s':''} masqué${hiddenDays>1?'s':''} dans cette liste (le total ci-dessous les exclut ; la paie, elle, les compte). <a href="#" class="pt-link" onclick="pt_toggleShowClosed(true);return false;">Afficher</a></div>` : '';
+  return `${hiddenNote}
     <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Entrée</th><th>Sortie</th><th>Durée (h)</th><th></th></tr></thead><tbody>${
       lines.length ? lines.map(l=>l.html).join('') + `<tr class="pt-total"><td colspan="3">Total</td><td>${pt_fmtH(total)}</td><td></td></tr>` : `<tr><td colspan="5" class="pt-muted">Aucune session sur cette période.</td></tr>`}</tbody></table></div>
     <div class="actions-row"><button class="btn ghost small" onclick="pt_exportEmployeeCsv()">Exporter en CSV</button></div>
@@ -2477,17 +2753,21 @@ function pt_tabEmployes(codes, sessions, anoms){
 async function pt_addEventUI(){
   const d = document.getElementById('pt-ne-date').value, t = document.getElementById('pt-ne-time').value, y = Number(document.getElementById('pt-ne-type').value);
   if(!d || !t){ alert('Choisis une date et une heure.'); return; }
+  if(pt_guardDay(d, 'Ce pointage')) return;
   document.getElementById('pt-ne-date').value = ''; document.getElementById('pt-ne-time').value = '';
   try{ await pt_addEvents([{ code:pt_sel, iso:new Date(d + 'T' + t + ':00').toISOString(), type:y }]); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 async function pt_saveEventRow(id){
   const d = document.getElementById('pt-ev-d-' + id).value, t = document.getElementById('pt-ev-t-' + id).value, y = Number(document.getElementById('pt-ev-y-' + id).value);
   if(!d || !t){ alert('Date et heure requises.'); return; }
+  const cur = pt_events.find(x=>x.id === id);
+  if(pt_guardDay(d, 'Cette modification') || (cur && pt_guardDay(pt_day(new Date(cur.dt)), 'Cette modification'))) return;
   try{ await pt_updateEvent(id, { dt:new Date(d + 'T' + t + ':00').toISOString(), type:y }); pt_toast('Pointage modifié.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 async function pt_addManual(){
   const d = document.getElementById('pt-m-date').value, h = document.getElementById('pt-m-hours').value.trim(), n = document.getElementById('pt-m-note').value.trim();
   if(!d || !h){ alert('Date et nombre d’heures requis.'); return; }
+  if(pt_guardDay(d, 'Cette session')) return;
   document.getElementById('pt-m-date').value = ''; document.getElementById('pt-m-hours').value = ''; document.getElementById('pt-m-note').value = '';
   try{ await pt_addEntryDoc({ kind:'manual', code:pt_sel, date:d, hours:pt_num(h), note:n }); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
@@ -2681,7 +2961,8 @@ function pt_exportExcel(){
   const wb = XLSX.utils.book_new();
   const add = (name, header, rows)=>XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header].concat(rows)), name);
   add('Resume paie', ['Code','Nom','Poste','Heures','Mode','Taux','Jours travailles','Salaire base','Transport','Primes','Sous-total','Jours off','Avances','Net'],
-    codes.map(c=>{ const p = pt_displayPayroll(c, fs); return [c, pt_name(c), pt_poste(c), +p.totalHours.toFixed(2), p.mode === 'daily' ? 'Jour' : 'Heure', p.rate, p.workedDays, +p.baseWage.toFixed(2), +p.transportTotal.toFixed(2), +p.bonusesTotal.toFixed(2), +p.subTotal.toFixed(2), +p.leavesTotal.toFixed(2), +p.advancesTotal.toFixed(2), +p.net.toFixed(2)]; }));
+    codes.map(c=>{ const p = pt_displayPayroll(c, fs); return [c, pt_name(c), pt_poste(c), +p.totalHours.toFixed(2), p.mode === 'daily' ? 'Jour' : 'Heure', p.rate, p.workedDays, +p.baseWage.toFixed(2), +p.transportTotal.toFixed(2), +p.bonusesTotal.toFixed(2), +p.subTotal.toFixed(2), +p.leavesTotal.toFixed(2), +p.advancesTotal.toFixed(2), +p.net.toFixed(2)]; })
+      .concat([(()=>{ const T = pt_paieTotals(codes, fs); return ['', 'TOTAL', '', +T.hours.toFixed(2), '', '', '', +T.base.toFixed(2), +T.transport.toFixed(2), +T.bonuses.toFixed(2), +T.sub.toFixed(2), +T.leaves.toFixed(2), +T.advances.toFixed(2), +T.net.toFixed(2)]; })()]));
   const hist = [];
   codes.forEach(c=>{
     pt_entries.filter(e=>e.code === c && ['prime','off','avance'].includes(e.kind)).forEach(e=>hist.push([c, pt_name(c), e.kind === 'prime' ? 'Prime' : e.kind === 'off' ? 'Jour Off' : 'Avance', e.date, e.note || '', e.kind === 'avance' ? -(Number(e.amount)||0) : (Number(e.amount)||0)]));
