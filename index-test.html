@@ -1562,7 +1562,7 @@ async function pt_importFile(){
   if(!parsed.length){ pt_status('Aucune ligne de pointage reconnue. Formats acceptés : export ZKBio (code ⇥ jj/mm/aaaa hh:mm ⇥ 0/1) ou fichier brut du pointeur (code ⇥ aaaa-mm-jj hh:mm:ss ⇥ … ⇥ statut).', 'err'); return; }
   const seen = new Set(pt_events.map(e=>e.code + '|' + e.dt + '|' + e.type));
   const fresh = []; let skipped = 0, closedSkipped = 0;
-  parsed.forEach(p=>{ if(pt_dayClosed(pt_day(new Date(p.iso)))){ closedSkipped++; return; } const k = p.code + '|' + p.iso + '|' + p.type; if(seen.has(k)) return; seen.add(k); if(pt_isIgnored(p.code, p.iso, p.type)){ skipped++; return; } fresh.push(p); });
+  parsed.forEach(p=>{ if(pt_dayClosed(pt_day(new Date(p.iso)), p.code)){ closedSkipped++; return; } const k = p.code + '|' + p.iso + '|' + p.type; if(seen.has(k)) return; seen.add(k); if(pt_isIgnored(p.code, p.iso, p.type)){ skipped++; return; } fresh.push(p); });
   try{
     if(fresh.length) await pt_addEvents(fresh);
     inp.value = '';
@@ -1700,25 +1700,35 @@ function pt_mergeRanges(list){
   r.forEach(x=>{ const last = out[out.length - 1]; if(last && x.from <= pt_addDays(last.to, 1)){ if(x.to > last.to) last.to = x.to; } else out.push({ from:x.from, to:x.to }); });
   return out;
 }
-let pt_lockMemo = { ref:null, ranges:[] };
-function pt_lockRanges(){ if(pt_lockMemo.ref !== pt_clotures){ pt_lockMemo = { ref:pt_clotures, ranges:pt_mergeRanges(pt_clotures) }; } return pt_lockMemo.ranges; }
-function pt_dayClosed(day){ if(!day) return false; return pt_lockRanges().some(r=>day >= r.from && day <= r.to); }
-// nombre de jours de [from,to] couverts par une liste de clôtures (par défaut : toutes)
-function pt_coveredDays(from, to, list){
+/* Une clôture sans « code » verrouille tous les employés ; une clôture avec « code » verrouille seulement cet employé. */
+const pt_isGlobalCl = (c)=>c.code === undefined || c.code === null || c.code === '';
+let pt_lockMemo = { ref:null, map:{} };
+function pt_lockRanges(code){
+  if(pt_lockMemo.ref !== pt_clotures) pt_lockMemo = { ref:pt_clotures, map:{} };
+  const k = (code === undefined || code === null) ? '*' : String(code);
+  if(!pt_lockMemo.map[k]) pt_lockMemo.map[k] = pt_mergeRanges(pt_clotures.filter(c=>pt_isGlobalCl(c) || (k !== '*' && String(c.code) === k)));
+  return pt_lockMemo.map[k];
+}
+function pt_dayClosed(day, code){ if(!day) return false; return pt_lockRanges(code).some(r=>day >= r.from && day <= r.to); }
+// nombre de jours de [from,to] couverts par une liste de clôtures (par défaut : toutes celles qui concernent l'employé)
+function pt_coveredDays(from, to, list, code){
   let n = 0;
-  (list ? pt_mergeRanges(list) : pt_lockRanges()).forEach(r=>{ const a = r.from > from ? r.from : from, b = r.to < to ? r.to : to; if(a <= b) n += pt_dayDiff(a, b) + 1; });
+  (list ? pt_mergeRanges(list) : pt_lockRanges(code)).forEach(r=>{ const a = r.from > from ? r.from : from, b = r.to < to ? r.to : to; if(a <= b) n += pt_dayDiff(a, b) + 1; });
   return n;
 }
-function pt_guardDay(day, what){
-  if(day && pt_dayClosed(day)){ alert((what || 'Cette modification') + ' concerne un jour clôturé (' + fmtDateShort(day) + ').\nRouvre-le d’abord dans l’onglet Clôtures.'); return true; }
+function pt_guardDay(day, what, code){
+  if(day && pt_dayClosed(day, code)){ alert((what || 'Cette modification') + ' concerne un jour clôturé (' + fmtDateShort(day) + ').\nRouvre-le d’abord dans l’onglet Clôtures (ou, pour un employé, dans sa section Paie).'); return true; }
   return false;
 }
 function pt_withFilter(from, to, fn){ const keep = pt_filter; pt_filter = { from, to }; try{ return fn(); } finally { pt_filter = keep; } }
 
 /* ---------- clôture de période (paie figée) ---------- */
-function pt_closureFor(from, to){ return pt_clotures.find(c=>c.from === from && c.to === to) || null; }
-function pt_currentClosure(){ return (pt_filter.from && pt_filter.to) ? pt_closureFor(pt_filter.from, pt_filter.to) : null; }
-function pt_frozenRow(code){ const c = pt_currentClosure(); return (c && c.rows && c.rows[code]) || null; }
+function pt_closureFor(from, to, code){
+  const same = pt_clotures.filter(c=>c.from === from && c.to === to);
+  return (code !== undefined && code !== null ? same.find(c=>String(c.code) === String(code)) : null) || same.find(pt_isGlobalCl) || null;
+}
+function pt_currentClosure(code){ return (pt_filter.from && pt_filter.to) ? pt_closureFor(pt_filter.from, pt_filter.to, code) : null; }
+function pt_frozenRow(code){ const c = pt_currentClosure(code); return (c && c.rows && c.rows[code]) || null; }
 // paie à afficher : chiffres figés si la période affichée est exactement une période clôturée, sinon calcul en direct
 function pt_displayPayroll(code, sessions){
   const live = pt_payroll(code, sessions), f = pt_frozenRow(code);
@@ -1756,7 +1766,7 @@ function pt_loanDues(code){
 function pt_loanStats(l, asOf){
   const total = Number(l.amount) || 0, sch = (l.schedule || []).filter(x=>x && x.d);
   const sum = (f)=>sch.filter(f).reduce((s,x)=>s + (Number(x.a) || 0), 0);
-  const planned = sum(()=>true), repaid = sum(x=>asOf ? x.d <= asOf : pt_dayClosed(x.d));
+  const planned = sum(()=>true), repaid = sum(x=>asOf ? x.d <= asOf : pt_dayClosed(x.d, l.code));
   const r2 = (n)=>Math.round(n * 100) / 100;
   return { total, planned:r2(planned), toPlan:r2(total - planned), repaid:r2(repaid), due:r2(total - repaid) };
 }
@@ -1952,10 +1962,10 @@ function pt_render(fresh){
   const st = pt_saveInputs(body);
   const all = pt_compute();
   const sessions = all.sessions.filter(s=>pt_inRange(pt_day(s.date)));
-  const anomsPeriod = all.anomalies.filter(a=>pt_inRange(pt_day(a.dt)) && (pt_showClosed || !pt_dayClosed(pt_day(a.dt))));
+  const anomsPeriod = all.anomalies.filter(a=>pt_inRange(pt_day(a.dt)) && (pt_showClosed || !pt_dayClosed(pt_day(a.dt), a.code)));
   const anoms = anomsPeriod.filter(a=>!pt_anomIgnored(a));
   const nIgnored = anomsPeriod.length - anoms.length;
-  const overlaps = pt_computeOverlaps(sessions).filter(o=>pt_showClosed || !pt_dayClosed(o.day));
+  const overlaps = pt_computeOverlaps(sessions).filter(o=>pt_showClosed || !pt_dayClosed(o.day, o.codeA));
   const codes = pt_codes();
   if(pt_sel === null || !codes.includes(pt_sel)) pt_sel = codes.length ? codes[0] : null;
   pt_renderTabs(anoms.length + overlaps.length);
@@ -2057,7 +2067,7 @@ async function pt_ovAlign(i){
   const o = pt_ovList[i]; if(!o) return;
   const t = document.getElementById('pt-ov-time-' + i).value;
   if(!t){ alert('Indique une heure.'); return; }
-  if(pt_guardDay(o.day, 'Cet alignement')) return;
+  if(pt_guardDay(o.day, 'Cet alignement', o.codeA) || pt_guardDay(o.day, 'Cet alignement', o.codeB)) return;
   const evA = pt_events.find(e=>e.code === o.codeA && e.type === 1 && new Date(e.dt).getTime() === o.aEnd.getTime());
   const evB = pt_events.find(e=>e.code === o.codeB && e.type === 0 && new Date(e.dt).getTime() === o.bStart.getTime());
   if(!evA || !evB){ pt_toast('Ce pointage a déjà changé, actualisation…'); pt_render(true); return; }
@@ -2097,7 +2107,7 @@ async function pt_saveFix(i){
   const a = pt_anomList[i]; if(!a) return;
   const d = document.getElementById('pt-fix-date').value, t = document.getElementById('pt-fix-time').value;
   if(!d || !t){ alert('Date et heure requises.'); return; }
-  if(pt_guardDay(d, 'Cette correction') || pt_guardDay(pt_day(a.dt), 'Cette correction')) return;
+  if(pt_guardDay(d, 'Cette correction', a.code) || pt_guardDay(pt_day(a.dt), 'Cette correction', a.code)) return;
   try{
     pt_openFix = null;
     await Promise.all([
@@ -2109,13 +2119,13 @@ async function pt_saveFix(i){
 }
 async function pt_delEventConfirm(id){
   const e = pt_events.find(x=>x.id === id); if(!e) return;
-  if(pt_guardDay(pt_day(new Date(e.dt)), 'Cette suppression')) return;
+  if(pt_guardDay(pt_day(new Date(e.dt)), 'Cette suppression', e.code)) return;
   if(!confirm('Supprimer ce pointage (' + pt_fmtDT(new Date(e.dt)) + ', ' + (e.type===0?'Entrée':'Sortie') + ') ?')) return;
   pt_openFix = null;
   try{ await pt_deleteEvents([id]); pt_render(true); }catch(err){ console.error(err); alert('Erreur : ' + (err.message || err)); }
 }
 async function pt_delEntry(id){ try{ await pt_entriesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); } }
-async function pt_delEntryConfirm(id, what){ const en = pt_entries.find(x=>x.id === id); if(en && pt_guardDay(en.date, 'Cette suppression')) return; if(confirm('Supprimer ' + what + ' ?')) pt_delEntry(id); }
+async function pt_delEntryConfirm(id, what){ const en = pt_entries.find(x=>x.id === id); if(en && pt_guardDay(en.date, 'Cette suppression', en.code)) return; if(confirm('Supprimer ' + what + ' ?')) pt_delEntry(id); }
 async function pt_clearResolved(){
   if(!confirm('Effacer tout l’historique des corrections ?')) return;
   await pt_commit(pt_entries.filter(e=>e.kind === 'resolved').map(e=>({ t:'del', ref:pt_entriesCol.doc(e.id) })));
@@ -2127,7 +2137,7 @@ function pt_clPayToggle(id){ pt_clPay = pt_clPay === id ? null : id; pt_render(t
 async function pt_payEdit(id, code, value){
   const c = pt_clotures.find(x=>x.id === id); if(!c || !c.rows || !c.rows[code]) return;
   const row = c.rows[code], solde = Number(row.solde !== undefined ? row.solde : row.net) || 0, paid = Math.max(0, pt_num(value)), out = pt_r2(solde - paid), old = Number(row.reportOut) || 0;
-  const later = pt_clotures.some(x=>(x.kind === 'week' || x.kind === 'period') && x.from > c.to);
+  const later = pt_clotures.some(x=>(x.kind === 'week' || x.kind === 'period') && x.from > c.to && x.rows && x.rows[code]);
   if(later && Math.abs(out - old) > 0.004){ alert('Une période plus récente est déjà clôturée : son report ne peut plus changer.\nPour verser cette somme maintenant, enregistre plutôt une « Avance » (motif : règlement) dans la période en cours : elle sera déduite du solde reporté.'); pt_render(true); return; }
   try{ await pt_cloturesCol.doc(id).set({ rows:{ [code]:{ paidAmt:paid, reportOut:out, paid: paid + 0.004 >= Math.max(0, solde) } } }, { merge:true }); pt_toast('Versement enregistré.'); }
   catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
@@ -2186,7 +2196,7 @@ function pt_tabClotures(){
   const list = pt_clotures.slice().sort((a,b)=>(b.from || '').localeCompare(a.from || '') || (b.to || '').localeCompare(a.to || ''));
   const listRows = list.map(c=>{
     const r = Object.keys(c.rows || {}).map(k=>c.rows[k]), nPaid = r.filter(x=>x.paid).length;
-    return `<tr><td>${PT_KIND_LABEL[c.kind] || 'Période'}</td><td>${pt_e(pt_rangeLabel(c.from, c.to))}</td><td>${fmtDateShort(String(c.createdAt || '').slice(0,10))}</td><td>${nPaid} / ${r.length} <button class="btn ghost small" onclick="pt_clPayToggle('${c.id}')">${pt_clPay === c.id ? 'Masquer' : 'Versements'}</button></td><td>${c.mailedAt ? '<span class="pt-muted">✉️ ' + fmtDateShort(String(c.mailedAt).slice(0,10)) + '</span> ' : ''}<button class="btn ghost small" onclick="pt_mailClosure('${c.id}')">${c.mailedAt ? 'Renvoyer' : 'Envoyer'}</button></td><td><button class="btn ghost small" onclick="pt_reopenRange('${c.id}')">Rouvrir</button></td></tr>${pt_payRows(c)}`;
+    return `<tr><td>${PT_KIND_LABEL[c.kind] || 'Période'}</td><td>${pt_e(pt_rangeLabel(c.from, c.to))}${pt_isGlobalCl(c) ? '' : ' <span class="pt-badge pt-b-prime">' + pt_e(pt_name(c.code)) + '</span>'}</td><td>${fmtDateShort(String(c.createdAt || '').slice(0,10))}</td><td>${nPaid} / ${r.length} <button class="btn ghost small" onclick="pt_clPayToggle('${c.id}')">${pt_clPay === c.id ? 'Masquer' : 'Versements'}</button></td><td>${c.mailedAt ? '<span class="pt-muted">✉️ ' + fmtDateShort(String(c.mailedAt).slice(0,10)) + '</span> ' : ''}<button class="btn ghost small" onclick="pt_mailClosure('${c.id}')">${c.mailedAt ? 'Renvoyer' : 'Envoyer'}</button></td><td><button class="btn ghost small" onclick="pt_reopenRange('${c.id}')">Rouvrir</button></td></tr>${pt_payRows(c)}`;
   }).join('');
   return `<div class="ticket">
       <div class="section-label">Clôtures — jours, semaines, mois</div>
@@ -2227,7 +2237,7 @@ async function pt_addEntry(kind){
   const raw = aEl.value.trim();
   if(!raw){ alert('Indique au moins le montant.'); return; }
   const data = { kind, code:pt_sel, date:dEl.value || todayISO(), amount:pt_num(raw), note:nEl.value.trim() };
-  if(pt_guardDay(data.date, 'Cette entrée')) return;
+  if(pt_guardDay(data.date, 'Cette entrée', pt_sel)) return;
   if(kind === 'avance'){
     const wk = pt_weekRange(data.date);
     const sol = pt_withFilter(wk.from, wk.to, ()=>pt_payroll(pt_sel, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))).solde);
@@ -2249,11 +2259,11 @@ const pt_r2 = (x)=>Math.round((Number(x) || 0) * 100) / 100;
    Les plages peuvent se recouper (ex. une semaine, puis le mois qui la contient). Rouvrir une clôture ne rouvre pas les jours
    qu'une autre clôture couvre encore. */
 const PT_KIND_LABEL = { day:'Jour', week:'Semaine', month:'Mois', period:'Période' };
-function pt_closureRows(from, to){
+function pt_closureRows(from, to, only){
   return pt_withFilter(from, to, ()=>{
     const sessions = pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)));
     const rows = {};
-    pt_codes().forEach(code=>{
+    (only !== undefined && only !== null ? [Number(only)] : pt_codes()).forEach(code=>{
       const p = pt_payroll(code, sessions);
       rows[code] = { name:pt_name(code), hours:pt_r2(p.totalHours), rate:p.rate, mode:p.mode, workedDays:p.workedDays, baseWage:pt_r2(p.baseWage),
         transportTotal:pt_r2(p.transportTotal), bonusesTotal:pt_r2(p.bonusesTotal), subTotal:pt_r2(p.subTotal), leavesTotal:pt_r2(p.leavesTotal),
@@ -2264,43 +2274,55 @@ function pt_closureRows(from, to){
   });
 }
 function pt_rangeLabel(from, to){ return from === to ? 'le ' + fmtDateShort(from) : 'du ' + fmtDateShort(from) + ' au ' + fmtDateShort(to); }
-async function pt_closeRange(from, to, kind){
+async function pt_closeRange(from, to, kind, code){
+  const one = (code !== undefined && code !== null);
   if(!from || !to){ alert('Renseigne les dates Du et Au avant de clôturer.'); return; }
   if(from > to){ alert('La date de début est après la date de fin.'); return; }
-  if(pt_closureFor(from, to)){ alert('Cette période est déjà clôturée.'); return; }
-  const total = pt_dayDiff(from, to) + 1, already = pt_coveredDays(from, to);
-  const anom = pt_compute().anomalies.filter(a=>{ const d = pt_day(a.dt); return d >= from && d <= to && !pt_anomIgnored(a) && !pt_dayClosed(d); }).length;
-  let msg = 'Clôturer ' + pt_rangeLabel(from, to) + ' ?\nLa paie de chaque employé sera figée et ces jours ne pourront plus être modifiés ni réimportés (tu pourras les rouvrir).';
+  if(pt_closureFor(from, to, one ? code : undefined)){ alert(one ? 'Cette période est déjà clôturée pour ' + pt_name(code) + '.' : 'Cette période est déjà clôturée.'); return; }
+  const total = pt_dayDiff(from, to) + 1, already = pt_coveredDays(from, to, undefined, one ? code : undefined);
+  const anom = pt_compute().anomalies.filter(a=>{ const d = pt_day(a.dt); return (!one || a.code === code) && d >= from && d <= to && !pt_anomIgnored(a) && !pt_dayClosed(d, a.code); }).length;
+  const concerns = (c)=>pt_isGlobalCl(c) || !one || String(c.code) === String(code);
+  let msg = 'Clôturer ' + pt_rangeLabel(from, to) + (one ? ' pour ' + pt_name(code) : '') + ' ?\n' + (one ? 'La paie de cet employé sera figée et ses jours ne pourront plus être modifiés ni réimportés (tu pourras les rouvrir).' : 'La paie de chaque employé sera figée et ces jours ne pourront plus être modifiés ni réimportés (tu pourras les rouvrir).');
   if(anom) msg += '\n\n⚠️ ' + anom + ' anomalie' + (anom > 1 ? 's' : '') + ' non traitée' + (anom > 1 ? 's' : '') + ' sur cette période.';
   if(to >= todayISO()) msg += '\n\n⚠️ La période n’est pas terminée : des pointages peuvent encore arriver.';
   if(already) msg += '\n\n' + (already >= total ? 'Tous les jours sont déjà verrouillés par d’autres clôtures : celle-ci fige seulement la paie de cette période.' : already + ' jour' + (already > 1 ? 's' : '') + ' déjà clôturé' + (already > 1 ? 's' : '') + '.');
   if(kind === 'week' || kind === 'period' || !kind){
-    const chain = (c)=>(c.kind === 'week' || c.kind === 'period') && c.from && c.to;
+    const chain = (c)=>(c.kind === 'week' || c.kind === 'period') && c.from && c.to && concerns(c) && (!one || (c.rows && c.rows[code]));
     if(pt_clotures.some(c=>chain(c) && c.from > to)) msg += '\n\n⚠️ Des clôtures plus récentes existent déjà : leur report ne sera pas recalculé.';
     let prev = null; pt_clotures.forEach(c=>{ if(chain(c) && c.to < from && (!prev || c.to > prev.to)) prev = c; });
-    if(prev && pt_addDays(prev.to, 1) < from && Object.keys(prev.rows || {}).some(k=>(Number(prev.rows[k].reportOut) || 0) < 0)) msg += '\n\n⚠️ Des jours non clôturés séparent la dernière période clôturée (jusqu’au ' + fmtDateShort(prev.to) + ') de celle-ci, et des soldes négatifs y sont à reporter.';
+    if(prev && pt_addDays(prev.to, 1) < from && Object.keys(prev.rows || {}).some(k=>(!one || Number(k) === code) && (Number(prev.rows[k].reportOut) || 0) !== 0)) msg += '\n\n⚠️ Des jours non clôturés séparent la dernière période clôturée (jusqu’au ' + fmtDateShort(prev.to) + ') de celle-ci, et un solde y est à reporter.';
   }
-  { const pre = pt_closureRows(from, to), unval = Object.keys(pre).filter(k=>!pt_validationFor(Number(k), from, to) && ((Number(pre[k].solde) || 0) !== 0 || (Number(pre[k].net) || 0) > 0));
-    if(unval.length) msg += '\n\n⚠️ ' + unval.length + ' employé' + (unval.length > 1 ? 's' : '') + ' non validé' + (unval.length > 1 ? 's' : '') + ' (' + unval.map(k=>pre[k].name).join(', ') + ') : leur versé sera le solde positif en entier. Tu peux d’abord les valider une par une dans la section Paie.'; }
+  { const pre = pt_closureRows(from, to, one ? code : undefined), unval = Object.keys(pre).filter(k=>!pt_validationFor(Number(k), from, to) && ((Number(pre[k].solde) || 0) !== 0 || (Number(pre[k].net) || 0) > 0));
+    if(unval.length) msg += '\n\n⚠️ ' + (one ? 'Cet employé n’est pas validé' : unval.length + ' employé' + (unval.length > 1 ? 's' : '') + ' non validé' + (unval.length > 1 ? 's' : '') + ' (' + unval.map(k=>pre[k].name).join(', ') + ')') + ' : le versé sera le solde positif en entier. Tu peux d’abord valider' + (one ? '' : ' chaque employé') + ' dans la section Paie.'; }
   if(!confirm(msg)) return;
-  const doc = { from, to, kind:kind || 'period', createdAt:new Date().toISOString(), createdBy:currentUser, rows:pt_closureRows(from, to) };
+  const doc = { from, to, kind:kind || 'period', createdAt:new Date().toISOString(), createdBy:currentUser, rows:pt_closureRows(from, to, one ? code : undefined) };
+  if(one) doc.code = code;
   let ref;
   try{ ref = await pt_cloturesCol.add(doc); pt_toast('Clôturé.'); }
   catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); return; }
-  // envoi automatique du récapitulatif : semaines et périodes (pas les jours ni les mois), jusqu'à 16 jours pour rester sous la limite d'EmailJS
+  // envoi automatique du récapitulatif : semaines et périodes (pas les jours ni les mois), jusqu'à 16 jours pour rester sous la limite d'EmailJS.
+  // Par employé : le mail part une seule fois, quand tous les employés actifs de la période sont clôturés.
   const cfg = pt_mailCfg();
   if((doc.kind === 'week' || doc.kind === 'period') && cfg.auto && cfg.publicKey){
+    let mailDoc = doc;
+    if(one){
+      const sibs = pt_clotures.filter(c=>c.from === from && c.to === to).concat([{ ...doc, id:ref && ref.id }]);
+      if(sibs.some(c=>c.mailedAt)) return;
+      const all = pt_closureRows(from, to), active = Object.keys(all).filter(k=>{ const r = all[k]; return r.hours > 0 || r.net > 0 || r.solde !== 0 || r.leavesTotal || r.advancesTotal; });
+      if(!active.every(k=>sibs.some(c=>pt_isGlobalCl(c) || String(c.code) === String(k)))) return;
+      mailDoc = { from, to, kind:doc.kind, createdAt:doc.createdAt, rows:Object.assign({}, ...sibs.map(c=>c.rows || {})) };
+    }
     if(total > 16) pt_toast('Clôturé. Période trop longue pour l’envoi automatique du mail : utilise « Envoyer » dans la liste des clôtures.');
     else {
-      try{ await pt_mailClosureSend(doc, ref && ref.id); }
+      try{ await pt_mailClosureSend(mailDoc, ref && ref.id); }
       catch(e){ console.error(e); alert('La période est clôturée, mais le mail n’a pas pu être envoyé :\n' + (e.message || e) + '\n\nTu pourras le renvoyer depuis la liste « Clôtures enregistrées ».'); }
     }
   }
 }
 async function pt_reopenRange(id){
   const c = pt_clotures.find(x=>x.id === id); if(!c) return;
-  const keep = pt_coveredDays(c.from, c.to, pt_clotures.filter(x=>x.id !== id));
-  let msg = 'Rouvrir ' + pt_rangeLabel(c.from, c.to) + ' ?\nLes cases « Payé » de cette clôture seront perdues et la paie sera de nouveau calculée en direct.';
+  const keep = pt_coveredDays(c.from, c.to, pt_clotures.filter(x=>x.id !== id && (pt_isGlobalCl(x) || (!pt_isGlobalCl(c) && String(x.code) === String(c.code)))));
+  let msg = 'Rouvrir ' + pt_rangeLabel(c.from, c.to) + (pt_isGlobalCl(c) ? '' : ' pour ' + pt_name(c.code)) + ' ?\nLes cases « Payé » de cette clôture seront perdues et la paie sera de nouveau calculée en direct.';
   if(keep) msg += '\n\n' + keep + ' jour' + (keep > 1 ? 's' : '') + ' reste' + (keep > 1 ? 'nt' : '') + ' verrouillé' + (keep > 1 ? 's' : '') + ' par d’autres clôtures (semaine, mois…) : rouvre-les aussi si besoin.';
   if(!confirm(msg)) return;
   try{ await pt_cloturesCol.doc(id).delete(); pt_toast('Rouvert.'); }
@@ -2333,7 +2355,7 @@ function pt_recapHtml(from, to, closure){
     const money = (n)=>n ? pt_fmtMoney(n) : '';
     const dayLabel = (d)=>PT_DOW[new Date(d + 'T12:00:00').getDay()] + ' ' + pt_dm(new Date(d + 'T12:00:00'));
     const emps = [];
-    pt_codes().forEach(code=>{
+    pt_codes().filter(code=>!closure || pt_isGlobalCl(closure) || String(closure.code) === String(code)).forEach(code=>{
       const p = pt_payroll(code, sessions), fz = closure && closure.rows && closure.rows[code];
       const tot = fz ? { hours:fz.hours, transport:fz.transportTotal, bonuses:fz.bonusesTotal, leaves:fz.leavesTotal, advances:fz.advancesTotal, loans:Number(fz.loanTotal) || 0, report:Number(fz.reportIn) || 0, carry:Number(fz.reportOut) || 0, net:fz.net }
                      : { hours:p.totalHours, transport:p.transportTotal, bonuses:p.bonusesTotal, leaves:p.leavesTotal, advances:p.advancesTotal, loans:p.loanTotal, report:p.reportIn, carry:p.reportOut, net:p.net };
@@ -2411,7 +2433,12 @@ function pt_mailCfgCard(){
   </div>`;
 }
 function pt_closePeriod(){ return pt_closeRange(pt_filter.from, pt_filter.to, 'period'); }
-function pt_reopenPeriod(){ const c = pt_currentClosure(); if(c) return pt_reopenRange(c.id); }
+function pt_reopenPeriod(code){ const c = pt_currentClosure(code); if(c) return pt_reopenRange(c.id); }
+function pt_closeEmployee(){
+  if(pt_sel === null) return;
+  const wk = pt_filter.from ? pt_weekRange(pt_filter.from) : null;
+  return pt_closeRange(pt_filter.from, pt_filter.to, (wk && wk.from === pt_filter.from && wk.to === pt_filter.to) ? 'week' : 'period', pt_sel);
+}
 async function pt_togglePaid(code, checked){
   const c = pt_currentClosure(); if(!c) return;
   try{ await pt_cloturesCol.doc(c.id).set({ rows:{ [code]:{ paid:!!checked } } }, { merge:true }); }
@@ -2466,7 +2493,7 @@ async function pt_loanCreate(){
   if(!(amt > 0)){ alert('Indique le montant total du prêt.'); return; }
   if((first && !(step > 0)) || (!first && step > 0)){ alert('Renseigne à la fois la 1re échéance et le montant par semaine, ou aucun des deux (échéancier saisi à la main ensuite).'); return; }
   const schedule = first ? pt_genSchedule(amt, first, step) : [];
-  if(schedule.some(x=>pt_dayClosed(x.d))){ alert('Une des échéances tombe dans un jour clôturé. Choisis une première échéance plus récente.'); return; }
+  if(schedule.some(x=>pt_dayClosed(x.d, pt_sel))){ alert('Une des échéances tombe dans un jour clôturé. Choisis une première échéance plus récente.'); return; }
   ['pt-ln-amt','pt-ln-note','pt-ln-first','pt-ln-step'].forEach(i=>{ g(i).value = ''; });
   try{ await pt_addEntryDoc({ kind:'pret', code:pt_sel, date, amount:amt, note, schedule }); pt_toast('Prêt enregistré.'); }
   catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
@@ -2474,8 +2501,8 @@ async function pt_loanCreate(){
 function pt_loanLine(id, i, field, value){
   const l = pt_entries.find(x=>x.id === id); if(!l) return;
   const sch = (l.schedule || []).map(x=>({ d:x.d, a:x.a })), line = sch[i]; if(!line) return;
-  if(pt_guardDay(line.d, 'Cette échéance')){ pt_render(true); return; }
-  if(field === 'd'){ if(!value || pt_guardDay(value, 'Cette échéance')){ pt_render(true); return; } line.d = value; }
+  if(pt_guardDay(line.d, 'Cette échéance', l.code)){ pt_render(true); return; }
+  if(field === 'd'){ if(!value || pt_guardDay(value, 'Cette échéance', l.code)){ pt_render(true); return; } line.d = value; }
   else line.a = pt_num(value);
   pt_loanSet(id, sch);
 }
@@ -2483,19 +2510,19 @@ function pt_loanAddLine(id){
   const l = pt_entries.find(x=>x.id === id); if(!l) return;
   const sch = (l.schedule || []).map(x=>({ d:x.d, a:x.a })), st = pt_loanStats(l);
   let d = sch.length ? pt_addDays(sch[sch.length - 1].d, 7) : todayISO();
-  while(pt_dayClosed(d)) d = pt_addDays(d, 7);
+  while(pt_dayClosed(d, l.code)) d = pt_addDays(d, 7);
   sch.push({ d, a:Math.max(0, st.toPlan) });
   pt_loanSet(id, sch);
 }
 function pt_loanDelLine(id, i){
   const l = pt_entries.find(x=>x.id === id); if(!l) return;
   const sch = (l.schedule || []).map(x=>({ d:x.d, a:x.a })), line = sch[i]; if(!line) return;
-  if(pt_guardDay(line.d, 'Cette suppression')) return;
+  if(pt_guardDay(line.d, 'Cette suppression', l.code)) return;
   sch.splice(i, 1); pt_loanSet(id, sch);
 }
 async function pt_loanDelete(id){
   const l = pt_entries.find(x=>x.id === id); if(!l) return;
-  if((l.schedule || []).some(x=>pt_dayClosed(x.d))){ alert('Des échéances de ce prêt ont déjà été prélevées (jours clôturés) : il ne peut pas être supprimé. Rouvre d’abord les périodes concernées.'); return; }
+  if((l.schedule || []).some(x=>pt_dayClosed(x.d, l.code))){ alert('Des échéances de ce prêt ont déjà été prélevées (jours clôturés) : il ne peut pas être supprimé. Rouvre d’abord les périodes concernées.'); return; }
   if(!confirm('Supprimer ce prêt de ' + pt_fmtMoney(l.amount) + ' et son échéancier ?')) return;
   try{ await pt_entriesCol.doc(id).delete(); pt_toast('Prêt supprimé.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
@@ -2505,7 +2532,7 @@ function pt_loansSection(code){
     const st = pt_loanStats(l);
     const sch = (l.schedule || []).map((x, i)=>({ ...x, i })).sort((a,b)=>String(a.d).localeCompare(String(b.d)));
     const rows = sch.map(x=>{
-      const lock = pt_dayClosed(x.d);
+      const lock = pt_dayClosed(x.d, l.code);
       return `<tr><td>${lock ? fmtDateShort(x.d) + ' 🔒' : `<input type="date" class="pt-auto" value="${pt_e(x.d)}" onchange="pt_loanLine('${l.id}',${x.i},'d',this.value)">`}</td>
         <td>${lock ? pt_fmtMoney(x.a) : `<input type="text" inputmode="decimal" class="pt-w90" value="${pt_e(x.a)}" onchange="pt_loanLine('${l.id}',${x.i},'a',this.value)">`}</td>
         <td>${lock ? '<span class="pt-badge pt-b-prime">remboursée</span>' : '<span class="pt-muted">à venir</span>'}</td>
@@ -2593,7 +2620,7 @@ function pt_histTotalsHtml(p, codes){
 async function pt_validate(){
   if(pt_sel === null) return;
   if(!pt_filter.from || !pt_filter.to){ alert('Renseigne les dates Du / Au (en haut) : la validation porte sur la période affichée.'); return; }
-  if(pt_currentClosure()){ alert('Cette période est clôturée. Modifie le versé dans Clôtures › Versements, ou rouvre la période.'); return; }
+  if(pt_currentClosure(pt_sel)){ alert('Cette période est clôturée pour cet employé. Modifie le versé dans Clôtures › Versements, ou rouvre la période.'); return; }
   const el = document.getElementById('pt-vs-amt'); if(!el) return;
   const sessions = pt_periodSessions(), q = pt_payroll(pt_sel, sessions), paid = Math.max(0, pt_num(el.value));
   const out = Math.round((q.solde - paid) * 100) / 100 || 0;
@@ -2603,7 +2630,7 @@ async function pt_validate(){
 }
 async function pt_unvalidate(){
   const v = pt_validationFor(pt_sel, pt_filter.from, pt_filter.to); if(!v) return;
-  if(pt_currentClosure()){ alert('Cette période est clôturée : rouvre-la d’abord.'); return; }
+  if(pt_currentClosure(pt_sel)){ alert('Cette période est clôturée pour cet employé : rouvre-la d’abord.'); return; }
   try{ await pt_entriesCol.doc(v.id).delete(); pt_toast('Validation annulée.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 function pt_vsPreview(solde){
@@ -2612,7 +2639,7 @@ function pt_vsPreview(solde){
   out.innerHTML = r > 0.004 ? '<span style="color:var(--moss);">Reste dû reporté sur la semaine suivante : +' + pt_fmtMoney(r) + '</span>' : r < -0.004 ? '<span style="color:var(--rust);">Solde négatif reporté sur la semaine suivante : −' + pt_fmtMoney(-r) + '</span>' : 'Rien à reporter.';
 }
 function pt_versementHtml(p, sessions){
-  const cl = pt_currentClosure(), v = p.validated, solde = p.solde;
+  const cl = pt_currentClosure(pt_sel), v = p.validated, solde = p.solde;
   const paid = v ? Number(v.paidAmt) || 0 : Math.max(0, solde), r = Math.round((solde - paid) * 100) / 100;
   const rep = r > 0.004 ? '<span style="color:var(--moss);">Reste dû reporté sur la semaine suivante : +' + pt_fmtMoney(r) + '</span>' : r < -0.004 ? '<span style="color:var(--rust);">Solde négatif reporté sur la semaine suivante : −' + pt_fmtMoney(-r) + '</span>' : 'Rien à reporter.';
   const stale = v && !cl && Math.abs((Number(v.solde) || 0) - solde) > 0.5;
@@ -2622,9 +2649,9 @@ function pt_versementHtml(p, sessions){
     <div class="pt-row"><div class="field"><label>Solde de la période</label><div style="font-family:'IBM Plex Mono',monospace;font-weight:700;padding:8px 0;">${pt_money2(solde)}</div></div>
       <div class="field"><label>Montant versé (DA)</label><input type="text" inputmode="decimal" id="pt-vs-amt" class="pt-draft pt-w90" value="${pt_e(Math.round(paid * 100) / 100)}" ${cl ? 'disabled' : ''} oninput="pt_vsPreview(${solde})"></div></div>
     <div class="pt-muted" id="pt-vs-rep" style="margin:8px 0;">${rep}</div>
-    <div class="pt-muted" style="margin-bottom:8px;">Solde négatif : il est reporté tel quel. Solde positif : la différence entre le solde et le versé est reportée sur la semaine suivante.</div>
+    <div class="pt-muted" style="margin-bottom:8px;">Solde négatif : il est reporté tel quel. Solde positif : la différence entre le solde et le versé est reportée sur la semaine suivante. « Clôturer cet employé » fige sa paie et verrouille ses jours, sans toucher aux autres employés.</div>
     <div class="actions-row">
-      ${cl ? `<button class="btn ghost small" onclick="pt_reopenPeriod()">Rouvrir la période</button>` : `<button class="btn small" onclick="pt_validate()">${v ? 'Valider à nouveau' : 'Valider'}</button>${v ? `<button class="btn ghost small" onclick="pt_unvalidate()">Annuler la validation</button>` : ''}<button class="btn small" style="background:var(--moss);border-color:var(--moss);" onclick="pt_closePeriod()">Clôturer la période</button>`}
+      ${cl ? `<button class="btn ghost small" onclick="pt_reopenPeriod(${pt_sel})">Rouvrir la période</button>` : `<button class="btn small" onclick="pt_validate()">${v ? 'Valider à nouveau' : 'Valider'}</button>${v ? `<button class="btn ghost small" onclick="pt_unvalidate()">Annuler la validation</button>` : ''}<button class="btn small" style="background:var(--moss);border-color:var(--moss);" onclick="pt_closeEmployee()">Clôturer cet employé</button>`}
     </div>`;
 }
 function pt_paieSection(c, sessions, codes){
@@ -2652,7 +2679,7 @@ function pt_paieSection(c, sessions, codes){
 
 /* ---------- onglet Employés (fusion Par employé + Paie, en sections repliables) ---------- */
 function pt_pointagesSection(c, sessions){
-  const openDay = (dk)=>pt_showClosed || !pt_dayClosed(dk);
+  const openDay = (dk)=>pt_showClosed || !pt_dayClosed(dk, c);
   const mySessAll = sessions.filter(s=>s.code === c);
   const mySess = mySessAll.filter(s=>openDay(pt_day(s.date)));
   const myManualAll = pt_entries.filter(e=>e.kind === 'manual' && e.code === c && pt_inRange(e.date));
@@ -2732,8 +2759,8 @@ function pt_tabEmployes(codes, sessions, anoms){
 async function pt_addEventUI(){
   const d = document.getElementById('pt-ne-date').value, t = document.getElementById('pt-ne-time').value, y = Number(document.getElementById('pt-ne-type').value);
   if(!d || !t){ alert('Choisis une date et une heure.'); return; }
-  if(pt_guardDay(d, 'Ce pointage')) return;
   const empEl = document.getElementById('pt-ne-emp'), emp = empEl && empEl.value !== '' ? Number(empEl.value) : pt_sel;
+  if(pt_guardDay(d, 'Ce pointage', emp)) return;
   document.getElementById('pt-ne-date').value = ''; document.getElementById('pt-ne-time').value = '';
   try{ await pt_addEvents([{ code:emp, iso:new Date(d + 'T' + t + ':00').toISOString(), type:y }]); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
@@ -2741,13 +2768,13 @@ async function pt_saveEventRow(id){
   const d = document.getElementById('pt-ev-d-' + id).value, t = document.getElementById('pt-ev-t-' + id).value, y = Number(document.getElementById('pt-ev-y-' + id).value);
   if(!d || !t){ alert('Date et heure requises.'); return; }
   const cur = pt_events.find(x=>x.id === id);
-  if(pt_guardDay(d, 'Cette modification') || (cur && pt_guardDay(pt_day(new Date(cur.dt)), 'Cette modification'))) return;
+  if(pt_guardDay(d, 'Cette modification', cur && cur.code) || (cur && pt_guardDay(pt_day(new Date(cur.dt)), 'Cette modification', cur.code))) return;
   try{ await pt_updateEvent(id, { dt:new Date(d + 'T' + t + ':00').toISOString(), type:y }); pt_toast('Pointage modifié.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 async function pt_addManual(){
   const d = document.getElementById('pt-m-date').value, h = document.getElementById('pt-m-hours').value.trim(), n = document.getElementById('pt-m-note').value.trim();
   if(!d || !h){ alert('Date et nombre d’heures requis.'); return; }
-  if(pt_guardDay(d, 'Cette session')) return;
+  if(pt_guardDay(d, 'Cette session', pt_sel)) return;
   const hrs = pt_parseHours(h);
   if(!(hrs > 0)){ alert('Indique les heures au format 8:30 (ou 8h30, ou 8,5).'); return; }
   document.getElementById('pt-m-date').value = ''; document.getElementById('pt-m-hours').value = ''; document.getElementById('pt-m-note').value = '';
