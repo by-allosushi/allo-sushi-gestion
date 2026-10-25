@@ -455,7 +455,7 @@
 .pt-chk input{width:auto;margin:0;}
 .pt-form{display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px;align-items:center;margin-top:12px;}
 .pt-form-title{display:flex;align-items:center;gap:8px;}
-.pt-form-title label{font-size:13.5px;font-weight:700;white-space:nowrap;}
+.pt-form-title label{font-size:13.5px;font-weight:700;white-space:nowrap;min-width:78px;display:inline-block;}
 @media(max-width:600px){
   .pt-form{grid-template-columns:1fr 1fr;}
   .pt-form .pt-form-title{grid-column:1/-1;}
@@ -1900,7 +1900,7 @@ function pt_restoreInputs(st, withValues){
     if(el){ el.focus(); if(st.focus.s != null && el.setSelectionRange){ try{ el.setSelectionRange(st.focus.s, st.focus.e); }catch(e){} } }
   }
 }
-let pt_open = { overview:false, conges:false, congeEmp:false, pointages:true, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
+let pt_open = { pointages:true, rawEvs:false, manual:false, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
 function pt_toggleSec(key){ pt_open[key] = !pt_open[key]; pt_render(true); }
 function pt_accordion(key, title, innerHtml){
   const open = !!pt_open[key];
@@ -2189,15 +2189,15 @@ function pt_tabClotures(){
 function pt_formRow(k, label){
   const enter = `onkeydown="if(event.key==='Enter')pt_addEntry('${k}')"`;
   return `<div class="pt-form">
-    <div class="pt-form-title"><label>${label}</label><input type="date" id="pt-f-${k}-date" class="pt-draft pt-auto" value="${todayISO()}"></div>
-    <input type="text" id="pt-f-${k}-note" class="pt-draft" placeholder="Motif" ${enter}>
+    <div class="pt-form-title"><label>${label}</label></div>
     <input type="text" inputmode="decimal" id="pt-f-${k}-amt" class="pt-draft" placeholder="Montant (DA)" ${enter}>
+    <input type="text" id="pt-f-${k}-note" class="pt-draft" placeholder="Motif" ${enter}>
     <button class="btn small" onclick="pt_addEntry('${k}')">Ajouter</button>
   </div>`;
 }
 async function pt_addEntry(kind){
   if(pt_sel === null) return;
-  const dEl = document.getElementById('pt-f-' + kind + '-date'), nEl = document.getElementById('pt-f-' + kind + '-note'), aEl = document.getElementById('pt-f-' + kind + '-amt');
+  const dEl = document.getElementById('pt-f-date'), nEl = document.getElementById('pt-f-' + kind + '-note'), aEl = document.getElementById('pt-f-' + kind + '-amt');
   const raw = aEl.value.trim();
   if(!raw){ alert('Indique au moins le montant.'); return; }
   const data = { kind, code:pt_sel, date:dEl.value || todayISO(), amount:pt_num(raw), note:nEl.value.trim() };
@@ -2207,13 +2207,13 @@ async function pt_addEntry(kind){
     const sol = pt_withFilter(wk.from, wk.to, ()=>pt_payroll(pt_sel, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))).solde);
     if(sol - data.amount < 0 && !confirm('Cette avance dépasse le solde de la semaine du ' + fmtDateShort(wk.from) + ' au ' + fmtDateShort(wk.to) + '.\nSolde actuel : ' + pt_fmtMoney(sol) + ' — après l’avance : −' + pt_fmtMoney(data.amount - sol) + '.\nLe déficit sera reporté sur la semaine suivante.\n\nEnregistrer quand même ?')) return;
   }
-  aEl.value = ''; nEl.value = ''; dEl.value = todayISO();
+  aEl.value = ''; nEl.value = '';
   try{ await pt_addEntryDoc(data); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
 }
 function pt_histRows(p){
   return [
     ...p.bonuses.map(x=>({ ...x, cat:'Prime', cls:'pt-b-prime', sign:1 })),
-    ...p.leaves.map(x=>({ ...x, cat:'Jour Off (congé)', cls:'pt-b-off', sign:1 })),
+    ...p.leaves.map(x=>({ ...x, cat:'Jour Off', cls:'pt-b-off', sign:1 })),
     ...p.advances.map(x=>({ ...x, cat:'Avance', cls:'pt-b-avance', sign:-1 }))
   ].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 }
@@ -2574,18 +2574,13 @@ function pt_paieSection(c, sessions, codes){
       <td class="${r.sign<0?'pt-minus':'pt-plus'}">${r.sign<0?'−':'+'}${pt_fmtMoney(r.amount)}</td>
       <td><button class="btn ghost small" onclick="pt_delEntryConfirm('${r.id}','cette entrée')">Supprimer</button></td></tr>`).join('')
     : `<tr><td colspan="5" class="pt-muted">Aucune entrée sur cette période.</td></tr>`;
+  const rateLine = `Taux : ${pt_fmtMoney(p.rate)}${p.mode==='daily'?' / jour':' / heure'} · ${p.transport.enabled ? 'Transport : ' + pt_fmtMoney(p.transport.amount) + ' / jour' : 'Transport désactivé'} · <a href="#" class="pt-link" onclick="pt_setTab('reglages');return false;">Modifier dans Réglages</a>`;
   return `${lockLine}
-    <div class="pt-muted">Taux : ${pt_fmtMoney(p.rate)}${p.mode==='daily'?' / jour':' / heure'} · ${p.transport.enabled ? 'Transport : ' + pt_fmtMoney(p.transport.amount) + ' / jour' : 'Transport désactivé'} · <a href="#" class="pt-link" onclick="pt_setTab('reglages');return false;">Modifier dans Réglages</a></div>
-    ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off (congé payé)')}${pt_formRow('avance','Avance')}
+    <div class="pt-muted">${rateLine}</div>
+    <div class="pt-row" style="margin-top:10px;"><div class="field"><label>Date</label><input type="date" id="pt-f-date" class="pt-draft pt-auto" value="${todayISO()}"></div></div>
+    ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off')}${pt_formRow('avance','Avance')}
     <h2 class="section" style="margin-top:20px;">Historique</h2>
     <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Catégorie</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${hist}</tbody></table></div>
-    ${pt_histTotalsHtml(p, codes)}
-    ${pt_loansSection(c)}
-    <div class="grid grid-2" style="margin-top:14px;">
-      <div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span></div><div class="value">${pt_fmtMoney(p.subTotal)}</div></div>
-      <div class="result-box final"><div class="label">Net à payer</div><div class="value">${pt_fmtMoney(p.net)}</div></div>
-    </div>
-    ${(p.loanTotal || p.reportIn < 0 || p.reportOut < 0) ? `<div class="pt-muted" style="margin-top:8px;">${[p.loanTotal ? 'Remboursement de prêt : −' + pt_fmtMoney(p.loanTotal) : '', p.reportIn < 0 ? 'Report de la période précédente : −' + pt_fmtMoney(-p.reportIn) : '', p.reportOut < 0 ? '<span style="color:var(--rust);">⚠️ Solde négatif : ' + pt_fmtMoney(-p.reportOut) + ' reportés sur la période suivante (payé : 0)</span>' : ''].filter(Boolean).join(' · ')}</div>` : ''}
     <div class="actions-row"><button class="btn ghost small" onclick="pt_exportPayslip()">Exporter le bulletin (CSV)</button></div>`;
 }
 
@@ -2605,32 +2600,34 @@ function pt_pointagesSection(c, sessions){
   const rawEvs = pt_events.filter(e=>e.code === c && pt_inRange(pt_day(new Date(e.dt))) && openDay(pt_day(new Date(e.dt)))).sort((a,b)=>new Date(b.dt) - new Date(a.dt));
   const manualRows = myManual.slice().sort((a,b)=>b.date.localeCompare(a.date));
   const hiddenNote = hiddenDays ? `<div class="pt-muted" style="margin-bottom:8px;">🔒 ${hiddenDays} jour${hiddenDays>1?'s':''} clôturé${hiddenDays>1?'s':''} masqué${hiddenDays>1?'s':''} dans cette liste (le total ci-dessous les exclut ; la paie, elle, les compte). <a href="#" class="pt-link" onclick="pt_toggleShowClosed(true);return false;">Afficher</a></div>` : '';
-  return `${hiddenNote}
-    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Entrée</th><th>Sortie</th><th>Durée (hh:mm)</th><th></th></tr></thead><tbody>${
-      lines.length ? lines.map(l=>l.html).join('') + `<tr class="pt-total"><td colspan="3">Total</td><td>${pt_fmtH(total)}</td><td></td></tr>` : `<tr><td colspan="5" class="pt-muted">Aucune session sur cette période.</td></tr>`}</tbody></table></div>
-    <div class="actions-row"><button class="btn ghost small" onclick="pt_exportEmployeeCsv()">Exporter en CSV</button></div>
-    <h2 class="section" style="margin-top:18px;">Ajouter / corriger un pointage</h2>
-    <div class="pt-row">
-      <select id="pt-ne-emp" class="pt-draft pt-auto">${pt_codes().map(x=>`<option value="${x}" ${x===c?'selected':''}>${pt_e(pt_label(x))}</option>`).join('')}</select>
-      <input type="date" id="pt-ne-date" class="pt-draft pt-auto"><input type="time" id="pt-ne-time" class="pt-draft pt-auto">
-      <select id="pt-ne-type" class="pt-draft pt-auto"><option value="0">Entrée</option><option value="1">Sortie</option></select>
-      <button class="btn small" onclick="pt_addEventUI()">Ajouter</button>
-    </div>
-    <div class="pt-scroll" style="margin-top:12px;"><table class="pt-table"><thead><tr><th>Date</th><th>Heure</th><th>Type</th><th></th></tr></thead><tbody>${
+  const sub = (key, title, inner)=>`<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:8px;"><div class="row-between" style="cursor:pointer;" onclick="pt_toggleSec('${key}')"><div style="font-weight:600;font-size:13px;">${title}</div><span class="pt-chevron">${pt_open[key] ? '▾' : '▸'}</span></div>${pt_open[key] ? '<div style="margin-top:8px;">' + inner + '</div>' : ''}</div>`;
+  const rawTable = `<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Heure</th><th>Type</th><th></th></tr></thead><tbody>${
       rawEvs.length ? rawEvs.map(ev=>{ const d = new Date(ev.dt); return `<tr>
         <td><input type="date" id="pt-ev-d-${ev.id}" class="pt-draft pt-auto" value="${pt_day(d)}"></td>
         <td><input type="time" id="pt-ev-t-${ev.id}" class="pt-draft pt-auto" value="${pt_hhmm(d)}"></td>
         <td><select id="pt-ev-y-${ev.id}" class="pt-draft pt-auto"><option value="0" ${ev.type===0?'selected':''}>Entrée</option><option value="1" ${ev.type===1?'selected':''}>Sortie</option></select></td>
         <td><button class="btn ghost small" onclick="pt_saveEventRow('${ev.id}')">Enregistrer</button> <button class="btn ghost small" onclick="pt_delEventConfirm('${ev.id}')">Supprimer</button></td></tr>`; }).join('')
-      : `<tr><td colspan="4" class="pt-muted">Aucun pointage sur cette période.</td></tr>`}</tbody></table></div>
-    <h2 class="section" style="margin-top:18px;">Sessions manuelles</h2>
-    <div class="pt-muted" style="margin-bottom:8px;">Heures ajoutées sans pointage, quand le pointage est irrécupérable (ou pour un employé géré sans pointage).</div>
+      : `<tr><td colspan="4" class="pt-muted">Aucun pointage sur cette période.</td></tr>`}</tbody></table></div>`;
+  const manualBlock = `<div class="pt-muted" style="margin-bottom:8px;">Heures ajoutées sans pointage (pointage irrécupérable, ou employé géré sans pointage).</div>
     <div class="pt-row">
       <input type="date" id="pt-m-date" class="pt-draft pt-auto"><input type="text" inputmode="text" id="pt-m-hours" class="pt-draft pt-w90" placeholder="ex. 8:30">
       <input type="text" id="pt-m-note" class="pt-draft pt-grow" placeholder="Note (optionnel)"><button class="btn small" onclick="pt_addManual()">Ajouter</button>
     </div>
     ${manualRows.length ? `<div class="pt-scroll" style="margin-top:10px;"><table class="pt-table"><thead><tr><th>Date</th><th>Heures (hh:mm)</th><th>Note</th><th></th></tr></thead><tbody>${
       manualRows.map(m=>`<tr><td>${fmtDateShort(m.date)}</td><td>${pt_fmtH(m.hours)}</td><td>${pt_e(m.note)}</td><td><button class="btn ghost small" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>`).join('')}</tbody></table></div>` : ''}`;
+  return `${hiddenNote}
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Entrée</th><th>Sortie</th><th>Durée (hh:mm)</th><th></th></tr></thead><tbody>${
+      lines.length ? lines.map(l=>l.html).join('') + `<tr class="pt-total"><td colspan="3">Total</td><td>${pt_fmtH(total)}</td><td></td></tr>` : `<tr><td colspan="5" class="pt-muted">Aucune session sur cette période.</td></tr>`}</tbody></table></div>
+    <div class="pt-muted" style="margin-top:12px;font-weight:600;">Ajouter un pointage</div>
+    <div class="pt-row" style="margin-top:4px;">
+      <select id="pt-ne-emp" class="pt-draft pt-auto">${pt_codes().map(x=>`<option value="${x}" ${x===c?'selected':''}>${pt_e(pt_label(x))}</option>`).join('')}</select>
+      <input type="date" id="pt-ne-date" class="pt-draft pt-auto"><input type="time" id="pt-ne-time" class="pt-draft pt-auto">
+      <select id="pt-ne-type" class="pt-draft pt-auto"><option value="0">Entrée</option><option value="1">Sortie</option></select>
+      <button class="btn small" onclick="pt_addEventUI()">Ajouter</button>
+    </div>
+    ${sub('rawEvs', 'Modifier / supprimer un pointage (' + rawEvs.length + ')', rawTable)}
+    ${sub('manual', 'Sessions manuelles (' + myManualAll.length + ')', manualBlock)}
+    <div class="actions-row"><button class="btn ghost small" onclick="pt_exportEmployeeCsv()">Exporter en CSV</button></div>`;
 }
 function pt_empCards(q, isAdmin){
   const card = (cls, l, n)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div></div>`;
@@ -2648,11 +2645,6 @@ function pt_tabEmployes(codes, sessions, anoms){
   if(!codes.length) return pt_empty('Aucune donnée pour l’instant.');
   const isAdmin = pt_isAdmin();
   let html = '';
-  if(isAdmin){
-    const ov = pt_paieOverviewHtml(codes, sessions);
-    html += pt_accordion('overview', 'Tableau de paie — tous les employés (net total : ' + pt_fmtMoney(ov.totNet) + ')' + (ov.closed ? ' — 🔒 clôturée' : ''), ov.html);
-    html += pt_accordion('conges', 'Soldes de congé — tous les employés', pt_congesHtml(codes));
-  }
   if(pt_selAll){
     const qs = codes.map(x=>pt_displayPayroll(x, sessions)), S = (k)=>qs.reduce((t,q)=>t + (Number(q[k]) || 0), 0);
     const tot = { totalHours:S('totalHours'), workedDays:S('workedDays'), baseWage:S('baseWage'), transportTotal:S('transportTotal'), bonusesTotal:S('bonusesTotal'), advancesTotal:S('advancesTotal'), leavesTotal:S('leavesTotal'), loanTotal:S('loanTotal'), subTotal:S('subTotal'), reportOut:S('reportOut'), net:S('net') };
@@ -2664,13 +2656,12 @@ function pt_tabEmployes(codes, sessions, anoms){
     ${pt_empSelect(codes)}
     ${pt_empCards(p, isAdmin)}
   </div>`;
-  html += pt_accordion('pointages', 'Pointages', pt_pointagesSection(c, sessions));
+  html += pt_accordion('pointages', 'Pointages de l’employé', pt_pointagesSection(c, sessions));
   if(myAn.length){
     pt_anomList = myAn;
     html += pt_accordion('anomEmp', 'Anomalies de cette personne (' + myAn.length + ')', myAn.map((a,i)=>pt_anomRow(i)).join(''));
   }
   if(isAdmin) html += pt_accordion('paie', 'Paie', pt_paieSection(c, sessions, codes));
-  if(isAdmin){ const kk = pt_conge(c, pt_filter.to || todayISO()); html += pt_accordion('congeEmp', 'Congés — ' + pt_name(c) + ' (restant : ' + (kk.left < 0 ? '−' : '') + pt_fmtMoney(Math.abs(kk.left)) + ')', pt_congeEmpHtml(c)); }
   return html;
 }
 async function pt_addEventUI(){
