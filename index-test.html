@@ -1374,7 +1374,7 @@ let pt_clotures = [];
 let pt_eventsVersion = 0, pt_computeCache = null; // mémoire du calcul sessions/anomalies, invalidée quand les pointages changent
 let pt_ready = { events:false, cfg:false, entries:false, ign:false, groups:false, ovIgn:false, anIgn:false, clot:false };
 let pt_started = false, pt_error = '', pt_loadStartedAt = null;
-let pt_tab = 'anomalies', pt_sel = null, pt_openFix = null, pt_anomList = [];
+let pt_tab = 'employes', pt_sel = null, pt_openFix = null, pt_anomList = [];
 let pt_ovList = [], pt_ovOpen = null;
 let pt_filter = { from:null, to:null };
 let pt_showClosed = false; // false : les jours clôturés sont masqués des listes de travail (anomalies, pointages…)
@@ -1917,7 +1917,7 @@ function pt_restoreInputs(st, withValues){
     if(el){ el.focus(); if(st.focus.s != null && el.setSelectionRange){ try{ el.setSelectionRange(st.focus.s, st.focus.e); }catch(e){} } }
   }
 }
-let pt_open = { pointages:true, rawEvs:false, manual:false, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
+let pt_open = { pointages:true, clotures:false, manual:false, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
 function pt_toggleSec(key){ pt_open[key] = !pt_open[key]; pt_render(true); }
 function pt_accordion(key, title, innerHtml){
   const open = !!pt_open[key];
@@ -1935,16 +1935,17 @@ function pt_selEmp(v){ if(v === 'all'){ pt_selAll = true; } else { pt_selAll = f
 function pt_isAdmin(){ return !!(session && session.isAdmin); }
 function pt_renderTabs(nAnom){
   // Réglages (taux, salaires) : réservé aux administrateurs
-  const tabs = [['anomalies','Anomalies'],['employes','Employés'],['clotures','Clôtures'],['journal','Corrections passées'],['reglages','Réglages']]
-    .filter(t=>(pt_isAdmin() || (t[0] !== 'reglages' && t[0] !== 'journal' && t[0] !== 'clotures')) && (t[0] !== 'journal' || pt_hasAutoLogs()));
+  const tabs = [['employes','Employés'],['journal','Corrections passées'],['reglages','Réglages']]
+    .filter(t=>(pt_isAdmin() || (t[0] !== 'reglages' && t[0] !== 'journal')) && (t[0] !== 'journal' || pt_hasAutoLogs()));
   document.getElementById('pointage-tabs').innerHTML = tabs.map(([id,l])=>
-    `<button class="${pt_tab===id?'active':''}" onclick="pt_setTab('${id}')">${l}${id==='anomalies' && nAnom ? ` <span class="count-pill">${nAnom}</span>` : ''}</button>`).join('');
+    `<button class="${pt_tab===id?'active':''}" onclick="pt_setTab('${id}')">${l}${id==='employes' && nAnom ? ` <span class="count-pill">${nAnom}</span>` : ''}</button>`).join('');
 }
 function pt_render(fresh){
   if(activeModule !== 'pointage') return;
   const body = document.getElementById('pt-body'); if(!body) return;
-  if(!pt_isAdmin() && (pt_tab === 'reglages' || pt_tab === 'journal' || pt_tab === 'clotures')) pt_tab = 'anomalies';
-  if(pt_tab === 'journal' && !pt_hasAutoLogs()) pt_tab = 'anomalies';
+  if(!pt_isAdmin() && (pt_tab === 'reglages' || pt_tab === 'journal')) pt_tab = 'employes';
+  if(!['employes','journal','reglages'].includes(pt_tab)) pt_tab = 'employes';
+  if(pt_tab === 'journal' && !pt_hasAutoLogs()) pt_tab = 'employes';
   pt_renderPeriod();
   if(pt_error){ pt_renderTabs(0); body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
   if(!Object.keys(pt_ready).every(k=>pt_ready[k])){
@@ -1970,10 +1971,8 @@ function pt_render(fresh){
   if(pt_sel === null || !codes.includes(pt_sel)) pt_sel = codes.length ? codes[0] : null;
   pt_renderTabs(anoms.length + overlaps.length);
   let html;
-  if(pt_tab === 'anomalies') html = pt_tabAnomalies(anoms, nIgnored) + pt_tabOverlaps(overlaps);
-  else if(pt_tab === 'employes') html = pt_tabEmployes(codes, sessions, anoms);
+  if(pt_tab === 'employes') html = pt_tabEmployes(codes, sessions, anoms, overlaps);
   else if(pt_tab === 'journal') html = pt_tabJournal();
-  else if(pt_tab === 'clotures') html = pt_tabClotures();
   else html = pt_tabReglages(codes);
   body.innerHTML = html;
   pt_restoreInputs(st, !fresh);
@@ -1988,7 +1987,7 @@ function pt_empSelect(codes){
 function pt_anomRow(i){
   const a = pt_anomList[i], open = pt_openFix === pt_anomKey(a);
   let h = `<div class="pt-an"><div><b>${pt_fmtDT(a.dt)}</b> · ${a.type}<div class="pt-an-reason">${pt_e(a.reason)}</div></div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn ghost small" onclick="pt_toggleFix(${i})">${open ? 'Annuler' : 'Corriger'}</button><button class="btn ghost small" onclick="pt_anomIgnore(${i})">Ignorer</button></div></div>`;
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn ghost small" onclick="pt_toggleFix(${i})">${open ? 'Annuler' : 'Corriger'}</button></div></div>`;
   if(!open) return h;
   const corrType = a.type === 'Entrée' ? 1 : 0;
   h += `<div class="pt-fix"><div class="pt-muted" style="margin-bottom:6px;">Ajouter le pointage manquant (${corrType===0?'Entrée':'Sortie'}) :</div>
@@ -2004,44 +2003,15 @@ function pt_anomRow(i){
   }
   return h + `</div>`;
 }
-function pt_tabAnomalies(anoms, nIgnored){
-  pt_anomList = anoms;
-  let html = '';
-  if(anoms.length || nIgnored){
-    html += `<div class="ticket"><div class="section-label">Nettoyer la liste</div>
-      <div class="pt-row"><input type="date" id="pt-ign-before" class="pt-draft pt-auto"><button class="btn ghost small" onclick="pt_anomIgnoreBefore()">Ignorer toutes les anomalies avant cette date</button></div>
-      <div class="pt-muted" style="margin-top:6px;">Ignorer ne modifie jamais les pointages : l'anomalie est seulement retirée de la liste.${nIgnored ? ' ' + nIgnored + ' anomalie' + (nIgnored>1?'s':'') + ' ignorée' + (nIgnored>1?'s':'') + ' sur cette période — <a href="#" class="pt-link" onclick="pt_anomUnignoreAll();return false;">tout réafficher</a>.' : ''}</div>
-    </div>`;
-  }
-  if(!anoms.length) html += pt_empty('Aucune anomalie ouverte sur cette période 🎉');
-  else {
-    const byCode = {};
-    anoms.forEach((a,i)=>{ (byCode[a.code] = byCode[a.code] || []).push(i); });
-    Object.keys(byCode).map(Number).sort((a,b)=>a-b).forEach(code=>{
-      const idxs = byCode[code];
-      html += `<div class="ticket"><div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;">${pt_e(pt_label(code))}</div><span class="pt-muted">${idxs.length} anomalie${idxs.length>1?'s':''}</span></div>${idxs.map(pt_anomRow).join('')}</div>`;
-    });
-  }
-  const resolved = pt_entries.filter(e=>e.kind === 'resolved').sort((a,b)=>(b.resolvedAt||'').localeCompare(a.resolvedAt||''));
-  if(resolved.length){
-    html += `<div class="ticket"><div class="section-label">Corrigées — historique</div>${
-      resolved.map(r=>`<div class="pt-an ok"><div><b>${pt_fmtDT(new Date(r.dt))}</b> · ${pt_e(pt_name(r.code))}<div class="pt-an-reason">${pt_e(r.reason)} — corrigé le ${fmtDateShort(String(r.resolvedAt||'').slice(0,10))}</div></div>
-        <button class="btn ghost small" onclick="pt_delEntry('${r.id}')">Effacer</button></div>`).join('')}
-      <button class="btn ghost small" style="margin-top:8px;" onclick="pt_clearResolved()">Vider l’historique des corrections</button></div>`;
-  }
-  return html;
-}
-function pt_tabOverlaps(overlaps){
-  pt_ovList = overlaps;
-  if(!overlaps.length) return '';
-  const rows = overlaps.map((o,i)=>{
+function pt_ovRows(overlaps){
+  return overlaps.map((o,i)=>{
     const open = pt_ovOpen === o.key;
     let h = `<div class="pt-an"><div><b>${pt_dm(new Date(o.day + 'T00:00:00'))}</b> — ${pt_e(pt_name(o.codeA))} sorti à ${pt_hhmm(o.aEnd)} · ${pt_e(pt_name(o.codeB))} entré à ${pt_hhmm(o.bStart)}
-        <div class="pt-an-reason">Écart : ${pt_fmtH(o.hours)} (hh:mm) en trop, à vérifier</div></div>
+        <div class="pt-an-reason">Chevauchement de poste : écart de ${pt_fmtH(o.hours)} (hh:mm) en trop, à vérifier</div></div>
       <button class="btn ghost small" onclick="pt_ovToggle(${i})">${open ? 'Fermer' : 'Comparer'}</button></div>`;
     if(open){
       h += `<div class="pt-fix">
-        <div class="pt-muted" style="margin-bottom:8px;">${pt_e(pt_name(o.codeA))} : sortie à ${pt_hhmm(o.aEnd)} — ${pt_e(pt_name(o.codeB))} : entrée à ${pt_hhmm(o.bStart)}. Retiens une heure commune pour les deux, ou garde les deux pointages tels quels.</div>
+        <div class="pt-muted" style="margin-bottom:8px;">${pt_e(pt_name(o.codeA))} : sortie à ${pt_hhmm(o.aEnd)} — ${pt_e(pt_name(o.codeB))} : entrée à ${pt_hhmm(o.bStart)}. Retiens une heure commune pour les deux, ou garde les deux pointages tels quels (tu peux aussi modifier ou supprimer un pointage dans la liste ci-dessous).</div>
         <div class="pt-row">
           <input type="time" id="pt-ov-time-${i}" class="pt-draft pt-auto" value="${pt_hhmm(o.bStart)}">
           <button class="btn small" onclick="pt_ovAlign(${i})">Retenir cette heure pour les deux</button>
@@ -2051,7 +2021,6 @@ function pt_tabOverlaps(overlaps){
     }
     return h;
   }).join('');
-  return `<div class="ticket"><div class="section-label">Chevauchements de poste <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— une sortie après l'entrée du collègue suivant</span></div>${rows}</div>`;
 }
 function pt_ovToggle(i){
   const o = pt_ovList[i]; if(!o) return;
@@ -2077,25 +2046,6 @@ async function pt_ovAlign(i){
     await Promise.all([ pt_updateEvent(evA.id, { dt:iso }), pt_updateEvent(evB.id, { dt:iso }) ]);
     pt_toast('Pointages alignés à ' + t + '.');
   }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
-}
-async function pt_anomIgnore(i){
-  const a = pt_anomList[i]; if(!a) return;
-  try{ pt_openFix = null; await pt_anIgnRef.set({ k:{ [pt_anomIgnKey(a)]:true } }, { merge:true }); pt_toast('Anomalie ignorée.'); }
-  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
-}
-async function pt_anomIgnoreBefore(){
-  const v = document.getElementById('pt-ign-before').value;
-  if(!v){ alert('Choisis d’abord une date.'); return; }
-  const n = pt_compute().anomalies.filter(a=>pt_day(a.dt) < v && !pt_anomIgnored(a)).length;
-  if(!n){ alert('Aucune anomalie avant le ' + fmtDateShort(v) + '.'); return; }
-  if(!confirm('Ignorer ' + n + ' anomalie' + (n>1?'s':'') + ' datée' + (n>1?'s':'') + ' avant le ' + fmtDateShort(v) + ' ?\nLes pointages ne sont pas modifiés ; tu pourras tout réafficher.')) return;
-  try{ await pt_anIgnRef.set({ before:v }, { merge:true }); pt_toast(n + ' anomalie' + (n>1?'s':'') + ' ignorée' + (n>1?'s':'') + '.'); }
-  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
-}
-async function pt_anomUnignoreAll(){
-  if(!confirm('Réafficher toutes les anomalies ignorées ?')) return;
-  try{ await pt_anIgnRef.set({ k:{}, before:null }); pt_toast('Anomalies réaffichées.'); }
-  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 function pt_toggleFix(i){
   const a = pt_anomList[i]; if(!a) return;
@@ -2168,57 +2118,37 @@ function pt_closeFreeRange(){
   const f = document.getElementById('pt-cl-from').value, t = document.getElementById('pt-cl-to').value;
   pt_closeRange(f, t, 'period');
 }
-function pt_tabClotures(){
-  if(!pt_clMonth) pt_clMonth = (pt_filter.to || pt_filter.from || todayISO()).slice(0,7);
-  const mr = pt_monthRange(pt_clMonth);
-  const evByDay = {}, anByDay = {};
-  pt_events.forEach(e=>{ const d = pt_day(new Date(e.dt)); evByDay[d] = (evByDay[d] || 0) + 1; });
-  pt_compute().anomalies.forEach(a=>{ if(pt_anomIgnored(a)) return; const d = pt_day(a.dt); anByDay[d] = (anByDay[d] || 0) + 1; });
-  const sum = (map, from, to)=>{ let n = 0; for(let d = from; d <= to; d = pt_addDays(d, 1)) n += map[d] || 0; return n; };
-  const anCell = (n)=>n ? `<span class="pt-badge pt-b-avance">${n}</span>` : `<span class="pt-muted">0</span>`;
-  const weeks = []; let cur = null;
-  for(let d = mr.from; d <= mr.to; d = pt_addDays(d, 1)){
-    const w = pt_weekRange(d);
-    if(!cur || cur.from !== w.from){ cur = { from:w.from, to:w.to, days:[] }; weeks.push(cur); }
-    cur.days.push(d);
-  }
-  const dm = (iso)=>pt_dm(new Date(iso + 'T12:00:00'));
-  const rows = weeks.map(w=>{
-    const act = pt_clAction(w.from, w.to, 'week', false);
-    let h = `<tr class="pt-total"><td>Semaine ${pt_isoWeek(w.from)} · ${dm(w.from)} → ${dm(w.to)}</td><td>${sum(evByDay, w.from, w.to)}</td><td>${anCell(sum(anByDay, w.from, w.to))}</td><td>${act.badge}</td><td>${act.btn}</td></tr>`;
-    w.days.forEach(d=>{
-      const a2 = pt_clAction(d, d, 'day', false);
-      h += `<tr class="pt-cl-day"><td>${PT_DOW[new Date(d + 'T12:00:00').getDay()]} ${dm(d)}</td><td>${evByDay[d] || 0}</td><td>${anCell(anByDay[d] || 0)}</td><td>${a2.badge}</td><td>${a2.btn}</td></tr>`;
-    });
-    return h;
-  }).join('');
-  const mAct = pt_clAction(mr.from, mr.to, 'month', true);
-  const list = pt_clotures.slice().sort((a,b)=>(b.from || '').localeCompare(a.from || '') || (b.to || '').localeCompare(a.to || ''));
-  const listRows = list.map(c=>{
-    const r = Object.keys(c.rows || {}).map(k=>c.rows[k]), nPaid = r.filter(x=>x.paid).length;
-    return `<tr><td>${PT_KIND_LABEL[c.kind] || 'Période'}</td><td>${pt_e(pt_rangeLabel(c.from, c.to))}${pt_isGlobalCl(c) ? '' : ' <span class="pt-badge pt-b-prime">' + pt_e(pt_name(c.code)) + '</span>'}</td><td>${fmtDateShort(String(c.createdAt || '').slice(0,10))}</td><td>${nPaid} / ${r.length} <button class="btn ghost small" onclick="pt_clPayToggle('${c.id}')">${pt_clPay === c.id ? 'Masquer' : 'Versements'}</button></td><td>${c.mailedAt ? '<span class="pt-muted">✉️ ' + fmtDateShort(String(c.mailedAt).slice(0,10)) + '</span> ' : ''}<button class="btn ghost small" onclick="pt_mailClosure('${c.id}')">${c.mailedAt ? 'Renvoyer' : 'Envoyer'}</button></td><td><button class="btn ghost small" onclick="pt_reopenRange('${c.id}')">Rouvrir</button></td></tr>${pt_payRows(c)}`;
-  }).join('');
-  return `<div class="ticket">
-      <div class="section-label">Clôtures — jours, semaines, mois</div>
-      <div class="pt-muted">Clôturer fige la paie et verrouille les jours : ils ne sont plus réimportés (même si tu retélécharges tout l’historique du pointeur), ni corrigés automatiquement, ni modifiables, et ils disparaissent des listes de travail (interrupteur « Afficher aussi les jours clôturés » en haut). Les semaines vont du lundi au dimanche. Rouvre pour modifier à nouveau.</div>
-    </div>
-    <div class="ticket">
-      <div class="row-between" style="margin-bottom:10px;gap:8px;">
-        <button class="btn ghost small" onclick="pt_clNav(-1)">◀</button>
-        <div class="pt-row" style="justify-content:center;"><div style="font-weight:700;text-transform:capitalize;">${pt_e(pt_monthLabel(pt_clMonth))}</div><input type="month" class="pt-auto" value="${pt_clMonth}" onchange="pt_clSetMonth(this.value)"></div>
-        <button class="btn ghost small" onclick="pt_clNav(1)">▶</button>
+let pt_clScope = 'emp';
+function pt_clSetScope(v){ pt_clScope = v === 'all' ? 'all' : 'emp'; pt_render(true); }
+function pt_cloturesSection(){
+  const sel = pt_selAll ? null : pt_sel;
+  const has = pt_filter.from && pt_filter.to;
+  const cur = has ? pt_currentClosure(sel === null ? undefined : sel) : null;
+  const allCl = has ? pt_closureFor(pt_filter.from, pt_filter.to) : null;
+  let head;
+  if(!has) head = '<div class="pt-muted">Renseigne les dates Du / Au (en haut) : la clôture porte sur la période affichée.</div>';
+  else {
+    const state = allCl ? '🔒 clôturée pour tous les employés' : cur ? '🔒 clôturée pour ' + pt_e(pt_name(sel)) : 'non clôturée';
+    head = `<div class="pt-muted" style="margin-bottom:8px;">Période affichée : ${pt_e(pt_rangeLabel(pt_filter.from, pt_filter.to))} — ${state}.</div>
+      <div class="actions-row">
+        ${sel !== null && !cur && !allCl ? `<button class="btn small" onclick="pt_closeEmployee()">Clôturer ${pt_e(pt_name(sel))}</button>` : ''}
+        ${!allCl ? `<button class="btn small" style="background:var(--moss);border-color:var(--moss);" onclick="pt_closePeriod()">Clôturer tous les employés</button>` : ''}
+        ${cur && !allCl ? `<button class="btn ghost small" onclick="pt_reopenPeriod(${sel})">Rouvrir ${pt_e(pt_name(sel))}</button>` : ''}
+        ${allCl ? `<button class="btn ghost small" onclick="pt_reopenRange('${allCl.id}')">Rouvrir pour tous</button>` : ''}
       </div>
-      <div class="pt-row" style="margin-bottom:12px;"><span class="pt-muted">Mois entier :</span>${mAct.badge}${mAct.btn}</div>
-      <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Période</th><th>Pointages</th><th>Anomalies</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-    </div>
-    <div class="ticket"><div class="section-label">Période libre</div>
-      <div class="pt-row"><input type="date" id="pt-cl-from" class="pt-draft pt-auto"><input type="date" id="pt-cl-to" class="pt-draft pt-auto"><button class="btn small" onclick="pt_closeFreeRange()">Clôturer cette période</button></div>
-      <div class="pt-muted" style="margin-top:6px;">Utile pour clôturer d’un coup tout l’historique déjà traité (par ex. depuis le début jusqu’à la fin du dernier mois payé).</div>
-    </div>
-    ${pt_mailCfgCard()}
-    <div class="ticket"><div class="section-label">Clôtures enregistrées</div>
-      ${list.length ? `<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Type</th><th>Période</th><th>Créée le</th><th>Payé</th><th>Mail</th><th></th></tr></thead><tbody>${listRows}</tbody></table></div>` : `<div class="pt-muted">Aucune clôture pour l’instant.</div>`}
-    </div>`;
+      <div class="pt-muted" style="margin-top:6px;">Clôturer fige la paie et verrouille les jours : ils ne sont plus réimportés ni modifiables et disparaissent des listes de travail (interrupteur « Afficher aussi les jours clôturés » en haut). Les semaines vont du lundi au dimanche.</div>`;
+  }
+  const scope = (sel === null) ? 'all' : pt_clScope;
+  let list = pt_clotures.slice();
+  if(scope === 'emp' && sel !== null) list = list.filter(c=>pt_isGlobalCl(c) || String(c.code) === String(sel));
+  list.sort((a,b)=>(b.from || '').localeCompare(a.from || '') || (b.to || '').localeCompare(a.to || ''));
+  const rows = list.map(c=>{
+    const r = Object.keys(c.rows || {}).map(k=>c.rows[k]), nPaid = r.filter(x=>x.paid).length;
+    return `<tr><td>${PT_KIND_LABEL[c.kind] || 'Période'}</td><td>${pt_e(pt_rangeLabel(c.from, c.to))}</td><td>${pt_isGlobalCl(c) ? 'Tous' : pt_e(pt_name(c.code))}</td><td>${fmtDateShort(String(c.createdAt || '').slice(0,10))}</td><td>${nPaid} / ${r.length} <button class="btn ghost small" onclick="pt_clPayToggle('${c.id}')">${pt_clPay === c.id ? 'Masquer' : 'Versements'}</button></td><td>${c.mailedAt ? '<span class="pt-muted">✉️ ' + fmtDateShort(String(c.mailedAt).slice(0,10)) + '</span> ' : ''}<button class="btn ghost small" onclick="pt_mailClosure('${c.id}')">${c.mailedAt ? 'Renvoyer' : 'Envoyer'}</button></td><td><button class="btn ghost small" onclick="pt_reopenRange('${c.id}')">Rouvrir</button></td></tr>${pt_payRows(c)}`;
+  }).join('');
+  const filter = sel !== null ? `<div class="field" style="max-width:260px;margin:10px 0;"><label>Afficher</label><select onchange="pt_clSetScope(this.value)"><option value="emp" ${scope === 'emp' ? 'selected' : ''}>Clôtures de ${pt_e(pt_name(sel))}</option><option value="all" ${scope === 'all' ? 'selected' : ''}>Toutes les clôtures</option></select></div>` : '';
+  return `${head}${filter}
+    ${list.length ? `<div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Type</th><th>Période</th><th>Employé</th><th>Créée le</th><th>Payé</th><th>Mail</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="pt-muted" style="margin-top:8px;">Aucune clôture enregistrée.</div>'}`;
 }
 
 /* ---------- onglet Paie ---------- */
@@ -2678,7 +2608,8 @@ function pt_paieSection(c, sessions, codes){
 }
 
 /* ---------- onglet Employés (fusion Par employé + Paie, en sections repliables) ---------- */
-function pt_pointagesSection(c, sessions){
+function pt_pointagesSection(c, sessions, myAn, myOv){
+  myAn = myAn || []; myOv = myOv || [];
   const openDay = (dk)=>pt_showClosed || !pt_dayClosed(dk, c);
   const mySessAll = sessions.filter(s=>s.code === c);
   const mySess = mySessAll.filter(s=>openDay(pt_day(s.date)));
@@ -2693,8 +2624,11 @@ function pt_pointagesSection(c, sessions){
   const rawEvs = pt_events.filter(e=>e.code === c && pt_inRange(pt_day(new Date(e.dt))) && openDay(pt_day(new Date(e.dt)))).sort((a,b)=>new Date(b.dt) - new Date(a.dt));
   const manualRows = myManual.slice().sort((a,b)=>b.date.localeCompare(a.date));
   const hiddenNote = hiddenDays ? `<div class="pt-muted" style="margin-bottom:8px;">🔒 ${hiddenDays} jour${hiddenDays>1?'s':''} clôturé${hiddenDays>1?'s':''} masqué${hiddenDays>1?'s':''} dans cette liste (le total ci-dessous les exclut ; la paie, elle, les compte). <a href="#" class="pt-link" onclick="pt_toggleShowClosed(true);return false;">Afficher</a></div>` : '';
-  const sub = (key, title, inner)=>`<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:8px;"><div class="row-between" style="cursor:pointer;" onclick="pt_toggleSec('${key}')"><div style="font-weight:600;font-size:13px;">${title}</div><span class="pt-chevron">${pt_open[key] ? '▾' : '▸'}</span></div>${pt_open[key] ? '<div style="margin-top:8px;">' + inner + '</div>' : ''}</div>`;
-  const rawTable = `<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Heure</th><th>Type</th><th></th></tr></thead><tbody>${
+  const nProb = myAn.length + myOv.length, isOpen = pt_open.rawEvs !== undefined ? pt_open.rawEvs : nProb > 0;
+  const sub = (key, title, inner)=>`<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:8px;"><div class="row-between" style="cursor:pointer;" onclick="pt_toggleRaw(${nProb > 0})"><div style="font-weight:600;font-size:13px;">${title}</div><span class="pt-chevron">${isOpen ? '▾' : '▸'}</span></div>${isOpen ? '<div style="margin-top:8px;">' + inner + '</div>' : ''}</div>`;
+  const probTitle = nProb ? ' (' + [myAn.length ? myAn.length + ' manque' + (myAn.length > 1 ? 's' : '') : '', myOv.length ? myOv.length + ' chevauchement' + (myOv.length > 1 ? 's' : '') : ''].filter(Boolean).join(', ') + ')' : ' (' + rawEvs.length + ')';
+  const probBlock = nProb ? `<div class="pt-muted" style="margin-bottom:6px;font-weight:600;">À régler</div>${myAn.map((a,i)=>pt_anomRow(i)).join('')}${myOv.length ? pt_ovRows(myOv) : ''}<div class="pt-muted" style="margin:10px 0 6px;font-weight:600;">Tous les pointages de la période</div>` : '';
+  const rawTable = probBlock + `<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Heure</th><th>Type</th><th></th></tr></thead><tbody>${
       rawEvs.length ? rawEvs.map(ev=>{ const d = new Date(ev.dt); return `<tr>
         <td><input type="date" id="pt-ev-d-${ev.id}" class="pt-draft pt-auto" value="${pt_day(d)}"></td>
         <td><input type="time" id="pt-ev-t-${ev.id}" class="pt-draft pt-auto" value="${pt_hhmm(d)}"></td>
@@ -2718,7 +2652,7 @@ function pt_pointagesSection(c, sessions){
       <select id="pt-ne-type" class="pt-draft pt-auto"><option value="0">Entrée</option><option value="1">Sortie</option></select>
       <button class="btn small" onclick="pt_addEventUI()">Ajouter</button>
     </div>
-    ${sub('rawEvs', 'Modifier / supprimer un pointage (' + rawEvs.length + ')', rawTable)}
+    ${sub('rawEvs', 'Modifier / supprimer un pointage' + probTitle, rawTable)}
     <div class="actions-row"><button class="btn ghost small" onclick="pt_exportEmployeeCsv()">Exporter en CSV</button></div>`;
 }
 function pt_empCards(q, isAdmin){
@@ -2733,27 +2667,30 @@ function pt_empCards(q, isAdmin){
   if(isAdmin) h += `<div class="grid grid-2"><div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span></div><div class="value">${pt_fmtMoney(q.subTotal)}</div></div><div class="result-box final"><div class="label">Net à payer${q.reportOut < -0.004 ? '<br><span style="font-weight:400;font-size:11px;color:var(--rust);">report −' + pt_fmtMoney(-q.reportOut) + '</span>' : q.reportOut > 0.004 ? '<br><span style="font-weight:400;font-size:11px;color:var(--moss);">reste dû +' + pt_fmtMoney(q.reportOut) + '</span>' : ''}</div><div class="value">${pt_fmtMoney(q.net)}</div></div></div>`;
   return h;
 }
-function pt_tabEmployes(codes, sessions, anoms){
+function pt_toggleRaw(auto){ pt_open.rawEvs = !(pt_open.rawEvs !== undefined ? pt_open.rawEvs : auto); pt_render(true); }
+function pt_tabEmployes(codes, sessions, anoms, overlaps){
+  overlaps = overlaps || [];
   if(!codes.length) return pt_empty('Aucune donnée pour l’instant.');
   const isAdmin = pt_isAdmin();
   let html = '';
   if(pt_selAll){
     const qs = codes.map(x=>pt_displayPayroll(x, sessions)), S = (k)=>qs.reduce((t,q)=>t + (Number(q[k]) || 0), 0);
     const tot = { totalHours:S('totalHours'), workedDays:S('workedDays'), baseWage:S('baseWage'), transportTotal:S('transportTotal'), bonusesTotal:S('bonusesTotal'), advancesTotal:S('advancesTotal'), leavesTotal:S('leavesTotal'), loanTotal:S('loanTotal'), subTotal:S('subTotal'), reportOut:S('reportOut'), net:S('net') };
-    return html + `<div class="ticket">${pt_empSelect(codes)}${pt_empCards(tot, isAdmin)}<div class="pt-muted">Totaux de tous les employés sur la période affichée. Choisis un employé pour voir ses pointages, sa paie et ses congés.</div></div>`;
+    return html + `<div class="ticket">${pt_empSelect(codes)}${pt_empCards(tot, isAdmin)}<div class="pt-muted">Totaux de tous les employés sur la période affichée. Choisis un employé pour voir ses pointages et sa paie.</div></div>`
+      + (() => { const probs = codes.map(x=>({ x, a:anoms.filter(a=>a.code === x).length, o:overlaps.filter(o=>o.codeA === x || o.codeB === x).length })).filter(r=>r.a || r.o);
+          return probs.length ? `<div class="ticket"><div class="section-label">À régler</div>${probs.map(r=>`<div class="pt-an"><div><b>${pt_e(pt_label(r.x))}</b><div class="pt-an-reason">${[r.a ? r.a + ' entrée(s)/sortie(s) manquante(s)' : '', r.o ? r.o + ' chevauchement(s)' : ''].filter(Boolean).join(' · ')}</div></div><button class="btn ghost small" onclick="pt_selEmp('${r.x}')">Ouvrir</button></div>`).join('')}</div>` : ''; })()
+      + (isAdmin ? pt_accordion('clotures', 'Clôtures', pt_cloturesSection()) : '');
   }
   const c = pt_sel, p = pt_displayPayroll(c, sessions);
-  const myAn = anoms.filter(a=>a.code === c);
+  const myAn = anoms.filter(a=>a.code === c), myOv = overlaps.filter(o=>o.codeA === c || o.codeB === c);
+  pt_anomList = myAn; pt_ovList = myOv;
   html += `<div class="ticket">
     ${pt_empSelect(codes)}
     ${pt_empCards(p, isAdmin)}
   </div>`;
-  html += pt_accordion('pointages', 'Pointages de l’employé', pt_pointagesSection(c, sessions));
-  if(myAn.length){
-    pt_anomList = myAn;
-    html += pt_accordion('anomEmp', 'Anomalies de cette personne (' + myAn.length + ')', myAn.map((a,i)=>pt_anomRow(i)).join(''));
-  }
+  html += pt_accordion('pointages', 'Pointages de l’employé', pt_pointagesSection(c, sessions, myAn, myOv));
   if(isAdmin) html += pt_accordion('paie', 'Paie', pt_paieSection(c, sessions, codes));
+  if(isAdmin) html += pt_accordion('clotures', 'Clôtures', pt_cloturesSection());
   return html;
 }
 async function pt_addEventUI(){
@@ -2784,6 +2721,7 @@ async function pt_addManual(){
 /* ---------- onglet Réglages ---------- */
 function pt_tabReglages(codes){
   const isAdmin = !!(session && session.isAdmin);
+  const mailCard = isAdmin ? pt_mailCfgCard() : '';
   let suggestion = 1; while(codes.includes(suggestion)) suggestion++;
   const cards = codes.map(c=>{
     const e = pt_emp[c] || {}, tr = pt_transport(c);
@@ -2815,6 +2753,7 @@ function pt_tabReglages(codes){
   <h2 class="section">Employés</h2>
   ${cards || pt_empty('Importe un export ZKBio ou ajoute un employé ci-dessus.')}
   ${isAdmin ? pt_groupsSection(codes) : ''}
+  ${mailCard}
   <div class="ticket"><div class="section-label">Données</div>
     <div class="actions-row" style="margin-top:0;"><button class="btn small" onclick="pt_exportExcel()">Exporter en Excel (sauvegarde complète)</button></div>
     <div class="pt-muted" style="margin-top:6px;">Un fichier .xlsx avec toutes les données (réglages, pointages, sessions, anomalies, historique de paie) et le résumé de paie de la période affichée.</div>
