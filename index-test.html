@@ -501,7 +501,7 @@
 
 <!-- ===================== APPLICATION ===================== -->
 <div id="app-shell" style="display:none;">
-<div style="background:#FBBF24;color:#1a1400;text-align:center;font-size:12px;font-weight:700;padding:6px 10px;">VERSION TEST — mêmes données que la version normale. La correction automatique est désactivée tant que vous ne l'activez pas.</div>
+<div style="background:#FBBF24;color:#1a1400;text-align:center;font-size:12px;font-weight:700;padding:6px 10px;">VERSION TEST — mêmes données que la version normale.</div>
 <header class="top">
   <div>
     <div class="title display">ALLO SUSHI</div>
@@ -1375,7 +1375,8 @@ let pt_idn = 0;
 function pt_e(v){ return esc(v==null ? '' : String(v)); }
 function pt_norm(s){ return (s||'').toString().trim().toLowerCase(); }
 function pt_fmtMoney(n){ return Math.round(Number(n)||0).toLocaleString('fr-FR') + ' DA'; }
-function pt_fmtH(h){ return (Number(h)||0).toFixed(2).replace('.',','); }
+function pt_fmtH(h){ const m = Math.round((Number(h) || 0) * 60), a = Math.abs(m); return (m < 0 ? '−' : '') + String(Math.floor(a / 60)).padStart(2, '0') + ':' + String(a % 60).padStart(2, '0'); } // heures décimales → hh:mm (affichage seulement)
+function pt_parseHours(v){ const t = String(v == null ? '' : v).trim().toLowerCase().replace(/\s/g, ''); let m = t.match(/^(\d+)[:h](\d{1,2})$/); if(m) return Number(m[1]) + Number(m[2]) / 60; m = t.match(/^(\d+)h$/); if(m) return Number(m[1]); return pt_num(t); } // accepte 8:30, 8h30, 8,5
 function pt_hhmm(d){ return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
 function pt_dm(d){ return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0'); }
 function pt_fmtDT(d){ return pt_dm(d) + ' ' + pt_hhmm(d); }
@@ -1714,7 +1715,8 @@ function pt_displayPayroll(code, sessions){
   const live = pt_payroll(code, sessions), f = pt_frozenRow(code);
   if(!f) return live;
   return { ...live, totalHours:f.hours, rate:f.rate, mode:f.mode, workedDays:f.workedDays, baseWage:f.baseWage, transportTotal:f.transportTotal,
-           bonusesTotal:f.bonusesTotal, subTotal:f.subTotal, leavesTotal:f.leavesTotal, advancesTotal:f.advancesTotal, net:f.net, frozen:true, paid:!!f.paid };
+           bonusesTotal:f.bonusesTotal, subTotal:f.subTotal, leavesTotal:f.leavesTotal, advancesTotal:f.advancesTotal, loanTotal:Number(f.loanTotal) || 0, reportIn:Number(f.reportIn) || 0,
+           solde:(f.solde !== undefined ? f.solde : f.net), reportOut:Number(f.reportOut) || 0, net:f.net, frozen:true, paid:!!f.paid };
 }
 // vrai si les données actuelles ne correspondent plus à ce qui a été figé
 function pt_closureStale(sessions){
@@ -1725,318 +1727,91 @@ function pt_closureStale(sessions){
     return Math.round(l.net) !== Math.round(f.net) || Math.abs(l.totalHours - f.hours) > 0.005;
   });
 }
-function pt_payroll(code, sessions){
+function pt_baseOf(code, sessions){
   const mySess = sessions.filter(s=>s.code === code);
   const myManual = pt_entries.filter(e=>e.kind === 'manual' && e.code === code && pt_inRange(e.date));
   const totalHours = mySess.reduce((s,x)=>s+x.hours, 0) + myManual.reduce((s,x)=>s+(Number(x.hours)||0), 0);
   const rate = pt_rate(code), mode = pt_mode(code);
   const workedDays = new Set([...mySess.map(s=>pt_day(s.date)), ...myManual.map(m=>m.date)]).size;
   const baseWage = mode === 'daily' ? workedDays * rate : totalHours * rate;
+  return { totalHours, rate, mode, workedDays, baseWage };
+}
+/* ---- prêts : { kind:'pret', code, date, amount (total), note, schedule:[{d:'AAAA-MM-JJ', a:montant}] } ----
+   Chaque échéance se déduit de la paie de la période qui contient sa date. Elle est « remboursée » quand son jour est clôturé. */
+function pt_loansOf(code){ return pt_entries.filter(e=>e.kind === 'pret' && e.code === code); }
+function pt_loanDues(code){
+  const out = [];
+  pt_loansOf(code).forEach(l=>(l.schedule || []).forEach((x, i)=>{ if(x && x.d && pt_inRange(x.d)) out.push({ id:l.id + ':' + i, date:x.d, amount:Number(x.a) || 0, note:l.note || 'Prêt' }); }));
+  return out;
+}
+function pt_loanStats(l, asOf){
+  const total = Number(l.amount) || 0, sch = (l.schedule || []).filter(x=>x && x.d);
+  const sum = (f)=>sch.filter(f).reduce((s,x)=>s + (Number(x.a) || 0), 0);
+  const planned = sum(()=>true), repaid = sum(x=>asOf ? x.d <= asOf : pt_dayClosed(x.d));
+  const r2 = (n)=>Math.round(n * 100) / 100;
+  return { total, planned:r2(planned), toPlan:r2(total - planned), repaid:r2(repaid), due:r2(total - repaid) };
+}
+/* ---- report : déficit d'une période clôturée (semaine / période) déduit de la suivante ---- */
+function pt_reportIn(code, from){
+  if(!from) return 0;
+  let best = null;
+  pt_clotures.forEach(c=>{
+    if((c.kind !== 'week' && c.kind !== 'period') || !c.from || !c.to || c.to >= from) return;
+    if(!best || c.to > best.to || (c.to === best.to && c.from > best.from)) best = c;
+  });
+  const r = best && best.rows && best.rows[code];
+  return r ? Math.min(0, Number(r.reportOut) || 0) : 0;
+}
+function pt_payroll(code, sessions){
+  const b = pt_baseOf(code, sessions);
   const tr = pt_transport(code);
-  const transportTotal = tr.enabled ? workedDays * tr.amount : 0;
+  const transportTotal = tr.enabled ? b.workedDays * tr.amount : 0;
   const bonuses = pt_entriesOf('prime', code), leaves = pt_entriesOf('off', code);
-  const advances = pt_entriesOf('avance', code);
+  const advances = pt_entriesOf('avance', code), loans = pt_loanDues(code);
   const sum = (arr)=>arr.reduce((s,x)=>s+x.amount, 0);
-  const bonusesTotal = sum(bonuses), leavesTotal = sum(leaves), advancesTotal = sum(advances);
-  const subTotal = baseWage + transportTotal + bonusesTotal;
-  const net = subTotal + leavesTotal - advancesTotal;
-  return { totalHours, rate, mode, workedDays, baseWage, transport:tr, transportTotal, bonuses, leaves, advances, bonusesTotal, leavesTotal, advancesTotal, subTotal, net };
+  const bonusesTotal = sum(bonuses), leavesTotal = sum(leaves), advancesTotal = sum(advances), loanTotal = sum(loans);
+  const subTotal = b.baseWage + transportTotal + bonusesTotal;
+  const reportIn = pt_reportIn(code, pt_filter.from);
+  const solde = Math.round((subTotal + leavesTotal - advancesTotal - loanTotal + reportIn) * 100) / 100; // peut être négatif
+  const net = Math.max(0, solde), reportOut = Math.min(0, solde) || 0;                                   // à payer / déficit reporté
+  return { ...b, transport:tr, transportTotal, bonuses, leaves, advances, loans, bonusesTotal, leavesTotal, advancesTotal, loanTotal, subTotal, reportIn, solde, net, reportOut };
 }
-
-/* ==================== ANALYSE & CORRECTION AUTOMATIQUE DES POINTAGES ==================== */
-/* Réglages et journal sont stockés dans pointage_entries (collection déjà utilisée) : aucune règle Firestore à ajouter.
-   - doc 'autocfg'   (kind:'autocfg') : réglages de l'analyse automatique
-   - docs 'af_…'     (kind:'autofix') : une correction appliquée, avec de quoi l'annuler
-   Principe : chaque correction est déterministe (même identifiant si deux appareils la calculent en même temps),
-   journalisée, annulable, et une correction annulée n'est jamais refaite. Les périodes de paie clôturées ne sont jamais touchées. */
-const PT_AUTO_DEFAULTS = { enabled:true, dupMin:10, estimate:true, overlapMin:30 };
-const PT_AUTO_MAX_RUN = 400;
-let pt_autoBusy = false, pt_autoKey = '', pt_autoRuns = 0;
-
-function pt_autoCfg(){
-  const c = pt_entries.find(e=>e.kind === 'autocfg') || {};
-  const n = (v, d)=>{ const x = Number(v); return (v !== undefined && v !== null && v !== '' && isFinite(x) && x >= 0) ? x : d; };
-  return { enabled: c.enabled === true, dupMin: n(c.dupMin, PT_AUTO_DEFAULTS.dupMin), estimate: c.estimate !== false, overlapMin: n(c.overlapMin, PT_AUTO_DEFAULTS.overlapMin) };
+/* ---- congé : 1/12 du salaire de base (heures × taux, sans transport ni primes) de la période de calcul ; perçu = « Jours off » payés ---- */
+function pt_congeFrom(asOf){
+  const c = pt_entries.find(e=>e.kind === 'congecfg') || {};
+  const f = /^\d{4}-\d{2}-\d{2}$/.test(c.from || '') ? c.from : '';
+  return (f && f <= asOf) ? f : asOf.slice(0, 4) + '-01-01';
 }
-function pt_autoSetCfg(field, value){
-  const patch = (field === 'enabled' || field === 'estimate') ? { [field]: !!value } : { [field]: Math.max(0, pt_num(value)) };
-  return pt_entriesCol.doc('autocfg').set({ kind:'autocfg', ...patch }, { merge:true }).then(()=>pt_toast('Réglage enregistré.')).catch(e=>alert('Erreur : ' + (e.message || e)));
+function pt_congeOpen(code){ const c = pt_entries.find(e=>e.kind === 'congecfg') || {}; return Number(c.open && c.open[code]) || 0; } // solde initial (négatif = l'employé doit)
+/* base de la semaine : valeur figée si la semaine a été clôturée telle quelle, sinon calcul en direct */
+function pt_congeWeekBase(code, from, to){
+  const fz = pt_clotures.find(c=>c.from === from && c.to === to && c.rows && c.rows[code] && c.rows[code].baseWage !== undefined);
+  if(fz) return { base:Number(fz.rows[code].baseWage) || 0, frozen:true };
+  return { base:pt_withFilter(from, to, ()=>pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))).baseWage), frozen:false };
 }
-
-/* ---------- outils ---------- */
-const pt_tod = (ms)=>{ const d = new Date(ms); return d.getHours() * 60 + d.getMinutes(); };
-const pt_cdist = (a, b)=>{ const x = Math.abs(a - b) % 1440; return Math.min(x, 1440 - x); };
-function pt_circMean(arr){
-  let s = 0, c = 0;
-  arr.forEach(a=>{ const t = a / 1440 * 2 * Math.PI; s += Math.sin(t); c += Math.cos(t); });
-  let m = Math.atan2(s, c) / (2 * Math.PI) * 1440; if(m < 0) m += 1440;
-  return m;
-}
-function pt_median(a){ if(!a.length) return 0; const s = a.slice().sort((x,y)=>x-y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2; }
-
-/* Profil habituel d'un employé : durée médiane de présence, heure moyenne d'arrivée et de départ (sur ses sessions saines). */
-function pt_autoProfile(L){
-  const dur = [], st = [], en = [];
-  for(let i = 0; i + 1 < L.length; i++){
-    if(L[i].type === 0 && L[i+1].type === 1){
-      const h = (L[i+1].ms - L[i].ms) / 3600000;
-      if(h >= 2 && h <= 14){ dur.push(h); st.push(pt_tod(L[i].ms)); en.push(pt_tod(L[i+1].ms)); i++; }
-    }
+/* registre hebdomadaire : par semaine (lundi → dimanche) du début de la période de calcul jusqu'à asOf */
+function pt_congeWeeks(code, asOf){
+  const to = asOf || todayISO(), start = pt_congeFrom(to), weeks = [];
+  let w = pt_weekRange(start).from, cumAcq = 0, cumTaken = 0, left = pt_congeOpen(code);
+  while(w <= to && weeks.length < 400){
+    const wt = pt_addDays(w, 6), a = w < start ? start : w, b = wt > to ? to : wt;
+    const bw = (a === w && b === wt) ? pt_congeWeekBase(code, w, wt) : { base:pt_withFilter(a, b, ()=>pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))).baseWage), frozen:false };
+    const taken = pt_entries.filter(e=>e.kind === 'off' && e.code === code && e.date >= a && e.date <= b).reduce((t,e)=>t + (Number(e.amount) || 0), 0);
+    const acq = bw.base / 12; cumAcq += acq; cumTaken += taken; left += acq - taken;
+    weeks.push({ from:w, to:wt, base:bw.base, acq, taken, cumAcq, cumTaken, left, frozen:bw.frozen });
+    w = pt_addDays(w, 7);
   }
-  const n = dur.length, medDur = pt_median(dur), mad = pt_median(dur.map(x=>Math.abs(x - medDur)));
-  const sM = n ? pt_circMean(st) : 0, eM = n ? pt_circMean(en) : 0;
-  const sSp = n ? st.reduce((s,x)=>s + pt_cdist(x, sM), 0) / n : 0, eSp = n ? en.reduce((s,x)=>s + pt_cdist(x, eM), 0) / n : 0;
-  return { n, medDur, mad, sM, eM, ok: n >= 4 && sSp <= 120 && eSp <= 120, estOK: n >= 6 && mad <= 1 };
+  return weeks;
+}
+function pt_conge(code, asOf){
+  const to = asOf || todayISO(), from = pt_congeFrom(to), weeks = pt_congeWeeks(code, to), open = pt_congeOpen(code);
+  const base = weeks.reduce((t,x)=>t + x.base, 0), total = base / 12, taken = weeks.reduce((t,x)=>t + x.taken, 0);
+  return { from, to, base, total, taken, open, left:open + total - taken, weeks };
 }
 
-/* ---------- moteur : plan de correction pour UN employé ---------- */
-/* evs : [{ id, dt(ISO), type }] — retourne { acts, final, unresolved } sans rien écrire. */
-function pt_autoPlanEmployee(code, evs, cfg, ctx){
-  const L = evs.map(e=>({ id:e.id, code, ms:new Date(e.dt).getTime(), type:e.type })).sort((a,b)=>a.ms - b.ms || a.type - b.type);
-  const prof = pt_autoProfile(L), acts = [];
-  const iso = (ms)=>new Date(ms).toISOString();
-  const k16 = (ms)=>iso(ms).slice(0,16).replace(/\D/g, '');
-  const lid = (rule, ms, extra)=>'af_' + rule + '_' + code + '_' + k16(ms) + (extra || '');
-  const T = (t)=>t === 0 ? 'Entrée' : 'Sortie';
-  const hm = (ms)=>pt_hhmm(new Date(ms));
-  const ok = (id, ms)=>!ctx.seen(id) && !ctx.locked(ms);
-  const dur = Math.round(prof.medDur * 60) * 60000, canEst = cfg.estimate && prof.estOK;
-  const near = (ms, a, b)=>pt_cdist(pt_tod(ms), a) < pt_cdist(pt_tod(ms), b);
-  const canToExit = (ev, g)=>g >= 2 && g <= 14 && (prof.ok ? near(ev.ms, prof.eM, prof.sM) : (g >= 4 && g <= 13));
-  const canToEntry = (ev, g)=>g >= 2 && g <= 14 && (prof.ok ? near(ev.ms, prof.sM, prof.eM) : (g >= 4 && g <= 13));
-  const evInfo = (ev)=>({ id:ev.id, c:code, t:iso(ev.ms), y:ev.type });
-  const del = (ev, rule, text)=>{ acts.push({ logId:lid(rule, ev.ms, '_' + ev.type), type:'del', rule, code, ev:evInfo(ev), text }); };
-  const flip = (ev, to, text)=>{ acts.push({ logId:lid('flip', ev.ms), type:'flip', rule:'flip', code, ev:evInfo(ev), to, text }); ev.type = to; ev.mod = true; };
-  const addEv = (type, ms, text)=>{
-    const lg = lid('add', ms, '_' + type); if(!ok(lg, ms)) return null;
-    const ev = { id:'auto_' + code + '_' + k16(ms) + '_' + type, code, ms, type, mod:true };
-    acts.push({ logId:lg, type:'add', rule:'add', code, ev:evInfo(ev), text }); return ev;
-  };
-  let unresolved = 0;
-
-  // 1) doublons : même type deux fois en quelques minutes (double appui sur le pointeur)
-  const dupMs = cfg.dupMin * 60000;
-  for(let i = 1; i < L.length;){
-    const a = L[i-1], b = L[i];
-    if(b.type === a.type && b.ms - a.ms <= dupMs && ok(lid('dup', b.ms, '_' + b.type), b.ms)){
-      del(b, 'dup', 'Doublon : 2e ' + T(b.type).toLowerCase() + ' à ' + hm(b.ms) + ', ' + Math.round((b.ms - a.ms) / 60000) + ' min après la 1re (' + hm(a.ms) + ')');
-      L.splice(i, 1);
-    } else i++;
-  }
-
-  // 2) parcours chronologique : appariement entrée → sortie, avec réparation des cas courants
-  let open = null, i = 0;
-  while(i < L.length){
-    const ev = L[i];
-    if(ev.type === 0){
-      if(open === null){ open = ev; i++; continue; }
-      const g = (ev.ms - open.ms) / 3600000, nxt = L[i+1];
-      // a) entrée suivie d'une sortie quasi immédiate : rebond, la vraie sortie est la suivante
-      if(nxt && nxt.type === 1 && nxt.ms - ev.ms < 600000 && (nxt.ms - open.ms) / 3600000 <= 14 && ok(lid('rebond', ev.ms, '_0'), ev.ms)){
-        del(ev, 'rebond', 'Entrée parasite à ' + hm(ev.ms) + ' (sortie ' + Math.round((nxt.ms - ev.ms) / 60000) + ' min après) : la session ' + hm(open.ms) + ' → ' + hm(nxt.ms) + ' est conservée');
-        L.splice(i, 1); continue;
-      }
-      // b) deuxième « entrée » en réalité une sortie (type inversé)
-      const idF = lid('flip', ev.ms);
-      if(ctx.seen(idF)){ unresolved++; open.hold = true; ev.hold = true; open = ev; i++; continue; } // correction refusée/annulée par l'utilisateur : on n'insiste pas, ni par une autre correction
-      if(canToExit(ev, g) && ok(idF, ev.ms)){
-        flip(ev, 1, 'Entrée de ' + hm(ev.ms) + ' corrigée en Sortie : une entrée était déjà ouverte à ' + hm(open.ms) + ' (' + pt_fmtH(g) + ' h de présence)');
-        continue;
-      }
-      // c) sortie oubliée : on l'estime avec la durée habituelle
-      const msE = open.ms + dur;
-      const ne = (canEst && !open.hold && msE <= ev.ms - 1800000) ? addEv(1, msE, 'Sortie manquante estimée à ' + hm(msE) + ' (entrée de ' + hm(open.ms) + ' + durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
-      if(ne){ ne.type = 1; L.splice(i, 0, ne); continue; }
-      unresolved++; open = ev; i++; continue;
-    }
-    // ev est une Sortie
-    if(open !== null){
-      const h = (ev.ms - open.ms) / 3600000;
-      if(h <= 15){ open = null; i++; continue; }
-      const msE = open.ms + dur;
-      const ne = (canEst && !open.hold && msE <= ev.ms - 1800000) ? addEv(1, msE, 'Sortie manquante estimée à ' + hm(msE) + ' (entrée de ' + hm(open.ms) + ' + durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
-      if(ne){ L.splice(i, 0, ne); continue; }
-      unresolved++; open = null; // la sortie devient orpheline : traitée ci-dessous
-    }
-    const p1 = L[i-1], p2 = L[i-2];
-    // d) sortie parasite juste après une entrée, suivie de la vraie sortie
-    if(p1 && p2 && p2.type === 0 && p1.type === 1 && !p1.mod && p1.ms - p2.ms < 600000 && ev.ms - p2.ms >= 2 * 3600000 && ev.ms - p2.ms <= 14 * 3600000 && ok(lid('tiny', p1.ms, '_1'), p1.ms)){
-      del(p1, 'tiny', 'Sortie parasite à ' + hm(p1.ms) + ' (session de ' + Math.round((p1.ms - p2.ms) / 60000) + ' min) : la vraie sortie est à ' + hm(ev.ms));
-      L.splice(i - 1, 1); open = p2; i = i - 1; continue;
-    }
-    // e) première « sortie » en réalité une entrée, suivie d'une vraie sortie
-    const nx = L[i+1], idF = lid('flip', ev.ms);
-    if(nx && nx.type === 1){
-      if(ctx.seen(idF)){ unresolved++; ev.hold = true; nx.hold = true; i++; continue; }
-      const gS = (nx.ms - ev.ms) / 3600000;
-      if(canToEntry(ev, gS) && ok(idF, ev.ms)){
-        flip(ev, 0, 'Sortie de ' + hm(ev.ms) + ' corrigée en Entrée : aucune entrée avant, et une sortie suit à ' + hm(nx.ms) + ' (' + pt_fmtH(gS) + ' h de présence)');
-        continue;
-      }
-    }
-    // f) entrée oubliée : on l'estime avec la durée habituelle
-    const msS = ev.ms - dur, prevMs = p1 ? p1.ms : -Infinity;
-    const ne = (canEst && !ev.hold && msS >= prevMs + 1800000) ? addEv(0, msS, 'Entrée manquante estimée à ' + hm(msS) + ' (sortie de ' + hm(ev.ms) + ' − durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
-    if(ne){ L.splice(i, 0, ne); continue; }
-    unresolved++; i++;
-  }
-  // g) dernière entrée jamais fermée depuis plus de 16 h (une entrée récente = employé encore en service : on n'y touche pas)
-  if(open !== null && (ctx.now - open.ms) / 3600000 > 16){
-    const msE = open.ms + dur;
-    const ne = (canEst && !open.hold && msE <= ctx.now) ? addEv(1, msE, 'Sortie manquante estimée à ' + hm(msE) + ' (entrée de ' + hm(open.ms) + ' + durée habituelle ' + pt_fmtH(prof.medDur) + ' h)') : null;
-    if(ne) L.push(ne); else unresolved++;
-  }
-  return { acts, final:L, unresolved };
-}
-
-/* ---------- moteur : plan global (tous les employés + chevauchements de poste) ---------- */
-function pt_autoPlan(){
-  const cfg = pt_autoCfg();
-  const seenIds = new Set(pt_entries.filter(e=>e.kind === 'autofix').map(e=>e.id));
-  const locks = pt_clotures.map(c=>[c.from, c.to]);
-  const ctx = {
-    now: Date.now(),
-    seen: (id)=>seenIds.has(id),
-    locked: (ms)=>{ const d = pt_day(new Date(ms)); return locks.some(l=>d >= l[0] && d <= l[1]); }
-  };
-  const byCode = {};
-  pt_events.forEach(e=>{ (byCode[e.code] = byCode[e.code] || []).push(e); });
-  let acts = [], unresolved = 0;
-  const finalEvents = [];
-  Object.keys(byCode).forEach(k=>{
-    const r = pt_autoPlanEmployee(Number(k), byCode[k], cfg, ctx);
-    acts = acts.concat(r.acts); unresolved += r.unresolved;
-    r.final.forEach(e=>finalEvents.push({ id:e.id, code:e.code, dt:new Date(e.ms).toISOString(), type:e.type, mod:!!e.mod }));
-  });
-  // chevauchements de poste (deux collègues qui se relaient) : petit dépassement → la sortie est ramenée à l'entrée du collègue
-  if(cfg.overlapMin > 0 && pt_groups.length){
-    const sessions = pt_computeRaw(finalEvents).sessions;
-    pt_computeOverlaps(sessions, true).forEach(o=>{
-      if(o.hours * 60 > cfg.overlapMin) return;
-      const evA = finalEvents.find(e=>e.code === o.codeA && e.type === 1 && new Date(e.dt).getTime() === o.aEnd.getTime());
-      if(!evA || evA.mod || String(evA.id).startsWith('auto_')) return;
-      const logId = 'af_ovl_' + o.codeA + '_' + o.aEnd.toISOString().slice(0,16).replace(/\D/g, '');
-      if(ctx.seen(logId) || ctx.locked(o.aEnd.getTime()) || ctx.locked(o.bStart.getTime())) return;
-      const toT = o.bStart.toISOString();
-      acts.push({ logId, type:'time', rule:'ovl', code:o.codeA, changes:[{ id:evA.id, c:o.codeA, y:1, fromT:o.aEnd.toISOString(), toT }],
-        text:'Chevauchement de ' + Math.round(o.hours * 60) + ' min : sortie de ' + pt_name(o.codeA) + ' ramenée de ' + pt_hhmm(o.aEnd) + ' à ' + pt_hhmm(o.bStart) + ' (entrée de ' + pt_name(o.codeB) + ')' });
-    });
-  }
-  return { acts, unresolved };
-}
-
-/* ---------- application des corrections ---------- */
-async function pt_autoApply(acts){
-  const at = new Date().toISOString(), ops = [];
-  const mset = (iso, id, val)=>({ t:'set', ref:pt_monthRef(iso.slice(0,7)), data:{ ev:{ [id]:val } } });
-  acts.forEach(a=>{
-    const doc = { kind:'autofix', rule:a.rule, type:a.type, code:a.code, text:a.text, runId:at, at, undone:false, creePar:'auto' };
-    if(a.type === 'del'){
-      ops.push(mset(a.ev.t, a.ev.id, PT_DEL()));
-      ops.push(pt_ignoreOp([{ code:a.ev.c, dt:a.ev.t, type:a.ev.y }])); // supprimé : ne reviendra pas à l'import
-      doc.ev = a.ev;
-    } else if(a.type === 'flip'){
-      ops.push(mset(a.ev.t, a.ev.id, { c:a.ev.c, t:a.ev.t, y:a.to }));
-      ops.push(pt_ignoreOp([{ code:a.ev.c, dt:a.ev.t, type:a.ev.y }]));
-      doc.ev = a.ev; doc.to = a.to;
-    } else if(a.type === 'add'){
-      ops.push(mset(a.ev.t, a.ev.id, { c:a.ev.c, t:a.ev.t, y:a.ev.y }));
-      doc.ev = a.ev;
-    } else if(a.type === 'time'){
-      a.changes.forEach(ch=>{
-        if(ch.fromT.slice(0,7) !== ch.toT.slice(0,7)) ops.push(mset(ch.fromT, ch.id, PT_DEL()));
-        ops.push(mset(ch.toT, ch.id, { c:ch.c, t:ch.toT, y:ch.y }));
-        ops.push(pt_ignoreOp([{ code:ch.c, dt:ch.fromT, type:ch.y }]));
-      });
-      doc.changes = a.changes;
-    }
-    ops.push({ t:'set', ref:pt_entriesCol.doc(a.logId), data:doc });
-  });
-  await pt_commit(ops);
-  pt_toast(acts.length + ' correction' + (acts.length > 1 ? 's' : '') + ' automatique' + (acts.length > 1 ? 's' : '') + ' appliquée' + (acts.length > 1 ? 's' : '') + '.');
-}
-
-/* ---------- déclenchement ---------- */
-function pt_autoMaybeRun(force){
-  if(pt_autoBusy || !pt_isAdmin()) return;
-  if(!Object.keys(pt_ready).every(k=>pt_ready[k])) return;
-  const cfg = pt_autoCfg();
-  if(!cfg.enabled && !force) return;
-  const key = pt_eventsVersion + '|' + pt_clotures.length + '|' + JSON.stringify(cfg) + '|' + pt_entries.filter(e=>e.kind === 'autofix').length + '|' + pt_groups.length;
-  if(!force && (key === pt_autoKey || pt_autoRuns >= 20)) return; // garde-fou contre toute boucle
-  pt_autoKey = key;
-  const plan = pt_autoPlan();
-  if(!plan.acts.length){ if(force) pt_toast(plan.unresolved ? 'Rien de plus à corriger tout seul — ' + plan.unresolved + ' cas à voir à la main.' : 'Tout est déjà propre.'); return; }
-  pt_autoBusy = true; pt_autoRuns++;
-  pt_autoApply(plan.acts.slice(0, PT_AUTO_MAX_RUN))
-    .catch(e=>{ console.error(e); pt_autoRuns = 99; alert('Correction automatique interrompue : ' + (e.message || e)); })
-    .then(()=>{ pt_autoBusy = false; });
-}
-function pt_autoRunNow(){ pt_autoRuns = 0; pt_autoMaybeRun(true); }
-/* Aperçu : liste des corrections proposées sur la période choisie ; chacune se valide ou se refuse une par une.
-   Une correction refusée est enregistrée dans le journal comme « refusée » et n'est plus jamais reproposée (bouton « Reproposer »). */
-let pt_autoPrev = { open:false, from:null, to:null };
-let pt_autoPlanCache = { key:'', plan:null };
-function pt_autoPlanCached(){
-  const key = [pt_eventsVersion, pt_clotures.length, pt_groups.length, Object.keys(pt_ovIgn).length, pt_entries.filter(e=>e.kind === 'autofix').length, JSON.stringify(pt_autoCfg())].join('|');
-  if(pt_autoPlanCache.key !== key) pt_autoPlanCache = { key, plan:pt_autoPlan() };
-  return pt_autoPlanCache.plan;
-}
-function pt_autoActIso(a){ return a.ev ? a.ev.t : a.changes[0].fromT; }
-function pt_autoPeriodPlan(){
-  const f = pt_autoPrev.from, t = pt_autoPrev.to;
-  const acts = pt_autoPlanCached().acts.filter(a=>{ const d = pt_day(new Date(pt_autoActIso(a))); return (!f || d >= f) && (!t || d <= t); })
-    .sort((x,y)=>pt_autoActIso(x).localeCompare(pt_autoActIso(y)));
-  return { acts };
-}
-function pt_autoPrevToggle(){ pt_autoPrev.open = !pt_autoPrev.open; pt_render(true); }
-function pt_autoSetPeriod(field, v){ pt_autoPrev[field] = v || ''; pt_render(true); }
-function pt_autoPeriodLabel(){
-  const f = pt_autoPrev.from, t = pt_autoPrev.to;
-  return (!f && !t) ? 'tout l’historique' : 'du ' + (f ? fmtDateShort(f) : '…') + ' au ' + (t ? fmtDateShort(t) : '…');
-}
-async function pt_autoValidate(logId){
-  const a = pt_autoPeriodPlan().acts.find(x=>x.logId === logId); if(!a || pt_autoBusy) return;
-  pt_autoBusy = true;
-  try{ await pt_autoApply([a]); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
-  pt_autoBusy = false; pt_render(true);
-}
-async function pt_autoValidateAll(){
-  const list = pt_autoPeriodPlan().acts; if(!list.length || pt_autoBusy) return;
-  if(!confirm('Appliquer les ' + list.length + ' correction' + (list.length > 1 ? 's' : '') + ' proposée' + (list.length > 1 ? 's' : '') + ' (' + pt_autoPeriodLabel() + ') ?\nTout reste annulable depuis le journal.')) return;
-  pt_autoBusy = true;
-  try{ await pt_autoApply(list.slice(0, PT_AUTO_MAX_RUN)); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
-  pt_autoBusy = false; pt_render(true);
-}
-async function pt_autoReject(logId){
-  const a = pt_autoPeriodPlan().acts.find(x=>x.logId === logId); if(!a) return;
-  const at = new Date().toISOString();
-  const doc = { kind:'autofix', rule:a.rule, type:a.type, code:a.code, text:a.text, runId:at, at, undone:true, rejected:true, creePar:'refus',
-    ev:a.ev || null, to:(a.to === undefined ? null : a.to), changes:a.changes || null };
-  try{ await pt_entriesCol.doc(a.logId).set(doc); pt_toast('Correction refusée — elle ne sera plus proposée.'); }
-  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
-}
-async function pt_autoUnreject(id){
-  const l = pt_entries.find(e=>e.id === id); if(!l || !l.rejected) return;
-  try{ await pt_entriesCol.doc(id).delete(); pt_toast('Correction à nouveau proposée.'); }
-  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
-}
-function pt_autoPreviewHtml(){
-  if(!pt_autoPrev.open) return '';
-  const list = pt_autoPeriodPlan().acts;
-  if(!list.length) return `<div class="ticket"><div class="section-label">Aperçu — ${pt_e(pt_autoPeriodLabel())}</div><div class="pt-muted">Rien à corriger automatiquement sur cette période. Les cas restants se traitent à la main dans la liste ci-dessous.</div>
-    <div class="pt-row" style="margin-top:10px;"><button class="btn ghost small" onclick="pt_autoPrevToggle()">Fermer</button></div></div>`;
-  const rows = list.map(a=>{
-    const r = PT_AUTO_RULES[a.rule] || [a.rule, 'pt-b-off'];
-    return `<tr><td>${pt_fmtDT(new Date(pt_autoActIso(a)))}</td><td>${pt_e(pt_name(a.code))}</td><td><span class="pt-badge ${r[1]}">${pt_e(r[0])}</span></td><td style="white-space:normal;min-width:220px;">${pt_e(a.text)}</td>
-      <td><button class="btn small" onclick="pt_autoValidate('${a.logId}')">Valider</button> <button class="btn ghost small" onclick="pt_autoReject('${a.logId}')">Refuser</button></td></tr>`;
-  }).join('');
-  return `<div class="ticket"><div class="section-label">Aperçu — ${pt_e(pt_autoPeriodLabel())} · ${list.length} correction${list.length>1?'s':''} proposée${list.length>1?'s':''} <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">(rien n’est modifié tant que tu ne valides pas)</span></div>
-    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Pointage</th><th>Employé</th><th>Règle</th><th>Correction</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="pt-row" style="margin-top:10px;"><button class="btn small" onclick="pt_autoValidateAll()">Tout valider (${list.length})</button><button class="btn ghost small" onclick="pt_autoPrevToggle()">Fermer</button></div></div>`;
-}
-
-/* ---------- annulation ---------- */
+/* ==================== ANCIENNES CORRECTIONS AUTOMATIQUES (annulation seulement) ==================== */
+/* La correction automatique a été retirée de l'application. Si des corrections avaient déjà été appliquées avant (documents
+   kind:'autofix' de pointage_entries), l'onglet « Corrections passées » permet de les annuler. Sans trace, l'onglet n'apparaît pas. */
 async function pt_autoUndo(ids){
   const list = ids.map(id=>pt_entries.find(e=>e.id === id)).filter(l=>l && l.kind === 'autofix' && !l.undone);
   if(!list.length) return;
@@ -2068,55 +1843,27 @@ function pt_autoUndoRun(runId){
   if(!ids.length) return;
   if(confirm('Annuler les ' + ids.length + ' correction(s) de ce passage ?\nLes pointages reviennent à leur état d’origine, et ces corrections ne seront pas refaites automatiquement.')) pt_autoUndo(ids);
 }
-
-/* ---------- affichage : carte (onglet Anomalies), journal, réglages ---------- */
 const PT_AUTO_RULES = { dup:['Doublon','pt-b-prime'], rebond:['Rebond','pt-b-prime'], tiny:['Parasite','pt-b-prime'], flip:['Type inversé','pt-b-prime'], add:['Estimé','pt-b-off'], ovl:['Chevauchement','pt-b-prime'] };
-function pt_autoLogs(){ return pt_entries.filter(e=>e.kind === 'autofix').sort((a,b)=>String(b.at || '').localeCompare(String(a.at || ''))); }
-function pt_autoCard(){
-  if(!pt_isAdmin()) return '';
-  if(pt_autoPrev.from === null){ pt_autoPrev.from = pt_filter.from || ''; pt_autoPrev.to = pt_filter.to || ''; } // au départ : la période affichée en haut
-  const cfg = pt_autoCfg(), logs = pt_autoLogs(), active = logs.filter(l=>!l.undone), est = active.filter(l=>l.rule === 'add').length;
-  return `<div class="ticket"><div class="section-label">Correction automatique ${cfg.enabled ? '<span class="pt-badge pt-b-prime">activée</span>' : '<span class="pt-badge pt-b-off">désactivée</span>'}</div>
-    <div class="pt-muted">Doublons, entrées/sorties inversées, pointages parasites, oublis et petits chevauchements sont proposés ici ; tu valides ou refuses chaque correction. Tout est tracé dans le journal et annulable.</div>
-    <div class="grid grid-2" style="margin-top:10px;">
-      <div class="field"><label>Analyser du</label><input type="date" value="${pt_e(pt_autoPrev.from)}" onchange="pt_autoSetPeriod('from', this.value)"></div>
-      <div class="field"><label>Au</label><input type="date" value="${pt_e(pt_autoPrev.to)}" onchange="pt_autoSetPeriod('to', this.value)"></div>
-    </div>
-    <div class="pt-muted" style="margin-top:4px;">Laisse vide pour tout l’historique. Cette période ne concerne que l’aperçu et « Tout valider » ; elle est indépendante de la période affichée en haut.${cfg.enabled ? ' Quand la correction automatique est activée (Réglages), elle s’applique, elle, à toutes les dates.' : ''}</div>
-    <div class="pt-row" style="margin-top:10px;"><button class="btn small" onclick="pt_autoPrevToggle()">${pt_autoPrev.open ? 'Masquer l’aperçu' : 'Voir ce qui serait corrigé'}</button><button class="btn ghost small" onclick="pt_setTab('journal')">Journal (${active.length})</button></div>
-    ${est ? `<div class="pt-muted" style="margin-top:8px;">${est} pointage${est>1?'s':''} estimé${est>1?'s':''} à l’horaire habituel — à vérifier dans le journal si besoin.</div>` : ''}
-  </div>${pt_autoPreviewHtml()}`;
-}
+function pt_autoLogs(){ return pt_entries.filter(e=>e.kind === 'autofix' && !e.rejected).sort((a,b)=>String(b.at || '').localeCompare(String(a.at || ''))); }
+function pt_hasAutoLogs(){ return pt_autoLogs().some(l=>!l.undone); }
 function pt_tabJournal(){
   const logs = pt_autoLogs().slice(0, 400);
-  if(!logs.length) return pt_empty('Aucune correction automatique pour l’instant.');
+  if(!logs.length) return pt_empty('Aucune ancienne correction automatique.');
   const runs = []; const map = {};
   logs.forEach(l=>{ const r = l.runId || l.at || ''; if(!map[r]){ map[r] = { runId:r, items:[] }; runs.push(map[r]); } map[r].items.push(l); });
   const when = (l)=>{ const t = l.ev ? l.ev.t : (l.changes && l.changes[0] ? l.changes[0].fromT : null); return t ? pt_fmtDT(new Date(t)) : ''; };
-  return runs.map(r=>{
+  return `<div class="ticket"><div class="pt-muted">La correction automatique n’existe plus. Ces corrections avaient été appliquées avant son retrait : tu peux les annuler pour retrouver les pointages d’origine.</div></div>` + runs.map(r=>{
     const d = new Date(r.runId), left = r.items.filter(x=>!x.undone).length;
     const head = isNaN(d.getTime()) ? 'Passage' : 'Passage du ' + fmtDateShort(pt_day(d)) + ' à ' + pt_hhmm(d);
     const rows = r.items.sort((a,b)=>String(a.text).localeCompare(String(b.text))).map(l=>{
       const rule = PT_AUTO_RULES[l.rule] || [l.rule || '', 'pt-b-off'];
       return `<tr${l.undone ? ' class="pt-manual"' : ''}><td>${when(l)}</td><td>${pt_e(pt_name(l.code))}</td><td><span class="pt-badge ${rule[1]}">${pt_e(rule[0])}</span></td><td style="white-space:normal;min-width:220px;">${pt_e(l.text)}</td>
-        <td>${l.rejected ? `<span class="pt-muted">refusée</span> <button class="btn ghost small" onclick="pt_autoUnreject('${l.id}')">Reproposer</button>` : l.undone ? '<span class="pt-muted">annulée</span>' : `<button class="btn ghost small" onclick="pt_autoUndo(['${l.id}'])">Annuler</button>`}</td></tr>`;
+        <td>${l.undone ? '<span class="pt-muted">annulée</span>' : `<button class="btn ghost small" onclick="pt_autoUndo(['${l.id}'])">Annuler</button>`}</td></tr>`;
     }).join('');
     return `<div class="ticket"><div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;">${head} <span class="pt-muted">— ${r.items.length} correction${r.items.length>1?'s':''}</span></div>
       ${left ? `<button class="btn ghost small" onclick="pt_autoUndoRun('${r.runId}')">Tout annuler</button>` : ''}</div>
       <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Pointage</th><th>Employé</th><th>Règle</th><th>Correction</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }).join('');
-}
-function pt_autoSettingsCard(){
-  const c = pt_autoCfg();
-  return `<div class="ticket"><div class="section-label">Correction automatique des pointages</div>
-    <div class="perm-row"><span>Analyser et corriger automatiquement (à l’ouverture de Pointage et après chaque import)</span><label class="switch"><input type="checkbox" ${c.enabled ? 'checked' : ''} onchange="pt_autoSetCfg('enabled', this.checked)"><span class="slider"></span></label></div>
-    <div class="perm-row"><span>Estimer un pointage oublié avec l’horaire habituel de l’employé</span><label class="switch"><input type="checkbox" ${c.estimate ? 'checked' : ''} onchange="pt_autoSetCfg('estimate', this.checked)"><span class="slider"></span></label></div>
-    <div class="grid grid-2" style="margin-top:10px;">
-      <div class="field"><label>Doublon : même pointage en moins de (min)</label><input type="text" inputmode="numeric" value="${c.dupMin}" onchange="pt_autoSetCfg('dupMin', this.value)"></div>
-      <div class="field"><label>Chevauchement corrigé jusqu’à (min)</label><input type="text" inputmode="numeric" value="${c.overlapMin}" onchange="pt_autoSetCfg('overlapMin', this.value)"></div>
-    </div>
-    <div class="pt-muted" style="margin-top:8px;">L’estimation n’a lieu que si l’employé a au moins 6 sessions régulières. Les périodes de paie clôturées ne sont jamais modifiées.</div>
-  </div>`;
 }
 
 /* ==================== rendu ==================== */
@@ -2144,7 +1891,7 @@ function pt_restoreInputs(st, withValues){
     if(el){ el.focus(); if(st.focus.s != null && el.setSelectionRange){ try{ el.setSelectionRange(st.focus.s, st.focus.e); }catch(e){} } }
   }
 }
-let pt_open = { overview:false, pointages:true, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
+let pt_open = { overview:false, conges:false, congeEmp:false, pointages:true, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
 function pt_toggleSec(key){ pt_open[key] = !pt_open[key]; pt_render(true); }
 function pt_accordion(key, title, innerHtml){
   const open = !!pt_open[key];
@@ -2161,8 +1908,8 @@ function pt_selEmp(v){ pt_sel = Number(v); pt_render(true); }
 function pt_isAdmin(){ return !!(session && session.isAdmin); }
 function pt_renderTabs(nAnom){
   // Réglages (taux, salaires) : réservé aux administrateurs
-  const tabs = [['anomalies','Anomalies'],['employes','Employés'],['clotures','Clôtures'],['journal','Journal auto'],['reglages','Réglages']]
-    .filter(t=>pt_isAdmin() || (t[0] !== 'reglages' && t[0] !== 'journal' && t[0] !== 'clotures'));
+  const tabs = [['anomalies','Anomalies'],['employes','Employés'],['clotures','Clôtures'],['journal','Corrections passées'],['reglages','Réglages']]
+    .filter(t=>(pt_isAdmin() || (t[0] !== 'reglages' && t[0] !== 'journal' && t[0] !== 'clotures')) && (t[0] !== 'journal' || pt_hasAutoLogs()));
   document.getElementById('pointage-tabs').innerHTML = tabs.map(([id,l])=>
     `<button class="${pt_tab===id?'active':''}" onclick="pt_setTab('${id}')">${l}${id==='anomalies' && nAnom ? ` <span class="count-pill">${nAnom}</span>` : ''}</button>`).join('');
 }
@@ -2170,6 +1917,7 @@ function pt_render(fresh){
   if(activeModule !== 'pointage') return;
   const body = document.getElementById('pt-body'); if(!body) return;
   if(!pt_isAdmin() && (pt_tab === 'reglages' || pt_tab === 'journal' || pt_tab === 'clotures')) pt_tab = 'anomalies';
+  if(pt_tab === 'journal' && !pt_hasAutoLogs()) pt_tab = 'anomalies';
   pt_renderPeriod();
   if(pt_error){ pt_renderTabs(0); body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
   if(!Object.keys(pt_ready).every(k=>pt_ready[k])){
@@ -2202,7 +1950,6 @@ function pt_render(fresh){
   else html = pt_tabReglages(codes);
   body.innerHTML = html;
   pt_restoreInputs(st, !fresh);
-  setTimeout(()=>pt_autoMaybeRun(), 0); // analyse automatique (administrateur) quand les données ont changé
 }
 function pt_empty(msg){ return `<div class="ticket"><div class="empty-state">${msg}</div></div>`; }
 function pt_empSelect(codes){
@@ -2232,7 +1979,7 @@ function pt_anomRow(i){
 }
 function pt_tabAnomalies(anoms, nIgnored){
   pt_anomList = anoms;
-  let html = pt_autoCard();
+  let html = '';
   if(anoms.length || nIgnored){
     html += `<div class="ticket"><div class="section-label">Nettoyer la liste</div>
       <div class="pt-row"><input type="date" id="pt-ign-before" class="pt-draft pt-auto"><button class="btn ghost small" onclick="pt_anomIgnoreBefore()">Ignorer toutes les anomalies avant cette date</button></div>
@@ -2263,7 +2010,7 @@ function pt_tabOverlaps(overlaps){
   const rows = overlaps.map((o,i)=>{
     const open = pt_ovOpen === o.key;
     let h = `<div class="pt-an"><div><b>${pt_dm(new Date(o.day + 'T00:00:00'))}</b> — ${pt_e(pt_name(o.codeA))} sorti à ${pt_hhmm(o.aEnd)} · ${pt_e(pt_name(o.codeB))} entré à ${pt_hhmm(o.bStart)}
-        <div class="pt-an-reason">Écart : ${pt_fmtH(o.hours)} h en trop, à vérifier</div></div>
+        <div class="pt-an-reason">Écart : ${pt_fmtH(o.hours)} (hh:mm) en trop, à vérifier</div></div>
       <button class="btn ghost small" onclick="pt_ovToggle(${i})">${open ? 'Fermer' : 'Comparer'}</button></div>`;
     if(open){
       h += `<div class="pt-fix">
@@ -2445,13 +2192,18 @@ async function pt_addEntry(kind){
   if(!raw){ alert('Indique au moins le montant.'); return; }
   const data = { kind, code:pt_sel, date:dEl.value || todayISO(), amount:pt_num(raw), note:nEl.value.trim() };
   if(pt_guardDay(data.date, 'Cette entrée')) return;
+  if(kind === 'avance'){
+    const wk = pt_weekRange(data.date);
+    const sol = pt_withFilter(wk.from, wk.to, ()=>pt_payroll(pt_sel, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))).solde);
+    if(sol - data.amount < 0 && !confirm('Cette avance dépasse le solde de la semaine du ' + fmtDateShort(wk.from) + ' au ' + fmtDateShort(wk.to) + '.\nSolde actuel : ' + pt_fmtMoney(sol) + ' — après l’avance : −' + pt_fmtMoney(data.amount - sol) + '.\nLe déficit sera reporté sur la semaine suivante.\n\nEnregistrer quand même ?')) return;
+  }
   aEl.value = ''; nEl.value = ''; dEl.value = todayISO();
   try{ await pt_addEntryDoc(data); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
 }
 function pt_histRows(p){
   return [
     ...p.bonuses.map(x=>({ ...x, cat:'Prime', cls:'pt-b-prime', sign:1 })),
-    ...p.leaves.map(x=>({ ...x, cat:'Jour Off', cls:'pt-b-off', sign:1 })),
+    ...p.leaves.map(x=>({ ...x, cat:'Jour Off (congé)', cls:'pt-b-off', sign:1 })),
     ...p.advances.map(x=>({ ...x, cat:'Avance', cls:'pt-b-avance', sign:-1 }))
   ].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 }
@@ -2469,7 +2221,8 @@ function pt_closureRows(from, to){
       const p = pt_payroll(code, sessions);
       rows[code] = { name:pt_name(code), hours:pt_r2(p.totalHours), rate:p.rate, mode:p.mode, workedDays:p.workedDays, baseWage:pt_r2(p.baseWage),
         transportTotal:pt_r2(p.transportTotal), bonusesTotal:pt_r2(p.bonusesTotal), subTotal:pt_r2(p.subTotal), leavesTotal:pt_r2(p.leavesTotal),
-        advancesTotal:pt_r2(p.advancesTotal), net:pt_r2(p.net), paid: p.net <= 0 }; // rien à verser => déjà « payé »
+        advancesTotal:pt_r2(p.advancesTotal), loanTotal:pt_r2(p.loanTotal), reportIn:pt_r2(p.reportIn), solde:pt_r2(p.solde), reportOut:pt_r2(p.reportOut),
+        net:pt_r2(p.net), paid: p.net <= 0 }; // rien à verser => déjà « payé »
     });
     return rows;
   });
@@ -2485,6 +2238,12 @@ async function pt_closeRange(from, to, kind){
   if(anom) msg += '\n\n⚠️ ' + anom + ' anomalie' + (anom > 1 ? 's' : '') + ' non traitée' + (anom > 1 ? 's' : '') + ' sur cette période.';
   if(to >= todayISO()) msg += '\n\n⚠️ La période n’est pas terminée : des pointages peuvent encore arriver.';
   if(already) msg += '\n\n' + (already >= total ? 'Tous les jours sont déjà verrouillés par d’autres clôtures : celle-ci fige seulement la paie de cette période.' : already + ' jour' + (already > 1 ? 's' : '') + ' déjà clôturé' + (already > 1 ? 's' : '') + '.');
+  if(kind === 'week' || kind === 'period' || !kind){
+    const chain = (c)=>(c.kind === 'week' || c.kind === 'period') && c.from && c.to;
+    if(pt_clotures.some(c=>chain(c) && c.from > to)) msg += '\n\n⚠️ Des clôtures plus récentes existent déjà : leur report ne sera pas recalculé.';
+    let prev = null; pt_clotures.forEach(c=>{ if(chain(c) && c.to < from && (!prev || c.to > prev.to)) prev = c; });
+    if(prev && pt_addDays(prev.to, 1) < from && Object.keys(prev.rows || {}).some(k=>(Number(prev.rows[k].reportOut) || 0) < 0)) msg += '\n\n⚠️ Des jours non clôturés séparent la dernière période clôturée (jusqu’au ' + fmtDateShort(prev.to) + ') de celle-ci, et des soldes négatifs y sont à reporter.';
+  }
   if(!confirm(msg)) return;
   const doc = { from, to, kind:kind || 'period', createdAt:new Date().toISOString(), createdBy:currentUser, rows:pt_closureRows(from, to) };
   let ref;
@@ -2538,16 +2297,16 @@ function pt_recapHtml(from, to, closure){
     const emps = [];
     pt_codes().forEach(code=>{
       const p = pt_payroll(code, sessions), fz = closure && closure.rows && closure.rows[code];
-      const tot = fz ? { hours:fz.hours, transport:fz.transportTotal, bonuses:fz.bonusesTotal, leaves:fz.leavesTotal, advances:fz.advancesTotal, net:fz.net }
-                     : { hours:p.totalHours, transport:p.transportTotal, bonuses:p.bonusesTotal, leaves:p.leavesTotal, advances:p.advancesTotal, net:p.net };
-      const days = {}, get = (d)=>(days[d] = days[d] || { sess:[], manual:[], prime:0, off:0, avance:0 });
+      const tot = fz ? { hours:fz.hours, transport:fz.transportTotal, bonuses:fz.bonusesTotal, leaves:fz.leavesTotal, advances:fz.advancesTotal, loans:Number(fz.loanTotal) || 0, report:Number(fz.reportIn) || 0, carry:Number(fz.reportOut) || 0, net:fz.net }
+                     : { hours:p.totalHours, transport:p.transportTotal, bonuses:p.bonusesTotal, leaves:p.leavesTotal, advances:p.advancesTotal, loans:p.loanTotal, report:p.reportIn, carry:p.reportOut, net:p.net };
+      const days = {}, get = (d)=>(days[d] = days[d] || { sess:[], manual:[], prime:0, off:0, avance:0, pret:0 });
       sessions.filter(s=>s.code === code).forEach(s=>get(pt_day(s.date)).sess.push(s));
       pt_entries.filter(e=>e.kind === 'manual' && e.code === code && pt_inRange(e.date)).forEach(m=>get(m.date).manual.push(m));
-      p.bonuses.forEach(x=>{ get(x.date).prime += x.amount; }); p.leaves.forEach(x=>{ get(x.date).off += x.amount; }); p.advances.forEach(x=>{ get(x.date).avance += x.amount; });
-      if(!Object.keys(days).length && !tot.net) return;
+      p.bonuses.forEach(x=>{ get(x.date).prime += x.amount; }); p.leaves.forEach(x=>{ get(x.date).off += x.amount; }); p.advances.forEach(x=>{ get(x.date).avance += x.amount; }); p.loans.forEach(x=>{ get(x.date).pret += x.amount; });
+      if(!Object.keys(days).length && !tot.net && !tot.carry) return;
       emps.push({ code, name:pt_e(pt_name(code)), rate:p.rate, mode:p.mode, tr:p.transport, days, tot });
     });
-    const G = { hours:0, transport:0, bonuses:0, leaves:0, advances:0, net:0 };
+    const G = { hours:0, transport:0, bonuses:0, leaves:0, advances:0, loans:0, report:0, carry:0, net:0 };
     let body = '';
     emps.forEach(e=>{
       const price = pt_fmtMoney(e.rate) + (e.mode === 'daily' ? '/j' : '/h');
@@ -2560,21 +2319,26 @@ function pt_recapHtml(from, to, closure){
           const first = i === 0, worked = x.sess.length + x.manual.length > 0;
           body += '<tr>' + PT_TD(dayLabel(d)) + PT_TD(e.name) + PT_TD(l.a) + PT_TD(l.b) + PT_TD(l.h ? pt_fmtH(l.h) : '', true) + PT_TD(first ? price : '', true)
             + PT_TD(first && worked && e.tr.enabled ? pt_fmtMoney(e.tr.amount) : '', true) + PT_TD(first ? money(x.prime) : '', true) + PT_TD(first ? money(x.off) : '', true)
-            + PT_TD(first && x.avance ? '−' + pt_fmtMoney(x.avance) : '', true) + '<td></td></tr>';
+            + PT_TD(first && x.avance ? '−' + pt_fmtMoney(x.avance) : '', true) + PT_TD(first && x.pret ? '−' + pt_fmtMoney(x.pret) : '', true) + '<td></td><td></td></tr>';
         });
       });
       const t = e.tot;
       body += '<tr bgcolor="#e8efe8">' + PT_TD('TOTAL', false, true) + PT_TD(e.name, false, true) + '<td></td><td></td>' + PT_TD(pt_fmtH(t.hours), true, true) + PT_TD(price, true, true)
-        + PT_TD(money(t.transport), true, true) + PT_TD(money(t.bonuses), true, true) + PT_TD(money(t.leaves), true, true) + PT_TD(t.advances ? '−' + pt_fmtMoney(t.advances) : '', true, true) + PT_TD(pt_fmtMoney(t.net), true, true) + '</tr>';
+        + PT_TD(money(t.transport), true, true) + PT_TD(money(t.bonuses), true, true) + PT_TD(money(t.leaves), true, true) + PT_TD(t.advances ? '−' + pt_fmtMoney(t.advances) : '', true, true) + PT_TD(t.loans ? '−' + pt_fmtMoney(t.loans) : '', true, true) + PT_TD(t.report < 0 ? '−' + pt_fmtMoney(-t.report) : '', true, true) + PT_TD(pt_fmtMoney(t.net), true, true) + '</tr>';
       Object.keys(G).forEach(k=>{ G[k] += Number(t[k]) || 0; });
     });
-    if(!emps.length) body = '<tr><td colspan="11">Aucune activité sur cette période.</td></tr>';
+    if(!emps.length) body = '<tr><td colspan="13">Aucune activité sur cette période.</td></tr>';
     else body += '<tr bgcolor="#cfe0cf">' + PT_TD('TOTAL GÉNÉRAL', false, true) + '<td></td><td></td><td></td>' + PT_TD(pt_fmtH(G.hours), true, true) + '<td></td>'
-      + PT_TD(money(G.transport), true, true) + PT_TD(money(G.bonuses), true, true) + PT_TD(money(G.leaves), true, true) + PT_TD(G.advances ? '−' + pt_fmtMoney(G.advances) : '', true, true) + PT_TD(pt_fmtMoney(G.net), true, true) + '</tr>';
+      + PT_TD(money(G.transport), true, true) + PT_TD(money(G.bonuses), true, true) + PT_TD(money(G.leaves), true, true) + PT_TD(G.advances ? '−' + pt_fmtMoney(G.advances) : '', true, true) + PT_TD(G.loans ? '−' + pt_fmtMoney(G.loans) : '', true, true) + PT_TD(G.report < 0 ? '−' + pt_fmtMoney(-G.report) : '', true, true) + PT_TD(pt_fmtMoney(G.net), true, true) + '</tr>';
+    const carries = emps.filter(e=>e.tot.carry < 0).map(e=>e.name + ' : −' + pt_fmtMoney(-e.tot.carry));
+    const carryHtml = carries.length ? '<p style="color:#b3261e;font-size:12px;"><b>Solde négatif reporté sur la période suivante</b> (payé : 0) — ' + carries.join(' · ') + '</p>' : '';
+    const soldes = emps.map(e=>{ const k = pt_conge(e.code, to); const loans = pt_loansOf(e.code).reduce((t, l)=>t + pt_loanStats(l, to).due, 0); return { name:e.name, k, loans }; }).filter(x=>x.k.total || x.k.taken || x.loans);
+    const soldesHtml = soldes.length ? '<p style="margin-bottom:4px;"><b>Soldes au ' + fmtDateShort(to) + '</b></p><table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;font-size:12px;border-color:#bbb;"><tr bgcolor="#2d4a35" style="color:#fff;"><th align="left">Employé</th><th>Congé total (1/12)</th><th>Congé perçu</th><th>Congé restant</th><th>Prêt : reste dû</th></tr>'
+      + soldes.map(x=>'<tr>' + PT_TD(x.name) + PT_TD(pt_fmtMoney(x.k.total), true) + PT_TD(pt_fmtMoney(x.k.taken), true) + PT_TD((x.k.left < 0 ? '−' : '') + pt_fmtMoney(Math.abs(x.k.left)), true) + PT_TD(x.loans ? pt_fmtMoney(x.loans) : '', true) + '</tr>').join('') + '</table>' : '';
     const html = '<div style="font-family:Arial,sans-serif;font-size:13px;color:#222;">'
       + '<p>Récapitulatif ' + pt_e(pt_rangeLabel(from, to)) + (closure && closure.createdAt ? ' — clôturé le ' + fmtDateShort(String(closure.createdAt).slice(0,10)) : '') + '.</p>'
-      + '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;font-size:12px;border-color:#bbb;"><tr bgcolor="#2d4a35" style="color:#fff;"><th align="left">Date</th><th align="left">Employé</th><th>Entrée</th><th>Sortie</th><th>Heures</th><th>Prix unitaire</th><th>Transport</th><th>Prime</th><th>Jour off</th><th>Avance</th><th>Total</th></tr>'
-      + body + '</table><p style="color:#666;font-size:11px;">Total = base + transport + primes + jours off − avances.</p></div>';
+      + '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;font-size:12px;border-color:#bbb;"><tr bgcolor="#2d4a35" style="color:#fff;"><th align="left">Date</th><th align="left">Employé</th><th>Entrée</th><th>Sortie</th><th>Heures (hh:mm)</th><th>Prix unitaire</th><th>Transport</th><th>Prime</th><th>Jour off</th><th>Avance</th><th>Prêt</th><th>Report</th><th>Total</th></tr>'
+      + body + '</table>' + carryHtml + '<p style="color:#666;font-size:11px;">Total = base + transport + primes + jours off (congé) − avances − prêt − report précédent.</p>' + soldesHtml + '</div>';
     return { html, totals:G, count:emps.length };
   });
 }
@@ -2628,21 +2392,149 @@ function pt_closureBar(sessions){
 function pt_paieTotals(codes, sessions){
   const qs = codes.map(x=>pt_displayPayroll(x, sessions));
   const S = (k)=>qs.reduce((s,q)=>s + (Number(q[k]) || 0), 0);
-  return { hours:S('totalHours'), base:S('baseWage'), transport:S('transportTotal'), bonuses:S('bonusesTotal'), sub:S('subTotal'), leaves:S('leavesTotal'), advances:S('advancesTotal'), net:S('net') };
+  return { hours:S('totalHours'), base:S('baseWage'), transport:S('transportTotal'), bonuses:S('bonusesTotal'), sub:S('subTotal'), leaves:S('leavesTotal'), advances:S('advancesTotal'), loans:S('loanTotal'), report:S('reportIn'), carry:S('reportOut'), net:S('net') };
 }
+const pt_negHtml = (n)=>n < 0 ? '<span style="color:var(--rust);">−' + pt_fmtMoney(-n) + '</span>' : '';
+const pt_carryHtml = (n)=>n < 0 ? '<div style="color:var(--rust);font-size:10.5px;font-weight:400;">report −' + pt_fmtMoney(-n) + '</div>' : '';
 function pt_paieOverviewHtml(codes, sessions){
   const c = pt_currentClosure();
   const T = pt_paieTotals(codes, sessions), totNet = T.net;
   const rows = codes.map(x=>{
     const q = pt_displayPayroll(x, sessions);
     const paidCell = c ? `<td>${pt_frozenRow(x) ? `<input type="checkbox" ${q.paid ? 'checked' : ''} onchange="pt_togglePaid(${x}, this.checked)">` : ''}</td>` : '';
-    return `<tr><td>${pt_e(pt_label(x))}</td><td>${pt_fmtH(q.totalHours)}</td><td>${pt_fmtMoney(q.rate)}${q.mode==='daily'?'/j':'/h'}</td><td>${pt_fmtMoney(q.baseWage)}</td><td>${pt_fmtMoney(q.transportTotal)}</td><td>${pt_fmtMoney(q.bonusesTotal)}</td><td><b>${pt_fmtMoney(q.subTotal)}</b></td><td>${pt_fmtMoney(q.leavesTotal)}</td><td>${pt_fmtMoney(q.advancesTotal)}</td><td><b>${pt_fmtMoney(q.net)}</b></td>${paidCell}</tr>`;
+    return `<tr><td>${pt_e(pt_label(x))}</td><td>${pt_fmtH(q.totalHours)}</td><td>${pt_fmtMoney(q.rate)}${q.mode==='daily'?'/j':'/h'}</td><td>${pt_fmtMoney(q.baseWage)}</td><td>${pt_fmtMoney(q.transportTotal)}</td><td>${pt_fmtMoney(q.bonusesTotal)}</td><td><b>${pt_fmtMoney(q.subTotal)}</b></td><td>${pt_fmtMoney(q.leavesTotal)}</td><td>${pt_fmtMoney(q.advancesTotal)}</td><td>${q.loanTotal ? pt_fmtMoney(q.loanTotal) : ''}</td><td>${pt_negHtml(q.reportIn)}</td><td><b>${pt_fmtMoney(q.net)}</b>${pt_carryHtml(q.reportOut)}</td>${paidCell}</tr>`;
   }).join('');
   const resteAPayer = c ? codes.reduce((s,x)=>{ const q = pt_displayPayroll(x, sessions); return s + (pt_frozenRow(x) && !q.paid && q.net > 0 ? q.net : 0); }, 0) : 0;
-  const totalRow = `<tr class="pt-total"><td>TOTAL</td><td>${pt_fmtH(T.hours)}</td><td></td><td>${pt_fmtMoney(T.base)}</td><td>${pt_fmtMoney(T.transport)}</td><td>${pt_fmtMoney(T.bonuses)}</td><td>${pt_fmtMoney(T.sub)}</td><td>${pt_fmtMoney(T.leaves)}</td><td>${pt_fmtMoney(T.advances)}</td><td>${pt_fmtMoney(T.net)}</td>${c ? '<td></td>' : ''}</tr>`;
-  return { totNet, closed:!!c, html: `${pt_closureBar(sessions)}<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Employé</th><th>Heures</th><th>Taux</th><th>Base</th><th>Transport</th><th>Primes</th><th>Sous-total</th><th>Jours off</th><th>Avances</th><th>Net</th>${c ? '<th>Payé</th>' : ''}</tr></thead><tbody>${rows}
-    ${totalRow}${c ? `<tr class="pt-total"><td colspan="9">RESTE À PAYER</td><td>${pt_fmtMoney(resteAPayer)}</td><td></td></tr>` : ''}</tbody></table></div>
-    <div class="pt-muted" style="margin-top:6px;">Total net à payer : <b>${pt_fmtMoney(T.net)}</b> (sous-total + jours off − avances).</div>` };
+  const totalRow = `<tr class="pt-total"><td>TOTAL</td><td>${pt_fmtH(T.hours)}</td><td></td><td>${pt_fmtMoney(T.base)}</td><td>${pt_fmtMoney(T.transport)}</td><td>${pt_fmtMoney(T.bonuses)}</td><td>${pt_fmtMoney(T.sub)}</td><td>${pt_fmtMoney(T.leaves)}</td><td>${pt_fmtMoney(T.advances)}</td><td>${T.loans ? pt_fmtMoney(T.loans) : ''}</td><td>${pt_negHtml(T.report)}</td><td>${pt_fmtMoney(T.net)}${pt_carryHtml(T.carry)}</td>${c ? '<td></td>' : ''}</tr>`;
+  return { totNet, closed:!!c, html: `${pt_closureBar(sessions)}<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Employé</th><th>Heures (hh:mm)</th><th>Taux</th><th>Base</th><th>Transport</th><th>Primes</th><th>Sous-total</th><th>Jours off</th><th>Avances</th><th>Prêt</th><th>Report</th><th>Net à payer</th>${c ? '<th>Payé</th>' : ''}</tr></thead><tbody>${rows}
+    ${totalRow}${c ? `<tr class="pt-total"><td colspan="11">RESTE À PAYER</td><td>${pt_fmtMoney(resteAPayer)}</td><td></td></tr>` : ''}</tbody></table></div>
+    <div class="pt-muted" style="margin-top:6px;">Net à payer = sous-total + jours off − avances − remboursement de prêt − report. S’il est négatif, il est payé 0 et le déficit (en rouge) est reporté sur la période suivante.</div>` };
+}
+/* ---------- prêts (échéancier hebdomadaire) ---------- */
+function pt_genSchedule(total, first, step){
+  const out = []; let rest = total, d = first;
+  if(!(step > 0) || !first) return out;
+  while(rest > 0.004 && out.length < 300){ const a = Math.min(step, rest); out.push({ d, a:Math.round(a * 100) / 100 }); rest -= a; d = pt_addDays(d, 7); }
+  return out;
+}
+function pt_loanSet(id, schedule){
+  const sorted = schedule.map(x=>({ d:x.d, a:Math.round((Number(x.a) || 0) * 100) / 100 })).sort((a,b)=>String(a.d).localeCompare(String(b.d)));
+  return pt_entriesCol.doc(id).set({ schedule:sorted }, { merge:true }).catch(e=>{ console.error(e); alert('Erreur : ' + (e.message || e)); });
+}
+async function pt_loanCreate(){
+  if(pt_sel === null) return;
+  const g = (id)=>document.getElementById(id);
+  const date = g('pt-ln-date').value || todayISO(), amt = pt_num(g('pt-ln-amt').value), note = g('pt-ln-note').value.trim(), first = g('pt-ln-first').value, step = pt_num(g('pt-ln-step').value);
+  if(!(amt > 0)){ alert('Indique le montant total du prêt.'); return; }
+  if((first && !(step > 0)) || (!first && step > 0)){ alert('Renseigne à la fois la 1re échéance et le montant par semaine, ou aucun des deux (échéancier saisi à la main ensuite).'); return; }
+  const schedule = first ? pt_genSchedule(amt, first, step) : [];
+  if(schedule.some(x=>pt_dayClosed(x.d))){ alert('Une des échéances tombe dans un jour clôturé. Choisis une première échéance plus récente.'); return; }
+  ['pt-ln-amt','pt-ln-note','pt-ln-first','pt-ln-step'].forEach(i=>{ g(i).value = ''; });
+  try{ await pt_addEntryDoc({ kind:'pret', code:pt_sel, date, amount:amt, note, schedule }); pt_toast('Prêt enregistré.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+function pt_loanLine(id, i, field, value){
+  const l = pt_entries.find(x=>x.id === id); if(!l) return;
+  const sch = (l.schedule || []).map(x=>({ d:x.d, a:x.a })), line = sch[i]; if(!line) return;
+  if(pt_guardDay(line.d, 'Cette échéance')){ pt_render(true); return; }
+  if(field === 'd'){ if(!value || pt_guardDay(value, 'Cette échéance')){ pt_render(true); return; } line.d = value; }
+  else line.a = pt_num(value);
+  pt_loanSet(id, sch);
+}
+function pt_loanAddLine(id){
+  const l = pt_entries.find(x=>x.id === id); if(!l) return;
+  const sch = (l.schedule || []).map(x=>({ d:x.d, a:x.a })), st = pt_loanStats(l);
+  let d = sch.length ? pt_addDays(sch[sch.length - 1].d, 7) : todayISO();
+  while(pt_dayClosed(d)) d = pt_addDays(d, 7);
+  sch.push({ d, a:Math.max(0, st.toPlan) });
+  pt_loanSet(id, sch);
+}
+function pt_loanDelLine(id, i){
+  const l = pt_entries.find(x=>x.id === id); if(!l) return;
+  const sch = (l.schedule || []).map(x=>({ d:x.d, a:x.a })), line = sch[i]; if(!line) return;
+  if(pt_guardDay(line.d, 'Cette suppression')) return;
+  sch.splice(i, 1); pt_loanSet(id, sch);
+}
+async function pt_loanDelete(id){
+  const l = pt_entries.find(x=>x.id === id); if(!l) return;
+  if((l.schedule || []).some(x=>pt_dayClosed(x.d))){ alert('Des échéances de ce prêt ont déjà été prélevées (jours clôturés) : il ne peut pas être supprimé. Rouvre d’abord les périodes concernées.'); return; }
+  if(!confirm('Supprimer ce prêt de ' + pt_fmtMoney(l.amount) + ' et son échéancier ?')) return;
+  try{ await pt_entriesCol.doc(id).delete(); pt_toast('Prêt supprimé.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+function pt_loansSection(code){
+  const loans = pt_loansOf(code).sort((a,b)=>String(b.date || '').localeCompare(String(a.date || '')));
+  const cards = loans.map(l=>{
+    const st = pt_loanStats(l);
+    const sch = (l.schedule || []).map((x, i)=>({ ...x, i })).sort((a,b)=>String(a.d).localeCompare(String(b.d)));
+    const rows = sch.map(x=>{
+      const lock = pt_dayClosed(x.d);
+      return `<tr><td>${lock ? fmtDateShort(x.d) + ' 🔒' : `<input type="date" class="pt-auto" value="${pt_e(x.d)}" onchange="pt_loanLine('${l.id}',${x.i},'d',this.value)">`}</td>
+        <td>${lock ? pt_fmtMoney(x.a) : `<input type="text" inputmode="decimal" class="pt-w90" value="${pt_e(x.a)}" onchange="pt_loanLine('${l.id}',${x.i},'a',this.value)">`}</td>
+        <td>${lock ? '<span class="pt-badge pt-b-prime">remboursée</span>' : '<span class="pt-muted">à venir</span>'}</td>
+        <td>${lock ? '' : `<button class="btn ghost small" onclick="pt_loanDelLine('${l.id}',${x.i})">✕</button>`}</td></tr>`;
+    }).join('');
+    return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px;">
+      <div class="row-between"><div style="font-weight:700;">Prêt de ${pt_fmtMoney(st.total)} <span class="pt-muted">— ${fmtDateShort(l.date)}${l.note ? ' · ' + pt_e(l.note) : ''}</span></div><button class="btn ghost small" onclick="pt_loanDelete('${l.id}')">Supprimer</button></div>
+      <div class="pt-kpis">
+        <div class="pt-kpi"><div class="n">${pt_fmtMoney(st.repaid)}</div><div class="l">Remboursé</div></div>
+        <div class="pt-kpi"><div class="n">${pt_fmtMoney(st.due)}</div><div class="l">Reste dû</div></div>
+        <div class="pt-kpi"><div class="n">${pt_fmtMoney(st.planned)}</div><div class="l">Planifié</div></div>
+        <div class="pt-kpi"><div class="n" ${st.toPlan !== 0 ? 'style="color:var(--rust);"' : ''}>${pt_fmtMoney(st.toPlan)}</div><div class="l">${st.toPlan < 0 ? 'Échéances en trop' : 'Reste à planifier'}</div></div>
+      </div>
+      <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date d’échéance</th><th>Montant (DA)</th><th>Statut</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="pt-muted">Aucune échéance : ajoute-en une.</td></tr>'}</tbody></table></div>
+      <div class="actions-row"><button class="btn ghost small" onclick="pt_loanAddLine('${l.id}')">+ Ajouter une échéance</button></div>
+    </div>`;
+  }).join('');
+  return `<div class="section-label" style="margin-top:16px;">Prêts</div>
+    <div class="pt-muted">Chaque échéance est déduite de la paie de la semaine (ou période) qui contient sa date, et devient « remboursée » quand cette période est clôturée. Si la paie ne suffit pas, le déficit est reporté sur la période suivante.</div>
+    ${cards}
+    <div class="pt-form" style="margin-top:12px;display:block;">
+      <div class="pt-row"><div class="field"><label>Nouveau prêt — date</label><input type="date" id="pt-ln-date" class="pt-draft pt-auto" value="${todayISO()}"></div>
+        <div class="field"><label>Montant total (DA)</label><input type="text" inputmode="decimal" id="pt-ln-amt" class="pt-draft pt-w90"></div>
+        <div class="field pt-grow"><label>Motif</label><input type="text" id="pt-ln-note" class="pt-draft"></div></div>
+      <div class="pt-row" style="margin-top:6px;"><div class="field"><label>1re échéance (date)</label><input type="date" id="pt-ln-first" class="pt-draft pt-auto"></div>
+        <div class="field"><label>Montant par semaine (DA)</label><input type="text" inputmode="decimal" id="pt-ln-step" class="pt-draft pt-w90"></div>
+        <button class="btn small" onclick="pt_loanCreate()">Créer le prêt</button></div>
+      <div class="pt-muted" style="margin-top:6px;">Laisse « 1re échéance » et « Montant par semaine » vides pour saisir l’échéancier à la main ensuite (montants différents chaque semaine).</div>
+    </div>`;
+}
+/* ---------- congé : 1/12 du salaire de base ---------- */
+function pt_congeSetFrom(v){
+  return pt_entriesCol.doc('congecfg').set({ kind:'congecfg', from:String(v || '') }, { merge:true }).then(()=>{ pt_toast('Début de la période de calcul enregistré.'); pt_render(true); }).catch(e=>alert('Erreur : ' + (e.message || e)));
+}
+function pt_congeSetOpen(code, v){
+  const n = pt_num(v);
+  return pt_entriesCol.doc('congecfg').set({ kind:'congecfg', open:{ [code]:n } }, { merge:true }).then(()=>{ pt_toast('Solde initial enregistré.'); pt_render(true); }).catch(e=>alert('Erreur : ' + (e.message || e)));
+}
+const pt_money2 = (n)=>(n < -0.004 ? '<span style="color:var(--rust);">−' + pt_fmtMoney(-n) + '</span>' : pt_fmtMoney(n));
+function pt_congeEmpHtml(code){
+  const asOf = pt_filter.to || todayISO(), k = pt_conge(code, asOf), selWeek = pt_weekRange(asOf).from;
+  const cur = k.weeks.find(x=>x.from === selWeek) || k.weeks[k.weeks.length - 1];
+  const rows = k.weeks.map(x=>`<tr${x.from === selWeek ? ' style="background:var(--paper);font-weight:700;"' : ''}><td>S${pt_isoWeek(x.from)} · ${pt_dm(new Date(x.from + 'T12:00:00'))} → ${pt_dm(new Date(x.to + 'T12:00:00'))}${x.frozen ? ' 🔒' : ''}</td><td>${pt_fmtMoney(x.base)}</td><td>${pt_fmtMoney(x.acq)}</td><td>${pt_fmtMoney(x.taken)}</td><td>${pt_fmtMoney(x.cumAcq)}</td><td>${pt_fmtMoney(x.cumTaken)}</td><td>${pt_money2(x.left)}</td></tr>`).join('');
+  const cfg = pt_entries.find(e=>e.kind === 'congecfg') || {};
+  return `<div class="pt-muted">Congé acquis chaque semaine = 1/12 du salaire de base de la semaine (heures × taux, sans transport ni primes). Congé perçu = montants saisis en « Jour Off (congé payé) » dans la rubrique Paie. Les valeurs des semaines clôturées (🔒) sont conservées.</div>
+    <div class="section-label" style="margin-top:10px;">Au ${fmtDateShort(asOf)}${cur ? ' — semaine ' + pt_isoWeek(cur.from) : ''}</div>
+    <div class="pt-kpis">
+      <div class="pt-kpi"><div class="n">${pt_fmtMoney(k.total)}</div><div class="l">Congé total (cumul)</div></div>
+      <div class="pt-kpi"><div class="n">${pt_fmtMoney(k.taken)}</div><div class="l">Congé perçu (cumul)</div></div>
+      <div class="pt-kpi"><div class="n">${pt_money2(k.left)}</div><div class="l">Congé restant${k.left < 0 ? ' (l’employé doit)' : ''}</div></div>
+      <div class="pt-kpi"><div class="n">${pt_money2(k.open)}</div><div class="l">Solde initial</div></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:10px;">
+      <div class="field"><label>Solde initial (DA) — avant l’historique</label><input type="text" inputmode="decimal" value="${pt_e(k.open || '')}" placeholder="0" onchange="pt_congeSetOpen(${code}, this.value)"></div>
+      <div class="field"><label>Début de la période de calcul</label><input type="date" value="${pt_e(/^\d{4}-\d{2}-\d{2}$/.test(cfg.from || '') ? cfg.from : '')}" onchange="pt_congeSetFrom(this.value)"></div>
+    </div>
+    <div class="pt-muted" style="margin:6px 0 10px;">Solde initial : congé déjà acquis/perçu avant la date de début. Mets un montant <b>négatif</b> si l’employé te doit déjà une somme de congé (ex. −3 000). Début vide = 1er janvier.</div>
+    <div class="pt-scroll" style="max-height:340px;overflow:auto;"><table class="pt-table"><thead><tr><th>Semaine</th><th>Salaire de base</th><th>Congé acquis</th><th>Congé perçu</th><th>Total cumulé</th><th>Perçu cumulé</th><th>Restant</th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="pt-muted">Aucune semaine.</td></tr>'}</tbody></table></div>`;
+}
+function pt_congesHtml(codes){
+  const asOf = pt_filter.to || todayISO();
+  const ks = codes.map(c=>({ c, k:pt_conge(c, asOf) }));
+  const T = ks.reduce((t, x)=>({ base:t.base + x.k.base, open:t.open + x.k.open, total:t.total + x.k.total, taken:t.taken + x.k.taken, left:t.left + x.k.left }), { base:0, open:0, total:0, taken:0, left:0 });
+  return `<div class="pt-muted">Congé acquis = 1/12 du salaire de base (heures × taux, sans transport ni primes) depuis le début de la période de calcul jusqu’au ${fmtDateShort(asOf)}. Restant = solde initial + total − perçu. Le détail par semaine est dans la fiche de chaque employé.</div>
+    <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Employé</th><th>Salaire de base</th><th>Solde initial</th><th>Congé total (1/12)</th><th>Congé perçu</th><th>Congé restant</th></tr></thead><tbody>${
+      ks.map(x=>`<tr><td>${pt_e(pt_label(x.c))}</td><td>${pt_fmtMoney(x.k.base)}</td><td>${pt_money2(x.k.open)}</td><td>${pt_fmtMoney(x.k.total)}</td><td>${pt_fmtMoney(x.k.taken)}</td><td><b>${pt_money2(x.k.left)}</b></td></tr>`).join('')}
+      <tr class="pt-total"><td>TOTAL</td><td>${pt_fmtMoney(T.base)}</td><td>${pt_money2(T.open)}</td><td>${pt_fmtMoney(T.total)}</td><td>${pt_fmtMoney(T.taken)}</td><td>${pt_money2(T.left)}</td></tr></tbody></table></div>`;
 }
 function pt_histTotalsHtml(p, codes){
   const sum = (arr)=>arr.reduce((s,x)=>s + (Number(x.amount) || 0), 0);
@@ -2674,14 +2566,16 @@ function pt_paieSection(c, sessions, codes){
     : `<tr><td colspan="5" class="pt-muted">Aucune entrée sur cette période.</td></tr>`;
   return `${lockLine}
     <div class="pt-muted">Taux : ${pt_fmtMoney(p.rate)}${p.mode==='daily'?' / jour':' / heure'} · ${p.transport.enabled ? 'Transport : ' + pt_fmtMoney(p.transport.amount) + ' / jour' : 'Transport désactivé'} · <a href="#" class="pt-link" onclick="pt_setTab('reglages');return false;">Modifier dans Réglages</a></div>
-    ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off')}${pt_formRow('avance','Avance')}
+    ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off (congé payé)')}${pt_formRow('avance','Avance')}
     <h2 class="section" style="margin-top:20px;">Historique</h2>
     <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Catégorie</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${hist}</tbody></table></div>
     ${pt_histTotalsHtml(p, codes)}
+    ${pt_loansSection(c)}
     <div class="grid grid-2" style="margin-top:14px;">
       <div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span></div><div class="value">${pt_fmtMoney(p.subTotal)}</div></div>
       <div class="result-box final"><div class="label">Net à payer</div><div class="value">${pt_fmtMoney(p.net)}</div></div>
     </div>
+    ${(p.loanTotal || p.reportIn < 0 || p.reportOut < 0) ? `<div class="pt-muted" style="margin-top:8px;">${[p.loanTotal ? 'Remboursement de prêt : −' + pt_fmtMoney(p.loanTotal) : '', p.reportIn < 0 ? 'Report de la période précédente : −' + pt_fmtMoney(-p.reportIn) : '', p.reportOut < 0 ? '<span style="color:var(--rust);">⚠️ Solde négatif : ' + pt_fmtMoney(-p.reportOut) + ' reportés sur la période suivante (payé : 0)</span>' : ''].filter(Boolean).join(' · ')}</div>` : ''}
     <div class="actions-row"><button class="btn ghost small" onclick="pt_exportPayslip()">Exporter le bulletin (CSV)</button></div>`;
 }
 
@@ -2702,7 +2596,7 @@ function pt_pointagesSection(c, sessions){
   const manualRows = myManual.slice().sort((a,b)=>b.date.localeCompare(a.date));
   const hiddenNote = hiddenDays ? `<div class="pt-muted" style="margin-bottom:8px;">🔒 ${hiddenDays} jour${hiddenDays>1?'s':''} clôturé${hiddenDays>1?'s':''} masqué${hiddenDays>1?'s':''} dans cette liste (le total ci-dessous les exclut ; la paie, elle, les compte). <a href="#" class="pt-link" onclick="pt_toggleShowClosed(true);return false;">Afficher</a></div>` : '';
   return `${hiddenNote}
-    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Entrée</th><th>Sortie</th><th>Durée (h)</th><th></th></tr></thead><tbody>${
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Entrée</th><th>Sortie</th><th>Durée (hh:mm)</th><th></th></tr></thead><tbody>${
       lines.length ? lines.map(l=>l.html).join('') + `<tr class="pt-total"><td colspan="3">Total</td><td>${pt_fmtH(total)}</td><td></td></tr>` : `<tr><td colspan="5" class="pt-muted">Aucune session sur cette période.</td></tr>`}</tbody></table></div>
     <div class="actions-row"><button class="btn ghost small" onclick="pt_exportEmployeeCsv()">Exporter en CSV</button></div>
     <h2 class="section" style="margin-top:18px;">Ajouter / corriger un pointage</h2>
@@ -2721,10 +2615,10 @@ function pt_pointagesSection(c, sessions){
     <h2 class="section" style="margin-top:18px;">Sessions manuelles</h2>
     <div class="pt-muted" style="margin-bottom:8px;">Heures ajoutées sans pointage, quand le pointage est irrécupérable (ou pour un employé géré sans pointage).</div>
     <div class="pt-row">
-      <input type="date" id="pt-m-date" class="pt-draft pt-auto"><input type="text" inputmode="decimal" id="pt-m-hours" class="pt-draft pt-w90" placeholder="Heures">
+      <input type="date" id="pt-m-date" class="pt-draft pt-auto"><input type="text" inputmode="text" id="pt-m-hours" class="pt-draft pt-w90" placeholder="ex. 8:30">
       <input type="text" id="pt-m-note" class="pt-draft pt-grow" placeholder="Note (optionnel)"><button class="btn small" onclick="pt_addManual()">Ajouter</button>
     </div>
-    ${manualRows.length ? `<div class="pt-scroll" style="margin-top:10px;"><table class="pt-table"><thead><tr><th>Date</th><th>Heures</th><th>Note</th><th></th></tr></thead><tbody>${
+    ${manualRows.length ? `<div class="pt-scroll" style="margin-top:10px;"><table class="pt-table"><thead><tr><th>Date</th><th>Heures (hh:mm)</th><th>Note</th><th></th></tr></thead><tbody>${
       manualRows.map(m=>`<tr><td>${fmtDateShort(m.date)}</td><td>${pt_fmtH(m.hours)}</td><td>${pt_e(m.note)}</td><td><button class="btn ghost small" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>`).join('')}</tbody></table></div>` : ''}`;
 }
 function pt_tabEmployes(codes, sessions, anoms){
@@ -2734,13 +2628,14 @@ function pt_tabEmployes(codes, sessions, anoms){
   if(isAdmin){
     const ov = pt_paieOverviewHtml(codes, sessions);
     html += pt_accordion('overview', 'Tableau de paie — tous les employés (net total : ' + pt_fmtMoney(ov.totNet) + ')' + (ov.closed ? ' — 🔒 clôturée' : ''), ov.html);
+    html += pt_accordion('conges', 'Soldes de congé — tous les employés', pt_congesHtml(codes));
   }
   const c = pt_sel, p = pt_displayPayroll(c, sessions);
   const myAn = anoms.filter(a=>a.code === c);
   html += `<div class="ticket">
     ${pt_empSelect(codes)}
     <div class="pt-kpis">
-      <div class="pt-kpi"><div class="n">${pt_fmtH(p.totalHours)} h</div><div class="l">Heures période</div></div>
+      <div class="pt-kpi"><div class="n">${pt_fmtH(p.totalHours)}</div><div class="l">Heures période (hh:mm)</div></div>
       <div class="pt-kpi"><div class="n">${p.workedDays}</div><div class="l">Jours travaillés</div></div>
       ${isAdmin ? `<div class="pt-kpi"><div class="n">${pt_fmtMoney(p.baseWage)}</div><div class="l">Salaire de base</div></div><div class="pt-kpi"><div class="n">${pt_fmtMoney(p.net)}</div><div class="l">Net à payer</div></div>` : ''}
     </div>
@@ -2751,6 +2646,7 @@ function pt_tabEmployes(codes, sessions, anoms){
     html += pt_accordion('anomEmp', 'Anomalies de cette personne (' + myAn.length + ')', myAn.map((a,i)=>pt_anomRow(i)).join(''));
   }
   if(isAdmin) html += pt_accordion('paie', 'Paie', pt_paieSection(c, sessions, codes));
+  if(isAdmin){ const kk = pt_conge(c, pt_filter.to || todayISO()); html += pt_accordion('congeEmp', 'Congés — ' + pt_name(c) + ' (restant : ' + (kk.left < 0 ? '−' : '') + pt_fmtMoney(Math.abs(kk.left)) + ')', pt_congeEmpHtml(c)); }
   return html;
 }
 async function pt_addEventUI(){
@@ -2771,8 +2667,10 @@ async function pt_addManual(){
   const d = document.getElementById('pt-m-date').value, h = document.getElementById('pt-m-hours').value.trim(), n = document.getElementById('pt-m-note').value.trim();
   if(!d || !h){ alert('Date et nombre d’heures requis.'); return; }
   if(pt_guardDay(d, 'Cette session')) return;
+  const hrs = pt_parseHours(h);
+  if(!(hrs > 0)){ alert('Indique les heures au format 8:30 (ou 8h30, ou 8,5).'); return; }
   document.getElementById('pt-m-date').value = ''; document.getElementById('pt-m-hours').value = ''; document.getElementById('pt-m-note').value = '';
-  try{ await pt_addEntryDoc({ kind:'manual', code:pt_sel, date:d, hours:pt_num(h), note:n }); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  try{ await pt_addEntryDoc({ kind:'manual', code:pt_sel, date:d, hours:hrs, note:n }); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 
 /* ---------- onglet Réglages ---------- */
@@ -2808,7 +2706,6 @@ function pt_tabReglages(codes){
   </div>
   <h2 class="section">Employés</h2>
   ${cards || pt_empty('Importe un export ZKBio ou ajoute un employé ci-dessus.')}
-  ${isAdmin ? pt_autoSettingsCard() : ''}
   ${isAdmin ? pt_groupsSection(codes) : ''}
   <div class="ticket"><div class="section-label">Données</div>
     <div class="actions-row" style="margin-top:0;"><button class="btn small" onclick="pt_exportExcel()">Exporter en Excel (sauvegarde complète)</button></div>
@@ -2955,6 +2852,10 @@ function pt_exportPayslip(){
   csv += 'Sous-total (base+transport+primes);' + p.subTotal.toFixed(2) + '\n';
   csv += 'Jours off;' + p.leavesTotal.toFixed(2) + '\n';
   csv += 'Avances;' + p.advancesTotal.toFixed(2) + '\n';
+  csv += 'Remboursement pret;' + (p.loanTotal || 0).toFixed(2) + '\n';
+  csv += 'Report periode precedente;' + (p.reportIn || 0).toFixed(2) + '\n';
+  csv += 'Solde;' + (p.solde !== undefined ? p.solde : p.net).toFixed(2) + '\n';
+  csv += 'Report vers periode suivante;' + (p.reportOut || 0).toFixed(2) + '\n';
   csv += 'NET A PAYER;' + p.net.toFixed(2) + '\n';
   pt_download('bulletin_' + pt_name(c).replace(/[^a-z0-9]+/gi,'_') + '.csv', ['\uFEFF' + csv], 'text/csv;charset=utf-8');
 }
@@ -2963,9 +2864,12 @@ function pt_exportExcel(){
   const all = pt_compute(), codes = pt_codes(), fs = all.sessions.filter(s=>pt_inRange(pt_day(s.date)));
   const wb = XLSX.utils.book_new();
   const add = (name, header, rows)=>XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header].concat(rows)), name);
-  add('Resume paie', ['Code','Nom','Poste','Heures','Mode','Taux','Jours travailles','Salaire base','Transport','Primes','Sous-total','Jours off','Avances','Net'],
-    codes.map(c=>{ const p = pt_displayPayroll(c, fs); return [c, pt_name(c), pt_poste(c), +p.totalHours.toFixed(2), p.mode === 'daily' ? 'Jour' : 'Heure', p.rate, p.workedDays, +p.baseWage.toFixed(2), +p.transportTotal.toFixed(2), +p.bonusesTotal.toFixed(2), +p.subTotal.toFixed(2), +p.leavesTotal.toFixed(2), +p.advancesTotal.toFixed(2), +p.net.toFixed(2)]; })
-      .concat([(()=>{ const T = pt_paieTotals(codes, fs); return ['', 'TOTAL', '', +T.hours.toFixed(2), '', '', '', +T.base.toFixed(2), +T.transport.toFixed(2), +T.bonuses.toFixed(2), +T.sub.toFixed(2), +T.leaves.toFixed(2), +T.advances.toFixed(2), +T.net.toFixed(2)]; })()]));
+  add('Resume paie', ['Code','Nom','Poste','Heures','Mode','Taux','Jours travailles','Salaire base','Transport','Primes','Sous-total','Jours off','Avances','Pret','Report precedent','Net a payer','Report suivant'],
+    codes.map(c=>{ const p = pt_displayPayroll(c, fs); return [c, pt_name(c), pt_poste(c), +p.totalHours.toFixed(2), p.mode === 'daily' ? 'Jour' : 'Heure', p.rate, p.workedDays, +p.baseWage.toFixed(2), +p.transportTotal.toFixed(2), +p.bonusesTotal.toFixed(2), +p.subTotal.toFixed(2), +p.leavesTotal.toFixed(2), +p.advancesTotal.toFixed(2), +(p.loanTotal || 0).toFixed(2), +(p.reportIn || 0).toFixed(2), +p.net.toFixed(2), +(p.reportOut || 0).toFixed(2)]; })
+      .concat([(()=>{ const T = pt_paieTotals(codes, fs); return ['', 'TOTAL', '', +T.hours.toFixed(2), '', '', '', +T.base.toFixed(2), +T.transport.toFixed(2), +T.bonuses.toFixed(2), +T.sub.toFixed(2), +T.leaves.toFixed(2), +T.advances.toFixed(2), +T.loans.toFixed(2), +T.report.toFixed(2), +T.net.toFixed(2), +T.carry.toFixed(2)]; })()]));
+  add('Conges', ['Code','Nom','Du','Au','Salaire base','Conge total (1/12)','Conge percu','Conge restant'], codes.map(c=>{ const k = pt_conge(c, pt_filter.to || todayISO()); return [c, pt_name(c), k.from, k.to, +k.base.toFixed(2), +k.total.toFixed(2), +k.taken.toFixed(2), +k.left.toFixed(2)]; }));
+  const prets = []; pt_entries.filter(e=>e.kind === 'pret').forEach(l=>{ const st = pt_loanStats(l); (l.schedule || []).forEach(x=>prets.push([l.code, pt_name(l.code), l.date, Number(l.amount) || 0, l.note || '', x.d, Number(x.a) || 0, pt_dayClosed(x.d) ? 'Rembourse' : 'A venir'])); if(!(l.schedule || []).length) prets.push([l.code, pt_name(l.code), l.date, Number(l.amount) || 0, l.note || '', '', 0, '']); });
+  add('Prets', ['Code','Nom','Date pret','Montant total','Motif','Echeance','Montant echeance','Statut'], prets);
   const hist = [];
   codes.forEach(c=>{
     pt_entries.filter(e=>e.code === c && ['prime','off','avance'].includes(e.kind)).forEach(e=>hist.push([c, pt_name(c), e.kind === 'prime' ? 'Prime' : e.kind === 'off' ? 'Jour Off' : 'Avance', e.date, e.note || '', e.kind === 'avance' ? -(Number(e.amount)||0) : (Number(e.amount)||0)]));
