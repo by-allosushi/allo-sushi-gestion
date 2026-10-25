@@ -434,6 +434,15 @@
 .pt-kpi{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
 .pt-kpi .n{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:var(--forest-light);}
 .pt-kpi .l{font-size:10.5px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.03em;margin-top:2px;}
+.pt-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin:12px 0 8px;}
+@media(min-width:600px){.pt-cards{grid-template-columns:repeat(3,1fr);}}
+@media(min-width:900px){.pt-cards{grid-template-columns:repeat(6,1fr);}}
+.pt-card{--c:#60A5FA;border-radius:8px;padding:7px 10px;background:color-mix(in srgb,var(--c) 11%,transparent);border-left:3px solid var(--c);}
+.pt-card .l{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--c);font-weight:600;}
+.pt-card .n{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:var(--c);margin-top:1px;white-space:nowrap;}
+.pt-card.c-hours{--c:#60A5FA;}.pt-card.c-days{--c:#818CF8;}.pt-card.c-base{--c:#38BDF8;}
+.pt-card.c-transport{--c:#2DD4BF;}.pt-card.c-bonus{--c:#86EFAC;}.pt-card.c-off{--c:#C4B5FD;}
+.pt-card.c-adv{--c:#F87171;}.pt-card.c-loan{--c:#FB923C;}
 .pt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .pt-table{width:100%;border-collapse:collapse;font-size:12.5px;}
 .pt-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-muted);padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
@@ -1904,7 +1913,8 @@ function pt_accordion(key, title, innerHtml){
   </div>`;
 }
 function pt_setTab(t){ pt_tab = t; pt_openFix = null; pt_render(true); window.scrollTo({ top:0 }); }
-function pt_selEmp(v){ pt_sel = Number(v); pt_render(true); }
+let pt_selAll = false;
+function pt_selEmp(v){ if(v === 'all'){ pt_selAll = true; } else { pt_selAll = false; pt_sel = Number(v); } pt_render(true); }
 function pt_isAdmin(){ return !!(session && session.isAdmin); }
 function pt_renderTabs(nAnom){
   // Réglages (taux, salaires) : réservé aux administrateurs
@@ -1953,8 +1963,8 @@ function pt_render(fresh){
 }
 function pt_empty(msg){ return `<div class="ticket"><div class="empty-state">${msg}</div></div>`; }
 function pt_empSelect(codes){
-  return `<div class="field" style="margin-bottom:12px;"><label>Employé</label><select id="pt-sel" onchange="pt_selEmp(this.value)">${
-    codes.map(x=>`<option value="${x}" ${x===pt_sel?'selected':''}>${pt_e(pt_label(x))} (code ${x})</option>`).join('')}</select></div>`;
+  return `<div class="field" style="margin-bottom:12px;"><label>Employé</label><select id="pt-sel" onchange="pt_selEmp(this.value)"><option value="all" ${pt_selAll?'selected':''}>👥 Tous les employés</option>${
+    codes.map(x=>`<option value="${x}" ${x===pt_sel&&!pt_selAll?'selected':''}>${pt_e(pt_label(x))} (code ${x})</option>`).join('')}</select></div>`;
 }
 
 /* ---------- onglet Anomalies ---------- */
@@ -2601,6 +2611,7 @@ function pt_pointagesSection(c, sessions){
     <div class="actions-row"><button class="btn ghost small" onclick="pt_exportEmployeeCsv()">Exporter en CSV</button></div>
     <h2 class="section" style="margin-top:18px;">Ajouter / corriger un pointage</h2>
     <div class="pt-row">
+      <select id="pt-ne-emp" class="pt-draft pt-auto">${pt_codes().map(x=>`<option value="${x}" ${x===c?'selected':''}>${pt_e(pt_label(x))}</option>`).join('')}</select>
       <input type="date" id="pt-ne-date" class="pt-draft pt-auto"><input type="time" id="pt-ne-time" class="pt-draft pt-auto">
       <select id="pt-ne-type" class="pt-draft pt-auto"><option value="0">Entrée</option><option value="1">Sortie</option></select>
       <button class="btn small" onclick="pt_addEventUI()">Ajouter</button>
@@ -2621,6 +2632,18 @@ function pt_pointagesSection(c, sessions){
     ${manualRows.length ? `<div class="pt-scroll" style="margin-top:10px;"><table class="pt-table"><thead><tr><th>Date</th><th>Heures (hh:mm)</th><th>Note</th><th></th></tr></thead><tbody>${
       manualRows.map(m=>`<tr><td>${fmtDateShort(m.date)}</td><td>${pt_fmtH(m.hours)}</td><td>${pt_e(m.note)}</td><td><button class="btn ghost small" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>`).join('')}</tbody></table></div>` : ''}`;
 }
+function pt_empCards(q, isAdmin){
+  const card = (cls, l, n)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div></div>`;
+  let h = '<div class="pt-cards">' + card('c-hours', 'Heures (hh:mm)', pt_fmtH(q.totalHours)) + card('c-days', 'Jours travaillés', q.workedDays);
+  if(isAdmin){
+    h += card('c-base', 'Salaire de base', pt_fmtMoney(q.baseWage)) + card('c-transport', 'Transport', pt_fmtMoney(q.transportTotal)) + card('c-bonus', 'Primes &amp; bonus', pt_fmtMoney(q.bonusesTotal)) + card('c-adv', 'Avances', pt_fmtMoney(q.advancesTotal));
+    if(q.leavesTotal) h += card('c-off', 'Jours off', pt_fmtMoney(q.leavesTotal));
+    if(q.loanTotal) h += card('c-loan', 'Prêt', pt_fmtMoney(q.loanTotal));
+  }
+  h += '</div>';
+  if(isAdmin) h += `<div class="grid grid-2"><div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span></div><div class="value">${pt_fmtMoney(q.subTotal)}</div></div><div class="result-box final"><div class="label">Net à payer${q.reportOut < 0 ? '<br><span style="font-weight:400;font-size:11px;color:var(--rust);">report −' + pt_fmtMoney(-q.reportOut) + '</span>' : ''}</div><div class="value">${pt_fmtMoney(q.net)}</div></div></div>`;
+  return h;
+}
 function pt_tabEmployes(codes, sessions, anoms){
   if(!codes.length) return pt_empty('Aucune donnée pour l’instant.');
   const isAdmin = pt_isAdmin();
@@ -2630,15 +2653,16 @@ function pt_tabEmployes(codes, sessions, anoms){
     html += pt_accordion('overview', 'Tableau de paie — tous les employés (net total : ' + pt_fmtMoney(ov.totNet) + ')' + (ov.closed ? ' — 🔒 clôturée' : ''), ov.html);
     html += pt_accordion('conges', 'Soldes de congé — tous les employés', pt_congesHtml(codes));
   }
+  if(pt_selAll){
+    const qs = codes.map(x=>pt_displayPayroll(x, sessions)), S = (k)=>qs.reduce((t,q)=>t + (Number(q[k]) || 0), 0);
+    const tot = { totalHours:S('totalHours'), workedDays:S('workedDays'), baseWage:S('baseWage'), transportTotal:S('transportTotal'), bonusesTotal:S('bonusesTotal'), advancesTotal:S('advancesTotal'), leavesTotal:S('leavesTotal'), loanTotal:S('loanTotal'), subTotal:S('subTotal'), reportOut:S('reportOut'), net:S('net') };
+    return html + `<div class="ticket">${pt_empSelect(codes)}${pt_empCards(tot, isAdmin)}<div class="pt-muted">Totaux de tous les employés sur la période affichée. Choisis un employé pour voir ses pointages, sa paie et ses congés.</div></div>`;
+  }
   const c = pt_sel, p = pt_displayPayroll(c, sessions);
   const myAn = anoms.filter(a=>a.code === c);
   html += `<div class="ticket">
     ${pt_empSelect(codes)}
-    <div class="pt-kpis">
-      <div class="pt-kpi"><div class="n">${pt_fmtH(p.totalHours)}</div><div class="l">Heures période (hh:mm)</div></div>
-      <div class="pt-kpi"><div class="n">${p.workedDays}</div><div class="l">Jours travaillés</div></div>
-      ${isAdmin ? `<div class="pt-kpi"><div class="n">${pt_fmtMoney(p.baseWage)}</div><div class="l">Salaire de base</div></div><div class="pt-kpi"><div class="n">${pt_fmtMoney(p.net)}</div><div class="l">Net à payer</div></div>` : ''}
-    </div>
+    ${pt_empCards(p, isAdmin)}
   </div>`;
   html += pt_accordion('pointages', 'Pointages', pt_pointagesSection(c, sessions));
   if(myAn.length){
@@ -2653,8 +2677,9 @@ async function pt_addEventUI(){
   const d = document.getElementById('pt-ne-date').value, t = document.getElementById('pt-ne-time').value, y = Number(document.getElementById('pt-ne-type').value);
   if(!d || !t){ alert('Choisis une date et une heure.'); return; }
   if(pt_guardDay(d, 'Ce pointage')) return;
+  const empEl = document.getElementById('pt-ne-emp'), emp = empEl && empEl.value !== '' ? Number(empEl.value) : pt_sel;
   document.getElementById('pt-ne-date').value = ''; document.getElementById('pt-ne-time').value = '';
-  try{ await pt_addEvents([{ code:pt_sel, iso:new Date(d + 'T' + t + ':00').toISOString(), type:y }]); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  try{ await pt_addEvents([{ code:emp, iso:new Date(d + 'T' + t + ':00').toISOString(), type:y }]); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 async function pt_saveEventRow(id){
   const d = document.getElementById('pt-ev-d-' + id).value, t = document.getElementById('pt-ev-t-' + id).value, y = Number(document.getElementById('pt-ev-y-' + id).value);
