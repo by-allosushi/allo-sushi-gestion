@@ -1763,20 +1763,18 @@ function pt_baseOf(code, sessions){
   const baseWage = mode === 'daily' ? workedDays * rate : totalHours * rate;
   return { totalHours, rate, mode, workedDays, baseWage };
 }
-/* ---- prêts : { kind:'pret', code, date, amount (total), note, schedule:[{d:'AAAA-MM-JJ', a:montant}] } ----
-   Chaque échéance se déduit de la paie de la période qui contient sa date. Elle est « remboursée » quand son jour est clôturé. */
+/* ---- prêts : emprunts { kind:'pret', code, date, amount, note } ; remboursements { kind:'pretrembt', code, date, amount, note, mode:'salaire'|'direct' }.
+   Un seul solde cumulé par employé : total emprunté − total remboursé. Un remboursement « sur salaire » est déduit de la paie de la période qui contient sa date. ---- */
 function pt_loansOf(code){ return pt_entries.filter(e=>e.kind === 'pret' && e.code === code); }
+function pt_repaysOf(code){ return pt_entries.filter(e=>e.kind === 'pretrembt' && e.code === code); }
 function pt_loanDues(code){
-  const out = [];
-  pt_loansOf(code).forEach(l=>(l.schedule || []).forEach((x, i)=>{ if(x && x.d && pt_inRange(x.d)) out.push({ id:l.id + ':' + i, date:x.d, amount:Number(x.a) || 0, note:l.note || 'Prêt' }); }));
-  return out;
+  return pt_repaysOf(code).filter(r=>r.mode !== 'direct' && r.date && pt_inRange(r.date)).map(r=>({ id:r.id, date:r.date, amount:Number(r.amount) || 0, note:r.note || 'Prêt' }));
 }
-function pt_loanStats(l, asOf){
-  const total = Number(l.amount) || 0, sch = (l.schedule || []).filter(x=>x && x.d);
-  const sum = (f)=>sch.filter(f).reduce((s,x)=>s + (Number(x.a) || 0), 0);
-  const planned = sum(()=>true), repaid = sum(x=>asOf ? x.d <= asOf : pt_dayClosed(x.d, l.code));
+function pt_loanBalance(code, asOf){
+  const ok = (e)=>!asOf || !e.date || e.date <= asOf, sum = (a)=>a.filter(ok).reduce((t, e)=>t + (Number(e.amount) || 0), 0);
+  const rs = pt_repaysOf(code), lent = sum(pt_loansOf(code)), sal = sum(rs.filter(r=>r.mode !== 'direct')), dir = sum(rs.filter(r=>r.mode === 'direct'));
   const r2 = (n)=>Math.round(n * 100) / 100;
-  return { total, planned:r2(planned), toPlan:r2(total - planned), repaid:r2(repaid), due:r2(total - repaid) };
+  return { lent:r2(lent), sal:r2(sal), dir:r2(dir), repaid:r2(sal + dir), due:r2(lent - sal - dir) };
 }
 /* ---- report : solde d'une période clôturée (semaine / période) non versé (+) ou à récupérer (−), repris sur la suivante ---- */
 function pt_validationFor(code, from, to){ return pt_entries.find(e=>e.kind === 'valid' && e.code === code && e.from === from && e.to === to) || null; }
@@ -1908,7 +1906,7 @@ function pt_restoreInputs(st, withValues){
     if(el){ el.focus(); if(st.focus.s != null && el.setSelectionRange){ try{ el.setSelectionRange(st.focus.s, st.focus.e); }catch(e){} } }
   }
 }
-let pt_open = { pointages:true, conge:false, clotures:false, manual:false, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
+let pt_open = { pointages:true, prets:false, conge:false, clotures:false, manual:false, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
 function pt_toggleSec(key){ pt_open[key] = !pt_open[key]; pt_render(true); }
 function pt_accordion(key, title, innerHtml){
   const open = !!pt_open[key];
@@ -2313,7 +2311,7 @@ function pt_recapHtml(from, to, closure){
       + PT_TD(money(G.transport), true, true) + PT_TD(money(G.bonuses), true, true) + PT_TD(money(G.leaves), true, true) + PT_TD(G.advances ? '−' + pt_fmtMoney(G.advances) : '', true, true) + PT_TD(G.loans ? '−' + pt_fmtMoney(G.loans) : '', true, true) + PT_TD(G.report ? (G.report < 0 ? '−' : '+') + pt_fmtMoney(Math.abs(G.report)) : '', true, true) + PT_TD(pt_fmtMoney(G.net), true, true) + '</tr>';
     const carryNeg = emps.filter(e=>e.tot.carry < -0.004).map(e=>e.name + ' : −' + pt_fmtMoney(-e.tot.carry)), carryPos = emps.filter(e=>e.tot.carry > 0.004).map(e=>e.name + ' : +' + pt_fmtMoney(e.tot.carry));
     const carryHtml = (carryNeg.length ? '<p style="color:#b3261e;font-size:12px;"><b>Solde négatif reporté sur la période suivante</b> (à récupérer) — ' + carryNeg.join(' · ') + '</p>' : '') + (carryPos.length ? '<p style="color:#1b6e3c;font-size:12px;"><b>Reste dû aux employés, reporté sur la période suivante</b> — ' + carryPos.join(' · ') + '</p>' : '');
-    const soldes = emps.map(e=>{ const k = pt_conge(e.code, to); const loans = pt_loansOf(e.code).reduce((t, l)=>t + pt_loanStats(l, to).due, 0); return { name:e.name, k, loans }; }).filter(x=>x.k.total || x.k.taken || x.loans);
+    const soldes = emps.map(e=>{ const k = pt_conge(e.code, to); const loans = Math.max(0, pt_loanBalance(e.code, to).due); return { name:e.name, k, loans }; }).filter(x=>x.k.total || x.k.taken || x.loans);
     const soldesHtml = soldes.length ? '<p style="margin-bottom:4px;"><b>Soldes au ' + fmtDateShort(to) + '</b></p><table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;font-size:12px;border-color:#bbb;"><tr bgcolor="#2d4a35" style="color:#fff;"><th align="left">Employé</th><th>Congé de la période</th><th>Congé versé</th><th>Reste à verser</th><th>Prêt : reste dû</th></tr>'
       + soldes.map(x=>'<tr>' + PT_TD(x.name) + PT_TD(pt_fmtMoney(x.k.total), true) + PT_TD(pt_fmtMoney(x.k.taken), true) + PT_TD((x.k.left < 0 ? '−' : '') + pt_fmtMoney(Math.abs(x.k.left)), true) + PT_TD(x.loans ? pt_fmtMoney(x.loans) : '', true) + '</tr>').join('') + '</table>' : '';
     const html = '<div style="font-family:Arial,sans-serif;font-size:13px;color:#222;">'
@@ -2396,93 +2394,70 @@ function pt_paieOverviewHtml(codes, sessions){
     ${totalRow}${c ? `<tr class="pt-total"><td colspan="11">RESTE À PAYER</td><td>${pt_fmtMoney(resteAPayer)}</td><td></td></tr>` : ''}</tbody></table></div>
     <div class="pt-muted" style="margin-top:6px;">Net à payer = sous-total + jours off − avances − remboursement de prêt − report. S’il est négatif, il est payé 0 et le déficit (en rouge) est reporté sur la période suivante.</div>` };
 }
-/* ---------- prêts (échéancier hebdomadaire) ---------- */
-function pt_genSchedule(total, first, step){
-  const out = []; let rest = total, d = first;
-  if(!(step > 0) || !first) return out;
-  while(rest > 0.004 && out.length < 300){ const a = Math.min(step, rest); out.push({ d, a:Math.round(a * 100) / 100 }); rest -= a; d = pt_addDays(d, 7); }
-  return out;
-}
-function pt_loanSet(id, schedule){
-  const sorted = schedule.map(x=>({ d:x.d, a:Math.round((Number(x.a) || 0) * 100) / 100 })).sort((a,b)=>String(a.d).localeCompare(String(b.d)));
-  return pt_entriesCol.doc(id).set({ schedule:sorted }, { merge:true }).catch(e=>{ console.error(e); alert('Erreur : ' + (e.message || e)); });
-}
-async function pt_loanCreate(){
-  if(pt_sel === null) return;
-  const g = (id)=>document.getElementById(id);
-  const date = g('pt-ln-date').value || todayISO(), amt = pt_num(g('pt-ln-amt').value), note = g('pt-ln-note').value.trim(), first = g('pt-ln-first').value, step = pt_num(g('pt-ln-step').value);
-  if(!(amt > 0)){ alert('Indique le montant total du prêt.'); return; }
-  if((first && !(step > 0)) || (!first && step > 0)){ alert('Renseigne à la fois la 1re échéance et le montant par semaine, ou aucun des deux (échéancier saisi à la main ensuite).'); return; }
-  const schedule = first ? pt_genSchedule(amt, first, step) : [];
-  if(schedule.some(x=>pt_dayClosed(x.d, pt_sel))){ alert('Une des échéances tombe dans un jour clôturé. Choisis une première échéance plus récente.'); return; }
-  ['pt-ln-amt','pt-ln-note','pt-ln-first','pt-ln-step'].forEach(i=>{ g(i).value = ''; });
-  try{ await pt_addEntryDoc({ kind:'pret', code:pt_sel, date, amount:amt, note, schedule }); pt_toast('Prêt enregistré.'); }
+/* ---------- prêts ---------- */
+async function pt_loanAdd(code){
+  const g = (id)=>document.getElementById(id), date = g('pt-ln-date').value || todayISO(), raw = g('pt-ln-amt').value.trim(), note = g('pt-ln-note').value.trim();
+  if(!raw){ alert('Indique le montant du prêt.'); return; }
+  const amt = pt_num(raw); if(!(amt > 0)){ alert('Le montant doit être positif.'); return; }
+  g('pt-ln-amt').value = ''; g('pt-ln-note').value = '';
+  try{ await pt_addEntryDoc({ kind:'pret', code, date, amount:amt, note }); pt_toast('Prêt enregistré.'); }
   catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
-function pt_loanLine(id, i, field, value){
-  const l = pt_entries.find(x=>x.id === id); if(!l) return;
-  const sch = (l.schedule || []).map(x=>({ d:x.d, a:x.a })), line = sch[i]; if(!line) return;
-  if(pt_guardDay(line.d, 'Cette échéance', l.code)){ pt_render(true); return; }
-  if(field === 'd'){ if(!value || pt_guardDay(value, 'Cette échéance', l.code)){ pt_render(true); return; } line.d = value; }
-  else line.a = pt_num(value);
-  pt_loanSet(id, sch);
+function pt_closuresCovering(day, code){
+  return pt_clotures.filter(c=>day >= c.from && day <= c.to && (pt_isGlobalCl(c) || String(c.code) === String(code)));
 }
-function pt_loanAddLine(id){
-  const l = pt_entries.find(x=>x.id === id); if(!l) return;
-  const sch = (l.schedule || []).map(x=>({ d:x.d, a:x.a })), st = pt_loanStats(l);
-  let d = sch.length ? pt_addDays(sch[sch.length - 1].d, 7) : todayISO();
-  while(pt_dayClosed(d, l.code)) d = pt_addDays(d, 7);
-  sch.push({ d, a:Math.max(0, st.toPlan) });
-  pt_loanSet(id, sch);
+async function pt_repayAdd(code){
+  const g = (id)=>document.getElementById(id), date = g('pt-rb-date').value || todayISO(), raw = g('pt-rb-amt').value.trim(), note = g('pt-rb-note').value.trim();
+  const mode = g('pt-rb-mode').value === 'direct' ? 'direct' : 'salaire';
+  if(!raw){ alert('Indique le montant remboursé.'); return; }
+  const amt = pt_num(raw); if(!(amt > 0)){ alert('Le montant doit être positif.'); return; }
+  if(mode === 'salaire' && pt_dayClosed(date, code)){
+    const cls = pt_closuresCovering(date, code), glob = cls.some(pt_isGlobalCl);
+    const msg = 'Cette semaine est clôturée pour ' + pt_name(code) + ' (' + cls.map(c=>pt_rangeLabel(c.from, c.to)).join(' ; ') + ').\n'
+      + 'Pour déduire ce remboursement de son salaire, il faut la rouvrir (les cases « Payé » de la clôture seront perdues, la paie sera recalculée en direct).'
+      + (glob ? '\n\n⚠ Une de ces clôtures concerne TOUS les employés : la rouvrir la rouvre pour tout le monde.' : '')
+      + '\n\nRouvrir maintenant et enregistrer le remboursement ?';
+    if(!confirm(msg)) return;
+    try{ for(const c of cls) await pt_cloturesCol.doc(c.id).delete(); }
+    catch(e){ console.error(e); alert('Erreur à la réouverture : ' + (e.message || e)); return; }
+  }
+  g('pt-rb-amt').value = ''; g('pt-rb-note').value = '';
+  try{ await pt_addEntryDoc({ kind:'pretrembt', code, date, amount:amt, note, mode }); pt_toast('Remboursement enregistré.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
-function pt_loanDelLine(id, i){
-  const l = pt_entries.find(x=>x.id === id); if(!l) return;
-  const sch = (l.schedule || []).map(x=>({ d:x.d, a:x.a })), line = sch[i]; if(!line) return;
-  if(pt_guardDay(line.d, 'Cette suppression', l.code)) return;
-  sch.splice(i, 1); pt_loanSet(id, sch);
-}
-async function pt_loanDelete(id){
-  const l = pt_entries.find(x=>x.id === id); if(!l) return;
-  if((l.schedule || []).some(x=>pt_dayClosed(x.d, l.code))){ alert('Des échéances de ce prêt ont déjà été prélevées (jours clôturés) : il ne peut pas être supprimé. Rouvre d’abord les périodes concernées.'); return; }
-  if(!confirm('Supprimer ce prêt de ' + pt_fmtMoney(l.amount) + ' et son échéancier ?')) return;
+async function pt_loanDel(id){
+  if(!confirm('Supprimer ce prêt ?')) return;
   try{ await pt_entriesCol.doc(id).delete(); pt_toast('Prêt supprimé.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
-function pt_loansSection(code){
-  const loans = pt_loansOf(code).sort((a,b)=>String(b.date || '').localeCompare(String(a.date || '')));
-  const cards = loans.map(l=>{
-    const st = pt_loanStats(l);
-    const sch = (l.schedule || []).map((x, i)=>({ ...x, i })).sort((a,b)=>String(a.d).localeCompare(String(b.d)));
-    const rows = sch.map(x=>{
-      const lock = pt_dayClosed(x.d, l.code);
-      return `<tr><td>${lock ? fmtDateShort(x.d) + ' 🔒' : `<input type="date" class="pt-auto" value="${pt_e(x.d)}" onchange="pt_loanLine('${l.id}',${x.i},'d',this.value)">`}</td>
-        <td>${lock ? pt_fmtMoney(x.a) : `<input type="text" inputmode="decimal" class="pt-w90" value="${pt_e(x.a)}" onchange="pt_loanLine('${l.id}',${x.i},'a',this.value)">`}</td>
-        <td>${lock ? '<span class="pt-badge pt-b-prime">remboursée</span>' : '<span class="pt-muted">à venir</span>'}</td>
-        <td>${lock ? '' : `<button class="btn ghost small" onclick="pt_loanDelLine('${l.id}',${x.i})">✕</button>`}</td></tr>`;
-    }).join('');
-    return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px;">
-      <div class="row-between"><div style="font-weight:700;">Prêt de ${pt_fmtMoney(st.total)} <span class="pt-muted">— ${fmtDateShort(l.date)}${l.note ? ' · ' + pt_e(l.note) : ''}</span></div><button class="btn ghost small" onclick="pt_loanDelete('${l.id}')">Supprimer</button></div>
-      <div class="pt-kpis">
-        <div class="pt-kpi"><div class="n">${pt_fmtMoney(st.repaid)}</div><div class="l">Remboursé</div></div>
-        <div class="pt-kpi"><div class="n">${pt_fmtMoney(st.due)}</div><div class="l">Reste dû</div></div>
-        <div class="pt-kpi"><div class="n">${pt_fmtMoney(st.planned)}</div><div class="l">Planifié</div></div>
-        <div class="pt-kpi"><div class="n" ${st.toPlan !== 0 ? 'style="color:var(--rust);"' : ''}>${pt_fmtMoney(st.toPlan)}</div><div class="l">${st.toPlan < 0 ? 'Échéances en trop' : 'Reste à planifier'}</div></div>
-      </div>
-      <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date d’échéance</th><th>Montant (DA)</th><th>Statut</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="pt-muted">Aucune échéance : ajoute-en une.</td></tr>'}</tbody></table></div>
-      <div class="actions-row"><button class="btn ghost small" onclick="pt_loanAddLine('${l.id}')">+ Ajouter une échéance</button></div>
-    </div>`;
-  }).join('');
-  return `<div class="section-label" style="margin-top:16px;">Prêts</div>
-    <div class="pt-muted">Chaque échéance est déduite de la paie de la semaine (ou période) qui contient sa date, et devient « remboursée » quand cette période est clôturée. Si la paie ne suffit pas, le déficit est reporté sur la période suivante.</div>
-    ${cards}
-    <div class="pt-form" style="margin-top:12px;display:block;">
-      <div class="pt-row"><div class="field"><label>Nouveau prêt — date</label><input type="date" id="pt-ln-date" class="pt-draft pt-auto" value="${todayISO()}"></div>
-        <div class="field"><label>Montant total (DA)</label><input type="text" inputmode="decimal" id="pt-ln-amt" class="pt-draft pt-w90"></div>
-        <div class="field pt-grow"><label>Motif</label><input type="text" id="pt-ln-note" class="pt-draft"></div></div>
-      <div class="pt-row" style="margin-top:6px;"><div class="field"><label>1re échéance (date)</label><input type="date" id="pt-ln-first" class="pt-draft pt-auto"></div>
-        <div class="field"><label>Montant par semaine (DA)</label><input type="text" inputmode="decimal" id="pt-ln-step" class="pt-draft pt-w90"></div>
-        <button class="btn small" onclick="pt_loanCreate()">Créer le prêt</button></div>
-      <div class="pt-muted" style="margin-top:6px;">Laisse « 1re échéance » et « Montant par semaine » vides pour saisir l’échéancier à la main ensuite (montants différents chaque semaine).</div>
-    </div>`;
+async function pt_repayDel(id){
+  const r = pt_entries.find(x=>x.id === id); if(!r) return;
+  if(r.mode !== 'direct' && pt_guardDay(r.date, 'Cette suppression', r.code)) return;
+  if(!confirm('Supprimer ce remboursement de ' + pt_fmtMoney(r.amount) + ' ?')) return;
+  try{ await pt_entriesCol.doc(id).delete(); pt_toast('Remboursement supprimé.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+function pt_pretsHtml(code){
+  const b = pt_loanBalance(code), card = (cls, l, n)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div></div>`;
+  const loans = pt_loansOf(code).sort((a,b2)=>String(b2.date || '').localeCompare(String(a.date || '')));
+  const reps = pt_repaysOf(code).sort((a,b2)=>String(b2.date || '').localeCompare(String(a.date || '')));
+  const lrows = loans.map(l=>`<tr><td>${fmtDateShort(l.date)}</td><td>${pt_e(l.note || '')}</td><td>${pt_fmtMoney(l.amount)}</td><td><button class="btn ghost small" onclick="pt_loanDel('${l.id}')">Supprimer</button></td></tr>`).join('');
+  const rrows = reps.map(r=>{ const lock = r.mode !== 'direct' && pt_dayClosed(r.date, code);
+    return `<tr><td>${fmtDateShort(r.date)}${lock ? ' 🔒' : ''}</td><td>${pt_e(r.note || '')}</td><td>${r.mode === 'direct' ? 'Versement direct' : 'Sur salaire'}</td><td>${pt_fmtMoney(r.amount)}</td><td><button class="btn ghost small" onclick="pt_repayDel('${r.id}')">Supprimer</button></td></tr>`; }).join('');
+  const state = b.lent > 0 || b.repaid > 0 ? (b.due <= 0.004 ? '<span class="pt-badge pt-b-prime">Tout remboursé</span>' : '') : '';
+  return `<div class="pt-muted">Plusieurs prêts possibles. Les remboursements se cumulent sur un seul solde. « Sur salaire » : déduit de la paie de la semaine qui contient la date ; « Versement direct » : sans effet sur la paie.</div>
+    <div class="pt-cards" style="margin-top:10px;">${card('c-days', 'Total emprunté', pt_fmtMoney(b.lent))}${card('c-transport', 'Total remboursé', pt_fmtMoney(b.repaid))}${card(b.due > 0.004 ? 'c-loan' : 'c-transport', 'Reste dû', b.due > 0.004 ? pt_fmtMoney(b.due) : (b.due < -0.004 ? pt_money2(b.due) : '0'))}</div>
+    <div class="pt-muted">Remboursé : ${pt_fmtMoney(b.sal)} sur salaire · ${pt_fmtMoney(b.dir)} en versement direct ${state}</div>
+    <h2 class="section" style="margin-top:16px;">Prêts accordés</h2>
+    <div class="pt-row"><input type="date" id="pt-ln-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-ln-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-ln-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small" onclick="pt_loanAdd('${code}')">Ajouter le prêt</button></div>
+    <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date d’emprunt</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${lrows || '<tr><td colspan="4" class="pt-muted">Aucun prêt.</td></tr>'}</tbody></table></div>
+    <h2 class="section" style="margin-top:16px;">Remboursements</h2>
+    <div class="pt-row"><input type="date" id="pt-rb-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-rb-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><select id="pt-rb-mode" class="pt-draft"><option value="salaire">Sur salaire</option><option value="direct">Versement direct</option></select><input type="text" id="pt-rb-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small" onclick="pt_repayAdd('${code}')">Ajouter le remboursement</button></div>
+    <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date</th><th>Motif</th><th>Mode</th><th>Montant</th><th></th></tr></thead><tbody>${rrows || '<tr><td colspan="5" class="pt-muted">Aucun remboursement.</td></tr>'}</tbody></table></div>`;
+}
+function pt_pretsAllHtml(codes){
+  let L = 0, R = 0, D = 0;
+  const rows = codes.map(c=>{ const b = pt_loanBalance(c); if(!b.lent && !b.repaid) return ''; L += b.lent; R += b.repaid; D += b.due;
+    return `<tr><td>${pt_e(pt_label(c))}</td><td>${pt_fmtMoney(b.lent)}</td><td>${pt_fmtMoney(b.repaid)}</td><td>${b.due <= 0.004 && b.due >= -0.004 ? 'Tout remboursé' : pt_money2(b.due)}</td></tr>`; }).join('');
+  return `<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Employé</th><th>Total prêté</th><th>Total remboursé</th><th>Reste dû</th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="pt-muted">Aucun prêt.</td></tr>'}${rows ? `<tr class="pt-total"><td>TOTAL</td><td>${pt_fmtMoney(L)}</td><td>${pt_fmtMoney(R)}</td><td>${pt_money2(D)}</td></tr>` : ''}</tbody></table></div>`;
 }
 /* ---------- congé : 1/12 du salaire de base ---------- */
 const pt_money2 = (n)=>(n < -0.004 ? '<span style="color:var(--rust);">−' + pt_fmtMoney(-n) + '</span>' : pt_fmtMoney(n));
@@ -2672,7 +2647,7 @@ function pt_tabEmployes(codes, sessions, anoms, overlaps){
     return html + `<div class="ticket">${pt_empSelect(codes)}${pt_empCards(tot, isAdmin)}<div class="pt-muted">Totaux de tous les employés sur la période affichée. Choisis un employé pour voir ses pointages et sa paie.</div></div>`
       + (() => { const probs = codes.map(x=>({ x, a:anoms.filter(a=>a.code === x).length, o:overlaps.filter(o=>o.codeA === x || o.codeB === x).length })).filter(r=>r.a || r.o);
           return probs.length ? `<div class="ticket"><div class="section-label">À régler</div>${probs.map(r=>`<div class="pt-an"><div><b>${pt_e(pt_label(r.x))}</b><div class="pt-an-reason">${[r.a ? r.a + ' entrée(s)/sortie(s) manquante(s)' : '', r.o ? r.o + ' chevauchement(s)' : ''].filter(Boolean).join(' · ')}</div></div><button class="btn ghost small" onclick="pt_selEmp('${r.x}')">Ouvrir</button></div>`).join('')}</div>` : ''; })()
-      + (isAdmin ? pt_accordion('conge', 'Congé — tous les employés', pt_congesHtml(codes)) + pt_accordion('clotures', 'Clôtures', pt_cloturesSection()) : '');
+      + (isAdmin ? pt_accordion('prets', 'Prêts — tous les employés', pt_pretsAllHtml(codes)) + pt_accordion('clotures', 'Clôtures', pt_cloturesSection()) + pt_accordion('conge', 'Congé — tous les employés', pt_congesHtml(codes)) : '');
   }
   const c = pt_sel, p = pt_displayPayroll(c, sessions);
   const myAn = anoms.filter(a=>a.code === c), myOv = overlaps.filter(o=>o.codeA === c || o.codeB === c);
@@ -2683,8 +2658,9 @@ function pt_tabEmployes(codes, sessions, anoms, overlaps){
   </div>`;
   html += pt_accordion('pointages', 'Pointages de l’employé', pt_pointagesSection(c, sessions, myAn, myOv));
   if(isAdmin) html += pt_accordion('paie', 'Paie', pt_paieSection(c, sessions, codes));
-  if(isAdmin) html += pt_accordion('conge', 'Congé', pt_congeEmpHtml(c));
+  if(isAdmin) html += pt_accordion('prets', 'Prêts', pt_pretsHtml(c));
   if(isAdmin) html += pt_accordion('clotures', 'Clôtures', pt_cloturesSection());
+  if(isAdmin) html += pt_accordion('conge', 'Congé', pt_congeEmpHtml(c));
   return html;
 }
 async function pt_addEventUI(){
@@ -2910,8 +2886,11 @@ function pt_exportExcel(){
       .concat([(()=>{ const T = pt_paieTotals(codes, fs); return ['', 'TOTAL', '', +T.hours.toFixed(2), '', '', '', +T.base.toFixed(2), +T.transport.toFixed(2), +T.bonuses.toFixed(2), +T.sub.toFixed(2), +T.leaves.toFixed(2), +T.advances.toFixed(2), +T.loans.toFixed(2), +T.report.toFixed(2), +T.net.toFixed(2), +T.carry.toFixed(2)]; })()]));
   add('Conges', ['Code','Nom','Du','Au','Salaire base','Solde initial','Conge calcule','Conge de la periode','Conge verse','Reste a verser'], codes.map(c=>{ const k = pt_conge(c); return [c, pt_name(c), k.from, k.to, +k.base.toFixed(2), +k.open.toFixed(2), +k.computed.toFixed(2), +k.total.toFixed(2), +k.taken.toFixed(2), +k.left.toFixed(2)]; }));
   add('Conges verses', ['Code','Nom','Date','Montant','Motif'], pt_entries.filter(e=>e.kind === 'congepaid').sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(e=>[e.code, pt_name(e.code), e.date, Number(e.amount) || 0, e.note || '']));
-  const prets = []; pt_entries.filter(e=>e.kind === 'pret').forEach(l=>{ const st = pt_loanStats(l); (l.schedule || []).forEach(x=>prets.push([l.code, pt_name(l.code), l.date, Number(l.amount) || 0, l.note || '', x.d, Number(x.a) || 0, pt_dayClosed(x.d) ? 'Rembourse' : 'A venir'])); if(!(l.schedule || []).length) prets.push([l.code, pt_name(l.code), l.date, Number(l.amount) || 0, l.note || '', '', 0, '']); });
-  add('Prets', ['Code','Nom','Date pret','Montant total','Motif','Echeance','Montant echeance','Statut'], prets);
+  const prets = []; pt_entries.filter(e=>e.kind === 'pret').forEach(l=>prets.push([l.code, pt_name(l.code), 'Emprunt', l.date, Number(l.amount) || 0, '', l.note || '']));
+  pt_entries.filter(e=>e.kind === 'pretrembt').forEach(r=>prets.push([r.code, pt_name(r.code), 'Remboursement', r.date, -(Number(r.amount) || 0), r.mode === 'direct' ? 'Versement direct' : 'Sur salaire', r.note || '']));
+  prets.sort((a,b)=>String(a[3]).localeCompare(String(b[3])));
+  add('Prets', ['Code','Nom','Operation','Date','Montant','Mode','Motif'], prets);
+  add('Prets soldes', ['Code','Nom','Total emprunte','Rembourse sur salaire','Rembourse direct','Reste du'], codes.map(c=>{ const b = pt_loanBalance(c); return [c, pt_name(c), b.lent, b.sal, b.dir, b.due]; }).filter(r=>r[2] || r[3] || r[4]));
   const hist = [];
   codes.forEach(c=>{
     pt_entries.filter(e=>e.code === c && ['prime','off','avance'].includes(e.kind)).forEach(e=>hist.push([c, pt_name(c), e.kind === 'prime' ? 'Prime' : e.kind === 'off' ? 'Jour Off' : 'Avance', e.date, e.note || '', e.kind === 'avance' ? -(Number(e.amount)||0) : (Number(e.amount)||0)]));
