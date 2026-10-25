@@ -1746,6 +1746,14 @@ function pt_closureStale(sessions){
     return Math.round(l.net) !== Math.round(f.net) || Math.abs(l.totalHours - f.hours) > 0.005;
   });
 }
+/* Net à payer : arrondi vers le haut au multiple de 10 DA (1182,3 → 1190). La petite différence est offerte : elle n'est pas reportée. */
+function pt_ceil10(x){ x = Math.round((Number(x) || 0) * 100) / 100; return x <= 0 ? 0 : Math.ceil(x / 10 - 1e-9) * 10; }
+function pt_netOf(solde){ return solde > 0 ? pt_ceil10(solde) : 0; }
+function pt_reportOf(solde, paid){
+  solde = Math.round((Number(solde) || 0) * 100) / 100; paid = Math.max(0, Number(paid) || 0);
+  if(solde > 0 && paid >= solde - 1e-9 && paid <= pt_netOf(solde) + 1e-9) return 0;   // versé = solde ou net arrondi : rien à reporter
+  return Math.round((solde - paid) * 100) / 100 || 0;
+}
 function pt_baseOf(code, sessions){
   const mySess = sessions.filter(s=>s.code === code);
   const myManual = pt_entries.filter(e=>e.kind === 'manual' && e.code === code && pt_inRange(e.date));
@@ -1798,41 +1806,24 @@ function pt_payroll(code, sessions){
   const subTotal = b.baseWage + transportTotal + bonusesTotal;
   const reportIn = pt_reportIn(code, pt_filter.from);
   const solde = Math.round((subTotal + leavesTotal - advancesTotal - loanTotal + reportIn) * 100) / 100; // peut être négatif
-  const net = Math.max(0, solde), v = pt_validationFor(code, pt_filter.from, pt_filter.to);
-  const paidAmt = v ? Math.max(0, Number(v.paidAmt) || 0) : net, reportOut = Math.round((solde - paidAmt) * 100) / 100 || 0; // report = solde − versé (versé par défaut : tout le solde positif)
+  const net = pt_netOf(solde), v = pt_validationFor(code, pt_filter.from, pt_filter.to);
+  const paidAmt = v ? Math.max(0, Number(v.paidAmt) || 0) : net, reportOut = pt_reportOf(solde, paidAmt); // report = solde − versé (versé par défaut : tout le solde positif)
   return { ...b, transport:tr, transportTotal, bonuses, leaves, advances, loans, bonusesTotal, leavesTotal, advancesTotal, loanTotal, subTotal, reportIn, solde, net, paidAmt, reportOut, validated:v };
 }
 /* ---- congé : 1/12 du salaire de base (heures × taux, sans transport ni primes) de la période de calcul ; perçu = « Jours off » payés ---- */
-function pt_congeFrom(asOf){
-  const c = pt_entries.find(e=>e.kind === 'congecfg') || {};
-  const f = /^\d{4}-\d{2}-\d{2}$/.test(c.from || '') ? c.from : '';
-  return (f && f <= asOf) ? f : asOf.slice(0, 4) + '-01-01';
-}
-function pt_congeOpen(code){ const c = pt_entries.find(e=>e.kind === 'congecfg') || {}; return Number(c.open && c.open[code]) || 0; } // solde initial (négatif = l'employé doit)
-/* base de la semaine : valeur figée si la semaine a été clôturée telle quelle, sinon calcul en direct */
-function pt_congeWeekBase(code, from, to){
-  const fz = pt_clotures.find(c=>c.from === from && c.to === to && c.rows && c.rows[code] && c.rows[code].baseWage !== undefined);
-  if(fz) return { base:Number(fz.rows[code].baseWage) || 0, frozen:true };
-  return { base:pt_withFilter(from, to, ()=>pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))).baseWage), frozen:false };
-}
-/* registre hebdomadaire : par semaine (lundi → dimanche) du début de la période de calcul jusqu'à asOf */
-function pt_congeWeeks(code, asOf){
-  const to = asOf || todayISO(), start = pt_congeFrom(to), weeks = [];
-  let w = pt_weekRange(start).from, cumAcq = 0, cumTaken = 0, left = pt_congeOpen(code);
-  while(w <= to && weeks.length < 400){
-    const wt = pt_addDays(w, 6), a = w < start ? start : w, b = wt > to ? to : wt;
-    const bw = (a === w && b === wt) ? pt_congeWeekBase(code, w, wt) : { base:pt_withFilter(a, b, ()=>pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))).baseWage), frozen:false };
-    const taken = pt_entries.filter(e=>e.kind === 'off' && e.code === code && e.date >= a && e.date <= b).reduce((t,e)=>t + (Number(e.amount) || 0), 0);
-    const acq = bw.base / 12; cumAcq += acq; cumTaken += taken; left += acq - taken;
-    weeks.push({ from:w, to:wt, base:bw.base, acq, taken, cumAcq, cumTaken, left, frozen:bw.frozen });
-    w = pt_addDays(w, 7);
-  }
-  return weeks;
-}
+/* Congé : calcul depuis le 24/10/2026 (date fixe). Congé de la période = arrondi↑10 de (1/12 × salaire de base) ;
+   salaire de base = heures × taux (ou jours × taux journalier). Total = solde initial + congé de la période ; reste = total − congés versés.
+   Le Jour Off n'entre pas dans le congé. Solde initial : doc congeopen_<code> ; versements : kind 'congepaid'. */
+const PT_CONGE_START = '2026-10-24';
+function pt_congeOpen(code){ const d = pt_entries.find(e=>e.kind === 'congeopen' && e.code === code); return d ? (Number(d.amount) || 0) : 0; }
+function pt_congePaidList(code){ return pt_entries.filter(e=>e.kind === 'congepaid' && e.code === code).sort((a,b)=>String(b.date).localeCompare(String(a.date))); }
 function pt_conge(code, asOf){
-  const to = asOf || todayISO(), from = pt_congeFrom(to), weeks = pt_congeWeeks(code, to), open = pt_congeOpen(code);
-  const base = weeks.reduce((t,x)=>t + x.base, 0), total = base / 12, taken = weeks.reduce((t,x)=>t + x.taken, 0);
-  return { from, to, base, total, taken, open, left:open + total - taken, weeks };
+  const to = asOf || todayISO(), from = PT_CONGE_START;
+  const base = to < from ? 0 : pt_withFilter(from, to, ()=>pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))).baseWage);
+  const computed = pt_ceil10(base / 12), open = pt_congeOpen(code);
+  const taken = pt_congePaidList(code).filter(e=>e.date <= to).reduce((t,e)=>t + (Number(e.amount) || 0), 0);
+  const total = Math.round((open + computed) * 100) / 100;
+  return { from, to, base, computed, open, total, taken, left:Math.round((total - taken) * 100) / 100 };
 }
 
 /* ==================== ANCIENNES CORRECTIONS AUTOMATIQUES (annulation seulement) ==================== */
@@ -1917,7 +1908,7 @@ function pt_restoreInputs(st, withValues){
     if(el){ el.focus(); if(st.focus.s != null && el.setSelectionRange){ try{ el.setSelectionRange(st.focus.s, st.focus.e); }catch(e){} } }
   }
 }
-let pt_open = { pointages:true, clotures:false, manual:false, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
+let pt_open = { pointages:true, conge:false, clotures:false, manual:false, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
 function pt_toggleSec(key){ pt_open[key] = !pt_open[key]; pt_render(true); }
 function pt_accordion(key, title, innerHtml){
   const open = !!pt_open[key];
@@ -2086,7 +2077,7 @@ let pt_clPay = null;
 function pt_clPayToggle(id){ pt_clPay = pt_clPay === id ? null : id; pt_render(true); }
 async function pt_payEdit(id, code, value){
   const c = pt_clotures.find(x=>x.id === id); if(!c || !c.rows || !c.rows[code]) return;
-  const row = c.rows[code], solde = Number(row.solde !== undefined ? row.solde : row.net) || 0, paid = Math.max(0, pt_num(value)), out = pt_r2(solde - paid), old = Number(row.reportOut) || 0;
+  const row = c.rows[code], solde = Number(row.solde !== undefined ? row.solde : row.net) || 0, paid = Math.max(0, pt_num(value)), out = pt_reportOf(solde, paid), old = Number(row.reportOut) || 0;
   const later = pt_clotures.some(x=>(x.kind === 'week' || x.kind === 'period') && x.from > c.to && x.rows && x.rows[code]);
   if(later && Math.abs(out - old) > 0.004){ alert('Une période plus récente est déjà clôturée : son report ne peut plus changer.\nPour verser cette somme maintenant, enregistre plutôt une « Avance » (motif : règlement) dans la période en cours : elle sera déduite du solde reporté.'); pt_render(true); return; }
   try{ await pt_cloturesCol.doc(id).set({ rows:{ [code]:{ paidAmt:paid, reportOut:out, paid: paid + 0.004 >= Math.max(0, solde) } } }, { merge:true }); pt_toast('Versement enregistré.'); }
@@ -2323,7 +2314,7 @@ function pt_recapHtml(from, to, closure){
     const carryNeg = emps.filter(e=>e.tot.carry < -0.004).map(e=>e.name + ' : −' + pt_fmtMoney(-e.tot.carry)), carryPos = emps.filter(e=>e.tot.carry > 0.004).map(e=>e.name + ' : +' + pt_fmtMoney(e.tot.carry));
     const carryHtml = (carryNeg.length ? '<p style="color:#b3261e;font-size:12px;"><b>Solde négatif reporté sur la période suivante</b> (à récupérer) — ' + carryNeg.join(' · ') + '</p>' : '') + (carryPos.length ? '<p style="color:#1b6e3c;font-size:12px;"><b>Reste dû aux employés, reporté sur la période suivante</b> — ' + carryPos.join(' · ') + '</p>' : '');
     const soldes = emps.map(e=>{ const k = pt_conge(e.code, to); const loans = pt_loansOf(e.code).reduce((t, l)=>t + pt_loanStats(l, to).due, 0); return { name:e.name, k, loans }; }).filter(x=>x.k.total || x.k.taken || x.loans);
-    const soldesHtml = soldes.length ? '<p style="margin-bottom:4px;"><b>Soldes au ' + fmtDateShort(to) + '</b></p><table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;font-size:12px;border-color:#bbb;"><tr bgcolor="#2d4a35" style="color:#fff;"><th align="left">Employé</th><th>Congé total (1/12)</th><th>Congé perçu</th><th>Congé restant</th><th>Prêt : reste dû</th></tr>'
+    const soldesHtml = soldes.length ? '<p style="margin-bottom:4px;"><b>Soldes au ' + fmtDateShort(to) + '</b></p><table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;font-size:12px;border-color:#bbb;"><tr bgcolor="#2d4a35" style="color:#fff;"><th align="left">Employé</th><th>Congé de la période</th><th>Congé versé</th><th>Reste à verser</th><th>Prêt : reste dû</th></tr>'
       + soldes.map(x=>'<tr>' + PT_TD(x.name) + PT_TD(pt_fmtMoney(x.k.total), true) + PT_TD(pt_fmtMoney(x.k.taken), true) + PT_TD((x.k.left < 0 ? '−' : '') + pt_fmtMoney(Math.abs(x.k.left)), true) + PT_TD(x.loans ? pt_fmtMoney(x.loans) : '', true) + '</tr>').join('') + '</table>' : '';
     const html = '<div style="font-family:Arial,sans-serif;font-size:13px;color:#222;">'
       + '<p>Récapitulatif ' + pt_e(pt_rangeLabel(from, to)) + (closure && closure.createdAt ? ' — clôturé le ' + fmtDateShort(String(closure.createdAt).slice(0,10)) : '') + '.</p>'
@@ -2494,42 +2485,44 @@ function pt_loansSection(code){
     </div>`;
 }
 /* ---------- congé : 1/12 du salaire de base ---------- */
-function pt_congeSetFrom(v){
-  return pt_entriesCol.doc('congecfg').set({ kind:'congecfg', from:String(v || '') }, { merge:true }).then(()=>{ pt_toast('Début de la période de calcul enregistré.'); pt_render(true); }).catch(e=>alert('Erreur : ' + (e.message || e)));
-}
-function pt_congeSetOpen(code, v){
-  const n = pt_num(v);
-  return pt_entriesCol.doc('congecfg').set({ kind:'congecfg', open:{ [code]:n } }, { merge:true }).then(()=>{ pt_toast('Solde initial enregistré.'); pt_render(true); }).catch(e=>alert('Erreur : ' + (e.message || e)));
-}
 const pt_money2 = (n)=>(n < -0.004 ? '<span style="color:var(--rust);">−' + pt_fmtMoney(-n) + '</span>' : pt_fmtMoney(n));
+async function pt_congeSaveOpen(code){
+  const el = document.getElementById('pt-co-open'); if(!el) return;
+  try{ await pt_entriesCol.doc('congeopen_' + code).set({ kind:'congeopen', code, amount:pt_num(el.value), savedAt:new Date().toISOString() }, { merge:true }); pt_toast('Solde initial de congé enregistré.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_congePayAdd(code){
+  const g = (i)=>document.getElementById(i), d = g('pt-cp-date').value || todayISO(), raw = g('pt-cp-amt').value.trim();
+  if(!raw){ alert('Indique le montant versé.'); return; }
+  const amt = pt_num(raw); if(!(amt > 0)){ alert('Le montant doit être positif.'); return; }
+  const note = g('pt-cp-note').value.trim(); g('pt-cp-amt').value = ''; g('pt-cp-note').value = '';
+  try{ await pt_addEntryDoc({ kind:'congepaid', code, date:d, amount:amt, note }); pt_toast('Versement de congé enregistré.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_congePayDel(id){
+  if(!confirm('Supprimer ce versement de congé ?')) return;
+  try{ await pt_entriesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
 function pt_congeEmpHtml(code){
-  const asOf = pt_filter.to || todayISO(), k = pt_conge(code, asOf), selWeek = pt_weekRange(asOf).from;
-  const cur = k.weeks.find(x=>x.from === selWeek) || k.weeks[k.weeks.length - 1];
-  const rows = k.weeks.map(x=>`<tr${x.from === selWeek ? ' style="background:var(--paper);font-weight:700;"' : ''}><td>S${pt_isoWeek(x.from)} · ${pt_dm(new Date(x.from + 'T12:00:00'))} → ${pt_dm(new Date(x.to + 'T12:00:00'))}${x.frozen ? ' 🔒' : ''}</td><td>${pt_fmtMoney(x.base)}</td><td>${pt_fmtMoney(x.acq)}</td><td>${pt_fmtMoney(x.taken)}</td><td>${pt_fmtMoney(x.cumAcq)}</td><td>${pt_fmtMoney(x.cumTaken)}</td><td>${pt_money2(x.left)}</td></tr>`).join('');
-  const cfg = pt_entries.find(e=>e.kind === 'congecfg') || {};
-  return `<div class="pt-muted">Congé acquis chaque semaine = 1/12 du salaire de base de la semaine (heures × taux, sans transport ni primes). Congé perçu = montants saisis en « Jour Off (congé payé) » dans la rubrique Paie. Les valeurs des semaines clôturées (🔒) sont conservées.</div>
-    <div class="section-label" style="margin-top:10px;">Au ${fmtDateShort(asOf)}${cur ? ' — semaine ' + pt_isoWeek(cur.from) : ''}</div>
-    <div class="pt-kpis">
-      <div class="pt-kpi"><div class="n">${pt_fmtMoney(k.total)}</div><div class="l">Congé total (cumul)</div></div>
-      <div class="pt-kpi"><div class="n">${pt_fmtMoney(k.taken)}</div><div class="l">Congé perçu (cumul)</div></div>
-      <div class="pt-kpi"><div class="n">${pt_money2(k.left)}</div><div class="l">Congé restant${k.left < 0 ? ' (l’employé doit)' : ''}</div></div>
-      <div class="pt-kpi"><div class="n">${pt_money2(k.open)}</div><div class="l">Solde initial</div></div>
-    </div>
-    <div class="grid grid-2" style="margin-top:10px;">
-      <div class="field"><label>Solde initial (DA) — avant l’historique</label><input type="text" inputmode="decimal" value="${pt_e(k.open || '')}" placeholder="0" onchange="pt_congeSetOpen(${code}, this.value)"></div>
-      <div class="field"><label>Début de la période de calcul</label><input type="date" value="${pt_e(/^\d{4}-\d{2}-\d{2}$/.test(cfg.from || '') ? cfg.from : '')}" onchange="pt_congeSetFrom(this.value)"></div>
-    </div>
-    <div class="pt-muted" style="margin:6px 0 10px;">Solde initial : congé déjà acquis/perçu avant la date de début. Mets un montant <b>négatif</b> si l’employé te doit déjà une somme de congé (ex. −3 000). Début vide = 1er janvier.</div>
-    <div class="pt-scroll" style="max-height:340px;overflow:auto;"><table class="pt-table"><thead><tr><th>Semaine</th><th>Salaire de base</th><th>Congé acquis</th><th>Congé perçu</th><th>Total cumulé</th><th>Perçu cumulé</th><th>Restant</th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="pt-muted">Aucune semaine.</td></tr>'}</tbody></table></div>`;
+  const k = pt_conge(code), list = pt_congePaidList(code);
+  const card = (cls, l, n)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div></div>`;
+  const mode = pt_mode(code) === 'daily';
+  const rows = list.map(e=>`<tr><td>${fmtDateShort(e.date)}</td><td>${pt_e(e.note || '')}</td><td>${pt_fmtMoney(e.amount)}</td><td><button class="btn ghost small" onclick="pt_congePayDel('${e.id}')">Supprimer</button></td></tr>`).join('');
+  return `<div class="pt-muted">Période de calcul : du <b>${fmtDateShort(k.from)}</b> au <b>${fmtDateShort(k.to)}</b> (aujourd’hui). Congé = 1/12 × ${mode ? 'jours travaillés × taux journalier' : 'heures travaillées × taux'}, arrondi vers le haut au multiple de 10 DA. Le Jour Off n’est pas compté.</div>
+    <div class="pt-row" style="margin-top:10px;"><div class="field"><label>Solde initial de congé (DA)</label><input type="text" inputmode="decimal" id="pt-co-open" class="pt-w90" value="${pt_e(k.open || '')}" placeholder="0"></div><button class="btn small" onclick="pt_congeSaveOpen(${code})">Enregistrer</button></div>
+    <div class="pt-muted" style="margin:4px 0 8px;">À saisir une fois (tu peux le modifier). Mets un montant négatif si l’employé te doit déjà du congé.</div>
+    <div class="pt-cards">${card('c-hours', 'Solde initial', pt_money2(k.open))}${card('c-base', 'Congé calculé (1/12, arrondi)', pt_fmtMoney(k.computed))}${card('c-days', 'Congé de toute la période', pt_money2(k.total))}${card('c-bonus', 'Congé versé', pt_fmtMoney(k.taken))}${card(k.left < 0 ? 'c-adv' : 'c-transport', 'Reste à verser', pt_money2(k.left))}</div>
+    <div class="pt-muted">Calcul : salaire de base ${pt_fmtMoney(k.base)} ÷ 12 = ${(k.base / 12).toLocaleString('fr-FR', { maximumFractionDigits:2 })} DA → arrondi ${pt_fmtMoney(k.computed)}. Total = solde initial + congé calculé.</div>
+    <h2 class="section" style="margin-top:16px;">Congés versés</h2>
+    <div class="pt-row"><input type="date" id="pt-cp-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-cp-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-cp-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small" onclick="pt_congePayAdd(${code})">Ajouter</button></div>
+    <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="pt-muted">Aucun congé versé.</td></tr>'}${list.length ? `<tr class="pt-total"><td colspan="2">Total versé</td><td>${pt_fmtMoney(k.taken)}</td><td></td></tr>` : ''}</tbody></table></div>`;
 }
 function pt_congesHtml(codes){
-  const asOf = pt_filter.to || todayISO();
-  const ks = codes.map(c=>({ c, k:pt_conge(c, asOf) }));
-  const T = ks.reduce((t, x)=>({ base:t.base + x.k.base, open:t.open + x.k.open, total:t.total + x.k.total, taken:t.taken + x.k.taken, left:t.left + x.k.left }), { base:0, open:0, total:0, taken:0, left:0 });
-  return `<div class="pt-muted">Congé acquis = 1/12 du salaire de base (heures × taux, sans transport ni primes) depuis le début de la période de calcul jusqu’au ${fmtDateShort(asOf)}. Restant = solde initial + total − perçu. Le détail par semaine est dans la fiche de chaque employé.</div>
-    <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Employé</th><th>Salaire de base</th><th>Solde initial</th><th>Congé total (1/12)</th><th>Congé perçu</th><th>Congé restant</th></tr></thead><tbody>${
-      ks.map(x=>`<tr><td>${pt_e(pt_label(x.c))}</td><td>${pt_fmtMoney(x.k.base)}</td><td>${pt_money2(x.k.open)}</td><td>${pt_fmtMoney(x.k.total)}</td><td>${pt_fmtMoney(x.k.taken)}</td><td><b>${pt_money2(x.k.left)}</b></td></tr>`).join('')}
-      <tr class="pt-total"><td>TOTAL</td><td>${pt_fmtMoney(T.base)}</td><td>${pt_money2(T.open)}</td><td>${pt_fmtMoney(T.total)}</td><td>${pt_fmtMoney(T.taken)}</td><td>${pt_money2(T.left)}</td></tr></tbody></table></div>`;
+  const ks = codes.map(c=>({ c, k:pt_conge(c) })), T = ks.reduce((t,x)=>({ open:t.open + x.k.open, computed:t.computed + x.k.computed, total:t.total + x.k.total, taken:t.taken + x.k.taken, left:t.left + x.k.left }), { open:0, computed:0, total:0, taken:0, left:0 });
+  return `<div class="pt-muted">Congé depuis le ${fmtDateShort(PT_CONGE_START)} jusqu’à aujourd’hui. Choisis un employé pour saisir son solde initial et ses versements.</div>
+    <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Employé</th><th>Solde initial</th><th>Congé calculé</th><th>Congé de la période</th><th>Congé versé</th><th>Reste à verser</th></tr></thead><tbody>${
+      ks.map(x=>`<tr><td>${pt_e(pt_label(x.c))}</td><td>${pt_money2(x.k.open)}</td><td>${pt_fmtMoney(x.k.computed)}</td><td>${pt_money2(x.k.total)}</td><td>${pt_fmtMoney(x.k.taken)}</td><td><b>${pt_money2(x.k.left)}</b></td></tr>`).join('')}
+      <tr class="pt-total"><td>TOTAL</td><td>${pt_money2(T.open)}</td><td>${pt_fmtMoney(T.computed)}</td><td>${pt_money2(T.total)}</td><td>${pt_fmtMoney(T.taken)}</td><td>${pt_money2(T.left)}</td></tr></tbody></table></div>`;
 }
 function pt_histTotalsHtml(p, codes){
   const sum = (arr)=>arr.reduce((s,x)=>s + (Number(x.amount) || 0), 0);
@@ -2553,7 +2546,7 @@ async function pt_validate(){
   if(pt_currentClosure(pt_sel)){ alert('Cette période est clôturée pour cet employé. Modifie le versé dans Clôtures › Versements, ou rouvre la période.'); return; }
   const el = document.getElementById('pt-vs-amt'); if(!el) return;
   const sessions = pt_periodSessions(), q = pt_payroll(pt_sel, sessions), paid = Math.max(0, pt_num(el.value));
-  const out = Math.round((q.solde - paid) * 100) / 100 || 0;
+  const out = pt_reportOf(q.solde, paid);
   const id = 'val_' + pt_sel + '_' + pt_filter.from + '_' + pt_filter.to;
   try{ await pt_entriesCol.doc(id).set({ kind:'valid', code:pt_sel, from:pt_filter.from, to:pt_filter.to, solde:Math.round(q.solde * 100) / 100, paidAmt:paid, reportOut:out, validatedAt:new Date().toISOString(), validatedBy:(typeof currentUser !== 'undefined' ? currentUser : '') }); pt_toast('Validé : ' + pt_name(pt_sel) + '.'); }
   catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
@@ -2565,12 +2558,12 @@ async function pt_unvalidate(){
 }
 function pt_vsPreview(solde){
   const el = document.getElementById('pt-vs-amt'), out = document.getElementById('pt-vs-rep'); if(!el || !out) return;
-  const paid = Math.max(0, pt_num(el.value)), r = Math.round((solde - paid) * 100) / 100;
+  const paid = Math.max(0, pt_num(el.value)), r = pt_reportOf(solde, paid);
   out.innerHTML = r > 0.004 ? '<span style="color:var(--moss);">Reste dû reporté sur la semaine suivante : +' + pt_fmtMoney(r) + '</span>' : r < -0.004 ? '<span style="color:var(--rust);">Solde négatif reporté sur la semaine suivante : −' + pt_fmtMoney(-r) + '</span>' : 'Rien à reporter.';
 }
 function pt_versementHtml(p, sessions){
   const cl = pt_currentClosure(pt_sel), v = p.validated, solde = p.solde;
-  const paid = v ? Number(v.paidAmt) || 0 : Math.max(0, solde), r = Math.round((solde - paid) * 100) / 100;
+  const paid = v ? Number(v.paidAmt) || 0 : pt_netOf(solde), r = pt_reportOf(solde, paid);
   const rep = r > 0.004 ? '<span style="color:var(--moss);">Reste dû reporté sur la semaine suivante : +' + pt_fmtMoney(r) + '</span>' : r < -0.004 ? '<span style="color:var(--rust);">Solde négatif reporté sur la semaine suivante : −' + pt_fmtMoney(-r) + '</span>' : 'Rien à reporter.';
   const stale = v && !cl && Math.abs((Number(v.solde) || 0) - solde) > 0.5;
   const status = cl ? '<span class="pt-badge pt-b-off">🔒 Période clôturée</span>' : v ? '<span class="pt-badge pt-b-prime">✓ Validé le ' + fmtDateShort(String(v.validatedAt || '').slice(0,10)) + '</span>' : '<span class="pt-muted">Non validé</span>';
@@ -2679,7 +2672,7 @@ function pt_tabEmployes(codes, sessions, anoms, overlaps){
     return html + `<div class="ticket">${pt_empSelect(codes)}${pt_empCards(tot, isAdmin)}<div class="pt-muted">Totaux de tous les employés sur la période affichée. Choisis un employé pour voir ses pointages et sa paie.</div></div>`
       + (() => { const probs = codes.map(x=>({ x, a:anoms.filter(a=>a.code === x).length, o:overlaps.filter(o=>o.codeA === x || o.codeB === x).length })).filter(r=>r.a || r.o);
           return probs.length ? `<div class="ticket"><div class="section-label">À régler</div>${probs.map(r=>`<div class="pt-an"><div><b>${pt_e(pt_label(r.x))}</b><div class="pt-an-reason">${[r.a ? r.a + ' entrée(s)/sortie(s) manquante(s)' : '', r.o ? r.o + ' chevauchement(s)' : ''].filter(Boolean).join(' · ')}</div></div><button class="btn ghost small" onclick="pt_selEmp('${r.x}')">Ouvrir</button></div>`).join('')}</div>` : ''; })()
-      + (isAdmin ? pt_accordion('clotures', 'Clôtures', pt_cloturesSection()) : '');
+      + (isAdmin ? pt_accordion('conge', 'Congé — tous les employés', pt_congesHtml(codes)) + pt_accordion('clotures', 'Clôtures', pt_cloturesSection()) : '');
   }
   const c = pt_sel, p = pt_displayPayroll(c, sessions);
   const myAn = anoms.filter(a=>a.code === c), myOv = overlaps.filter(o=>o.codeA === c || o.codeB === c);
@@ -2690,6 +2683,7 @@ function pt_tabEmployes(codes, sessions, anoms, overlaps){
   </div>`;
   html += pt_accordion('pointages', 'Pointages de l’employé', pt_pointagesSection(c, sessions, myAn, myOv));
   if(isAdmin) html += pt_accordion('paie', 'Paie', pt_paieSection(c, sessions, codes));
+  if(isAdmin) html += pt_accordion('conge', 'Congé', pt_congeEmpHtml(c));
   if(isAdmin) html += pt_accordion('clotures', 'Clôtures', pt_cloturesSection());
   return html;
 }
@@ -2914,7 +2908,8 @@ function pt_exportExcel(){
   add('Resume paie', ['Code','Nom','Poste','Heures','Mode','Taux','Jours travailles','Salaire base','Transport','Primes','Sous-total','Jours off','Avances','Pret','Report precedent','Net a payer','Report suivant'],
     codes.map(c=>{ const p = pt_displayPayroll(c, fs); return [c, pt_name(c), pt_poste(c), +p.totalHours.toFixed(2), p.mode === 'daily' ? 'Jour' : 'Heure', p.rate, p.workedDays, +p.baseWage.toFixed(2), +p.transportTotal.toFixed(2), +p.bonusesTotal.toFixed(2), +p.subTotal.toFixed(2), +p.leavesTotal.toFixed(2), +p.advancesTotal.toFixed(2), +(p.loanTotal || 0).toFixed(2), +(p.reportIn || 0).toFixed(2), +p.net.toFixed(2), +(p.reportOut || 0).toFixed(2)]; })
       .concat([(()=>{ const T = pt_paieTotals(codes, fs); return ['', 'TOTAL', '', +T.hours.toFixed(2), '', '', '', +T.base.toFixed(2), +T.transport.toFixed(2), +T.bonuses.toFixed(2), +T.sub.toFixed(2), +T.leaves.toFixed(2), +T.advances.toFixed(2), +T.loans.toFixed(2), +T.report.toFixed(2), +T.net.toFixed(2), +T.carry.toFixed(2)]; })()]));
-  add('Conges', ['Code','Nom','Du','Au','Salaire base','Conge total (1/12)','Conge percu','Conge restant'], codes.map(c=>{ const k = pt_conge(c, pt_filter.to || todayISO()); return [c, pt_name(c), k.from, k.to, +k.base.toFixed(2), +k.total.toFixed(2), +k.taken.toFixed(2), +k.left.toFixed(2)]; }));
+  add('Conges', ['Code','Nom','Du','Au','Salaire base','Solde initial','Conge calcule','Conge de la periode','Conge verse','Reste a verser'], codes.map(c=>{ const k = pt_conge(c); return [c, pt_name(c), k.from, k.to, +k.base.toFixed(2), +k.open.toFixed(2), +k.computed.toFixed(2), +k.total.toFixed(2), +k.taken.toFixed(2), +k.left.toFixed(2)]; }));
+  add('Conges verses', ['Code','Nom','Date','Montant','Motif'], pt_entries.filter(e=>e.kind === 'congepaid').sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(e=>[e.code, pt_name(e.code), e.date, Number(e.amount) || 0, e.note || '']));
   const prets = []; pt_entries.filter(e=>e.kind === 'pret').forEach(l=>{ const st = pt_loanStats(l); (l.schedule || []).forEach(x=>prets.push([l.code, pt_name(l.code), l.date, Number(l.amount) || 0, l.note || '', x.d, Number(x.a) || 0, pt_dayClosed(x.d) ? 'Rembourse' : 'A venir'])); if(!(l.schedule || []).length) prets.push([l.code, pt_name(l.code), l.date, Number(l.amount) || 0, l.note || '', '', 0, '']); });
   add('Prets', ['Code','Nom','Date pret','Montant total','Motif','Echeance','Montant echeance','Statut'], prets);
   const hist = [];
