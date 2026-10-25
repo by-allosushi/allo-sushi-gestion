@@ -2490,11 +2490,14 @@ async function pt_closeRange(from, to, kind){
   let ref;
   try{ ref = await pt_cloturesCol.add(doc); pt_toast('Clôturé.'); }
   catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); return; }
-  const wk = pt_weekRange(from), isWeek = doc.kind === 'week' || (doc.kind === 'period' && wk.from === from && wk.to === to);
+  // envoi automatique du récapitulatif : semaines et périodes (pas les jours ni les mois), jusqu'à 16 jours pour rester sous la limite d'EmailJS
   const cfg = pt_mailCfg();
-  if(isWeek && cfg.auto && cfg.publicKey){
-    try{ await pt_mailClosureSend({ ...doc, kind:'week' }, ref && ref.id); }
-    catch(e){ console.error(e); alert('La semaine est clôturée, mais le mail n’a pas pu être envoyé :\n' + (e.message || e) + '\n\nTu pourras le renvoyer depuis la liste « Clôtures enregistrées ».'); }
+  if((doc.kind === 'week' || doc.kind === 'period') && cfg.auto && cfg.publicKey){
+    if(total > 16) pt_toast('Clôturé. Période trop longue pour l’envoi automatique du mail : utilise « Envoyer » dans la liste des clôtures.');
+    else {
+      try{ await pt_mailClosureSend(doc, ref && ref.id); }
+      catch(e){ console.error(e); alert('La période est clôturée, mais le mail n’a pas pu être envoyé :\n' + (e.message || e) + '\n\nTu pourras le renvoyer depuis la liste « Clôtures enregistrées ».'); }
+    }
   }
 }
 async function pt_reopenRange(id){
@@ -2595,13 +2598,13 @@ async function pt_mailTest(){
 function pt_mailCfgCard(){
   const c = pt_mailCfg();
   return `<div class="ticket"><div class="section-label">Récapitulatif par mail (EmailJS) ${c.publicKey ? '<span class="pt-badge pt-b-prime">configuré</span>' : '<span class="pt-badge pt-b-off">clé publique manquante</span>'}</div>
-    <div class="pt-muted">Quand tu clôtures une semaine, un tableau (date, employé, entrée, sortie, prix unitaire, transport, primes, jours off, avances, total) est envoyé par mail à l’adresse indiquée dans le modèle EmailJS. Tu peux aussi renvoyer le récapitulatif de n’importe quelle clôture depuis la liste ci-dessous.</div>
+    <div class="pt-muted">Quand tu clôtures une semaine ou une période (16 jours maximum), un tableau (date, employé, entrée, sortie, prix unitaire, transport, primes, jours off, avances, total) est envoyé par mail à l’adresse indiquée dans le modèle EmailJS. Tu peux aussi renvoyer le récapitulatif de n’importe quelle clôture depuis la liste ci-dessous.</div>
     <div class="grid grid-2" style="margin-top:10px;">
       <div class="field"><label>Service ID</label><input type="text" value="${pt_e(c.serviceId)}" onchange="pt_mailSet('serviceId', this.value)"></div>
       <div class="field"><label>Template ID</label><input type="text" value="${pt_e(c.templateId)}" onchange="pt_mailSet('templateId', this.value)"></div>
     </div>
     <div class="field" style="margin-top:8px;"><label>Public Key</label><input type="text" value="${pt_e(c.publicKey)}" placeholder="Colle ici la clé publique EmailJS" onchange="pt_mailSet('publicKey', this.value)"></div>
-    <div class="perm-row" style="margin-top:8px;"><span>Envoyer automatiquement quand je clôture une semaine</span><label class="switch"><input type="checkbox" ${c.auto ? 'checked' : ''} onchange="pt_mailSet('auto', this.checked)"><span class="slider"></span></label></div>
+    <div class="perm-row" style="margin-top:8px;"><span>Envoyer automatiquement quand je clôture une semaine ou une période</span><label class="switch"><input type="checkbox" ${c.auto ? 'checked' : ''} onchange="pt_mailSet('auto', this.checked)"><span class="slider"></span></label></div>
     <div class="pt-row" style="margin-top:10px;"><button class="btn small" onclick="pt_mailTest()">Envoyer un mail de test</button></div>
   </div>`;
 }
