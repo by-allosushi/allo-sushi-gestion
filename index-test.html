@@ -2459,7 +2459,7 @@ function pt_pretsHtml(code){
     <div class="pt-row"><input type="date" id="pt-ln-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-ln-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-ln-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small b-add t-add" onclick="pt_loanAdd(${code})">Ajouter le prêt</button></div>
     <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date d’emprunt</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${lrows || '<tr><td colspan="4" class="pt-muted">Aucun prêt.</td></tr>'}</tbody></table></div>
     <h2 class="section" style="margin-top:16px;">Remboursements</h2>
-    <div class="pt-row"><input type="date" id="pt-rb-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-rb-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><select id="pt-rb-mode" class="pt-draft"><option value="salaire">Sur salaire</option><option value="direct">Versement direct</option></select><input type="text" id="pt-rb-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small b-add t-add" onclick="pt_repayAdd(${code})">Ajouter le remboursement</button></div>
+    <div class="pt-row"><input type="date" id="pt-rb-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-rb-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><select id="pt-rb-mode" class="pt-draft pt-auto"><option value="salaire">Sur salaire</option><option value="direct">Versement direct</option></select><input type="text" id="pt-rb-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small b-add t-add" onclick="pt_repayAdd(${code})">Ajouter le remboursement</button></div>
     <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date</th><th>Motif</th><th>Mode</th><th>Montant</th><th></th></tr></thead><tbody>${rrows || '<tr><td colspan="5" class="pt-muted">Aucun remboursement.</td></tr>'}</tbody></table></div>`;
 }
 function pt_pretsAllHtml(codes){
@@ -2629,8 +2629,7 @@ function pt_pointagesSection(c, sessions, myAn, myOv){
       <select id="pt-ne-type" class="pt-draft pt-auto"><option value="0">Entrée</option><option value="1">Sortie</option></select>
       <button class="btn small b-add t-add" onclick="pt_addEventUI()">Ajouter</button>
     </div>
-    ${sub('rawEvs', 'Modifier / supprimer un pointage' + probTitle, rawTable)}
-    <div class="actions-row"><button class="btn ghost small b-neutral t-io" onclick="pt_exportEmployeeCsv()">Exporter en CSV</button></div>`;
+    ${sub('rawEvs', 'Modifier / supprimer un pointage' + probTitle, rawTable)}`;
 }
 function pt_empCards(q, isAdmin){
   const card = (cls, l, n)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div></div>`;
