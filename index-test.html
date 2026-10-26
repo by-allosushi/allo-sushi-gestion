@@ -442,9 +442,13 @@
 .pt-card .n{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:var(--c);margin-top:1px;white-space:nowrap;}
 .pt-card.c-hours{--c:#60A5FA;}.pt-card.c-days{--c:#818CF8;}.pt-card.c-base{--c:#38BDF8;}
 .pt-card.c-transport{--c:#2DD4BF;}.pt-card.c-bonus{--c:#86EFAC;}.pt-card.c-off{--c:#C4B5FD;}
-#pt-sel,input#pt-from,input#pt-to,input[id^="pt-ne-"],select[id^="pt-ne-"],input[id^="pt-f-"],select[id^="pt-f-"],input[id^="pt-vs-"],select[id^="pt-vs-"],input[id^="pt-ln-"],select[id^="pt-ln-"],input[id^="pt-rb-"],select[id^="pt-rb-"],input[id^="pt-co-"],select[id^="pt-co-"],input[id^="pt-cp-"],select[id^="pt-cp-"]{--c:#E7E5E4;font-weight:600;color:var(--c);color-scheme:dark;background:color-mix(in srgb,var(--c) 14%,#151A17);border:1px solid color-mix(in srgb,var(--c) 35%,transparent);border-left:3px solid var(--c);}
+#pt-sel,input#pt-from,input#pt-to,input[id^="pt-ne-"],select[id^="pt-ne-"],input[id^="pt-f-"],select[id^="pt-f-"],input[id^="pt-vs-"],select[id^="pt-vs-"],input[id^="pt-ln-"],select[id^="pt-ln-"],input[id^="pt-rb-"],select[id^="pt-rb-"],input[id^="pt-co-"],select[id^="pt-co-"],input[id^="pt-cp-"],select[id^="pt-cp-"],input[id^="pt-fix-"],select[id^="pt-fix-"],input[id^="pt-ov-"],select[id^="pt-ov-"],input[id^="pt-ev-"],select[id^="pt-ev-"],input[id^="pt-cl-"],select[id^="pt-cl-"]{--c:#E7E5E4;font-weight:600;color:var(--c);color-scheme:dark;background:color-mix(in srgb,var(--c) 14%,#151A17);border:1px solid color-mix(in srgb,var(--c) 35%,transparent);border-left:3px solid var(--c);}
 select option{background:#151A17;color:#EAEDE9;font-weight:400;}
 input[id^="pt-"]::placeholder{color:#8B958F;font-weight:400;}
+/* boutons du module pointage : même style teinté, une couleur par type */
+.btn[class*=" t-"],.btn.ghost[class*=" t-"]{background:color-mix(in srgb,var(--c) 16%,#151A17);border-color:var(--c);color:var(--t);}
+.btn[class*=" t-"]:hover{filter:brightness(1.25);}
+.btn.t-add{--c:#3B82F6;--t:#93C5FD;}.btn.t-save{--c:#22C55E;--t:#86EFAC;}.btn.t-valid{--c:#14B8A6;--t:#5EEAD4;}.btn.t-del{--c:#EF4444;--t:#FCA5A5;}.btn.t-edit{--c:#F59E0B;--t:#FCD34D;}.btn.t-close{--c:#8B5CF6;--t:#C4B5FD;}.btn.t-reopen{--c:#F97316;--t:#FDBA74;}.btn.t-cancel{--c:#A8A29E;--t:#D6D3D1;}.btn.t-mail{--c:#EC4899;--t:#F9A8D4;}.btn.t-io{--c:#06B6D4;--t:#67E8F9;}.btn.t-view{--c:#0EA5E9;--t:#7DD3FC;}
 .pt-card.c-adv{--c:#F87171;}.pt-card.c-loan{--c:#FB923C;}
 .pt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .pt-table{width:100%;border-collapse:collapse;font-size:12.5px;}
@@ -878,8 +882,8 @@ function uu_render(){
       <div class="uh">
         <div class="uname">${esc(u.username||u.id)}${u.isAdmin?'<span class="badge-admin">Admin</span>':''}</div>
         <div style="display:flex;gap:6px;">
-          <button class="btn ghost small" onclick="uu_resetPassword('${u.id}')">🔑 Mot de passe</button>
-          <button class="btn rust small" onclick="uu_deleteUser('${u.id}')">🗑️</button>
+          <button class="btn ghost small b-neutral" onclick="uu_resetPassword('${u.id}')">🔑 Mot de passe</button>
+          <button class="btn rust small b-neutral" onclick="uu_deleteUser('${u.id}')">🗑️</button>
         </div>
       </div>
       <div class="perm-row">
@@ -1180,13 +1184,13 @@ function ca_renderSectionBody(key, ecart){
       <div class="section-label">Entrées de caisse (divers)</div>
       <div style="font-size:11.5px;color:var(--ink-muted);margin-bottom:8px;">Ex. monnaie apportée, vente d'huile… — tout ajout d'espèces hors ventes ERP.</div>
       ${ca_linesEditor(ca_session.entrees, 'entrees', 'Description (ex. monnaie, vente huile…)')}
-      <button class="btn small ghost" onclick="ca_addLine('entrees')">+ Ajouter une entrée</button>
+      <button class="btn small ghost b-add" onclick="ca_addLine('entrees')">+ Ajouter une entrée</button>
       <div class="subtotal"><span>Total entrées diverses</span><span class="mono">${ca_fmtMoney(ca_totalEntreesDiverses(ca_session))}</span></div>
     </div>`;
 
   if(key==='horscaisse') return `
     ${ca_sortiesEditor(ca_session.sorties)}
-    <button class="btn small ghost" onclick="ca_addSortie()">+ Ajouter une sortie</button>
+    <button class="btn small ghost b-add" onclick="ca_addSortie()">+ Ajouter une sortie</button>
     <div class="subtotal"><span>Total sorties de caisse</span><span class="mono">${ca_fmtMoney(ca_sumLines(ca_session.sorties))}</span></div>`;
 
   if(key==='erp') return `
@@ -1253,13 +1257,13 @@ function ca_renderCaisseTab(){
     ${!ca_detailOpen ? '' : `
     ${ca_renderAccordion(ecart)}
     <div class="actions-row" style="margin-top:14px;">
-      <button class="btn" onclick="ca_saveSession()">✓ Enregistrer la clôture du ${fmtDateShort(ca_session.date)}</button>
+      <button class="btn b-neutral" onclick="ca_saveSession()">✓ Enregistrer la clôture du ${fmtDateShort(ca_session.date)}</button>
     </div>
     `}
 
     ${!ca_detailOpen ? `
     <div class="actions-row">
-      <button class="btn ghost" onclick="ca_loadSessionForDate(todayISO())">↺ Réinitialiser (aujourd'hui)</button>
+      <button class="btn ghost b-neutral" onclick="ca_loadSessionForDate(todayISO())">↺ Réinitialiser (aujourd'hui)</button>
     </div>` : ''}
   `;
 }
@@ -1876,10 +1880,10 @@ function pt_tabJournal(){
     const rows = r.items.sort((a,b)=>String(a.text).localeCompare(String(b.text))).map(l=>{
       const rule = PT_AUTO_RULES[l.rule] || [l.rule || '', 'pt-b-off'];
       return `<tr${l.undone ? ' class="pt-manual"' : ''}><td>${when(l)}</td><td>${pt_e(pt_name(l.code))}</td><td><span class="pt-badge ${rule[1]}">${pt_e(rule[0])}</span></td><td style="white-space:normal;min-width:220px;">${pt_e(l.text)}</td>
-        <td>${l.undone ? '<span class="pt-muted">annulée</span>' : `<button class="btn ghost small" onclick="pt_autoUndo(['${l.id}'])">Annuler</button>`}</td></tr>`;
+        <td>${l.undone ? '<span class="pt-muted">annulée</span>' : `<button class="btn ghost small b-neutral t-cancel" onclick="pt_autoUndo(['${l.id}'])">Annuler</button>`}</td></tr>`;
     }).join('');
     return `<div class="ticket"><div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;">${head} <span class="pt-muted">— ${r.items.length} correction${r.items.length>1?'s':''}</span></div>
-      ${left ? `<button class="btn ghost small" onclick="pt_autoUndoRun('${r.runId}')">Tout annuler</button>` : ''}</div>
+      ${left ? `<button class="btn ghost small b-neutral t-cancel" onclick="pt_autoUndoRun('${r.runId}')">Tout annuler</button>` : ''}</div>
       <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Pointage</th><th>Employé</th><th>Règle</th><th>Correction</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }).join('');
 }
@@ -1946,7 +1950,7 @@ function pt_render(fresh){
     if(elapsed > 4500){
       const labels = { events:'Pointages', cfg:'Réglages employés', entries:'Primes / jours off / avances', ign:'Historique des suppressions', groups:'Groupes de poste', ovIgn:'Chevauchements ignorés', anIgn:'Anomalies ignorées', clot:'Périodes clôturées' };
       const missing = Object.keys(pt_ready).filter(k=>!pt_ready[k]).map(k=>labels[k] || k);
-      body.innerHTML = `<div class="alert-banner"><b>Le chargement prend plus de temps que prévu</b>Ça reste bloqué sur : ${missing.join(', ')}.<br>Ouvre la console du navigateur (touche F12 → onglet « Console ») pour voir le message d'erreur exact, et vérifie que les règles Firestore autorisent la collections <code>pointage_config</code> (documents « groupes », « chevauchements_ignores » et « anomalies_ignorees ») et <code>pointage_clotures</code>.<br><button class="btn small" style="margin-top:10px;" onclick="location.reload()">Réessayer</button></div>`;
+      body.innerHTML = `<div class="alert-banner"><b>Le chargement prend plus de temps que prévu</b>Ça reste bloqué sur : ${missing.join(', ')}.<br>Ouvre la console du navigateur (touche F12 → onglet « Console ») pour voir le message d'erreur exact, et vérifie que les règles Firestore autorisent la collections <code>pointage_config</code> (documents « groupes », « chevauchements_ignores » et « anomalies_ignorees ») et <code>pointage_clotures</code>.<br><button class="btn small t-cancel" style="margin-top:10px;" onclick="location.reload()">Réessayer</button></div>`;
     } else {
       body.innerHTML = '<div class="empty-state">Chargement…</div>';
     }
@@ -1979,18 +1983,18 @@ function pt_empSelect(codes){
 function pt_anomRow(i){
   const a = pt_anomList[i], open = pt_openFix === pt_anomKey(a);
   let h = `<div class="pt-an"><div><b>${pt_fmtDT(a.dt)}</b> · ${a.type}<div class="pt-an-reason">${pt_e(a.reason)}</div></div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn ghost small" onclick="pt_toggleFix(${i})">${open ? 'Annuler' : 'Corriger'}</button></div></div>`;
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn ghost small t-edit" onclick="pt_toggleFix(${i})">${open ? 'Annuler' : 'Corriger'}</button></div></div>`;
   if(!open) return h;
   const corrType = a.type === 'Entrée' ? 1 : 0;
   h += `<div class="pt-fix"><div class="pt-muted" style="margin-bottom:6px;">Ajouter le pointage manquant (${corrType===0?'Entrée':'Sortie'}) :</div>
-    <div class="pt-row"><input type="date" id="pt-fix-date" class="pt-draft pt-auto" value="${pt_day(a.dt)}"><input type="time" id="pt-fix-time" class="pt-draft pt-auto" value="${pt_hhmm(a.dt)}"><button class="btn small" onclick="pt_saveFix(${i})">Enregistrer</button></div>`;
+    <div class="pt-row"><input type="date" id="pt-fix-date" class="pt-draft pt-auto" value="${pt_day(a.dt)}"><input type="time" id="pt-fix-time" class="pt-draft pt-auto" value="${pt_hhmm(a.dt)}"><button class="btn small t-save" onclick="pt_saveFix(${i})">Enregistrer</button></div>`;
   const near = pt_eventsNear(a.code, a.dt);
   if(near.length > 1){
     h += `<div class="pt-muted" style="margin:14px 0 4px;">Ou compare les pointages de ${pt_e(pt_name(a.code))} autour de ce moment — utile si c’est un doublon à supprimer :</div>
       <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date / heure</th><th>Type</th><th></th></tr></thead><tbody>${
       near.map(ev=>{
         const d = new Date(ev.dt), isThis = d.getTime() === a.dt.getTime() && (ev.type === 0 ? 'Entrée' : 'Sortie') === a.type;
-        return `<tr><td>${pt_fmtDT(d)}${isThis ? ' ⚠️' : ''}</td><td>${ev.type===0?'Entrée':'Sortie'}</td><td><button class="btn ghost small" onclick="pt_delEventConfirm('${ev.id}')">Supprimer</button></td></tr>`;
+        return `<tr><td>${pt_fmtDT(d)}${isThis ? ' ⚠️' : ''}</td><td>${ev.type===0?'Entrée':'Sortie'}</td><td><button class="btn ghost small t-del" onclick="pt_delEventConfirm('${ev.id}')">Supprimer</button></td></tr>`;
       }).join('')}</tbody></table></div>`;
   }
   return h + `</div>`;
@@ -2000,14 +2004,14 @@ function pt_ovRows(overlaps){
     const open = pt_ovOpen === o.key;
     let h = `<div class="pt-an"><div><b>${pt_dm(new Date(o.day + 'T00:00:00'))}</b> — ${pt_e(pt_name(o.codeA))} sorti à ${pt_hhmm(o.aEnd)} · ${pt_e(pt_name(o.codeB))} entré à ${pt_hhmm(o.bStart)}
         <div class="pt-an-reason">Chevauchement de poste : écart de ${pt_fmtH(o.hours)} (hh:mm) en trop, à vérifier</div></div>
-      <button class="btn ghost small" onclick="pt_ovToggle(${i})">${open ? 'Fermer' : 'Comparer'}</button></div>`;
+      <button class="btn ghost small b-neutral t-view" onclick="pt_ovToggle(${i})">${open ? 'Fermer' : 'Comparer'}</button></div>`;
     if(open){
       h += `<div class="pt-fix">
         <div class="pt-muted" style="margin-bottom:8px;">${pt_e(pt_name(o.codeA))} : sortie à ${pt_hhmm(o.aEnd)} — ${pt_e(pt_name(o.codeB))} : entrée à ${pt_hhmm(o.bStart)}. Retiens une heure commune pour les deux, ou garde les deux pointages tels quels (tu peux aussi modifier ou supprimer un pointage dans la liste ci-dessous).</div>
         <div class="pt-row">
           <input type="time" id="pt-ov-time-${i}" class="pt-draft pt-auto" value="${pt_hhmm(o.bStart)}">
-          <button class="btn small" onclick="pt_ovAlign(${i})">Retenir cette heure pour les deux</button>
-          <button class="btn ghost small" onclick="pt_ovKeep(${i})">Garder les deux tels quels</button>
+          <button class="btn small t-save" onclick="pt_ovAlign(${i})">Retenir cette heure pour les deux</button>
+          <button class="btn ghost small b-neutral t-cancel" onclick="pt_ovKeep(${i})">Garder les deux tels quels</button>
         </div>
       </div>`;
     }
@@ -2100,8 +2104,8 @@ function pt_monthLabel(mk){ return new Date(Number(mk.slice(0,4)), Number(mk.sli
 const PT_DOW = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
 function pt_clAction(from, to, kind, big){
   const exact = pt_closureFor(from, to), total = pt_dayDiff(from, to) + 1, cov = pt_coveredDays(from, to);
-  const closeBtn = (title)=>`<button class="btn ${big ? '' : 'ghost '}small" ${title ? `title="${pt_e(title)}"` : ''} onclick="pt_closeRange('${from}','${to}','${kind}')">Clôturer</button>`;
-  if(exact) return { badge:`<span class="pt-badge pt-b-prime">🔒 Clôturé</span>`, btn:`<button class="btn ghost small" onclick="pt_reopenRange('${exact.id}')">Rouvrir</button>` };
+  const closeBtn = (title)=>`<button class="btn ${big ? '' : 'ghost '}small t-close" ${title ? `title="${pt_e(title)}"` : ''} onclick="pt_closeRange('${from}','${to}','${kind}')">Clôturer</button>`;
+  if(exact) return { badge:`<span class="pt-badge pt-b-prime">🔒 Clôturé</span>`, btn:`<button class="btn ghost small b-reopen t-reopen" onclick="pt_reopenRange('${exact.id}')">Rouvrir</button>` };
   if(cov >= total) return { badge:`<span class="pt-badge pt-b-off">🔒 Verrouillé</span>`, btn:closeBtn('Tous les jours sont déjà verrouillés par d’autres clôtures ; clôturer ici fige aussi la paie de cette période.') };
   if(cov > 0) return { badge:`<span class="pt-badge pt-b-off">Partiel ${cov}/${total} j</span>`, btn:closeBtn('') };
   return { badge:`<span class="pt-muted">Ouvert</span>`, btn:closeBtn('') };
@@ -2123,10 +2127,10 @@ function pt_cloturesSection(){
     const state = allCl ? '🔒 clôturée pour tous les employés' : cur ? '🔒 clôturée pour ' + pt_e(pt_name(sel)) : 'non clôturée';
     head = `<div class="pt-muted" style="margin-bottom:8px;">Période affichée : ${pt_e(pt_rangeLabel(pt_filter.from, pt_filter.to))} — ${state}.</div>
       <div class="actions-row">
-        ${sel !== null && !cur && !allCl ? `<button class="btn small" onclick="pt_closeEmployee()">Clôturer ${pt_e(pt_name(sel))}</button>` : ''}
-        ${!allCl ? `<button class="btn small" style="background:var(--moss);border-color:var(--moss);" onclick="pt_closePeriod()">Clôturer tous les employés</button>` : ''}
-        ${cur && !allCl ? `<button class="btn ghost small" onclick="pt_reopenPeriod(${sel})">Rouvrir ${pt_e(pt_name(sel))}</button>` : ''}
-        ${allCl ? `<button class="btn ghost small" onclick="pt_reopenRange('${allCl.id}')">Rouvrir pour tous</button>` : ''}
+        ${sel !== null && !cur && !allCl ? `<button class="btn small t-close" onclick="pt_closeEmployee()">Clôturer ${pt_e(pt_name(sel))}</button>` : ''}
+        ${!allCl ? `<button class="btn small t-close" onclick="pt_closePeriod()">Clôturer tous les employés</button>` : ''}
+        ${cur && !allCl ? `<button class="btn ghost small b-reopen t-reopen" onclick="pt_reopenPeriod(${sel})">Rouvrir ${pt_e(pt_name(sel))}</button>` : ''}
+        ${allCl ? `<button class="btn ghost small b-reopen t-reopen" onclick="pt_reopenRange('${allCl.id}')">Rouvrir pour tous</button>` : ''}
       </div>
       <div class="pt-muted" style="margin-top:6px;">Clôturer fige la paie et verrouille les jours : ils ne sont plus réimportés ni modifiables et disparaissent des listes de travail (interrupteur « Afficher aussi les jours clôturés » en haut). Les semaines vont du lundi au dimanche.</div>`;
   }
@@ -2136,9 +2140,9 @@ function pt_cloturesSection(){
   list.sort((a,b)=>(b.from || '').localeCompare(a.from || '') || (b.to || '').localeCompare(a.to || ''));
   const rows = list.map(c=>{
     const r = Object.keys(c.rows || {}).map(k=>c.rows[k]), nPaid = r.filter(x=>x.paid).length;
-    return `<tr><td>${PT_KIND_LABEL[c.kind] || 'Période'}</td><td>${pt_e(pt_rangeLabel(c.from, c.to))}</td><td>${pt_isGlobalCl(c) ? 'Tous' : pt_e(pt_name(c.code))}</td><td>${fmtDateShort(String(c.createdAt || '').slice(0,10))}</td><td>${nPaid} / ${r.length} <button class="btn ghost small" onclick="pt_clPayToggle('${c.id}')">${pt_clPay === c.id ? 'Masquer' : 'Versements'}</button></td><td>${c.mailedAt ? '<span class="pt-muted">✉️ ' + fmtDateShort(String(c.mailedAt).slice(0,10)) + '</span> ' : ''}<button class="btn ghost small" onclick="pt_mailClosure('${c.id}')">${c.mailedAt ? 'Renvoyer' : 'Envoyer'}</button></td><td><button class="btn ghost small" onclick="pt_reopenRange('${c.id}')">Rouvrir</button></td></tr>${pt_payRows(c)}`;
+    return `<tr><td>${PT_KIND_LABEL[c.kind] || 'Période'}</td><td>${pt_e(pt_rangeLabel(c.from, c.to))}</td><td>${pt_isGlobalCl(c) ? 'Tous' : pt_e(pt_name(c.code))}</td><td>${fmtDateShort(String(c.createdAt || '').slice(0,10))}</td><td>${nPaid} / ${r.length} <button class="btn ghost small t-view" onclick="pt_clPayToggle('${c.id}')">${pt_clPay === c.id ? 'Masquer' : 'Versements'}</button></td><td>${c.mailedAt ? '<span class="pt-muted">✉️ ' + fmtDateShort(String(c.mailedAt).slice(0,10)) + '</span> ' : ''}<button class="btn ghost small t-mail" onclick="pt_mailClosure('${c.id}')">${c.mailedAt ? 'Renvoyer' : 'Envoyer'}</button></td><td><button class="btn ghost small b-reopen t-reopen" onclick="pt_reopenRange('${c.id}')">Rouvrir</button></td></tr>${pt_payRows(c)}`;
   }).join('');
-  const filter = sel !== null ? `<div class="field" style="max-width:260px;margin:10px 0;"><label>Afficher</label><select onchange="pt_clSetScope(this.value)"><option value="emp" ${scope === 'emp' ? 'selected' : ''}>Clôtures de ${pt_e(pt_name(sel))}</option><option value="all" ${scope === 'all' ? 'selected' : ''}>Toutes les clôtures</option></select></div>` : '';
+  const filter = sel !== null ? `<div class="field" style="max-width:260px;margin:10px 0;"><label>Afficher</label><select id="pt-cl-scope" onchange="pt_clSetScope(this.value)"><option value="emp" ${scope === 'emp' ? 'selected' : ''}>Clôtures de ${pt_e(pt_name(sel))}</option><option value="all" ${scope === 'all' ? 'selected' : ''}>Toutes les clôtures</option></select></div>` : '';
   return `${head}${filter}
     ${list.length ? `<div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Type</th><th>Période</th><th>Employé</th><th>Créée le</th><th>Payé</th><th>Mail</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="pt-muted" style="margin-top:8px;">Aucune clôture enregistrée.</div>'}`;
 }
@@ -2150,7 +2154,7 @@ function pt_formRow(k, label){
     <div class="pt-form-title"><label>${label}</label></div>
     <input type="text" inputmode="decimal" id="pt-f-${k}-amt" class="pt-draft" placeholder="Montant (DA)" ${enter}>
     <input type="text" id="pt-f-${k}-note" class="pt-draft" placeholder="Motif" ${enter}>
-    <button class="btn small" onclick="pt_addEntry('${k}')">Ajouter</button>
+    <button class="btn small b-add t-add" onclick="pt_addEntry('${k}')">Ajouter</button>
   </div>`;
 }
 async function pt_addEntry(kind){
@@ -2351,7 +2355,7 @@ function pt_mailCfgCard(){
     </div>
     <div class="field" style="margin-top:8px;"><label>Public Key</label><input type="text" value="${pt_e(c.publicKey)}" placeholder="Colle ici la clé publique EmailJS" onchange="pt_mailSet('publicKey', this.value)"></div>
     <div class="perm-row" style="margin-top:8px;"><span>Envoyer automatiquement quand je clôture une semaine ou une période</span><label class="switch"><input type="checkbox" ${c.auto ? 'checked' : ''} onchange="pt_mailSet('auto', this.checked)"><span class="slider"></span></label></div>
-    <div class="pt-row" style="margin-top:10px;"><button class="btn small" onclick="pt_mailTest()">Envoyer un mail de test</button></div>
+    <div class="pt-row" style="margin-top:10px;"><button class="btn small b-neutral t-mail" onclick="pt_mailTest()">Envoyer un mail de test</button></div>
   </div>`;
 }
 function pt_closePeriod(){ return pt_closeRange(pt_filter.from, pt_filter.to, 'period'); }
@@ -2369,11 +2373,11 @@ async function pt_togglePaid(code, checked){
 function pt_closureBar(sessions){
   const c = pt_currentClosure();
   if(!pt_filter.from || !pt_filter.to) return `<div class="pt-muted" style="margin-bottom:10px;">Renseigne les dates Du / Au (en haut) pour pouvoir clôturer une période de paie.</div>`;
-  if(!c) return `<div class="pt-row" style="margin-bottom:10px;"><button class="btn small" onclick="pt_closePeriod()">Clôturer cette période</button><span class="pt-muted">Fige la paie de chaque employé du ${fmtDateShort(pt_filter.from)} au ${fmtDateShort(pt_filter.to)}.</span></div>`;
+  if(!c) return `<div class="pt-row" style="margin-bottom:10px;"><button class="btn small t-close" onclick="pt_closePeriod()">Clôturer cette période</button><span class="pt-muted">Fige la paie de chaque employé du ${fmtDateShort(pt_filter.from)} au ${fmtDateShort(pt_filter.to)}.</span></div>`;
   const rows = Object.keys(c.rows || {}).map(k=>c.rows[k]);
   const nPaid = rows.filter(r=>r.paid).length;
   const stale = pt_closureStale(sessions);
-  return `<div class="pt-row" style="margin-bottom:10px;"><span class="pt-badge pt-b-prime">Clôturée</span><span class="pt-muted">le ${fmtDateShort(String(c.createdAt || '').slice(0,10))} · payé : ${nPaid} / ${rows.length}</span><button class="btn ghost small" onclick="pt_reopenPeriod()">Rouvrir</button></div>
+  return `<div class="pt-row" style="margin-bottom:10px;"><span class="pt-badge pt-b-prime">Clôturée</span><span class="pt-muted">le ${fmtDateShort(String(c.createdAt || '').slice(0,10))} · payé : ${nPaid} / ${rows.length}</span><button class="btn ghost small b-reopen t-reopen" onclick="pt_reopenPeriod()">Rouvrir</button></div>
     ${stale ? `<div class="alert-banner" style="margin-bottom:10px;"><b>Les données ont changé depuis la clôture</b>Un pointage, une prime ou une avance de cette période a été modifié après coup. Les chiffres ci-dessous sont ceux figés à la clôture ; rouvre la période pour recalculer.</div>` : ''}`;
 }
 function pt_paieTotals(codes, sessions){
@@ -2444,18 +2448,18 @@ function pt_pretsHtml(code){
   const b = pt_loanBalance(code), card = (cls, l, n)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div></div>`;
   const loans = pt_loansOf(code).sort((a,b2)=>String(b2.date || '').localeCompare(String(a.date || '')));
   const reps = pt_repaysOf(code).sort((a,b2)=>String(b2.date || '').localeCompare(String(a.date || '')));
-  const lrows = loans.map(l=>`<tr><td>${fmtDateShort(l.date)}</td><td>${pt_e(l.note || '')}</td><td>${pt_fmtMoney(l.amount)}</td><td><button class="btn ghost small" onclick="pt_loanDel('${l.id}')">Supprimer</button></td></tr>`).join('');
+  const lrows = loans.map(l=>`<tr><td>${fmtDateShort(l.date)}</td><td>${pt_e(l.note || '')}</td><td>${pt_fmtMoney(l.amount)}</td><td><button class="btn ghost small t-del" onclick="pt_loanDel('${l.id}')">Supprimer</button></td></tr>`).join('');
   const rrows = reps.map(r=>{ const lock = r.mode !== 'direct' && pt_dayClosed(r.date, code);
-    return `<tr><td>${fmtDateShort(r.date)}${lock ? ' 🔒' : ''}</td><td>${pt_e(r.note || '')}</td><td>${r.mode === 'direct' ? 'Versement direct' : 'Sur salaire'}</td><td>${pt_fmtMoney(r.amount)}</td><td><button class="btn ghost small" onclick="pt_repayDel('${r.id}')">Supprimer</button></td></tr>`; }).join('');
+    return `<tr><td>${fmtDateShort(r.date)}${lock ? ' 🔒' : ''}</td><td>${pt_e(r.note || '')}</td><td>${r.mode === 'direct' ? 'Versement direct' : 'Sur salaire'}</td><td>${pt_fmtMoney(r.amount)}</td><td><button class="btn ghost small t-del" onclick="pt_repayDel('${r.id}')">Supprimer</button></td></tr>`; }).join('');
   const state = b.lent > 0 || b.repaid > 0 ? (b.due <= 0.004 ? '<span class="pt-badge pt-b-prime">Tout remboursé</span>' : '') : '';
   return `<div class="pt-muted">Plusieurs prêts possibles. Les remboursements se cumulent sur un seul solde. « Sur salaire » : déduit de la paie de la semaine qui contient la date ; « Versement direct » : sans effet sur la paie.</div>
     <div class="pt-cards" style="margin-top:10px;">${card('c-days', 'Total emprunté', pt_fmtMoney(b.lent))}${card('c-transport', 'Total remboursé', pt_fmtMoney(b.repaid))}${card(b.due > 0.004 ? 'c-loan' : 'c-transport', 'Reste dû', b.due > 0.004 ? pt_fmtMoney(b.due) : (b.due < -0.004 ? pt_money2(b.due) : '0'))}</div>
     <div class="pt-muted">Remboursé : ${pt_fmtMoney(b.sal)} sur salaire · ${pt_fmtMoney(b.dir)} en versement direct ${state}</div>
     <h2 class="section" style="margin-top:16px;">Prêts accordés</h2>
-    <div class="pt-row"><input type="date" id="pt-ln-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-ln-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-ln-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small" onclick="pt_loanAdd(${code})">Ajouter le prêt</button></div>
+    <div class="pt-row"><input type="date" id="pt-ln-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-ln-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-ln-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small b-add t-add" onclick="pt_loanAdd(${code})">Ajouter le prêt</button></div>
     <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date d’emprunt</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${lrows || '<tr><td colspan="4" class="pt-muted">Aucun prêt.</td></tr>'}</tbody></table></div>
     <h2 class="section" style="margin-top:16px;">Remboursements</h2>
-    <div class="pt-row"><input type="date" id="pt-rb-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-rb-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><select id="pt-rb-mode" class="pt-draft"><option value="salaire">Sur salaire</option><option value="direct">Versement direct</option></select><input type="text" id="pt-rb-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small" onclick="pt_repayAdd(${code})">Ajouter le remboursement</button></div>
+    <div class="pt-row"><input type="date" id="pt-rb-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-rb-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><select id="pt-rb-mode" class="pt-draft"><option value="salaire">Sur salaire</option><option value="direct">Versement direct</option></select><input type="text" id="pt-rb-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small b-add t-add" onclick="pt_repayAdd(${code})">Ajouter le remboursement</button></div>
     <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date</th><th>Motif</th><th>Mode</th><th>Montant</th><th></th></tr></thead><tbody>${rrows || '<tr><td colspan="5" class="pt-muted">Aucun remboursement.</td></tr>'}</tbody></table></div>`;
 }
 function pt_pretsAllHtml(codes){
@@ -2487,14 +2491,14 @@ function pt_congeEmpHtml(code){
   const k = pt_conge(code), list = pt_congePaidList(code);
   const card = (cls, l, n)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div></div>`;
   const mode = pt_mode(code) === 'daily';
-  const rows = list.map(e=>`<tr><td>${fmtDateShort(e.date)}</td><td>${pt_e(e.note || '')}</td><td>${pt_fmtMoney(e.amount)}</td><td><button class="btn ghost small" onclick="pt_congePayDel('${e.id}')">Supprimer</button></td></tr>`).join('');
+  const rows = list.map(e=>`<tr><td>${fmtDateShort(e.date)}</td><td>${pt_e(e.note || '')}</td><td>${pt_fmtMoney(e.amount)}</td><td><button class="btn ghost small t-del" onclick="pt_congePayDel('${e.id}')">Supprimer</button></td></tr>`).join('');
   return `<div class="pt-muted">Période de calcul : du <b>${fmtDateShort(k.from)}</b> au <b>${fmtDateShort(k.to)}</b> (aujourd’hui). Congé = 1/12 × ${mode ? 'jours travaillés × taux journalier' : 'heures travaillées × taux'}, arrondi vers le haut au multiple de 10 DA. Le Jour Off n’est pas compté.</div>
-    <div class="pt-row" style="margin-top:10px;"><div class="field"><label>Solde initial de congé (DA)</label><input type="text" inputmode="decimal" id="pt-co-open" class="pt-w90" value="${pt_e(k.open || '')}" placeholder="0"></div><button class="btn small" onclick="pt_congeSaveOpen(${code})">Enregistrer</button></div>
+    <div class="pt-row" style="margin-top:10px;"><div class="field"><label>Solde initial de congé (DA)</label><input type="text" inputmode="decimal" id="pt-co-open" class="pt-w90" value="${pt_e(k.open || '')}" placeholder="0"></div><button class="btn small t-save" onclick="pt_congeSaveOpen(${code})">Enregistrer</button></div>
     <div class="pt-muted" style="margin:4px 0 8px;">À saisir une fois (tu peux le modifier). Mets un montant négatif si l’employé te doit déjà du congé.</div>
     <div class="pt-cards">${card('c-hours', 'Solde initial', pt_money2(k.open))}${card('c-base', 'Congé calculé (1/12, arrondi)', pt_fmtMoney(k.computed))}${card('c-days', 'Congé de toute la période', pt_money2(k.total))}${card('c-bonus', 'Congé versé', pt_fmtMoney(k.taken))}${card(k.left < 0 ? 'c-adv' : 'c-transport', 'Reste à verser', pt_money2(k.left))}</div>
     <div class="pt-muted">Calcul : salaire de base ${pt_fmtMoney(k.base)} ÷ 12 = ${(k.base / 12).toLocaleString('fr-FR', { maximumFractionDigits:2 })} DA → arrondi ${pt_fmtMoney(k.computed)}. Total = solde initial + congé calculé.</div>
     <h2 class="section" style="margin-top:16px;">Congés versés</h2>
-    <div class="pt-row"><input type="date" id="pt-cp-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-cp-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-cp-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small" onclick="pt_congePayAdd(${code})">Ajouter</button></div>
+    <div class="pt-row"><input type="date" id="pt-cp-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-cp-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-cp-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small b-add t-add" onclick="pt_congePayAdd(${code})">Ajouter</button></div>
     <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="pt-muted">Aucun congé versé.</td></tr>'}${list.length ? `<tr class="pt-total"><td colspan="2">Total versé</td><td>${pt_fmtMoney(k.taken)}</td><td></td></tr>` : ''}</tbody></table></div>`;
 }
 function pt_congesHtml(codes){
@@ -2554,7 +2558,7 @@ function pt_versementHtml(p, sessions){
     <div class="pt-muted" id="pt-vs-rep" style="margin:8px 0;">${rep}</div>
     <div class="pt-muted" style="margin-bottom:8px;">Solde négatif : il est reporté tel quel. Solde positif : la différence entre le solde et le versé est reportée sur la semaine suivante. « Clôturer cet employé » fige sa paie et verrouille ses jours, sans toucher aux autres employés.</div>
     <div class="actions-row">
-      ${cl ? `<button class="btn ghost small" onclick="pt_reopenPeriod(${pt_sel})">Rouvrir la période</button>` : `<button class="btn small" onclick="pt_validate()">${v ? 'Valider à nouveau' : 'Valider'}</button>${v ? `<button class="btn ghost small" onclick="pt_unvalidate()">Annuler la validation</button>` : ''}<button class="btn small" style="background:var(--moss);border-color:var(--moss);" onclick="pt_closeEmployee()">Clôturer cet employé</button>`}
+      ${cl ? `<button class="btn ghost small b-reopen t-reopen" onclick="pt_reopenPeriod(${pt_sel})">Rouvrir la période</button>` : `<button class="btn small b-valid t-valid" onclick="pt_validate()">${v ? 'Valider à nouveau' : 'Valider'}</button>${v ? `<button class="btn ghost small b-neutral t-cancel" onclick="pt_unvalidate()">Annuler la validation</button>` : ''}<button class="btn small t-close" onclick="pt_closeEmployee()">Clôturer cet employé</button>`}
     </div>`;
 }
 function pt_paieSection(c, sessions, codes){
@@ -2567,7 +2571,7 @@ function pt_paieSection(c, sessions, codes){
       <td><span class="pt-badge ${r.cls}">${r.cat}</span></td>
       <td>${pt_e(r.note)}</td>
       <td class="${r.sign<0?'pt-minus':'pt-plus'}">${r.sign<0?'−':'+'}${pt_fmtMoney(r.amount)}</td>
-      <td><button class="btn ghost small" onclick="pt_delEntryConfirm('${r.id}','cette entrée')">Supprimer</button></td></tr>`).join('')
+      <td><button class="btn ghost small t-del" onclick="pt_delEntryConfirm('${r.id}','cette entrée')">Supprimer</button></td></tr>`).join('')
     : `<tr><td colspan="5" class="pt-muted">Aucune entrée sur cette période.</td></tr>`;
   const rateLine = `Taux : ${pt_fmtMoney(p.rate)}${p.mode==='daily'?' / jour':' / heure'} · ${p.transport.enabled ? 'Transport : ' + pt_fmtMoney(p.transport.amount) + ' / jour' : 'Transport désactivé'} · <a href="#" class="pt-link" onclick="pt_setTab('reglages');return false;">Modifier dans Réglages</a>`;
   const repLine = (p.reportIn || p.reportOut) ? `<div class="pt-muted" style="margin-bottom:8px;">${[p.reportIn > 0.004 ? '<span style="color:var(--moss);">Report précédent : +' + pt_fmtMoney(p.reportIn) + ' (non versé, repris dans cette paie)</span>' : p.reportIn < -0.004 ? '<span style="color:var(--rust);">Report précédent : −' + pt_fmtMoney(-p.reportIn) + ' (déduit de cette paie)</span>' : '', p.reportOut > 0.004 ? '<span style="color:var(--moss);">Reste dû reporté : +' + pt_fmtMoney(p.reportOut) + '</span>' : p.reportOut < -0.004 ? '<span style="color:var(--rust);">Solde négatif reporté : −' + pt_fmtMoney(-p.reportOut) + '</span>' : ''].filter(Boolean).join(' · ')}</div>` : '';
@@ -2591,7 +2595,7 @@ function pt_pointagesSection(c, sessions, myAn, myOv){
   const hiddenDays = new Set([...mySessAll.filter(s=>!openDay(pt_day(s.date))).map(s=>pt_day(s.date)), ...myManualAll.filter(m=>!openDay(m.date)).map(m=>m.date)]).size;
   const lines = [
     ...mySess.map(s=>({ ts:s.start.getTime(), hours:s.hours, html:`<tr><td>${fmtDateShort(pt_day(s.date))}</td><td>${pt_fmtDT(s.start)}</td><td>${pt_fmtDT(s.end)}</td><td>${pt_fmtH(s.hours)}</td><td></td></tr>` })),
-    ...myManual.map(m=>({ ts:new Date(m.date + 'T00:00:00').getTime(), hours:Number(m.hours)||0, html:`<tr class="pt-manual"><td>${fmtDateShort(m.date)}</td><td colspan="2">Session manuelle${m.note ? ' — ' + pt_e(m.note) : ''}</td><td>${pt_fmtH(m.hours)}</td><td><button class="btn ghost small" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>` }))
+    ...myManual.map(m=>({ ts:new Date(m.date + 'T00:00:00').getTime(), hours:Number(m.hours)||0, html:`<tr class="pt-manual"><td>${fmtDateShort(m.date)}</td><td colspan="2">Session manuelle${m.note ? ' — ' + pt_e(m.note) : ''}</td><td>${pt_fmtH(m.hours)}</td><td><button class="btn ghost small t-del" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>` }))
   ].sort((a,b)=>a.ts - b.ts);
   const total = lines.reduce((s,x)=>s + x.hours, 0);
   const rawEvs = pt_events.filter(e=>e.code === c && pt_inRange(pt_day(new Date(e.dt))) && openDay(pt_day(new Date(e.dt)))).sort((a,b)=>new Date(b.dt) - new Date(a.dt));
@@ -2606,15 +2610,15 @@ function pt_pointagesSection(c, sessions, myAn, myOv){
         <td><input type="date" id="pt-ev-d-${ev.id}" class="pt-draft pt-auto" value="${pt_day(d)}"></td>
         <td><input type="time" id="pt-ev-t-${ev.id}" class="pt-draft pt-auto" value="${pt_hhmm(d)}"></td>
         <td><select id="pt-ev-y-${ev.id}" class="pt-draft pt-auto"><option value="0" ${ev.type===0?'selected':''}>Entrée</option><option value="1" ${ev.type===1?'selected':''}>Sortie</option></select></td>
-        <td><button class="btn ghost small" onclick="pt_saveEventRow('${ev.id}')">Enregistrer</button> <button class="btn ghost small" onclick="pt_delEventConfirm('${ev.id}')">Supprimer</button></td></tr>`; }).join('')
+        <td><button class="btn ghost small t-save" onclick="pt_saveEventRow('${ev.id}')">Enregistrer</button> <button class="btn ghost small t-del" onclick="pt_delEventConfirm('${ev.id}')">Supprimer</button></td></tr>`; }).join('')
       : `<tr><td colspan="4" class="pt-muted">Aucun pointage sur cette période.</td></tr>`}</tbody></table></div>`;
   const manualBlock = `<div class="pt-muted" style="margin-bottom:8px;">Heures ajoutées sans pointage (pointage irrécupérable, ou employé géré sans pointage).</div>
     <div class="pt-row">
       <input type="date" id="pt-m-date" class="pt-draft pt-auto"><input type="text" inputmode="text" id="pt-m-hours" class="pt-draft pt-w90" placeholder="ex. 8:30">
-      <input type="text" id="pt-m-note" class="pt-draft pt-grow" placeholder="Note (optionnel)"><button class="btn small" onclick="pt_addManual()">Ajouter</button>
+      <input type="text" id="pt-m-note" class="pt-draft pt-grow" placeholder="Note (optionnel)"><button class="btn small b-add t-add" onclick="pt_addManual()">Ajouter</button>
     </div>
     ${manualRows.length ? `<div class="pt-scroll" style="margin-top:10px;"><table class="pt-table"><thead><tr><th>Date</th><th>Heures (hh:mm)</th><th>Note</th><th></th></tr></thead><tbody>${
-      manualRows.map(m=>`<tr><td>${fmtDateShort(m.date)}</td><td>${pt_fmtH(m.hours)}</td><td>${pt_e(m.note)}</td><td><button class="btn ghost small" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>`).join('')}</tbody></table></div>` : ''}`;
+      manualRows.map(m=>`<tr><td>${fmtDateShort(m.date)}</td><td>${pt_fmtH(m.hours)}</td><td>${pt_e(m.note)}</td><td><button class="btn ghost small t-del" onclick="pt_delEntryConfirm('${m.id}','cette session manuelle')">Supprimer</button></td></tr>`).join('')}</tbody></table></div>` : ''}`;
   return `${hiddenNote}
     <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Entrée</th><th>Sortie</th><th>Durée (hh:mm)</th><th></th></tr></thead><tbody>${
       lines.length ? lines.map(l=>l.html).join('') + `<tr class="pt-total"><td colspan="3">Total</td><td>${pt_fmtH(total)}</td><td></td></tr>` : `<tr><td colspan="5" class="pt-muted">Aucune session sur cette période.</td></tr>`}</tbody></table></div>
@@ -2623,10 +2627,10 @@ function pt_pointagesSection(c, sessions, myAn, myOv){
       <select id="pt-ne-emp" class="pt-draft pt-auto">${pt_codes().map(x=>`<option value="${x}" ${x===c?'selected':''}>${pt_e(pt_label(x))}</option>`).join('')}</select>
       <input type="date" id="pt-ne-date" class="pt-draft pt-auto"><input type="time" id="pt-ne-time" class="pt-draft pt-auto">
       <select id="pt-ne-type" class="pt-draft pt-auto"><option value="0">Entrée</option><option value="1">Sortie</option></select>
-      <button class="btn small" onclick="pt_addEventUI()">Ajouter</button>
+      <button class="btn small b-add t-add" onclick="pt_addEventUI()">Ajouter</button>
     </div>
     ${sub('rawEvs', 'Modifier / supprimer un pointage' + probTitle, rawTable)}
-    <div class="actions-row"><button class="btn ghost small" onclick="pt_exportEmployeeCsv()">Exporter en CSV</button></div>`;
+    <div class="actions-row"><button class="btn ghost small b-neutral t-io" onclick="pt_exportEmployeeCsv()">Exporter en CSV</button></div>`;
 }
 function pt_empCards(q, isAdmin){
   const card = (cls, l, n)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div></div>`;
@@ -2651,7 +2655,7 @@ function pt_tabEmployes(codes, sessions, anoms, overlaps){
     const tot = { totalHours:S('totalHours'), workedDays:S('workedDays'), baseWage:S('baseWage'), transportTotal:S('transportTotal'), bonusesTotal:S('bonusesTotal'), advancesTotal:S('advancesTotal'), leavesTotal:S('leavesTotal'), loanTotal:S('loanTotal'), subTotal:S('subTotal'), reportOut:S('reportOut'), net:S('net') };
     return html + `<div class="ticket">${pt_empSelect(codes)}${pt_empCards(tot, isAdmin)}<div class="pt-muted">Totaux de tous les employés sur la période affichée. Choisis un employé pour voir ses pointages et sa paie.</div></div>`
       + (() => { const probs = codes.map(x=>({ x, a:anoms.filter(a=>a.code === x).length, o:overlaps.filter(o=>o.codeA === x || o.codeB === x).length })).filter(r=>r.a || r.o);
-          return probs.length ? `<div class="ticket"><div class="section-label">À régler</div>${probs.map(r=>`<div class="pt-an"><div><b>${pt_e(pt_label(r.x))}</b><div class="pt-an-reason">${[r.a ? r.a + ' entrée(s)/sortie(s) manquante(s)' : '', r.o ? r.o + ' chevauchement(s)' : ''].filter(Boolean).join(' · ')}</div></div><button class="btn ghost small" onclick="pt_selEmp('${r.x}')">Ouvrir</button></div>`).join('')}</div>` : ''; })()
+          return probs.length ? `<div class="ticket"><div class="section-label">À régler</div>${probs.map(r=>`<div class="pt-an"><div><b>${pt_e(pt_label(r.x))}</b><div class="pt-an-reason">${[r.a ? r.a + ' entrée(s)/sortie(s) manquante(s)' : '', r.o ? r.o + ' chevauchement(s)' : ''].filter(Boolean).join(' · ')}</div></div><button class="btn ghost small b-neutral t-view" onclick="pt_selEmp('${r.x}')">Ouvrir</button></div>`).join('')}</div>` : ''; })()
       + (isAdmin ? pt_accordion('prets', 'Prêts — tous les employés', pt_pretsAllHtml(codes)) + pt_accordion('clotures', 'Clôtures', pt_cloturesSection()) + pt_accordion('conge', 'Congé — tous les employés', pt_congesHtml(codes)) : '');
   }
   const c = pt_sel, p = pt_displayPayroll(c, sessions);
@@ -2701,7 +2705,7 @@ function pt_tabReglages(codes){
   const cards = codes.map(c=>{
     const e = pt_emp[c] || {}, tr = pt_transport(c);
     return `<div class="ticket">
-      <div class="row-between"><div style="font-weight:700;font-family:'Manrope',sans-serif;">Code ${c}</div>${isAdmin ? `<button class="btn rust small" onclick="pt_deleteEmployee(${c})">🗑️ Supprimer</button>` : ''}</div>
+      <div class="row-between"><div style="font-weight:700;font-family:'Manrope',sans-serif;">Code ${c}</div>${isAdmin ? `<button class="btn small t-del" onclick="pt_deleteEmployee(${c})">🗑️ Supprimer</button>` : ''}</div>
       <div class="grid grid-2" style="margin-top:10px;">
         <div class="field"><label>Nom</label><input type="text" list="pt-names" value="${pt_e(e.name || PT_DEFAULT_NAMES[c] || '')}" placeholder="Nom de l’employé" onchange="pt_setField(${c},'name',this.value)"></div>
         <div class="field"><label>Poste</label><input type="text" value="${pt_e(e.poste || '')}" placeholder="Cuisinier, Serveur…" onchange="pt_setField(${c},'poste',this.value)"></div>
@@ -2717,43 +2721,43 @@ function pt_tabReglages(codes){
     <div class="section-label">Importer un export ZKBio</div>
     <div class="pt-row">
       <input type="file" id="pt-file" accept=".dat,.txt,.csv" class="pt-filein">
-      <button class="btn small" onclick="pt_importFile()">Importer</button>
+      <button class="btn small b-neutral t-io" onclick="pt_importFile()">Importer</button>
     </div>
     <div class="pt-muted" id="pt-import-status" style="margin-top:6px;"></div>
   </div>
   <div class="ticket"><div class="section-label">Ajouter un employé</div>
     <div class="pt-muted" style="margin-bottom:8px;">Pour quelqu’un géré sans pointeur, ou dont tu saisis toujours le pointage à la main : choisis un numéro de code libre.</div>
-    <div class="pt-row"><input type="text" inputmode="numeric" id="pt-new-code" class="pt-draft pt-w90" value="${suggestion}"><button class="btn small" onclick="pt_addEmployee()">Ajouter</button></div>
+    <div class="pt-row"><input type="text" inputmode="numeric" id="pt-new-code" class="pt-draft pt-w90" value="${suggestion}"><button class="btn small b-add t-add" onclick="pt_addEmployee()">Ajouter</button></div>
   </div>
   <h2 class="section">Employés</h2>
   ${cards || pt_empty('Importe un export ZKBio ou ajoute un employé ci-dessus.')}
   ${isAdmin ? pt_groupsSection(codes) : ''}
   ${mailCard}
   <div class="ticket"><div class="section-label">Données</div>
-    <div class="actions-row" style="margin-top:0;"><button class="btn small" onclick="pt_exportExcel()">Exporter en Excel (sauvegarde complète)</button></div>
+    <div class="actions-row" style="margin-top:0;"><button class="btn small b-neutral t-io" onclick="pt_exportExcel()">Exporter en Excel (sauvegarde complète)</button></div>
     <div class="pt-muted" style="margin-top:6px;">Un fichier .xlsx avec toutes les données (réglages, pointages, sessions, anomalies, historique de paie) et le résumé de paie de la période affichée.</div>
     ${isAdmin && (Object.keys(pt_ign.k).length || Object.keys(pt_ign.c).length) ? `<div class="section-label" style="margin-top:18px;">Écartés à l’import</div>
     <div class="pt-muted">${Object.keys(pt_ign.k).length} pointage(s) supprimé(s) ou modifié(s) et ${Object.keys(pt_ign.c).length} employé(s) supprimé(s) : un nouvel import du fichier du pointeur ne les fait pas revenir.</div>
-    <div class="actions-row"><button class="btn ghost small" onclick="pt_forgetIgnored()">Oublier ces suppressions (le prochain import les ramènera)</button></div>` : ''}
+    <div class="actions-row"><button class="btn ghost small b-neutral t-cancel" onclick="pt_forgetIgnored()">Oublier ces suppressions (le prochain import les ramènera)</button></div>` : ''}
     ${isAdmin ? `<div class="section-label" style="margin-top:18px;">Reprendre les données de l’outil local</div>
     <div class="pt-muted" style="margin-bottom:8px;">Dans l’outil de pointage local : Réglages → « Exporter pour Firebase (.json) ». Puis choisis ce fichier ici. Peut être relancé sans créer de doublons.</div>
-    <div class="pt-row"><input type="file" id="pt-mig-file" accept=".json,application/json" class="pt-filein"><button class="btn small" onclick="pt_importLocalJson()">Importer</button></div>
-    <div class="actions-row" style="margin-top:18px;"><button class="btn rust small" onclick="pt_resetEvents()">Réinitialiser tous les pointages</button></div>` : ''}
+    <div class="pt-row"><input type="file" id="pt-mig-file" accept=".json,application/json" class="pt-filein"><button class="btn small b-neutral t-io" onclick="pt_importLocalJson()">Importer</button></div>
+    <div class="actions-row" style="margin-top:18px;"><button class="btn small t-del" onclick="pt_resetEvents()">Réinitialiser tous les pointages</button></div>` : ''}
   </div>`;
 }
 function pt_groupsSection(codes){
   const rows = pt_groups.map((g, gi)=>{
     const chips = (g || []).map(c=>`<span class="pt-badge pt-b-prime">${pt_e(pt_name(c))} <a href="#" onclick="pt_grpRemove(${gi},${c});return false;" style="color:inherit;text-decoration:none;">✕</a></span>`).join(' ');
     const avail = codes.filter(c=>!(g || []).includes(c));
-    const addRow = avail.length ? `<select id="pt-grp-add-${gi}" style="width:auto;display:inline-block;"><option value="">+ ajouter…</option>${avail.map(c=>`<option value="${c}">${pt_e(pt_name(c))}</option>`).join('')}</select> <button class="btn ghost small" onclick="pt_grpAdd(${gi})">Ajouter</button>` : '';
+    const addRow = avail.length ? `<select id="pt-grp-add-${gi}" style="width:auto;display:inline-block;"><option value="">+ ajouter…</option>${avail.map(c=>`<option value="${c}">${pt_e(pt_name(c))}</option>`).join('')}</select> <button class="btn ghost small b-add t-add" onclick="pt_grpAdd(${gi})">Ajouter</button>` : '';
     return `<div class="ticket">
-      <div class="row-between"><div>${chips || '<span class="pt-muted">Vide</span>'}</div><button class="btn ghost small" onclick="pt_grpDelete(${gi})">Supprimer le groupe</button></div>
+      <div class="row-between"><div>${chips || '<span class="pt-muted">Vide</span>'}</div><button class="btn ghost small t-del" onclick="pt_grpDelete(${gi})">Supprimer le groupe</button></div>
       <div style="margin-top:10px;">${addRow}</div>
     </div>`;
   }).join('');
   return `<h2 class="section">Groupes de poste <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— pour repérer un dépassement quand deux ou plusieurs collègues se relaient</span></h2>
     ${rows || pt_empty('Aucun groupe.')}
-    <div class="ticket"><button class="btn ghost small" onclick="pt_grpNew()">+ Nouveau groupe</button></div>`;
+    <div class="ticket"><button class="btn ghost small b-neutral t-add" onclick="pt_grpNew()">+ Nouveau groupe</button></div>`;
 }
 async function pt_grpSave(){ try{ await pt_groupsRef.set(pt_groupsToDoc(pt_groups)); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); } }
 function pt_grpNew(){ pt_groups = pt_groups.concat([[]]); pt_grpSave(); pt_render(true); }
