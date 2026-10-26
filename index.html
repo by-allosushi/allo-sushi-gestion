@@ -449,6 +449,15 @@ input[id^="pt-"]::placeholder{color:#8B958F;font-weight:400;}
 .btn[class*=" t-"],.btn.ghost[class*=" t-"]{background:color-mix(in srgb,var(--c) 16%,#151A17);border-color:var(--c);color:var(--t);}
 .btn[class*=" t-"]:hover{filter:brightness(1.25);}
 .btn.t-add{--c:#3B82F6;--t:#93C5FD;}.btn.t-save{--c:#22C55E;--t:#86EFAC;}.btn.t-valid{--c:#14B8A6;--t:#5EEAD4;}.btn.t-del{--c:#EF4444;--t:#FCA5A5;}.btn.t-edit{--c:#F59E0B;--t:#FCD34D;}.btn.t-close{--c:#8B5CF6;--t:#C4B5FD;}.btn.t-reopen{--c:#F97316;--t:#FDBA74;}.btn.t-cancel{--c:#A8A29E;--t:#D6D3D1;}.btn.t-mail{--c:#EC4899;--t:#F9A8D4;}.btn.t-io{--c:#06B6D4;--t:#67E8F9;}.btn.t-view{--c:#0EA5E9;--t:#7DD3FC;}
+/* téléphone : formulaires du module pointage sur 2 colonnes, motif et boutons pleine largeur */
+@media(max-width:600px){
+  .pt-row{align-items:flex-end;}
+  .pt-row > input,.pt-row > select,.pt-row > .field{flex:1 1 calc(50% - 8px);min-width:0;width:auto;}
+  .pt-row > .pt-grow,.pt-row > #pt-rb-mode,.pt-row > #pt-ln-note{flex:1 1 100%;}
+  .pt-row > .btn{flex:1 1 100%;justify-content:center;}
+  .pt-table th,.pt-table td{padding:8px 6px;}
+  .pt-table .btn.small{padding:6px 8px;}
+}
 .pt-card.c-adv{--c:#F87171;}.pt-card.c-loan{--c:#FB923C;}
 .pt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .pt-table{width:100%;border-collapse:collapse;font-size:12.5px;}
@@ -2449,7 +2458,7 @@ function pt_pretsHtml(code){
   const reps = pt_repaysOf(code).sort((a,b2)=>String(b2.date || '').localeCompare(String(a.date || '')));
   const lrows = loans.map(l=>`<tr><td>${fmtDateShort(l.date)}</td><td>${pt_e(l.note || '')}</td><td>${pt_fmtMoney(l.amount)}</td><td><button class="btn ghost small t-del" onclick="pt_loanDel('${l.id}')">Supprimer</button></td></tr>`).join('');
   const rrows = reps.map(r=>{ const lock = r.mode !== 'direct' && pt_dayClosed(r.date, code);
-    return `<tr><td>${fmtDateShort(r.date)}${lock ? ' 🔒' : ''}</td><td>${pt_e(r.note || '')}</td><td>${r.mode === 'direct' ? 'Versement direct' : 'Sur salaire'}</td><td>${pt_fmtMoney(r.amount)}</td><td><button class="btn ghost small t-del" onclick="pt_repayDel('${r.id}')">Supprimer</button></td></tr>`; }).join('');
+    return `<tr><td>${fmtDateShort(r.date)}${lock ? ' 🔒' : ''}</td><td>${pt_e(r.note || '')}</td><td>${r.mode === 'direct' ? 'Direct' : 'Salaire'}</td><td>${pt_fmtMoney(r.amount)}</td><td><button class="btn ghost small t-del" onclick="pt_repayDel('${r.id}')">Supprimer</button></td></tr>`; }).join('');
   const state = b.lent > 0 || b.repaid > 0 ? (b.due <= 0.004 ? '<span class="pt-badge pt-b-prime">Tout remboursé</span>' : '') : '';
   return `<div class="pt-muted">Plusieurs prêts possibles. Les remboursements se cumulent sur un seul solde. « Sur salaire » : déduit de la paie de la semaine qui contient la date ; « Versement direct » : sans effet sur la paie.</div>
     <div class="pt-cards" style="margin-top:10px;">${card('c-days', 'Total emprunté', pt_fmtMoney(b.lent))}${card('c-transport', 'Total remboursé', pt_fmtMoney(b.repaid))}${card(b.due > 0.004 ? 'c-loan' : 'c-transport', 'Reste dû', b.due > 0.004 ? pt_fmtMoney(b.due) : (b.due < -0.004 ? pt_money2(b.due) : '0'))}</div>
