@@ -1778,12 +1778,28 @@ function pt_reportOf(solde, paid){
   if(solde > 0 && paid >= solde - 1e-9 && paid <= pt_netOf(solde) + 1e-9) return 0;   // versé = solde ou net arrondi : rien à reporter
   return Math.round((solde - paid) * 100) / 100 || 0;
 }
+/* Présence automatique (employé qui ne pointe pas, ex. Sidahmed) : présent tous les jours à partir du 24/10/2026, sauf absences saisies (kind 'absent').
+   Les jours à venir ne sont pas comptés. Avant le 24/10, les jours restent ceux du pointage. */
+const PT_AUTO_START = '2026-10-24';
+function pt_isAuto(code){ const e = pt_emp[code] || {}; return e.autoPresent !== undefined ? !!e.autoPresent : Number(code) === 15; }
+function pt_autoDays(code){
+  if(!pt_isAuto(code)) return [];
+  const today = todayISO();
+  let from = pt_filter.from || PT_AUTO_START, to = pt_filter.to || today;
+  if(from < PT_AUTO_START) from = PT_AUTO_START;
+  if(to > today) to = today;
+  const abs = new Set(pt_entries.filter(e=>e.kind === 'absent' && e.code === code).map(e=>e.date)), out = [];
+  for(let d = from; d <= to && out.length < 400; d = pt_addDays(d, 1)) if(!abs.has(d)) out.push(d);
+  return out;
+}
 function pt_baseOf(code, sessions){
   const mySess = sessions.filter(s=>s.code === code);
   const myManual = pt_entries.filter(e=>e.kind === 'manual' && e.code === code && pt_inRange(e.date));
   const totalHours = mySess.reduce((s,x)=>s+x.hours, 0) + myManual.reduce((s,x)=>s+(Number(x.hours)||0), 0);
   const rate = pt_rate(code), mode = pt_mode(code);
-  const workedDays = new Set([...mySess.map(s=>pt_day(s.date)), ...myManual.map(m=>m.date)]).size;
+  let dset = new Set([...mySess.map(s=>pt_day(s.date)), ...myManual.map(m=>m.date)]);
+  if(pt_isAuto(code)){ dset = new Set([...dset].filter(d=>d < PT_AUTO_START)); pt_autoDays(code).forEach(d=>dset.add(d)); }
+  const workedDays = dset.size;
   const baseWage = mode === 'daily' ? workedDays * rate : totalHours * rate;
   return { totalHours, rate, mode, workedDays, baseWage };
 }
@@ -1822,7 +1838,7 @@ function pt_payroll(code, sessions){
   const tr = pt_transport(code);
   const transportTotal = tr.enabled ? b.workedDays * tr.amount : 0;
   const bonuses = pt_entriesOf('prime', code), leaves = pt_entriesOf('off', code);
-  const advances = pt_entriesOf('avance', code), loans = pt_loanDues(code);
+  const advances = pt_entriesOf('avance', code), loans = pt_loanDues(code), absences = pt_entriesOf('absent', code);
   const sum = (arr)=>arr.reduce((s,x)=>s+x.amount, 0);
   const bonusesTotal = sum(bonuses), leavesTotal = sum(leaves), advancesTotal = sum(advances), loanTotal = sum(loans);
   const subTotal = b.baseWage + transportTotal + bonusesTotal;
@@ -1830,7 +1846,7 @@ function pt_payroll(code, sessions){
   const solde = pt_roundSolde(subTotal + leavesTotal - advancesTotal - loanTotal + reportIn); // arrondi au multiple de 10 supérieur ; peut être négatif
   const net = pt_netOf(solde), v = pt_validationFor(code, pt_filter.from, pt_filter.to);
   const paidAmt = v ? Math.max(0, Number(v.paidAmt) || 0) : net, reportOut = pt_reportOf(solde, paidAmt); // report = solde − versé (versé par défaut : tout le solde positif)
-  return { ...b, transport:tr, transportTotal, bonuses, leaves, advances, loans, bonusesTotal, leavesTotal, advancesTotal, loanTotal, subTotal, reportIn, solde, net, paidAmt, reportOut, validated:v };
+  return { ...b, transport:tr, transportTotal, bonuses, leaves, advances, loans, absences, bonusesTotal, leavesTotal, advancesTotal, loanTotal, subTotal, reportIn, solde, net, paidAmt, reportOut, validated:v };
 }
 /* ---- congé : 1/12 du salaire de base (heures × taux, sans transport ni primes) de la période de calcul ; perçu = « Jours off » payés ---- */
 /* Congé : calcul depuis le 24/10/2026 (date fixe). Congé de la période = arrondi↑10 de (1/12 × salaire de base) ;
@@ -1839,9 +1855,16 @@ function pt_payroll(code, sessions){
 const PT_CONGE_START = '2026-10-24';
 function pt_congeOpen(code){ const d = pt_entries.find(e=>e.kind === 'congeopen' && e.code === code); return d ? (Number(d.amount) || 0) : 0; }
 function pt_congePaidList(code){ return pt_entries.filter(e=>e.kind === 'congepaid' && e.code === code).sort((a,b)=>String(b.date).localeCompare(String(a.date))); }
+/* Employé payé au jour (paie forfaitaire) : son congé n'est pas calculé sur son taux journalier mais, pour chaque jour travaillé, sur 8 h × 250 DA (1/12 × 8 h × 250 DA = 166,67 DA par jour). Modifiable via congeHours / congeRate de la fiche employé. */
+function pt_congeForfait(code){
+  if(pt_mode(code) !== 'daily') return null;
+  const e = pt_emp[code] || {}, h = Number(e.congeHours) > 0 ? Number(e.congeHours) : 8, r = Number(e.congeRate) > 0 ? Number(e.congeRate) : 250;
+  return { hours:h, rate:r };
+}
 function pt_conge(code, asOf){
   const to = asOf || todayISO(), from = PT_CONGE_START;
-  const base = to < from ? 0 : pt_withFilter(from, to, ()=>pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))).baseWage);
+  const forfait = pt_congeForfait(code);
+  const base = to < from ? 0 : pt_withFilter(from, to, ()=>{ const b = pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))); return forfait ? b.workedDays * forfait.hours * forfait.rate : b.baseWage; });
   const computed = pt_ceil10(base / 12), open = pt_congeOpen(code);
   const taken = pt_congePaidList(code).filter(e=>e.date <= to).reduce((t,e)=>t + (Number(e.amount) || 0), 0);
   const total = Math.round((open + computed) * 100) / 100;
@@ -2201,6 +2224,20 @@ function pt_formRow(k, label){
     <button class="btn small b-add t-add" onclick="pt_addEntry('${k}')">Ajouter</button>
   </div>`;
 }
+function pt_absenceRow(){
+  return `<div class="pt-form"><div class="pt-form-title"><label>Absence</label></div>
+    <input type="text" id="pt-f-absent-note" class="pt-draft" style="grid-column:span 2;" placeholder="Motif (jour non travaillé)" onkeydown="if(event.key==='Enter')pt_addAbsence()">
+    <button class="btn small t-add" onclick="pt_addAbsence()">Ajouter</button></div>`;
+}
+async function pt_addAbsence(){
+  if(pt_sel === null || !pt_isAuto(pt_sel)) return;
+  const dEl = document.getElementById('pt-f-date'), nEl = document.getElementById('pt-f-absent-note'), date = (dEl && dEl.value) || todayISO();
+  if(date < PT_AUTO_START){ alert('Avant le ' + fmtDateShort(PT_AUTO_START) + ', les jours suivent le pointage : une absence n’a pas d’effet.'); return; }
+  if(pt_guardDay(date, 'Cette absence', pt_sel)) return;
+  if(pt_entries.some(e=>e.kind === 'absent' && e.code === pt_sel && e.date === date)){ alert('Une absence est déjà enregistrée le ' + fmtDateShort(date) + '.'); return; }
+  const note = nEl ? nEl.value.trim() : ''; if(nEl) nEl.value = '';
+  try{ await pt_addEntryDoc({ kind:'absent', code:pt_sel, date, amount:0, note }); pt_toast('Absence enregistrée.'); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
 async function pt_addEntry(kind){
   if(pt_sel === null) return;
   const dEl = document.getElementById('pt-f-date'), nEl = document.getElementById('pt-f-' + kind + '-note'), aEl = document.getElementById('pt-f-' + kind + '-amt');
@@ -2220,7 +2257,8 @@ function pt_histRows(p){
   return [
     ...p.bonuses.map(x=>({ ...x, cat:'Prime', cls:'pt-b-prime', sign:1 })),
     ...p.leaves.map(x=>({ ...x, cat:'Jour Off', cls:'pt-b-off', sign:1 })),
-    ...p.advances.map(x=>({ ...x, cat:'Avance', cls:'pt-b-avance', sign:-1 }))
+    ...p.advances.map(x=>({ ...x, cat:'Avance', cls:'pt-b-avance', sign:-1 })),
+    ...(p.absences || []).map(x=>({ ...x, cat:'Absence', cls:'pt-b-avance', sign:0 }))
   ].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 }
 const pt_r2 = (x)=>Math.round((Number(x) || 0) * 100) / 100;
@@ -2333,6 +2371,7 @@ function pt_recapHtml(from, to, closure, only){
       sessions.filter(s=>s.code === code).forEach(s=>get(pt_day(s.date)).sess.push(s));
       pt_entries.filter(e=>e.kind === 'manual' && e.code === code && pt_inRange(e.date)).forEach(m=>get(m.date).manual.push(m));
       p.bonuses.forEach(x=>{ get(x.date).prime += x.amount; }); p.leaves.forEach(x=>{ get(x.date).off += x.amount; }); p.advances.forEach(x=>{ get(x.date).avance += x.amount; }); p.loans.forEach(x=>{ get(x.date).pret += x.amount; });
+      pt_autoDays(code).forEach(d=>{ get(d).auto = true; }); (p.absences || []).forEach(a=>{ get(a.date).absent = true; });
       if(!Object.keys(days).length && !tot.net && !tot.carry) return;
       emps.push({ code, name:pt_e(pt_name(code)), rate:p.rate, mode:p.mode, tr:p.transport, days, tot });
     });
@@ -2344,9 +2383,9 @@ function pt_recapHtml(from, to, closure, only){
         const x = e.days[d];
         const lines = x.sess.map(s=>({ a:pt_hhmm(s.start), b:pt_hhmm(s.end) + (pt_day(s.end) !== pt_day(s.start) ? ' (+1)' : ''), h:s.hours }))
           .concat(x.manual.map(m=>({ a:'Manuel', b:'Manuel', h:Number(m.hours) || 0 })));
-        if(!lines.length) lines.push({ a:'', b:'', h:0 });
+        if(!lines.length) lines.push(x.auto ? { a:'Présent', b:'', h:0 } : x.absent ? { a:'Absent', b:'', h:0 } : { a:'', b:'', h:0 });
         lines.forEach((l, i)=>{
-          const first = i === 0, worked = x.sess.length + x.manual.length > 0;
+          const first = i === 0, worked = x.sess.length + x.manual.length > 0 || !!x.auto;
           body += '<tr>' + PT_TD(dayLabel(d)) + PT_TD(e.name) + PT_TD(l.a) + PT_TD(l.b) + PT_TD(l.h ? pt_fmtH(l.h) : '', true) + PT_TD(first ? price : '', true)
             + PT_TD(first && worked && e.tr.enabled ? pt_fmtMoney(e.tr.amount) : '', true) + PT_TD(first ? money(x.prime) : '', true) + PT_TD(first ? money(x.off) : '', true)
             + PT_TD(first && x.avance ? '−' + pt_fmtMoney(x.avance) : '', true) + PT_TD(first && x.pret ? '−' + pt_fmtMoney(x.pret) : '', true) + '<td></td><td></td></tr>';
@@ -2546,12 +2585,13 @@ function pt_congeEmpHtml(code){
   const k = pt_conge(code), list = pt_congePaidList(code);
   const card = (cls, l, n)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div></div>`;
   const mode = pt_mode(code) === 'daily';
+  const fo = pt_congeForfait(code);
   const rows = list.map(e=>`<tr><td>${fmtDateShort(e.date)}</td><td>${pt_e(e.note || '')}</td><td>${pt_fmtMoney(e.amount)}</td><td><button class="btn ghost small t-del" onclick="pt_congePayDel('${e.id}')">Supprimer</button></td></tr>`).join('');
-  return `<div class="pt-muted">Période de calcul : du <b>${fmtDateShort(k.from)}</b> au <b>${fmtDateShort(k.to)}</b> (aujourd’hui). Congé = 1/12 × ${mode ? 'jours travaillés × taux journalier' : 'heures travaillées × taux'}, arrondi vers le haut au multiple de 10 DA. Le Jour Off n’est pas compté.</div>
+  return `<div class="pt-muted">Période de calcul : du <b>${fmtDateShort(k.from)}</b> au <b>${fmtDateShort(k.to)}</b> (aujourd’hui). Congé = 1/12 × ${mode ? (fo ? 'jours travaillés × ' + fo.hours + ' h × ' + fo.rate + ' DA (paie forfaitaire)' : 'jours travaillés × taux journalier') : 'heures travaillées × taux'}, arrondi vers le haut au multiple de 10 DA. Le Jour Off n’est pas compté.</div>
     <div class="pt-row" style="margin-top:10px;"><div class="field"><label>Solde initial de congé (DA)</label><input type="text" inputmode="decimal" id="pt-co-open" class="pt-w90" value="${pt_e(k.open || '')}" placeholder="0"></div><button class="btn small t-save" onclick="pt_congeSaveOpen(${code})">Enregistrer</button></div>
     <div class="pt-muted" style="margin:4px 0 8px;">À saisir une fois (tu peux le modifier). Mets un montant négatif si l’employé te doit déjà du congé.</div>
     <div class="pt-cards">${card('c-hours', 'Solde initial', pt_money2(k.open))}${card('c-base', 'Congé calculé (1/12, arrondi)', pt_fmtMoney(k.computed))}${card('c-days', 'Congé de toute la période', pt_money2(k.total))}${card('c-bonus', 'Congé versé', pt_fmtMoney(k.taken))}${card(k.left < 0 ? 'c-adv' : 'c-transport', 'Reste à verser', pt_money2(k.left))}</div>
-    <div class="pt-muted">Calcul : salaire de base ${pt_fmtMoney(k.base)} ÷ 12 = ${(k.base / 12).toLocaleString('fr-FR', { maximumFractionDigits:2 })} DA → arrondi ${pt_fmtMoney(k.computed)}. Total = solde initial + congé calculé.</div>
+    <div class="pt-muted">Calcul : ${fo ? 'base forfaitaire (jours travaillés × ' + fo.hours + ' h × ' + fo.rate + ' DA)' : 'salaire de base'} ${pt_fmtMoney(k.base)} ÷ 12 = ${(k.base / 12).toLocaleString('fr-FR', { maximumFractionDigits:2 })} DA → arrondi ${pt_fmtMoney(k.computed)}. Total = solde initial + congé calculé.</div>
     <h2 class="section" style="margin-top:16px;">Congés versés</h2>
     <div class="pt-row"><input type="date" id="pt-cp-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-cp-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-cp-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small b-add t-add" onclick="pt_congePayAdd(${code})">Ajouter</button></div>
     <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="pt-muted">Aucun congé versé.</td></tr>'}${list.length ? `<tr class="pt-total"><td colspan="2">Total versé</td><td>${pt_fmtMoney(k.taken)}</td><td></td></tr>` : ''}</tbody></table></div>`;
@@ -2626,15 +2666,15 @@ function pt_paieSection(c, sessions, codes){
       <td>${fmtDateShort(r.date)}</td>
       <td><span class="pt-badge ${r.cls}">${r.cat}</span></td>
       <td>${pt_e(r.note)}</td>
-      <td class="${r.sign<0?'pt-minus':'pt-plus'}">${r.sign<0?'−':'+'}${pt_fmtMoney(r.amount)}</td>
+      <td class="${r.sign<0?'pt-minus':'pt-plus'}">${r.sign === 0 ? '1 jour' : (r.sign<0?'−':'+') + pt_fmtMoney(r.amount)}</td>
       <td><button class="btn ghost small t-del" onclick="pt_delEntryConfirm('${r.id}','cette entrée')">Supprimer</button></td></tr>`).join('')
     : `<tr><td colspan="5" class="pt-muted">Aucune entrée sur cette période.</td></tr>`;
   const rateLine = `Taux : ${pt_fmtMoney(p.rate)}${p.mode==='daily'?' / jour':' / heure'} · ${p.transport.enabled ? 'Transport : ' + pt_fmtMoney(p.transport.amount) + ' / jour' : 'Transport désactivé'} · <a href="#" class="pt-link" onclick="pt_setTab('reglages');return false;">Modifier dans Réglages</a>`;
   const repLine = (p.reportIn || p.reportOut) ? `<div class="pt-muted" style="margin-bottom:8px;">${[p.reportIn > 0.004 ? '<span style="color:var(--moss);">Report précédent : +' + pt_fmtMoney(p.reportIn) + ' (non versé, repris dans cette paie)</span>' : p.reportIn < -0.004 ? '<span style="color:var(--rust);">Report précédent : −' + pt_fmtMoney(-p.reportIn) + ' (déduit de cette paie)</span>' : '', p.reportOut > 0.004 ? '<span style="color:var(--moss);">Reste dû reporté : +' + pt_fmtMoney(p.reportOut) + '</span>' : p.reportOut < -0.004 ? '<span style="color:var(--rust);">Solde négatif reporté : −' + pt_fmtMoney(-p.reportOut) + '</span>' : ''].filter(Boolean).join(' · ')}</div>` : '';
   return `${lockLine}${repLine}
-    <div class="pt-muted">${rateLine}</div>
+    <div class="pt-muted">${rateLine}</div>${pt_isAuto(c) ? `<div class="pt-muted" style="margin-top:4px;">Présent tous les jours depuis le ${fmtDateShort(PT_AUTO_START)}, sans pointage : <b>${p.workedDays} jour${p.workedDays > 1 ? 's' : ''}</b> sur la période${(p.absences || []).length ? ' · ' + p.absences.length + ' absence' + (p.absences.length > 1 ? 's' : '') : ''}. Marque un jour d’absence ci-dessous pour qu’il ne soit ni payé ni compté pour le congé.</div>` : ''}
     <div class="pt-row" style="margin-top:10px;"><div class="field"><label>Date</label><input type="date" id="pt-f-date" class="pt-draft pt-auto" value="${todayISO()}"></div></div>
-    ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off')}${pt_formRow('avance','Avance')}
+    ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off')}${pt_formRow('avance','Avance')}${pt_isAuto(c) ? pt_absenceRow() : ''}
     <h2 class="section" style="margin-top:20px;">Historique</h2>
     <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Catégorie</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${hist}</tbody></table></div>
     ${pt_versementHtml(p, sessions)}`;
@@ -2765,6 +2805,7 @@ function pt_tabReglages(codes){
         <div class="field"><label>Nom</label><input type="text" list="pt-names" value="${pt_e(e.name || PT_DEFAULT_NAMES[c] || '')}" placeholder="Nom de l’employé" onchange="pt_setField(${c},'name',this.value)"></div>
         <div class="field"><label>Poste</label><input type="text" value="${pt_e(e.poste || '')}" placeholder="Cuisinier, Serveur…" onchange="pt_setField(${c},'poste',this.value)"></div>
         <div class="field"><label>Mode de salaire</label><select onchange="pt_setField(${c},'payMode',this.value)"><option value="hourly" ${pt_mode(c)==='hourly'?'selected':''}>DA / heure</option><option value="daily" ${pt_mode(c)==='daily'?'selected':''}>DA / jour travaillé</option></select></div>
+        <div class="field"><label>Présence</label><select onchange="pt_setEmp(${c},{autoPresent:this.value==='1'})"><option value="0" ${pt_isAuto(c)?'':'selected'}>Selon le pointage</option><option value="1" ${pt_isAuto(c)?'selected':''}>Présent tous les jours (sans pointage)</option></select></div>
         <div class="field"><label>Taux (DA)</label><input type="text" inputmode="decimal" value="${pt_rate(c) || ''}" placeholder="0" onchange="pt_setRate(${c},this.value)"></div>
       </div>
       <div class="perm-row" style="margin-top:8px;"><span>Prime de transport par jour travaillé</span><label class="switch"><input type="checkbox" ${tr.enabled?'checked':''} onchange="pt_setTransport(${c},{enabled:this.checked})"><span class="slider"></span></label></div>
