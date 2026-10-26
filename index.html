@@ -1770,6 +1770,8 @@ function pt_closureStale(sessions){
 }
 /* Net à payer : arrondi vers le haut au multiple de 10 DA (1182,3 → 1190). La petite différence est offerte : elle n'est pas reportée. */
 function pt_ceil10(x){ x = Math.round((Number(x) || 0) * 100) / 100; return x <= 0 ? 0 : Math.ceil(x / 10 - 1e-9) * 10; }
+/* Solde de la période : toujours arrondi au multiple de 10 DA supérieur, dans les deux sens (1182,3 → 1190 ; −152,4 → −150). */
+function pt_roundSolde(x){ x = Math.round((Number(x) || 0) * 100) / 100; return (Math.ceil(x / 10 - 1e-9) * 10) || 0; }
 function pt_netOf(solde){ return solde > 0 ? pt_ceil10(solde) : 0; }
 function pt_reportOf(solde, paid){
   solde = Math.round((Number(solde) || 0) * 100) / 100; paid = Math.max(0, Number(paid) || 0);
@@ -1825,7 +1827,7 @@ function pt_payroll(code, sessions){
   const bonusesTotal = sum(bonuses), leavesTotal = sum(leaves), advancesTotal = sum(advances), loanTotal = sum(loans);
   const subTotal = b.baseWage + transportTotal + bonusesTotal;
   const reportIn = pt_reportIn(code, pt_filter.from);
-  const solde = Math.round((subTotal + leavesTotal - advancesTotal - loanTotal + reportIn) * 100) / 100; // peut être négatif
+  const solde = pt_roundSolde(subTotal + leavesTotal - advancesTotal - loanTotal + reportIn); // arrondi au multiple de 10 supérieur ; peut être négatif
   const net = pt_netOf(solde), v = pt_validationFor(code, pt_filter.from, pt_filter.to);
   const paidAmt = v ? Math.max(0, Number(v.paidAmt) || 0) : net, reportOut = pt_reportOf(solde, paidAmt); // report = solde − versé (versé par défaut : tout le solde positif)
   return { ...b, transport:tr, transportTotal, bonuses, leaves, advances, loans, bonusesTotal, leavesTotal, advancesTotal, loanTotal, subTotal, reportIn, solde, net, paidAmt, reportOut, validated:v };
@@ -2591,7 +2593,7 @@ function pt_versementHtml(p, sessions){
   const cl = pt_currentClosure(pt_sel), v = p.validated, solde = p.solde;
   const paid = v ? Number(v.paidAmt) || 0 : pt_netOf(solde), r = pt_reportOf(solde, paid);
   const rep = r > 0.004 ? '<span style="color:var(--moss);">Reste dû reporté sur la semaine suivante : +' + pt_fmtMoney(r) + '</span>' : r < -0.004 ? '<span style="color:var(--rust);">Solde négatif reporté sur la semaine suivante : −' + pt_fmtMoney(-r) + '</span>' : 'Rien à reporter.';
-  const stale = v && !cl && Math.abs((Number(v.solde) || 0) - solde) > 0.5;
+  const stale = v && !cl && Math.abs(pt_roundSolde(v.solde) - solde) > 0.5;
   const status = cl ? '<span class="pt-badge pt-b-off">🔒 Période clôturée</span>' : v ? '<span class="pt-badge pt-b-prime">✓ Validé le ' + fmtDateShort(String(v.validatedAt || '').slice(0,10)) + '</span>' : '<span class="pt-muted">Non validé</span>';
   return `<h2 class="section" style="margin-top:20px;">Versement de la période</h2>
     <div class="pt-muted" style="margin-bottom:8px;">${status}${stale ? ' · <span style="color:var(--rust);">⚠️ les chiffres ont changé depuis la validation (solde validé : ' + pt_fmtMoney(v.solde) + ') — valide à nouveau</span>' : ''}</div>
