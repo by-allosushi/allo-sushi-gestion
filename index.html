@@ -455,6 +455,10 @@ input[id^="pt-"]::placeholder{color:#8B958F;font-weight:400;}
   .pt-row > input,.pt-row > select,.pt-row > .field{flex:1 1 calc(50% - 8px);min-width:0;width:auto;}
   .pt-row > .pt-grow,.pt-row > #pt-rb-mode,.pt-row > #pt-ln-note{flex:1 1 100%;}
   .pt-row > .btn{flex:1 1 100%;justify-content:center;}
+  #pt-body input:not([type=checkbox]):not([type=file]),#pt-body select,#pt-from,#pt-to{height:44px;min-height:44px;line-height:1.2;-webkit-appearance:none;appearance:none;margin:0;}
+  #pt-body input[type=date],#pt-body input[type=time],#pt-from,#pt-to{display:block;text-align:left;}
+  #pt-body input::-webkit-date-and-time-value,#pt-from::-webkit-date-and-time-value,#pt-to::-webkit-date-and-time-value{text-align:left;min-height:1.2em;margin:0;}
+  #pt-body select{padding-right:30px;background-repeat:no-repeat;background-position:right 11px center;background-size:12px;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23E7E5E4' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");}
   .pt-table th,.pt-table td{padding:8px 6px;}
   .pt-table .btn.small{padding:6px 8px;}
 }
