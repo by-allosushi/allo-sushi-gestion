@@ -1781,7 +1781,7 @@ function pt_reportOf(solde, paid){
 /* Présence automatique (employé qui ne pointe pas, ex. Sidahmed) : présent tous les jours à partir du 24/10/2026, sauf absences saisies (kind 'absent').
    Les jours à venir ne sont pas comptés. Avant le 24/10, les jours restent ceux du pointage. */
 const PT_AUTO_START = '2026-10-24';
-function pt_isAuto(code){ const e = pt_emp[code] || {}; return e.autoPresent !== undefined ? !!e.autoPresent : Number(code) === 15; }
+function pt_isAuto(code){ const e = pt_emp[code] || {}; return e.autoPresent !== undefined ? !!e.autoPresent : (Number(code) === 15 || /sidahmed|sid ahmed/i.test(String(pt_name(code) || ''))); }
 function pt_autoDays(code){
   if(!pt_isAuto(code)) return [];
   const today = todayISO();
