@@ -2319,13 +2319,13 @@ async function pt_mailSend(params){
   if(!r.ok){ let t = ''; try{ t = await r.text(); }catch(e){} throw new Error('EmailJS a refusé l’envoi (' + r.status + ') ' + t); }
 }
 const PT_TD = (v, right, bold)=>'<td' + (right ? ' align="right"' : '') + '>' + (bold ? '<b>' + v + '</b>' : v) + '</td>';
-function pt_recapHtml(from, to, closure){
+function pt_recapHtml(from, to, closure, only){
   return pt_withFilter(from, to, ()=>{
     const sessions = pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)));
     const money = (n)=>n ? pt_fmtMoney(n) : '';
     const dayLabel = (d)=>PT_DOW[new Date(d + 'T12:00:00').getDay()] + ' ' + pt_dm(new Date(d + 'T12:00:00'));
     const emps = [];
-    pt_codes().filter(code=>!closure || pt_isGlobalCl(closure) || String(closure.code) === String(code)).forEach(code=>{
+    pt_codes().filter(code=>(only === undefined || String(code) === String(only)) && (!closure || pt_isGlobalCl(closure) || String(closure.code) === String(code))).forEach(code=>{
       const p = pt_payroll(code, sessions), fz = closure && closure.rows && closure.rows[code];
       const tot = fz ? { hours:fz.hours, transport:fz.transportTotal, bonuses:fz.bonusesTotal, leaves:fz.leavesTotal, advances:fz.advancesTotal, loans:Number(fz.loanTotal) || 0, report:Number(fz.reportIn) || 0, carry:Number(fz.reportOut) || 0, net:fz.net }
                      : { hours:p.totalHours, transport:p.transportTotal, bonuses:p.bonusesTotal, leaves:p.leavesTotal, advances:p.advancesTotal, loans:p.loanTotal, report:p.reportIn, carry:p.reportOut, net:p.net };
@@ -2366,7 +2366,7 @@ function pt_recapHtml(from, to, closure){
     const soldesHtml = soldes.length ? '<p style="margin-bottom:4px;"><b>Soldes au ' + fmtDateShort(to) + '</b></p><table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;font-size:12px;border-color:#bbb;"><tr bgcolor="#2d4a35" style="color:#fff;"><th align="left">Employé</th><th>Congé de la période</th><th>Congé versé</th><th>Reste à verser</th><th>Prêt : reste dû</th></tr>'
       + soldes.map(x=>'<tr>' + PT_TD(x.name) + PT_TD(pt_fmtMoney(x.k.total), true) + PT_TD(pt_fmtMoney(x.k.taken), true) + PT_TD((x.k.left < 0 ? '−' : '') + pt_fmtMoney(Math.abs(x.k.left)), true) + PT_TD(x.loans ? pt_fmtMoney(x.loans) : '', true) + '</tr>').join('') + '</table>' : '';
     const html = '<div style="font-family:Arial,sans-serif;font-size:13px;color:#222;">'
-      + '<p>Récapitulatif ' + pt_e(pt_rangeLabel(from, to)) + (closure && closure.createdAt ? ' — clôturé le ' + fmtDateShort(String(closure.createdAt).slice(0,10)) : '') + '.</p>'
+      + '<p>Récapitulatif ' + pt_e(pt_rangeLabel(from, to)) + (closure && closure.createdAt ? ' — clôturé le ' + fmtDateShort(String(closure.createdAt).slice(0,10)) : (only !== undefined ? ' — situation au ' + fmtDateShort(todayISO()) + ', période non clôturée (chiffres du moment)' : '')) + '.</p>'
       + '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;font-size:12px;border-color:#bbb;"><tr bgcolor="#2d4a35" style="color:#fff;"><th align="left">Date</th><th align="left">Employé</th><th>Entrée</th><th>Sortie</th><th>Heures (hh:mm)</th><th>Prix unitaire</th><th>Transport</th><th>Prime</th><th>Jour off</th><th>Avance</th><th>Prêt</th><th>Report</th><th>Total</th></tr>'
       + body + '</table>' + carryHtml + '<p style="color:#666;font-size:11px;">Total = base + transport + primes + jours off (congé) − avances − prêt − report précédent.</p>' + soldesHtml + '</div>';
     return { html, totals:G, count:emps.length };
@@ -2380,6 +2380,17 @@ async function pt_mailClosureSend(c, id){
   await pt_mailSend({ semaine:label, tableau_html:r.html });
   if(id) pt_cloturesCol.doc(id).set({ mailedAt:new Date().toISOString() }, { merge:true }).catch(()=>{});
   pt_toast('Récapitulatif envoyé par mail.');
+}
+async function pt_mailEmployee(){
+  if(pt_sel === null || pt_selAll) return;
+  const code = pt_sel, from = pt_filter.from, to = pt_filter.to;
+  if(!from || !to){ alert('Renseigne les dates Du / Au (en haut) : la situation est envoyée pour la période affichée.'); return; }
+  try{
+    const cl = pt_closureFor(from, to, code), r = pt_recapHtml(from, to, cl || null, code);
+    if(r.html.length > 48000) throw new Error('Le récapitulatif est trop volumineux pour un seul envoi (' + Math.round(r.html.length / 1000) + ' Ko, limite EmailJS gratuite : 50 Ko). Choisis une période plus courte.');
+    await pt_mailSend({ semaine:'Situation de ' + pt_name(code) + ' · ' + pt_dm(new Date(from + 'T12:00:00')) + ' → ' + fmtDateShort(to), tableau_html:r.html });
+    pt_toast('Situation de ' + pt_name(code) + ' envoyée par mail.');
+  }catch(e){ console.error(e); alert('Envoi impossible : ' + (e.message || e)); }
 }
 async function pt_mailClosure(id){
   const c = pt_clotures.find(x=>x.id === id); if(!c) return;
@@ -2603,6 +2614,7 @@ function pt_versementHtml(p, sessions){
     <div class="pt-muted" style="margin-bottom:8px;">Solde négatif : il est reporté tel quel. Solde positif : la différence entre le solde et le versé est reportée sur la semaine suivante. « Clôturer cet employé » fige sa paie et verrouille ses jours, sans toucher aux autres employés.</div>
     <div class="actions-row">
       ${cl ? `<button class="btn ghost small b-reopen t-reopen" onclick="pt_reopenPeriod(${pt_sel})">Rouvrir la période</button>` : `<button class="btn small b-valid t-valid" onclick="pt_validate()">${v ? 'Valider à nouveau' : 'Valider'}</button>${v ? `<button class="btn ghost small b-neutral t-cancel" onclick="pt_unvalidate()">Annuler la validation</button>` : ''}<button class="btn small t-close" onclick="pt_closeEmployee()">Clôturer cet employé</button>`}
+      <button class="btn ghost small t-mail" onclick="pt_mailEmployee()">✉️ Envoyer sa situation par mail</button>
     </div>`;
 }
 function pt_paieSection(c, sessions, codes){
