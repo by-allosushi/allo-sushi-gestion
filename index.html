@@ -450,7 +450,10 @@ input[id^="pt-"]::placeholder{color:#8B958F;font-weight:400;}
 .btn[class*=" t-"]:hover{filter:brightness(1.25);}
 .btn.t-add{--c:#3B82F6;--t:#93C5FD;}.btn.t-save{--c:#22C55E;--t:#86EFAC;}.btn.t-valid{--c:#14B8A6;--t:#5EEAD4;}.btn.t-del{--c:#EF4444;--t:#FCA5A5;}.btn.t-edit{--c:#F59E0B;--t:#FCD34D;}.btn.t-close{--c:#8B5CF6;--t:#C4B5FD;}.btn.t-reopen{--c:#F97316;--t:#FDBA74;}.btn.t-cancel{--c:#A8A29E;--t:#D6D3D1;}.btn.t-mail{--c:#EC4899;--t:#F9A8D4;}.btn.t-io{--c:#06B6D4;--t:#67E8F9;}.btn.t-view{--c:#0EA5E9;--t:#7DD3FC;}
 /* téléphone : formulaires du module pointage sur 2 colonnes, motif et boutons pleine largeur */
+.pt-cl-cards{display:none;}
 @media(max-width:600px){
+  .pt-cl-cards{display:block;}.pt-cl-table{display:none;}
+  .pt-cl-cards .pt-row{flex-wrap:nowrap;gap:6px;}.pt-cl-cards .pt-row > .btn{flex:1 1 0;min-width:0;padding:8px 4px;}
   .pt-row{align-items:flex-end;}
   .pt-row > input,.pt-row > select,.pt-row > .field{flex:1 1 calc(50% - 8px);min-width:0;width:auto;}
   .pt-row > .pt-grow,.pt-row > #pt-rb-mode,.pt-row > #pt-ln-note{flex:1 1 100%;}
@@ -2126,6 +2129,13 @@ function pt_closeFreeRange(){
   const f = document.getElementById('pt-cl-from').value, t = document.getElementById('pt-cl-to').value;
   pt_closeRange(f, t, 'period');
 }
+let pt_clFrom = null, pt_clTo = null, pt_clOpenG = {}; // filtre de date propre à la liste des clôtures (null = suit la période affichée)
+function pt_clSetRange(){
+  const f = document.getElementById('pt-cl-from'), t = document.getElementById('pt-cl-to');
+  pt_clFrom = (f && f.value) || null; pt_clTo = (t && t.value) || null; pt_render(true);
+}
+function pt_clResetRange(){ pt_clFrom = null; pt_clTo = null; pt_render(true); }
+function pt_clGrpToggle(key, def){ pt_clOpenG[key] = !(pt_clOpenG[key] !== undefined ? pt_clOpenG[key] : def); pt_render(true); }
 let pt_clScope = 'emp';
 function pt_clSetScope(v){ pt_clScope = v === 'all' ? 'all' : 'emp'; pt_render(true); }
 function pt_cloturesSection(){
@@ -2149,14 +2159,34 @@ function pt_cloturesSection(){
   const scope = (sel === null) ? 'all' : pt_clScope;
   let list = pt_clotures.slice();
   if(scope === 'emp' && sel !== null) list = list.filter(c=>pt_isGlobalCl(c) || String(c.code) === String(sel));
+  const custom = pt_clFrom !== null || pt_clTo !== null, rf = pt_clFrom || pt_filter.from || '', rt = pt_clTo || pt_filter.to || '';
+  if(rf && rt) list = list.filter(c=>(c.from || '') <= rt && (c.to || '') >= rf);
   list.sort((a,b)=>(b.from || '').localeCompare(a.from || '') || (b.to || '').localeCompare(a.to || ''));
   const rows = list.map(c=>{
     const r = Object.keys(c.rows || {}).map(k=>c.rows[k]), nPaid = r.filter(x=>x.paid).length;
     return `<tr><td>${PT_KIND_LABEL[c.kind] || 'Période'}</td><td>${pt_e(pt_rangeLabel(c.from, c.to))}</td><td>${pt_isGlobalCl(c) ? 'Tous' : pt_e(pt_name(c.code))}</td><td>${fmtDateShort(String(c.createdAt || '').slice(0,10))}</td><td>${nPaid} / ${r.length} <button class="btn ghost small t-view" onclick="pt_clPayToggle('${c.id}')">${pt_clPay === c.id ? 'Masquer' : 'Versements'}</button></td><td>${c.mailedAt ? '<span class="pt-muted">✉️ ' + fmtDateShort(String(c.mailedAt).slice(0,10)) + '</span> ' : ''}<button class="btn ghost small t-mail" onclick="pt_mailClosure('${c.id}')">${c.mailedAt ? 'Renvoyer' : 'Envoyer'}</button></td><td><button class="btn ghost small b-reopen t-reopen" onclick="pt_reopenRange('${c.id}')">Rouvrir</button></td></tr>${pt_payRows(c)}`;
   }).join('');
   const filter = sel !== null ? `<div class="field" style="max-width:260px;margin:10px 0;"><label>Afficher</label><select id="pt-cl-scope" onchange="pt_clSetScope(this.value)"><option value="emp" ${scope === 'emp' ? 'selected' : ''}>Clôtures de ${pt_e(pt_name(sel))}</option><option value="all" ${scope === 'all' ? 'selected' : ''}>Toutes les clôtures</option></select></div>` : '';
-  return `${head}${filter}
-    ${list.length ? `<div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Type</th><th>Période</th><th>Employé</th><th>Créée le</th><th>Payé</th><th>Mail</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="pt-muted" style="margin-top:8px;">Aucune clôture enregistrée.</div>'}`;
+  const groups = []; list.forEach(c=>{ const k = c.from + '|' + c.to; let g = groups.find(x=>x.k === k); if(!g){ g = { k, from:c.from, to:c.to, items:[] }; groups.push(g); } g.items.push(c); });
+  const cards = groups.map((g, gi)=>{
+    const open = pt_clOpenG[g.k] !== undefined ? pt_clOpenG[g.k] : gi === 0;
+    let emps = 0, paid = 0, mails = 0;
+    g.items.forEach(c=>{ const r = Object.keys(c.rows || {}).map(k=>c.rows[k]); emps += r.length; paid += r.filter(x=>x.paid).length; if(c.mailedAt) mails++; });
+    const lines = open ? g.items.map(c=>{
+      const r = Object.keys(c.rows || {}).map(k=>c.rows[k]), nP = r.filter(x=>x.paid).length, all = r.length > 0 && nP === r.length;
+      const badge = r.length > 1 ? `<span class="pt-badge ${all ? 'pt-b-prime' : 'pt-b-off'}">${nP} / ${r.length} payés</span>` : `<span class="pt-badge ${all ? 'pt-b-prime' : 'pt-b-off'}">${all ? 'Payé' : 'Non payé'}</span>`;
+      return `<div style="padding:9px 0;border-top:1px solid var(--line);"><div class="row-between"><b>${pt_isGlobalCl(c) ? 'Tous les employés' : pt_e(pt_name(c.code))}</b>${badge}</div>
+        <div class="pt-muted" style="margin-top:2px;">Créée le ${fmtDateShort(String(c.createdAt || '').slice(0,10))}${c.mailedAt ? ' · ✉️ envoyé le ' + fmtDateShort(String(c.mailedAt).slice(0,10)) : ''}</div>
+        <div class="pt-row" style="margin-top:7px;"><button class="btn ghost small t-view" onclick="pt_clPayToggle('${c.id}')">${pt_clPay === c.id ? 'Masquer' : 'Versements'}</button>
+          <button class="btn ghost small t-mail" onclick="pt_mailClosure('${c.id}')">${c.mailedAt ? 'Renvoyer' : 'Envoyer'}</button>
+          <button class="btn ghost small t-reopen" onclick="pt_reopenRange('${c.id}')">Rouvrir</button></div>
+        ${pt_clPay === c.id ? `<div class="pt-scroll"><table class="pt-table"><tbody>${pt_payRows(c)}</tbody></table></div>` : ''}</div>`; }).join('') : '';
+    return `<div class="ticket" style="margin:8px 0 0;"><div class="row-between" style="cursor:pointer;" onclick="pt_clGrpToggle('${g.k}', ${gi === 0})"><div><div style="font-weight:700;">Semaine du ${pt_e(pt_rangeLabel(g.from, g.to)).replace(/^du /, '')}</div><div class="pt-muted">${emps} employé${emps > 1 ? 's' : ''} · ${paid} / ${emps} payé${paid > 1 ? 's' : ''} · ${mails ? mails + ' mail' + (mails > 1 ? 's envoyés' : ' envoyé') : 'aucun mail'}</div></div><span class="pt-chevron">${open ? '▾' : '▸'}</span></div>${lines}</div>`;
+  }).join('');
+  const range = `<div class="pt-row" style="margin:10px 0 4px;"><div class="field"><label>Clôtures du</label><input type="date" id="pt-cl-from" value="${pt_e(rf)}" onchange="pt_clSetRange()"></div><div class="field"><label>au</label><input type="date" id="pt-cl-to" value="${pt_e(rt)}" onchange="pt_clSetRange()"></div>${custom ? '<button class="btn ghost small t-cancel" onclick="pt_clResetRange()">Période affichée</button>' : ''}</div>
+    <div class="pt-muted" style="margin-bottom:4px;">${rf && rt ? list.length + ' clôture' + (list.length > 1 ? 's' : '') + ' du ' + pt_e(fmtDateShort(rf)) + ' au ' + pt_e(fmtDateShort(rt)) + (custom ? '' : ' (période affichée)') : 'Toutes les clôtures (renseigne les dates Du / Au pour filtrer).'}</div>`;
+  return `${head}${range}${filter}
+    ${list.length ? `<div class="pt-cl-cards">${cards}</div><div class="pt-scroll pt-cl-table" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Type</th><th>Période</th><th>Employé</th><th>Créée le</th><th>Payé</th><th>Mail</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="pt-muted" style="margin-top:8px;">Aucune clôture enregistrée.</div>'}`;
 }
 
 /* ---------- onglet Paie ---------- */
