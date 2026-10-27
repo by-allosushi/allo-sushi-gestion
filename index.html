@@ -465,6 +465,25 @@ input[id^="pt-"]::placeholder{color:#8B958F;font-weight:400;}
   .pt-table th,.pt-table td{padding:8px 6px;}
   .pt-table .btn.small{padding:6px 8px;}
 }
+/* fiches techniques */
+.ft-in,textarea.ft-in{--c:#E7E5E4;font-weight:600;color:var(--c);color-scheme:dark;background:color-mix(in srgb,var(--c) 14%,#151A17);border:1px solid color-mix(in srgb,var(--c) 35%,transparent);border-left:3px solid var(--c);border-radius:8px;padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:14px;width:100%;}
+textarea.ft-in{font-family:'Inter',sans-serif;font-weight:500;line-height:1.45;resize:vertical;}
+.ft-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+.ft-chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
+.ft-chip.on{background:color-mix(in srgb,#E7E5E4 18%,#151A17);border-color:#E7E5E4;}
+.ft-cat{display:inline-block;border:1px solid #E7E5E4;color:#E7E5E4;border-radius:999px;padding:3px 11px;font-size:12px;font-weight:600;}
+.ft-portions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 10px;}
+.ft-portions input{width:70px;text-align:center;}
+.ft-ings{list-style:none;margin:0;padding:0;}
+.ft-ing{display:flex;gap:12px;padding:9px 0;border-top:1px solid var(--line);font-size:16px;}
+.ft-ing .q{flex:0 0 132px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:#86EFAC;}
+.ft-step{display:flex;gap:12px;margin:12px 0;align-items:flex-start;}
+.ft-step .num,.ft-edstep .num{flex:0 0 30px;height:30px;border-radius:50%;background:color-mix(in srgb,#60A5FA 20%,#151A17);border:1px solid #60A5FA;color:#93C5FD;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;}
+.ft-step .txt,.ft-text{font-size:16px;line-height:1.5;}
+.ft-edrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;}
+.ft-actions{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}.ft-actions .btn{flex:1 1 auto;justify-content:center;}
+.ft-edrow .ft-q{flex:1 1 28%;min-width:0;}.ft-edrow .ft-u{flex:1 1 60%;min-width:0;}.ft-edrow .ft-n{flex:1 1 calc(100% - 56px);min-width:0;}.ft-edrow > .btn{flex:0 0 46px;padding:8px 0;}
+.ft-edstep{align-items:flex-start;}.ft-edstep textarea{flex:1 1 calc(100% - 44px);min-width:0;}.ft-mv{display:flex;gap:6px;flex:1 1 100%;justify-content:flex-end;}.ft-mv .btn{flex:0 0 46px;padding:8px 0;}
 .pt-card.c-adv{--c:#F87171;}.pt-card.c-loan{--c:#FB923C;}
 .pt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .pt-table{width:100%;border-collapse:collapse;font-size:12.5px;}
@@ -575,6 +594,12 @@ input[id^="pt-"]::placeholder{color:#8B958F;font-weight:400;}
   </main>
 </div>
 
+<div id="module-fiches" class="module">
+  <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
+    <div id="ft-body"></div>
+  </main>
+</div>
+
 <div id="module-dettes" class="module">
   <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
     <div id="dt-body"></div>
@@ -636,6 +661,7 @@ const SESSION_KEY = 'allosushi-session';
 const MODULE_DEFS = [
   { key:'caisse',   label:'Caisse',    ic:'💰', desc:'Sessions de caisse' },
   { key:'pointage', label:'Pointage',  ic:'⏱️', desc:'Heures, anomalies & paie' },
+  { key:'fiches',   label:'Fiches techniques', ic:'📋', desc:'Recettes & dressage' },
 ];
 let session = null; // { username, isAdmin, permissions:{caisse,pointage} }
 let usersCache = [];
@@ -950,6 +976,7 @@ function showModule(name){
   if(name==='users') uu_render();
   if(name==='caisse' && typeof ca_render==='function') ca_render();
   if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
+  if(name==='fiches'){ if(typeof ft_start==='function') ft_start(); if(typeof ft_render==='function') ft_render(); }
   if(name==='dettes'){ if(typeof dt_start==='function') dt_start(); if(typeof dt_render==='function') dt_render(); }
 }
 
@@ -3019,6 +3046,202 @@ function pt_exportExcel(){
    - kind:'avoir_histo'         : une mise à jour d'un de ces endroits { avoirId, date, ancien, montant }
    Dette = je dois · Emprunt = on me doit · Position = disponible + emprunts − dettes (devise par devise). */
 function hasDettesAccess(){ return !!(session && session.username === 'soufyane'); }
+/* ==================== MODULE FICHES TECHNIQUES ==================== */
+/* Une fiche = { name, cat, portions, prepMin, ingredients:[{q,u,n}], steps:[texte], dressage, temp, duree, notes }.
+   Collection 'fiches_techniques'. Lecture : tous les utilisateurs autorisés ; création / modification / suppression : administrateur seulement. */
+const ft_col = db.collection('fiches_techniques');
+const FT_CATS = ['Entrées', 'Sushis & Makis', 'Rolls', 'Bowls', 'Plats chauds', 'Sauces & préparations', 'Desserts', 'Boissons'];
+const FT_UNITS = ['g', 'kg', 'ml', 'cl', 'l', 'c. à café', 'c. à soupe', 'pièce(s)', 'tranche(s)', 'feuille(s)', 'pincée', 'au goût'];
+let ft_started = false, ft_ready = false, ft_fiches = [];
+let ft_view = 'list', ft_cur = null, ft_draft = null, ft_q = '', ft_cat = '', ft_portions = 1;
+
+const ft_e = (v)=>esc(v == null ? '' : String(v));
+const ft_isAdmin = ()=>!!(session && session.isAdmin);
+function ft_start(){
+  if(ft_started) return; ft_started = true;
+  ft_col.onSnapshot((snap)=>{
+    const list = []; snap.forEach(d=>list.push({ id:d.id, ...d.data() }));
+    ft_fiches = list; ft_ready = true;
+    if(ft_view === 'detail' && !ft_fiches.some(f=>f.id === ft_cur)){ ft_view = 'list'; ft_cur = null; }
+    if(ft_view !== 'edit') ft_render(); // pas de rafraîchissement pendant la saisie d'une fiche
+  }, (e)=>{ console.error(e); ft_ready = true; ft_render(); });
+}
+/* quantité saisie : « 1,5 », « 1/2 », « 1 1/2 » → nombre ; vide → null */
+function ft_parseQ(v){
+  let s = String(v == null ? '' : v).trim().replace(',', '.');
+  if(!s) return null;
+  const mix = s.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/); if(mix && Number(mix[3])) return Number(mix[1]) + Number(mix[2]) / Number(mix[3]);
+  const fr = s.match(/^(\d+)\s*\/\s*(\d+)$/); if(fr && Number(fr[2])) return Number(fr[1]) / Number(fr[2]);
+  const n = Number(s); return isNaN(n) ? null : n;
+}
+function ft_fmtQ(n, unit){
+  const d = /pièce|tranche|feuille/.test(unit || '') ? 1 : 2;
+  const k = Math.pow(10, d), r = Math.round(n * k) / k;
+  return r.toLocaleString('fr-FR', { maximumFractionDigits:d });
+}
+function ft_fmtMin(m){ m = Math.round(Number(m) || 0); if(!m) return ''; return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + String(m % 60).padStart(2, '0') : ''); }
+/* ingrédient mis à l'échelle pour N portions */
+function ft_scaled(f, n){
+  const base = Number(f.portions) > 0 ? Number(f.portions) : 1, k = n / base;
+  return (f.ingredients || []).map(i=>{
+    const q = ft_parseQ(i.q), isTaste = i.u === 'au goût';
+    return { name:i.n || '', unit:isTaste ? '' : (i.u || ''), text:isTaste ? 'au goût' : (q === null ? '' : ft_fmtQ(q * k, i.u)), q: q === null ? null : q * k };
+  });
+}
+function ft_catsAll(){
+  const used = ft_fiches.map(f=>f.cat).filter(Boolean), out = FT_CATS.slice();
+  used.forEach(c=>{ if(!out.includes(c)) out.push(c); });
+  return out;
+}
+
+/* ---------- navigation ---------- */
+function ft_open(id){ const f = ft_fiches.find(x=>x.id === id); if(!f) return; ft_cur = id; ft_view = 'detail'; ft_portions = Number(f.portions) > 0 ? Number(f.portions) : 1; ft_render(); window.scrollTo && window.scrollTo(0, 0); }
+function ft_back(){ ft_view = 'list'; ft_cur = null; ft_draft = null; ft_render(); }
+function ft_setQ(v){ ft_q = v; ft_renderList(); }
+function ft_setCat(c){ ft_cat = ft_cat === c ? '' : c; ft_render(); }
+function ft_setPortions(n){ n = Math.max(1, Math.min(999, Math.round(Number(n) || 1))); ft_portions = n; ft_renderDetail(); }
+function ft_stepPortions(d){ ft_setPortions(ft_portions + d); }
+
+/* ---------- liste ---------- */
+function ft_filtered(){
+  const q = ft_q.trim().toLowerCase();
+  const order = ft_catsAll();
+  return ft_fiches.filter(f=>(!ft_cat || f.cat === ft_cat) && (!q || [f.name, f.cat].concat((f.ingredients || []).map(i=>i.n)).join(' ').toLowerCase().includes(q)))
+    .sort((a, b)=>(order.indexOf(a.cat) - order.indexOf(b.cat)) || String(a.name || '').localeCompare(String(b.name || ''), 'fr'));
+}
+function ft_listHtml(){
+  const list = ft_filtered();
+  if(!ft_fiches.length) return `<div class="empty-state">${ft_isAdmin() ? 'Aucune fiche pour l’instant. Crée la première avec « Nouvelle fiche ».' : 'Aucune fiche technique pour l’instant.'}</div>`;
+  if(!list.length) return '<div class="empty-state">Aucune fiche ne correspond.</div>';
+  let h = '', last = null;
+  list.forEach(f=>{
+    if(f.cat !== last){ last = f.cat; h += `<div class="section-label" style="margin:14px 0 6px;">${ft_e(f.cat || 'Sans catégorie')}</div>`; }
+    const meta = [Number(f.portions) > 0 ? f.portions + ' portion' + (f.portions > 1 ? 's' : '') : '', ft_fmtMin(f.prepMin) ? 'prép. ' + ft_fmtMin(f.prepMin) : ''].filter(Boolean).join(' · ');
+    h += `<div class="ticket ft-item" style="margin-bottom:8px;cursor:pointer;" onclick="ft_open('${f.id}')"><div class="row-between"><div><div style="font-weight:700;font-size:16px;">${ft_e(f.name)}</div><div class="pt-muted">${ft_e(meta)}</div></div><span class="pt-chevron">▸</span></div></div>`;
+  });
+  return h;
+}
+function ft_renderList(){ const el = document.getElementById('ft-list'); if(el) el.innerHTML = ft_listHtml(); }
+function ft_listView(){
+  const cats = ft_catsAll().filter(c=>ft_fiches.some(f=>f.cat === c));
+  return `<div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;font-size:18px;">Fiches techniques</div>${ft_isAdmin() ? '<button class="btn small t-add" onclick="ft_new()">＋ Nouvelle fiche</button>' : ''}</div>
+    <div class="field" style="margin-bottom:10px;"><input type="search" id="ft-search" class="ft-in" placeholder="Rechercher un plat ou un ingrédient" value="${ft_e(ft_q)}" oninput="ft_setQ(this.value)"></div>
+    ${cats.length ? `<div class="ft-chips">${cats.map(c=>`<button class="ft-chip ${ft_cat === c ? 'on' : ''}" onclick="ft_setCat(${ft_e(JSON.stringify(c)).replace(/&quot;/g, '&quot;')})">${ft_e(c)}</button>`).join('')}</div>` : ''}
+    <div id="ft-list">${ft_listHtml()}</div>`;
+}
+
+/* ---------- fiche ---------- */
+function ft_detailInner(f){
+  const items = ft_scaled(f, ft_portions), changed = ft_portions !== (Number(f.portions) > 0 ? Number(f.portions) : 1);
+  const ing = items.length ? items.map(i=>`<li class="ft-ing"><span class="q">${ft_e((i.text + ' ' + i.unit).trim())}</span><span>${ft_e(i.name)}</span></li>`).join('') : '<li class="pt-muted">Aucun ingrédient.</li>';
+  const steps = (f.steps || []).length ? f.steps.map((s, i)=>`<div class="ft-step"><div class="num">${i + 1}</div><div class="txt">${ft_e(s).replace(/\n/g, '<br>')}</div></div>`).join('') : '<div class="pt-muted">Aucune étape.</div>';
+  const card = (cls, l, n)=>n ? `<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${ft_e(n)}</div></div>` : '';
+  const block = (title, txt)=>txt ? `<div class="ticket"><div class="section-label">${title}</div><div class="ft-text">${ft_e(txt).replace(/\n/g, '<br>')}</div></div>` : '';
+  const conserv = [f.temp ? 'Température : ' + f.temp : '', f.duree ? 'Durée : ' + f.duree : ''].filter(Boolean).join('\n');
+  return `<div class="ticket">
+      <div style="font-weight:800;font-size:20px;">${ft_e(f.name)}</div>
+      ${f.cat ? `<div style="margin:6px 0;"><span class="ft-cat">${ft_e(f.cat)}</span></div>` : ''}
+      <div class="pt-cards">${card('c-days', 'Portions (fiche)', f.portions)}${card('c-base', 'Préparation', ft_fmtMin(f.prepMin))}${card('c-transport', 'Température', f.temp)}${card('c-bonus', 'Durée de conservation', f.duree)}</div>
+    </div>
+    <div class="ticket">
+      <div class="section-label">Ingrédients</div>
+      <div class="ft-portions"><span>Pour</span><button class="btn ghost small" onclick="ft_stepPortions(-1)" aria-label="moins">−</button><input type="text" inputmode="numeric" id="ft-portions" class="ft-in" value="${ft_portions}" onchange="ft_setPortions(this.value)"><button class="btn ghost small" onclick="ft_stepPortions(1)" aria-label="plus">＋</button><span>portion${ft_portions > 1 ? 's' : ''}</span>${changed ? `<button class="btn ghost small t-cancel" onclick="ft_setPortions(${Number(f.portions) > 0 ? Number(f.portions) : 1})">Quantités de la fiche</button>` : ''}</div>
+      <ul class="ft-ings">${ing}</ul>
+    </div>
+    <div class="ticket"><div class="section-label">Préparation</div>${steps}</div>
+    ${block('Dressage', f.dressage)}${block('Conservation', conserv)}${block('Notes du chef', f.notes)}`;
+}
+function ft_renderDetail(){ const el = document.getElementById('ft-detail'); const f = ft_fiches.find(x=>x.id === ft_cur); if(el && f) el.innerHTML = ft_detailInner(f); }
+function ft_detailView(f){
+  return `<div style="margin-bottom:10px;"><button class="btn ghost small t-view" onclick="ft_back()">← Fiches</button></div>
+      <div class="ft-actions"><button class="btn ghost small t-io" onclick="ft_print()">🖨️ Imprimer</button>${ft_isAdmin() ? `<button class="btn ghost small t-edit" onclick="ft_edit('${f.id}')">Modifier</button><button class="btn ghost small t-view" onclick="ft_dup('${f.id}')">Dupliquer</button><button class="btn ghost small t-del" onclick="ft_del('${f.id}')">Supprimer</button>` : ''}</div>
+    <div id="ft-detail">${ft_detailInner(f)}</div>`;
+}
+function ft_print(){
+  const f = ft_fiches.find(x=>x.id === ft_cur); if(!f) return;
+  const items = ft_scaled(f, ft_portions);
+  const css = 'body{font-family:Arial,sans-serif;color:#111;margin:22px;}h1{margin:0 0 4px;font-size:24px;}h2{font-size:14px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #999;padding-bottom:3px;margin:18px 0 8px;}.m{color:#555;font-size:13px;}li{margin:3px 0;}ol li{margin:8px 0;}';
+  const meta = [f.cat, 'Pour ' + ft_portions + ' portion' + (ft_portions > 1 ? 's' : ''), ft_fmtMin(f.prepMin) ? 'Préparation : ' + ft_fmtMin(f.prepMin) : '', f.temp ? 'Température : ' + f.temp : '', f.duree ? 'Conservation : ' + f.duree : ''].filter(Boolean).join(' · ');
+  const html = `<html><head><meta charset="utf-8"><title>${ft_e(f.name)}</title><style>${css}</style></head><body><h1>${ft_e(f.name)}</h1><div class="m">${ft_e(meta)}</div>
+    <h2>Ingrédients</h2><ul>${items.map(i=>`<li><b>${ft_e((i.text + ' ' + i.unit).trim())}</b> ${ft_e(i.name)}</li>`).join('')}</ul>
+    <h2>Préparation</h2><ol>${(f.steps || []).map(s=>`<li>${ft_e(s).replace(/\n/g, '<br>')}</li>`).join('')}</ol>
+    ${f.dressage ? `<h2>Dressage</h2><div>${ft_e(f.dressage).replace(/\n/g, '<br>')}</div>` : ''}${f.notes ? `<h2>Notes du chef</h2><div>${ft_e(f.notes).replace(/\n/g, '<br>')}</div>` : ''}</body></html>`;
+  let fr = document.getElementById('ft-print-frame');
+  if(!fr){ fr = document.createElement('iframe'); fr.id = 'ft-print-frame'; fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'; document.body.appendChild(fr); }
+  fr.srcdoc = html;
+  fr.onload = ()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ console.error(e); } };
+}
+
+/* ---------- édition (administrateur) ---------- */
+function ft_blank(){ return { name:'', cat:'', portions:1, prepMin:'', ingredients:[{ q:'', u:'g', n:'' }], steps:[''], dressage:'', temp:'', duree:'', notes:'' }; }
+function ft_clone(f){ return JSON.parse(JSON.stringify({ name:f.name || '', cat:f.cat || '', portions:f.portions || 1, prepMin:f.prepMin || '', ingredients:(f.ingredients || []).map(i=>({ q:i.q == null ? '' : String(i.q), u:i.u || '', n:i.n || '' })), steps:(f.steps || []).slice(), dressage:f.dressage || '', temp:f.temp || '', duree:f.duree || '', notes:f.notes || '' })); }
+function ft_new(){ if(!ft_isAdmin()) return; ft_draft = ft_blank(); ft_cur = null; ft_view = 'edit'; ft_render(); }
+function ft_edit(id){ const f = ft_fiches.find(x=>x.id === id); if(!f || !ft_isAdmin()) return; ft_draft = ft_clone(f); ft_cur = id; ft_view = 'edit'; ft_render(); }
+function ft_dup(id){ const f = ft_fiches.find(x=>x.id === id); if(!f || !ft_isAdmin()) return; ft_draft = ft_clone(f); ft_draft.name = (f.name || '') + ' (copie)'; ft_cur = null; ft_view = 'edit'; ft_render(); }
+function ft_cancelEdit(){ ft_draft = null; if(ft_cur){ ft_view = 'detail'; } else ft_view = 'list'; ft_render(); }
+function ft_dSet(k, v){ if(ft_draft) ft_draft[k] = v; }
+function ft_ingSet(i, k, v){ if(ft_draft && ft_draft.ingredients[i]) ft_draft.ingredients[i][k] = v; }
+function ft_ingAdd(){ ft_draft.ingredients.push({ q:'', u:'g', n:'' }); ft_render(); setTimeout(()=>{ const els = document.querySelectorAll('.ft-ing-name'); if(els.length) els[els.length - 1].focus(); }, 0); }
+function ft_ingDel(i){ ft_draft.ingredients.splice(i, 1); if(!ft_draft.ingredients.length) ft_draft.ingredients.push({ q:'', u:'g', n:'' }); ft_render(); }
+function ft_stepSet(i, v){ if(ft_draft) ft_draft.steps[i] = v; }
+function ft_stepAdd(){ ft_draft.steps.push(''); ft_render(); setTimeout(()=>{ const els = document.querySelectorAll('.ft-step-in'); if(els.length) els[els.length - 1].focus(); }, 0); }
+function ft_stepDel(i){ ft_draft.steps.splice(i, 1); if(!ft_draft.steps.length) ft_draft.steps.push(''); ft_render(); }
+function ft_stepMove(i, d){ const j = i + d, s = ft_draft.steps; if(j < 0 || j >= s.length) return; const t = s[i]; s[i] = s[j]; s[j] = t; ft_render(); }
+async function ft_save(){
+  const d = ft_draft; if(!d || !ft_isAdmin()) return;
+  const name = String(d.name || '').trim();
+  if(!name){ alert('Donne un nom au plat.'); return; }
+  const portions = Math.max(1, Math.round(Number(String(d.portions).replace(',', '.')) || 1));
+  const ingredients = d.ingredients.map(i=>({ n:String(i.n || '').trim(), u:i.u || '', q:ft_parseQ(i.q) })).filter(i=>i.n);
+  for(const i of d.ingredients){ if(String(i.q || '').trim() && ft_parseQ(i.q) === null){ alert('Quantité non valide : « ' + i.q + ' ». Écris un nombre (1,5) ou une fraction (1/2).'); return; } }
+  const data = { name, cat:String(d.cat || '').trim(), portions, prepMin:Math.max(0, Math.round(Number(String(d.prepMin).replace(',', '.')) || 0)), ingredients,
+    steps:d.steps.map(s=>String(s || '').trim()).filter(Boolean), dressage:String(d.dressage || '').trim(), temp:String(d.temp || '').trim(), duree:String(d.duree || '').trim(), notes:String(d.notes || '').trim(),
+    updatedAt:new Date().toISOString(), updatedBy:(typeof currentUser !== 'undefined' ? currentUser : '') };
+  try{
+    let id = ft_cur;
+    if(id) await ft_col.doc(id).set(data, { merge:true });
+    else { data.createdAt = data.updatedAt; const ref = await ft_col.add(data); id = ref.id; }
+    ft_draft = null; ft_cur = id; ft_view = 'detail'; ft_portions = portions; ft_render(); window.scrollTo && window.scrollTo(0, 0);
+    if(typeof pt_toast === 'function') pt_toast('Fiche enregistrée.');
+  }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+async function ft_del(id){
+  const f = ft_fiches.find(x=>x.id === id); if(!f || !ft_isAdmin()) return;
+  if(!confirm('Supprimer la fiche « ' + f.name + ' » ? Cette action est définitive.')) return;
+  try{ await ft_col.doc(id).delete(); ft_back(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+function ft_editView(){
+  const d = ft_draft, a = (k)=>`oninput="ft_dSet('${k}', this.value)"`;
+  const ings = d.ingredients.map((i, n)=>`<div class="ft-edrow"><input type="text" inputmode="decimal" class="ft-in ft-q" placeholder="Qté" value="${ft_e(i.q)}" oninput="ft_ingSet(${n},'q',this.value)">
+      <select class="ft-in ft-u" onchange="ft_ingSet(${n},'u',this.value)">${FT_UNITS.concat(FT_UNITS.includes(i.u) || !i.u ? [] : [i.u]).map(u=>`<option ${u === i.u ? 'selected' : ''}>${ft_e(u)}</option>`).join('')}</select>
+      <input type="text" class="ft-in ft-ing-name ft-n" placeholder="Ingrédient" value="${ft_e(i.n)}" oninput="ft_ingSet(${n},'n',this.value)"><button class="btn ghost small t-del" onclick="ft_ingDel(${n})" aria-label="Retirer">✕</button></div>`).join('');
+  const steps = d.steps.map((s, n)=>`<div class="ft-edrow ft-edstep"><div class="num">${n + 1}</div><textarea class="ft-in ft-step-in" rows="2" placeholder="Décris l’étape" oninput="ft_stepSet(${n}, this.value)">${ft_e(s)}</textarea>
+      <div class="ft-mv"><button class="btn ghost small" onclick="ft_stepMove(${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="ft_stepMove(${n},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="ft_stepDel(${n})" aria-label="Retirer">✕</button></div></div>`).join('');
+  return `<div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;font-size:18px;">${ft_cur ? 'Modifier la fiche' : 'Nouvelle fiche'}</div></div>
+    <div class="ticket">
+      <div class="field"><label>Nom du plat</label><input type="text" class="ft-in" id="ft-name" value="${ft_e(d.name)}" ${a('name')}></div>
+      <div class="pt-row" style="margin-top:10px;"><div class="field" style="flex:2 1 160px;"><label>Catégorie</label><input type="text" class="ft-in" list="ft-cats" value="${ft_e(d.cat)}" placeholder="Choisis ou écris" ${a('cat')}><datalist id="ft-cats">${ft_catsAll().map(c=>`<option value="${ft_e(c)}">`).join('')}</datalist></div>
+        <div class="field" style="flex:1 1 90px;"><label>Portions</label><input type="text" inputmode="numeric" class="ft-in" value="${ft_e(d.portions)}" ${a('portions')}></div>
+        <div class="field" style="flex:1 1 110px;"><label>Préparation (min)</label><input type="text" inputmode="numeric" class="ft-in" value="${ft_e(d.prepMin)}" ${a('prepMin')}></div></div>
+    </div>
+    <div class="ticket"><div class="section-label">Ingrédients <span class="pt-muted" style="text-transform:none;letter-spacing:0;">(quantités pour ${ft_e(d.portions || 1)} portion${Number(d.portions) > 1 ? 's' : ''})</span></div>${ings}<div class="actions-row"><button class="btn small t-add" onclick="ft_ingAdd()">＋ Ingrédient</button></div></div>
+    <div class="ticket"><div class="section-label">Étapes de préparation</div>${steps}<div class="actions-row"><button class="btn small t-add" onclick="ft_stepAdd()">＋ Étape</button></div></div>
+    <div class="ticket"><div class="field"><label>Dressage (comment présenter le plat)</label><textarea class="ft-in" rows="3" ${a('dressage')}>${ft_e(d.dressage)}</textarea></div></div>
+    <div class="ticket"><div class="section-label">Conservation</div><div class="pt-row"><div class="field" style="flex:1 1 140px;"><label>Température</label><input type="text" class="ft-in" placeholder="ex. 0–4 °C" value="${ft_e(d.temp)}" ${a('temp')}></div>
+      <div class="field" style="flex:1 1 140px;"><label>Durée</label><input type="text" class="ft-in" placeholder="ex. 48 h" value="${ft_e(d.duree)}" ${a('duree')}></div></div></div>
+    <div class="ticket"><div class="field"><label>Notes ou astuces du chef</label><textarea class="ft-in" rows="3" ${a('notes')}>${ft_e(d.notes)}</textarea></div></div>
+    <div class="actions-row"><button class="btn t-save" onclick="ft_save()">Enregistrer la fiche</button><button class="btn ghost t-cancel" onclick="ft_cancelEdit()">Annuler</button></div>`;
+}
+
+function ft_render(){
+  const body = document.getElementById('ft-body'); if(!body) return;
+  if(!ft_ready){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  const f = ft_fiches.find(x=>x.id === ft_cur);
+  if(ft_view === 'edit' && ft_draft && ft_isAdmin()) body.innerHTML = ft_editView();
+  else if(ft_view === 'detail' && f) body.innerHTML = ft_detailView(f);
+  else { ft_view = 'list'; body.innerHTML = ft_listView(); }
+}
+
 const dt_dettesCol = db.collection('dettes_perso');
 
 let dt_dettes = [], dt_avoirs = [], dt_avoirHisto = [];
