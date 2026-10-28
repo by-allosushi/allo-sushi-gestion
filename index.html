@@ -647,8 +647,10 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
         <label class="switch"><input type="checkbox" id="nu-admin" onchange="uu_toggleAdminFields()"><span class="slider"></span></label>
       </div>
       <div id="nu-perm-detail">
-        <div class="perm-row"><span>Accès Caisse</span><label class="switch"><input type="checkbox" id="nu-perm-caisse" checked><span class="slider"></span></label></div>
-        <div class="perm-row"><span>Accès Pointage</span><label class="switch"><input type="checkbox" id="nu-perm-pointage" checked><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Caisse</span><label class="switch"><input type="checkbox" id="nu-perm-caisse"><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Pointage</span><label class="switch"><input type="checkbox" id="nu-perm-pointage"><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Fiches techniques</span><label class="switch"><input type="checkbox" id="nu-perm-fiches"><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Mise en place</span><label class="switch"><input type="checkbox" id="nu-perm-mep"><span class="slider"></span></label></div>
       </div>
       <button class="btn moss" style="margin-top:14px;" onclick="uu_createUser()">➕ Créer l'utilisateur</button>
     </div>
@@ -872,9 +874,11 @@ async function uu_createUser(){
     username: uname,
     password: pwd,
     isAdmin,
-    permissions: isAdmin ? { caisse:true, pointage:true } : {
+    permissions: isAdmin ? { caisse:true, pointage:true, fiches:true, mep:true } : {
       caisse: document.getElementById('nu-perm-caisse').checked,
-      pointage: document.getElementById('nu-perm-pointage').checked
+      pointage: document.getElementById('nu-perm-pointage').checked,
+      fiches: document.getElementById('nu-perm-fiches').checked,
+      mep: document.getElementById('nu-perm-mep').checked
     },
     creeLe: new Date().toISOString(),
     creePar: currentUser
@@ -883,8 +887,7 @@ async function uu_createUser(){
   document.getElementById('nu-username').value = '';
   document.getElementById('nu-password').value = '';
   document.getElementById('nu-admin').checked = false;
-  document.getElementById('nu-perm-caisse').checked = true;
-  document.getElementById('nu-perm-pointage').checked = true;
+  ['caisse', 'pointage', 'fiches', 'mep'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
   uu_toggleAdminFields();
 }
 
@@ -3354,7 +3357,7 @@ const mep_listsRef = db.collection('mise_en_place').doc('listes');
 const mep_saisiesCol = db.collection('mise_en_place_saisies');
 const MEP_SECTIONS = [['sushi', 'Sushi'], ['chaud', 'Chaud'], ['bar', 'Bar']];
 const MEP_UNITS = ['kg', 'g', 'L', 'pièces', 'bacs', 'bouteilles', 'sachets', 'boîtes', 'feuilles', 'portions'];
-let mep_adminStarted = false, mep_started = false, mep_listsReady = false, mep_lists = { sushi:[], chaud:[], bar:[] }, mep_emp = {}, mep_saisies = [], mep_saisiesReady = false;
+let mep_adminStarted = false, mep_started = false, mep_listsReady = false, mep_lists = { sushi:[], chaud:[], bar:[], cooks:[] }, mep_saisies = [], mep_saisiesReady = false;
 let mep_tab = 'hist', mep_sec = 'sushi', mep_date = '', mep_form = null, mep_done = null, mep_draft = null, mep_busy = false;
 const mep_e = (v)=>esc(v == null ? '' : String(v));
 const mep_isAdmin = ()=>!!(session && session.isAdmin);
@@ -3363,21 +3366,17 @@ function mep_ymd(d){ d = d || new Date(); return d.getFullYear() + '-' + String(
 function mep_frDate(ymd){ const p = String(ymd || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : ymd; }
 function mep_hm(iso){ const d = new Date(iso); return isNaN(d) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
 function mep_newId(){ return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
-/* employés proposés : ceux du pointage (noms seulement) */
-function mep_empList(){
-  const codes = new Set(Object.keys(PT_DEFAULT_NAMES).map(Number)); Object.keys(mep_emp).forEach(k=>codes.add(Number(k)));
-  return Array.from(codes).filter(c=>!isNaN(c)).map(c=>({ code:c, name:(mep_emp[c] && mep_emp[c].name) || PT_DEFAULT_NAMES[c] || '' })).filter(x=>x.name).sort((a, b)=>a.name.localeCompare(b.name, 'fr'));
-}
+/* cuisiniers proposés : la liste gérée par l'administrateur (Listes) */
+function mep_empList(){ return (mep_lists.cooks || []).filter(c=>c && c.n).map(c=>({ code:c.id, name:c.n })).sort((a, b)=>a.name.localeCompare(b.name, 'fr')); }
 function mep_typing(){ try{ const a = document.activeElement, b = document.getElementById('mep-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
 function mep_start(){
   if(mep_isAdmin() && !mep_adminStarted){ mep_adminStarted = true; mep_watchSaisies(); }
   if(mep_started) return; mep_started = true;
   mep_listsRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
-    mep_lists = { sushi:d.sushi || [], chaud:d.chaud || [], bar:d.bar || [] }; mep_listsReady = true;
+    mep_lists = { sushi:d.sushi || [], chaud:d.chaud || [], bar:d.bar || [], cooks:d.cooks || [] }; mep_listsReady = true;
     if((mep_tab !== 'listes' || !mep_draft) && !mep_typing()) mep_render();
   }, (e)=>{ console.error(e); mep_listsReady = true; mep_render(); });
-  pt_configRef.onSnapshot((doc)=>{ const d = doc.exists ? (doc.data() || {}) : {}; mep_emp = d.emp || {}; if(!mep_typing()) mep_render(); }, (e)=>console.error(e));
 }
 function mep_watchSaisies(){
   // seul l'administrateur lit les saisies
@@ -3399,7 +3398,7 @@ function mep_entryView(){
   const list = mep_lists[mep_sec] || [], emps = mep_empList();
   const rows = list.length ? list.map(i=>`<div class="mep-ing"><div class="n">${mep_e(i.n)}</div><input class="ft-in" type="text" inputmode="decimal" placeholder="0" value="${mep_e(mep_form.vals[i.id] || '')}" oninput="mep_setVal('${i.id}', this.value)"><div class="u">${mep_e(i.u || '')}</div></div>`).join('') : `<div class="pt-muted">Aucun ingrédient défini pour cette section.${mep_isAdmin() ? ' Ajoute-les dans « Listes ».' : ''}</div>`;
   return `<div class="mep-seg">${MEP_SECTIONS.map(x=>`<button class="${mep_sec === x[0] ? 'on' : ''}" onclick="mep_pickSec('${x[0]}')">${x[1]}</button>`).join('')}</div>
-    <div class="ticket"><div class="field"><label>Cuisinier</label><select class="ft-in" id="mep-emp" onchange="mep_setEmp(this.value)"><option value="">Choisis ton nom</option>${emps.map(x=>`<option value="${x.code}" ${String(mep_form.emp) === String(x.code) ? 'selected' : ''}>${mep_e(x.name)}</option>`).join('')}</select></div></div>
+    <div class="ticket"><div class="field"><label>Cuisinier</label><select class="ft-in" id="mep-emp" onchange="mep_setEmp(this.value)"><option value="">Choisis ton nom</option>${emps.map(x=>`<option value="${mep_e(x.code)}" ${String(mep_form.emp) === String(x.code) ? 'selected' : ''}>${mep_e(x.name)}</option>`).join('')}</select></div></div>
     <div class="ticket"><div class="section-label">Inventaire de fin de service — ${mep_e(mep_secName(mep_sec))}</div>${rows}</div>
     ${list.length ? '<div class="actions-row"><button class="btn t-save" style="width:100%;height:48px;" onclick="mep_submit()">Valider mon inventaire</button></div>' : ''}`;
 }
@@ -3420,14 +3419,14 @@ async function mep_submit(){
   if(missing.length){ alert('Il manque ' + missing.length + ' quantité' + (missing.length > 1 ? 's' : '') + ' : ' + missing.slice(0, 5).join(', ') + (missing.length > 5 ? '…' : '') + '\nMets 0 si tu n’en as plus.'); return; }
   if(!items.length){ alert('Rien à enregistrer.'); return; }
   const now = new Date();
-  const doc = { section:f.sec, date:mep_ymd(now), at:now.toISOString(), emp:Number(emp.code), name:emp.name, items, by:(typeof currentUser !== 'undefined' ? currentUser : '') };
+  const doc = { section:f.sec, date:mep_ymd(now), at:now.toISOString(), emp:String(emp.code), name:emp.name, items, by:(typeof currentUser !== 'undefined' ? currentUser : '') };
   mep_busy = true;
   try{ await mep_saisiesCol.add(doc); mep_done = { sec:f.sec, name:emp.name, hm:mep_hm(doc.at) }; mep_form = null; mep_render(); window.scrollTo && window.scrollTo(0, 0); }
   catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e) + '\nRéessaie.'); }
   mep_busy = false;
 }
 /* ---------- administrateur : historique ---------- */
-function mep_setTab(t){ mep_tab = t; if(t === 'listes' && !mep_draft) mep_draft = JSON.parse(JSON.stringify(mep_lists)); if(t !== 'listes') mep_draft = null; if(t === 'saisie') mep_resetForm(); mep_render(); }
+function mep_setTab(t){ mep_tab = t; if(t === 'listes' && !mep_draft) mep_draft = JSON.parse(JSON.stringify({ cooks:[], ...mep_lists })); if(t !== 'listes') mep_draft = null; if(t === 'saisie') mep_resetForm(); mep_render(); }
 function mep_setDate(v){ mep_date = v || mep_ymd(); mep_render(); }
 function mep_histSec(k){ mep_sec = k; mep_render(); }
 function mep_daySaisies(sec, date){ return mep_saisies.filter(x=>x.section === sec && x.date === date).sort((a, b)=>String(a.at).localeCompare(String(b.at))); }
@@ -3457,6 +3456,9 @@ async function mep_delSaisie(id){
   try{ await mep_saisiesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 /* ---------- administrateur : listes ---------- */
+function mep_cName(i, v){ if(mep_draft && mep_draft.cooks[i]) mep_draft.cooks[i].n = v; }
+function mep_cAdd(){ mep_draft.cooks.push({ id:mep_newId(), n:'' }); mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-cooks'); if(els.length) els[els.length - 1].focus(); }, 0); }
+function mep_cDel(i){ mep_draft.cooks.splice(i, 1); mep_render(); }
 function mep_dName(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].n = v; }
 function mep_dUnit(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].u = v; }
 function mep_dAdd(sec){ mep_draft[sec].push({ id:mep_newId(), n:'', u:'kg' }); mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-' + sec); if(els.length) els[els.length - 1].focus(); }, 0); }
@@ -3466,6 +3468,7 @@ async function mep_saveLists(){
   if(!mep_isAdmin() || !mep_draft) return;
   const out = {};
   MEP_SECTIONS.forEach(([k])=>{ out[k] = (mep_draft[k] || []).map(i=>({ id:i.id, n:String(i.n || '').trim(), u:String(i.u || '').trim() })).filter(i=>i.n); });
+  out.cooks = (mep_draft.cooks || []).map(c=>({ id:c.id, n:String(c.n || '').trim() })).filter(c=>c.n);
   try{ await mep_listsRef.set({ ...out, updatedAt:new Date().toISOString(), updatedBy:(typeof currentUser !== 'undefined' ? currentUser : '') }); mep_draft = null; mep_tab = 'hist'; mep_render(); if(typeof pt_toast === 'function') pt_toast('Listes enregistrées.'); }
   catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
 }
@@ -3473,6 +3476,7 @@ function mep_listsView(){
   const d = mep_draft || mep_lists;
   return `<datalist id="mep-units">${MEP_UNITS.map(u=>`<option value="${mep_e(u)}">`).join('')}</datalist>
     <div class="pt-muted" style="margin-bottom:8px;">Les ingrédients que les cuisiniers doivent compter à la fin de leur service. Les anciennes saisies gardent le nom et l’unité d’origine.</div>
+    <div class="ticket"><div class="section-label">Cuisiniers</div><div class="pt-muted" style="margin-bottom:8px;">Les noms proposés aux cuisiniers dans « Choisis ton nom ».</div>${(d.cooks || []).map((c, n)=>`<div class="ft-edrow"><input type="text" class="ft-in mep-name-cooks" style="flex:1 1 calc(100% - 56px);min-width:0;" placeholder="Prénom" value="${mep_e(c.n)}" oninput="mep_cName(${n},this.value)"><button class="btn ghost small t-del" onclick="mep_cDel(${n})" aria-label="Retirer">✕</button></div>`).join('') || '<div class="pt-muted">Aucun cuisinier.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_cAdd()">＋ Cuisinier</button></div></div>
     ${MEP_SECTIONS.map(([k, label])=>`<div class="ticket"><div class="section-label">${label}</div>${(d[k] || []).map((i, n)=>`<div class="ft-edrow"><input type="text" class="ft-in mep-name-${k}" style="flex:1 1 55%;min-width:0;" placeholder="Ingrédient" value="${mep_e(i.n)}" oninput="mep_dName('${k}',${n},this.value)"><input type="text" class="ft-in" list="mep-units" style="flex:1 1 28%;min-width:0;" placeholder="Unité" value="${mep_e(i.u)}" oninput="mep_dUnit('${k}',${n},this.value)">
       <div class="ft-mv" style="flex:1 1 100%;"><button class="btn ghost small" onclick="mep_dMove('${k}',${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_dMove('${k}',${n},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="mep_dDel('${k}',${n})" aria-label="Retirer">✕</button></div></div>`).join('') || '<div class="pt-muted">Aucun ingrédient.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_dAdd('${k}')">＋ Ingrédient</button></div></div>`).join('')}
     <div class="actions-row"><button class="btn t-save" onclick="mep_saveLists()">Enregistrer les listes</button><button class="btn ghost t-cancel" onclick="mep_setTab('hist')">Annuler</button></div>`;
