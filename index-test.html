@@ -560,6 +560,35 @@ input[id^="pt-"]::placeholder{color:#8B958F;font-weight:400;}
   </main>
 </div>
 
+<div id="module-restopro" class="module">
+  <style>
+    #module-restopro .rp-hero{text-align:center;padding:18px 14px;margin-bottom:10px;}
+    #module-restopro .rp-big{font-family:'Manrope',sans-serif;font-weight:800;font-size:30px;letter-spacing:-0.02em;margin:6px 0 4px;color:var(--moss);}
+    #module-restopro .rp-mid{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:16px;margin:6px 0 2px;}
+    #module-restopro .rp-row{display:grid;grid-template-columns:1.25fr 1fr 1fr 1fr;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
+    #module-restopro .rp-row:last-child{border-bottom:none;}
+    #module-restopro .rp-row > span:not(:first-child){text-align:right;}
+    #module-restopro .rp-row small{display:block;font-size:10.5px;color:var(--ink-muted);margin-top:1px;}
+    #module-restopro .rp-head{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-muted);padding:8px 0;}
+    #module-restopro .rp-total{font-weight:700;border-top:1px solid var(--line);}
+    #module-restopro .rp-row > span:first-child{position:relative;}
+    #module-restopro .rp-bar{display:block;height:3px;border-radius:2px;background:var(--forest);margin-top:5px;opacity:.7;max-width:100%;}
+    #module-restopro .movement-row{gap:10px;}
+  </style>
+  <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
+    <div class="ticket">
+      <div class="section-label">Période</div>
+      <div class="grid grid-2">
+        <div class="field"><label>Du</label><input type="date" id="rp-from" onchange="rp_dateInput()"></div>
+        <div class="field"><label>Au</label><input type="date" id="rp-to" onchange="rp_dateInput()"></div>
+      </div>
+      <div class="filter-row" id="rp-presets" style="margin-top:12px;margin-bottom:0;"></div>
+      <div id="rp-sync"></div>
+    </div>
+    <div id="rp-body"></div>
+  </main>
+</div>
+
 <div id="module-dettes" class="module">
   <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
     <div id="dt-body"></div>
@@ -621,6 +650,7 @@ const SESSION_KEY = 'allosushi-session';
 const MODULE_DEFS = [
   { key:'caisse',   label:'Caisse',    ic:'💰', desc:'Sessions de caisse' },
   { key:'pointage', label:'Pointage',  ic:'⏱️', desc:'Heures, anomalies & paie' },
+  { key:'restopro', label:'CA Resto Pro', ic:'📈', desc:'Chiffre d’affaires & remises' },
 ];
 let session = null; // { username, isAdmin, permissions:{caisse,pointage} }
 let usersCache = [];
@@ -693,6 +723,7 @@ function applySession(userDoc){
   buildModuleTabs();
   showModule('home');
   if(session.isAdmin){ uu_subscribeUsers(); }
+  try{ if(hasAccess('restopro')){ rp_watchMeta(); rp_requestSync(); } }catch(e){ console.warn('CA Resto Pro :', e); }
 }
 
 async function handleAuthSubmit(){
@@ -935,6 +966,7 @@ function showModule(name){
   if(name==='users') uu_render();
   if(name==='caisse' && typeof ca_render==='function') ca_render();
   if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
+  if(name==='restopro'){ if(typeof rp_start==='function') rp_start(); }
   if(name==='dettes'){ if(typeof dt_start==='function') dt_start(); if(typeof dt_render==='function') dt_render(); }
 }
 
@@ -2912,6 +2944,273 @@ function pt_exportExcel(){
   add('Corrections', ['Code','Nom','Anomalie d\'origine','Motif','Corrige le'], pt_entries.filter(e=>e.kind === 'resolved').map(r=>[r.code, pt_name(r.code), pt_fmtDT(new Date(r.dt)), r.reason, String(r.resolvedAt || '').slice(0,10)]));
   add('Reglages', ['Code','Nom','Poste','Mode','Taux','Transport actif','Montant transport'], codes.map(c=>{ const t = pt_transport(c); return [c, pt_name(c), pt_poste(c), pt_mode(c) === 'daily' ? 'DA/jour' : 'DA/heure', pt_rate(c), t.enabled ? 'Oui' : 'Non', t.amount]; }));
   XLSX.writeFile(wb, 'pointage_allo_sushi_' + todayISO() + '.xlsx');
+}
+
+/* ==================== MODULE CA RESTO PRO — chiffre d'affaires synchronisé depuis le PC du restaurant ====================
+   Source : collection Firestore « restopro_jours » (un document par jour, id = AAAA-MM-JJ) alimentée par sync_restopro.ps1.
+   Règles : CA = somme des tickets FERMÉS (BLOCAGE = 'F'), montant APRÈS remises (champ TTC de Resto Pro).
+            Tickets non fermés = tous les autres, comptés à part. Remises listées avec leur numéro de ticket. */
+const rp_col = db.collection('restopro_jours');
+const rp_metaRef = db.collection('restopro_meta').doc('synchro');
+const rp_demandeRef = db.collection('restopro_meta').doc('demande');
+let rp_from = '', rp_to = '', rp_preset = 'today';
+let rp_days = [], rp_meta = null, rp_err = '', rp_loading = false, rp_tok = 0, rp_timer = null, rp_ready = false;
+let rp_lastReq = 0, rp_pending = false, rp_noReply = false, rp_reqAt = 0, rp_unsub = null, rp_lastSynced = '', rp_metaSeen = false;
+
+const RP_PRESETS = [
+  { k:'today',     l:"Aujourd'hui" },
+  { k:'yesterday', l:'Hier' },
+  { k:'7d',        l:'7 derniers jours' },
+  { k:'month',     l:'Ce mois' },
+  { k:'lastmonth', l:'Mois dernier' }
+];
+
+function rp_pad(n){ return String(n).padStart(2,'0'); }
+function rp_iso(d){ return d.getFullYear()+'-'+rp_pad(d.getMonth()+1)+'-'+rp_pad(d.getDate()); }
+function rp_fmtDate(iso){ const p=String(iso||'').split('-'); return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : String(iso||''); }
+function rp_money(n){ return Number(n||0).toLocaleString('fr-FR',{maximumFractionDigits:2}) + ' DA'; }
+
+function rp_range(k){
+  const now = new Date(), t = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if(k==='yesterday'){ const y=new Date(t); y.setDate(y.getDate()-1); return [rp_iso(y), rp_iso(y)]; }
+  if(k==='7d'){ const s=new Date(t); s.setDate(s.getDate()-6); return [rp_iso(s), rp_iso(t)]; }
+  if(k==='month'){ return [rp_iso(new Date(t.getFullYear(), t.getMonth(), 1)), rp_iso(t)]; }
+  if(k==='lastmonth'){ return [rp_iso(new Date(t.getFullYear(), t.getMonth()-1, 1)), rp_iso(new Date(t.getFullYear(), t.getMonth(), 0))]; }
+  return [rp_iso(t), rp_iso(t)];
+}
+
+function rp_renderPresets(){
+  const el = document.getElementById('rp-presets');
+  if(!el) return;
+  el.innerHTML = RP_PRESETS.map(p =>
+    `<button type="button" class="filter-chip ${rp_preset===p.k?'active':''}" onclick="rp_setPreset('${p.k}')">${esc(p.l)}</button>`
+  ).join('');
+}
+
+function rp_setPreset(k){
+  const r = rp_range(k);
+  rp_from = r[0]; rp_to = r[1]; rp_preset = k;
+  document.getElementById('rp-from').value = rp_from;
+  document.getElementById('rp-to').value = rp_to;
+  rp_renderPresets();
+  rp_load();
+}
+
+function rp_dateInput(){
+  let f = document.getElementById('rp-from').value, t = document.getElementById('rp-to').value;
+  if(!f && !t) return;
+  if(!f) f = t;
+  if(!t) t = f;
+  if(f > t){ const x = f; f = t; t = x; }
+  rp_from = f; rp_to = t; rp_preset = '';
+  document.getElementById('rp-from').value = f;
+  document.getElementById('rp-to').value = t;
+  rp_renderPresets();
+  rp_load();
+}
+
+/* Demande au PC du restaurant de synchroniser maintenant (le PC surveille ce document environ toutes les 45 s).
+   Appelée à l'ouverture de l'application, à l'ouverture de l'onglet et au clic sur « Actualiser ». */
+function rp_requestSync(force){
+  const now = Date.now();
+  if(!force && now - rp_lastReq < 90000) return;
+  rp_lastReq = now; rp_reqAt = now; rp_pending = true; rp_noReply = false;
+  rp_demandeRef.set({ at: new Date().toISOString(), by: (typeof currentUser !== 'undefined' && currentUser) ? currentUser : '' })
+    .catch(e=>{ rp_pending = false; console.warn('Demande de synchro Resto Pro impossible :', e); if(document.getElementById('rp-sync')) rp_render(); });
+  if(document.getElementById('rp-sync')) rp_render();
+  /* Sans réponse du PC au bout de 3 minutes : on le signale (PC éteint, sans internet, ou écoute arrêtée). */
+  const mine = now;
+  setTimeout(()=>{ if(rp_pending && rp_reqAt === mine){ rp_pending = false; rp_noReply = true; if(document.getElementById('rp-sync')) rp_render(); } }, 180000);
+}
+
+/* Écoute le « signal de vie » du PC : met à jour le message « dernière synchro » et retire l'attente. Les chiffres, eux, arrivent en direct (écoute de la période). */
+function rp_watchMeta(){
+  if(rp_unsub) return;
+  rp_unsub = rp_metaRef.onSnapshot(snap=>{
+    const m = snap.exists ? snap.data() : null;
+    const synced = (m && m.syncedAt) ? m.syncedAt : '';
+    const changed = synced && synced !== rp_lastSynced && rp_metaSeen;
+    rp_lastSynced = synced; rp_metaSeen = true; rp_meta = m;
+    if(changed){ rp_pending = false; rp_noReply = false; }
+    if(document.getElementById('rp-sync')) rp_render();
+  }, e=>console.warn('Écoute synchro Resto Pro :', e));
+}
+
+function rp_refreshClick(){ rp_requestSync(true); }
+
+function rp_start(){
+  rp_watchMeta();
+  if(!rp_ready){ rp_ready = true; rp_setPreset('today'); }
+  else if(!rp_unsubDays) rp_load(true);
+  rp_requestSync();
+  /* Simple mise à jour de l'affichage « dernière synchro : il y a X min » : aucune lecture Firestore. */
+  if(!rp_timer) rp_timer = setInterval(()=>{ if(activeModule === 'restopro') rp_render(); }, 60000);
+}
+
+/* Écoute EN DIRECT de la période choisie : Firestore lit chaque jour une seule fois à l'ouverture,
+   puis ne relit que les jours qui changent réellement (au lieu de tout recharger à intervalle régulier). */
+let rp_unsubDays = null;
+function rp_load(silent){
+  if(!rp_from || !rp_to) return;
+  if(rp_unsubDays){ try{ rp_unsubDays(); }catch(e){} rp_unsubDays = null; }
+  const tok = ++rp_tok;
+  if(!silent){ rp_loading = true; rp_render(); }
+  const FP = firebase.firestore.FieldPath.documentId();
+  rp_unsubDays = rp_col.where(FP, '>=', rp_from).where(FP, '<=', rp_to).onSnapshot(snap=>{
+    if(tok !== rp_tok) return;
+    rp_days = snap.docs.map(d => Object.assign({ id:d.id }, d.data())).sort((a,b)=> a.id < b.id ? -1 : 1);
+    rp_err = ''; rp_loading = false;
+    rp_render();
+  }, e=>{
+    if(tok !== rp_tok) return;
+    rp_err = (e && e.message) ? e.message : String(e);
+    rp_loading = false;
+    rp_render();
+  });
+}
+
+function rp_compute(){
+  const perDay = [], open = [], rem = [];
+  let cNb=0, cCa=0, oNb=0, oCa=0, rSum=0, rAll=0;
+  rp_days.forEach(day=>{
+    let a=0, b=0, c=0, d=0, r=0;
+    (day.tickets || []).forEach(t=>{
+      const ttc = Number(t.ttc)||0, rm = Number(t.rem)||0;
+      const closed = String(t.blo||'').toUpperCase() === 'F';
+      const row = Object.assign({ date:day.id }, t);
+      if(closed){ a++; b += ttc; r += rm; }
+      else { c++; d += ttc; open.push(row); }
+      if(rm > 0){ rem.push(row); rAll += rm; }
+    });
+    perDay.push({ date:day.id, cNb:a, cCa:b, oNb:c, oCa:d, rSum:r });
+    cNb+=a; cCa+=b; oNb+=c; oCa+=d; rSum+=r;
+  });
+  const recent = (x,y)=> (y.date+' '+(y.h||'')).localeCompare(x.date+' '+(x.h||''));
+  open.sort(recent); rem.sort(recent);
+  return { perDay, open, rem, cNb, cCa, oNb, oCa, rSum, rAll, avg: cNb ? cCa/cNb : 0 };
+}
+
+function rp_syncHtml(){
+  const m = rp_meta;
+  const btn = `<button type="button" class="btn ghost small" onclick="rp_refreshClick()">↻ Actualiser</button>`;
+  if(rp_pending){
+    return `<div class="row-between" style="margin-top:12px;gap:8px;">
+      <span style="font-size:12px;color:var(--forest-light);">⏳ Mise à jour demandée au PC du restaurant… (moins d’une minute)</span>${btn}</div>`;
+  }
+  let ago = '';
+  if(m && m.syncedAt){
+    const ts = new Date(m.syncedAt).getTime();
+    if(isNaN(ts)){ ago = esc(m.syncedAt); }
+    else {
+      const mins = Math.max(0, Math.round((Date.now() - ts)/60000));
+      ago = mins < 1 ? 'à l’instant' : mins < 60 ? `il y a ${mins} min` : mins < 1440 ? `il y a ${Math.floor(mins/60)} h ${rp_pad(mins%60)}` : `le ${rp_fmtDate(String(m.syncedAt).slice(0,10))}`;
+    }
+  }
+  let txt, col = 'var(--ink-muted)';
+  if(rp_noReply){
+    col = 'var(--rust)';
+    txt = '⚠ Le PC du restaurant n’a pas répondu (éteint, sans internet ou écoute arrêtée ?).' + (ago ? ' Chiffres de la dernière synchro : ' + ago + '.' : '');
+  } else if(!ago){
+    col = 'var(--amber)'; txt = 'Aucune synchronisation reçue du PC du restaurant pour l’instant.';
+  } else {
+    txt = 'Dernière synchro : ' + ago;
+    if(ago === 'à l’instant' || /^il y a \d+ min$/.test(ago)) col = 'var(--moss)';
+  }
+  return `<div class="row-between" style="margin-top:12px;gap:8px;"><span style="font-size:12px;color:${col};">${txt}</span>${btn}</div>`;
+}
+
+function rp_ticketLabel(t){
+  const bits = [];
+  if(t.srv) bits.push(esc(t.srv));
+  if(t.tab) bits.push('table ' + esc(t.tab));
+  if(String(t.emp||'') === '1') bits.push('à emporter');
+  return bits.join(' · ');
+}
+
+function rp_render(){
+  const syncEl = document.getElementById('rp-sync');
+  if(syncEl) syncEl.innerHTML = rp_syncHtml();
+  const body = document.getElementById('rp-body');
+  if(!body) return;
+
+  if(rp_loading && !rp_days.length){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  if(rp_err){
+    body.innerHTML = `<div class="ticket" style="border-color:var(--rust);">
+      <div style="font-weight:600;">Impossible de charger les données.</div>
+      <div class="stat-label" style="margin-top:6px;">${esc(rp_err)}</div></div>`;
+    return;
+  }
+  if(!rp_days.length){
+    body.innerHTML = `<div class="empty-state"><div style="font-size:30px;">📭</div>
+      <div style="margin-top:8px;font-weight:600;">Aucune donnée pour cette période</div>
+      <div class="stat-label" style="margin-top:6px;">Aucun ticket ce jour-là, ou la synchronisation n’a pas encore envoyé cette période.</div></div>`;
+    return;
+  }
+
+  const c = rp_compute();
+  let h = '';
+
+  // --- Chiffres clés ---
+  h += `<div class="ticket rp-hero">
+    <div class="stat-label">CA — tickets fermés (après remises)</div>
+    <div class="rp-big">${rp_money(c.cCa)}</div>
+    <div class="stat-label">${c.cNb} ticket${c.cNb>1?'s':''} fermé${c.cNb>1?'s':''}${c.cNb ? ' · ticket moyen ' + rp_money(c.avg) : ''}</div>
+  </div>
+  <div class="grid grid-2">
+    <div class="stat-box"><div class="stat-label">CA tickets non fermés</div>
+      <div class="rp-mid" style="color:${c.oNb?'var(--amber)':'var(--ink)'};">${rp_money(c.oCa)}</div>
+      <div class="stat-label">${c.oNb} ticket${c.oNb>1?'s':''}</div></div>
+    <div class="stat-box"><div class="stat-label">Remises (tickets fermés)</div>
+      <div class="rp-mid" style="color:${c.rSum?'var(--rust)':'var(--ink)'};">${rp_money(c.rSum)}</div>
+      <div class="stat-label">${c.rem.length} ticket${c.rem.length>1?'s':''} avec remise</div></div>
+  </div>`;
+
+  // --- Détail par jour ---
+  if(c.perDay.length > 1){
+    const max = Math.max.apply(null, c.perDay.map(d=>d.cCa).concat([1]));
+    h += `<h2 class="section">Par jour</h2><div class="ticket" style="padding:6px 12px;">
+      <div class="rp-row rp-head"><span>Jour</span><span>CA fermé</span><span>Non fermé</span><span>Remises</span></div>`;
+    c.perDay.slice().reverse().forEach(d=>{
+      const w = Math.round(d.cCa / max * 100);
+      h += `<div class="rp-row"><span>${rp_fmtDate(d.date)}<small>${d.cNb} ticket${d.cNb>1?'s':''}</small>
+          <i class="rp-bar" style="width:${w}%"></i></span>
+        <span class="mono">${rp_money(d.cCa)}</span>
+        <span class="mono" style="color:${d.oNb?'var(--amber)':'var(--ink-muted)'};">${d.oNb ? rp_money(d.oCa) : '—'}</span>
+        <span class="mono" style="color:${d.rSum?'var(--rust)':'var(--ink-muted)'};">${d.rSum ? rp_money(d.rSum) : '—'}</span></div>`;
+    });
+    h += `<div class="rp-row rp-total"><span>Total</span><span class="mono">${rp_money(c.cCa)}</span>
+      <span class="mono">${c.oNb ? rp_money(c.oCa) : '—'}</span><span class="mono">${c.rSum ? rp_money(c.rSum) : '—'}</span></div></div>`;
+  }
+
+  // --- Tickets non fermés ---
+  h += `<h2 class="section">Tickets non fermés (${c.open.length})</h2>`;
+  if(!c.open.length){
+    h += `<div class="stat-label" style="padding:4px 2px 10px;">Aucun ticket non fermé sur cette période.</div>`;
+  } else {
+    c.open.forEach(t=>{
+      h += `<div class="movement-row"><div><div style="font-weight:600;">Ticket ${esc(t.n)} <span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span></div>
+        <div class="sub">${rp_fmtDate(t.date)} ${esc(t.h||'')}${rp_ticketLabel(t) ? ' · ' + rp_ticketLabel(t) : ''}</div></div>
+        <div class="mono" style="font-weight:700;">${rp_money(t.ttc)}</div></div>`;
+    });
+  }
+
+  // --- Remises avec numéro de ticket ---
+  h += `<h2 class="section">Remises (${c.rem.length})${c.rem.length ? ' — total ' + rp_money(c.rAll) : ''}</h2>`;
+  if(!c.rem.length){
+    h += `<div class="stat-label" style="padding:4px 2px 10px;">Aucune remise sur cette période.</div>`;
+  } else {
+    c.rem.forEach(t=>{
+      const closed = String(t.blo||'').toUpperCase() === 'F';
+      h += `<div class="movement-row"><div><div style="font-weight:600;">Ticket ${esc(t.n)}
+          ${closed ? '' : '<span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span>'}</div>
+        <div class="sub">${rp_fmtDate(t.date)} ${esc(t.h||'')}${rp_ticketLabel(t) ? ' · ' + rp_ticketLabel(t) : ''}</div></div>
+        <div style="text-align:right;"><div class="mono" style="font-weight:700;color:var(--rust);">− ${rp_money(t.rem)}</div>
+        <div class="sub">ticket : ${rp_money(t.ttc)}</div></div></div>`;
+    });
+  }
+
+  h += `<div class="stat-label" style="margin-top:14px;text-align:center;">Source : Resto Pro (tickets BON1) — montants après remises, comme l’écran Statistiques.</div>`;
+  body.innerHTML = h;
 }
 
 /* ==================== MODULE CARNET — dettes, emprunts & disponible (privé) ==================== */
