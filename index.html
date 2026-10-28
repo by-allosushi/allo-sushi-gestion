@@ -471,6 +471,23 @@ textarea.ft-in{font-family:'Inter',sans-serif;font-weight:500;line-height:1.45;r
 .ft-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
 .ft-chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
 .ft-chip.on{background:color-mix(in srgb,#E7E5E4 18%,#151A17);border-color:#E7E5E4;}
+.ft-top{position:sticky;top:0;z-index:3;background:var(--paper);padding:4px 0 6px;}
+.ft-scroll{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:6px;}.ft-scroll .ft-chip{flex:0 0 auto;padding:6px 12px;}
+.ft-todobar{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#FBBF24;margin:2px 0 4px;}
+.ft-dot{width:9px;height:9px;border-radius:50%;background:#FBBF24;display:inline-block;flex:0 0 auto;}
+.ft-fam{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 14px;min-height:48px;margin:6px 0 0;font-weight:700;font-size:15px;cursor:pointer;}
+.ft-fam .s{font-weight:500;color:var(--ink-muted,#9aa39d);font-size:13px;margin-left:8px;}.ft-fam .r{display:flex;align-items:center;gap:10px;color:var(--ink-muted,#9aa39d);}
+.ft-fam.open{border-bottom-left-radius:0;border-bottom-right-radius:0;}
+.ft-rows{border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;background:color-mix(in srgb,var(--surface) 60%,var(--paper));}
+.ft-row{display:flex;justify-content:space-between;align-items:center;min-height:44px;padding:0 14px;border-top:1px solid var(--line);font-size:15px;cursor:pointer;}.ft-row:first-child{border-top:0;}
+.mep-seg{display:flex;gap:6px;margin-bottom:12px;}.mep-seg button{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:15px;font-family:'Inter',sans-serif;cursor:pointer;}
+.mep-seg button.on{background:color-mix(in srgb,#E7E5E4 18%,#151A17);border-color:#E7E5E4;}
+.mep-ing{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);}.mep-ing .n{flex:1;font-size:16px;font-weight:600;}.mep-ing input{width:92px;text-align:center;}.mep-ing .u{width:58px;color:var(--ink-muted,#9aa39d);font-size:14px;}
+table.mep-g{width:100%;border-collapse:collapse;font-size:14px;}table.mep-g th,table.mep-g td{padding:9px 6px;border-top:1px solid var(--line);text-align:right;white-space:nowrap;}table.mep-g th:first-child,table.mep-g td:first-child{text-align:left;white-space:normal;}
+table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;border-top:0;}tr.mep-day{cursor:pointer;}tr.mep-day.on td{background:color-mix(in srgb,#E7E5E4 10%,transparent);}
+.ft-todo{font-size:11px;font-weight:700;color:#FBBF24;border:1px solid color-mix(in srgb,#FBBF24 55%,transparent);border-radius:999px;padding:2px 8px;white-space:nowrap;}
+.ft-link{color:#93C5FD;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+.ft-lk{flex:1 1 100%;font-size:12px;color:#93C5FD;}.ft-lk:empty{display:none;}
 .ft-cat{display:inline-block;border:1px solid #E7E5E4;color:#E7E5E4;border-radius:999px;padding:3px 11px;font-size:12px;font-weight:600;}
 .ft-portions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 10px;}
 .ft-portions input{width:70px;text-align:center;}
@@ -600,6 +617,12 @@ textarea.ft-in{font-family:'Inter',sans-serif;font-weight:500;line-height:1.45;r
   </main>
 </div>
 
+<div id="module-mep" class="module">
+  <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
+    <div id="mep-body"></div>
+  </main>
+</div>
+
 <div id="module-dettes" class="module">
   <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
     <div id="dt-body"></div>
@@ -662,6 +685,7 @@ const MODULE_DEFS = [
   { key:'caisse',   label:'Caisse',    ic:'💰', desc:'Sessions de caisse' },
   { key:'pointage', label:'Pointage',  ic:'⏱️', desc:'Heures, anomalies & paie' },
   { key:'fiches',   label:'Fiches techniques', ic:'📋', desc:'Recettes & dressage' },
+  { key:'mep',      label:'Mise en place', ic:'🧑‍🍳', desc:'Inventaire de fin de service' },
 ];
 let session = null; // { username, isAdmin, permissions:{caisse,pointage} }
 let usersCache = [];
@@ -977,6 +1001,7 @@ function showModule(name){
   if(name==='caisse' && typeof ca_render==='function') ca_render();
   if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
   if(name==='fiches'){ if(typeof ft_start==='function') ft_start(); if(typeof ft_render==='function') ft_render(); }
+  if(name==='mep'){ if(typeof mep_start==='function') mep_start(); if(typeof mep_render==='function') mep_render(); }
   if(name==='dettes'){ if(typeof dt_start==='function') dt_start(); if(typeof dt_render==='function') dt_render(); }
 }
 
@@ -3050,10 +3075,64 @@ function hasDettesAccess(){ return !!(session && session.username === 'soufyane'
 /* Une fiche = { name, cat, portions, prepMin, ingredients:[{q,u,n}], steps:[texte], dressage, temp, duree, notes }.
    Collection 'fiches_techniques'. Lecture : tous les utilisateurs autorisés ; création / modification / suppression : administrateur seulement. */
 const ft_col = db.collection('fiches_techniques');
-const FT_CATS = ['Entrées', 'Sushis & Makis', 'Rolls', 'Bowls', 'Plats chauds', 'Sauces & préparations', 'Desserts', 'Boissons'];
+const FT_BASE_CAT = 'Sauces & préparations';
+const FT_CATS = ['Nigiri', 'Hoso Maki', 'Uramaki', 'Futomaki', 'Crispy', 'Temaki', 'Sashimi', 'Création', 'Gyoza', 'Nem', 'Yakitori', 'Ebi Fry', 'Wok', 'Spring Roll', 'Tartare', FT_BASE_CAT];
+/* préparations de base (fiches liées depuis les plats) */
+const FT_BASES = [['base_riz', 'Riz vinaigré'], ['base_tempura', 'Crevette tempura'], ['base_oignon', 'Oignon frit'], ['base_spicy', 'Spicy tartare de saumon'], ['base_marine', 'Saumon mariné']];
+/* menu : [famille, pièces par portion, ingrédients ajoutés d'office, [[nom, [ingrédients], description du menu]]] */
+const FT_MENU = [
+ ['Nigiri', 2, [], [['Abokado', ['Avocat', 'Riz vinaigré']], ['Pickled Radish', ['Oshinko', 'Riz vinaigré']], ['Shiromizakana', ['Poisson blanc', 'Riz vinaigré']], ['Saké', ['Saumon', 'Riz vinaigré']], ['Ebi Tempura', ['Crevette tempura', 'Riz vinaigré']]]],
+ ['Hoso Maki', 6, [], [['Avocado', ['Avocat', 'Riz vinaigré', 'Algue']], ['Oshinko', ['Oshinko', 'Riz vinaigré', 'Algue']], ['Kanikama', ['Surimi', 'Riz vinaigré', 'Algue']], ['White Fish', ['Poisson blanc', 'Riz vinaigré', 'Algue']], ['Salmon', ['Saumon', 'Riz vinaigré', 'Algue']], ['Shrimp Tempura', ['Crevette tempura', 'Riz vinaigré', 'Algue']]]],
+ ['Uramaki', 4, ['Riz vinaigré', 'Algue'], [['Katsu', ['Poulet', 'Avocat', 'Oignon frit']], ['California', ['Surimi', 'Avocat', 'Oignon frit']], ['White Fish', ['Poisson blanc', 'Oshinko', 'Sésame']], ['Philadelphia', ['Saumon', 'Avocat', 'Fromage', 'Sésame']], ['Ebi Tempura', ['Crevette', 'Avocat', 'Sésame']]]],
+ ['Futomaki', 5, ['Riz vinaigré', 'Algue'], [['Yasai Végétarien', ['Avocat', 'Oshinko', 'Carotte', 'Concombre']], ['MoriTori Tempura', ['Poulet', 'Oshinko', 'Concombre', 'Fromage']], ['Spicy Kanikama', ['Surimi', 'Oshinko', 'Concombre']], ['FutoSaké', ['Saumon', 'Avocat', 'Concombre']], ['EbiMori Tempura', ['Crevette', 'Oshinko', 'Concombre']]]],
+ ['Crispy', 4, ['Riz vinaigré', 'Algue'], [['Chicken', ['Poulet', 'Avocat', 'Concombre', 'Fromage']], ['Surimi', ['Surimi', 'Oshinko', 'Concombre', 'Fromage']], ['White Fish', ['Poisson blanc', 'Oshinko', 'Concombre', 'Fromage']], ['Shrimp', ['Crevette', 'Avocat', 'Concombre', 'Fromage']], ['Salmon', ['Saumon', 'Avocat', 'Concombre', 'Fromage']]]],
+ ['Temaki', 1, ['Riz vinaigré', 'Algue'], [['Chicken', ['Poulet', 'Oshinko', 'Concombre', 'Sésame']], ['Salmon', ['Saumon', 'Avocat', 'Concombre', 'Sésame']]]],
+ ['Sashimi', 6, [], [['Salmon', ['Saumon mariné']]]],
+ ['Création', 8, ['Riz vinaigré', 'Algue'], [['Saporo', ['Crevette', 'Oshinko', 'Avocat']], ['Sunset', ['Surimi', 'Avocat', 'Enrobage œufs de lump']], ['Turnado Salmon', ['Saumon', 'Fromage Philadelphia']], ['Dragon Roll', ['Crevette', 'Fromage', 'Enrobage avocat']], ['Las Vegas', ['Saumon', 'Avocat', 'Fromage Philadelphia', 'Enrobage saumon']], ['Spicy Sahara Roll', ['Crevette', 'Oshinko', 'Concombre', 'Spicy tartare de saumon']]]],
+ ['Gyoza', 5, [], [['Chicken', ['Poulet haché tendre']], ['Beef', ['Viande hachée fraîche']]]],
+ ['Nem', 3, [], [['Chicken', ['Poulet haché tendre']], ['Shrimp', ['Crevette fraîche']]]],
+ ['Yakitori', 3, [], [['Beef', ['Filet de bœuf', 'Fromage fondant'], 'Brochettes de filet de bœuf au cœur de fromage fondant, accompagnées de garniture']]],
+ ['Ebi Fry', 0, [], [['Shrimp', ['Crevettes royales', 'Panko japonais'], 'Crevettes royales panées au panko japonais, parfaitement croustillantes']]],
+ ['Wok', 0, [], [['Chicken', ['Poulet', 'Légumes croquants', 'Sauce asiatique'], 'Poulet sauté au wok avec légumes croquants, relevé d’une sauce asiatique parfumée'], ['Beef', ['Bœuf', 'Légumes croquants', 'Sauce asiatique'], 'Bœuf sauté au wok avec légumes croquants, nappé d’une sauce asiatique savoureuse'], ['Shrimp', ['Crevettes', 'Légumes croquants', 'Sauce asiatique'], 'Crevettes sautées au wok avec légumes croquants, sublimées par une sauce asiatique délicate']]],
+ ['Spring Roll', 2, [], [['Salmon', ['Saumon', 'Légumes croquants', 'Herbes fraîches'], 'Rouleaux de printemps frais au saumon, légumes croquants et herbes fraîches'], ['Shrimp', ['Crevettes', 'Légumes croquants', 'Herbes aromatiques'], 'Rouleaux de printemps frais garnis de crevettes, accompagnés de légumes croquants et d’herbes aromatiques']]],
+ ['Tartare', 0, [], [['Salmon', ['Saumon', 'Avocat'], 'Saumon et avocat frais, assaisonnement délicat et saveurs fraîches']]]
+];
+function ft_slug(t){ return String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''); }
+/* fiches du menu : plats + préparations de base, avec leur identifiant stable */
+function ft_menuSeed(){
+  const baseId = {}; FT_BASES.forEach(b=>baseId[b[1].toLowerCase()] = b[0]);
+  const out = [];
+  FT_BASES.forEach(b=>out.push({ id:b[0], name:b[1], cat:FT_BASE_CAT, portions:1, pieces:'', prepMin:0, ingredients:[], steps:[], dressage:'', accomp:'', temp:'', duree:'', notes:'' }));
+  FT_MENU.forEach(fam=>{
+    const cat = fam[0], pieces = fam[1], add = fam[2];
+    fam[3].forEach(it=>{
+      const generic = cat !== 'Création', names = it[1].slice();
+      add.forEach(a=>{ if(!names.includes(a)) names.push(a); });
+      out.push({ id:'menu_' + ft_slug(cat) + '_' + ft_slug(it[0]), name:generic ? cat + ' ' + it[0] : it[0], cat, portions:1, pieces:pieces || '', prepMin:0,
+        ingredients:names.map(n=>({ n, u:'', q:null, ref:baseId[n.toLowerCase()] || '' })), steps:[], dressage:'', accomp:'', temp:'', duree:'',
+        notes:it[2] ? 'Description du menu : ' + it[2] : '' });
+    });
+  });
+  return out;
+}
+function ft_seedMissing(){ return ft_menuSeed().filter(x=>!ft_fiches.some(f=>f.id === x.id)); }
+async function ft_importMenu(){
+  if(!ft_isAdmin()) return;
+  const miss = ft_seedMissing(); if(!miss.length) return;
+  if(!confirm('Importer ' + miss.length + ' fiche(s) du menu ? Les fiches déjà présentes ne sont pas modifiées.')) return;
+  try{
+    const now = new Date().toISOString();
+    for(let i = 0; i < miss.length; i += 400){
+      const b = db.batch();
+      miss.slice(i, i + 400).forEach(x=>{ const d = { ...x, createdAt:now, updatedAt:now, updatedBy:(typeof currentUser !== 'undefined' ? currentUser : ''), seeded:true }; delete d.id; b.set(ft_col.doc(x.id), d); });
+      await b.commit();
+    }
+    if(typeof pt_toast === 'function') pt_toast(miss.length + ' fiches importées.');
+  }catch(e){ console.error(e); alert('Erreur d’import : ' + (e.message || e)); }
+}
 const FT_UNITS = ['g', 'kg', 'ml', 'cl', 'l', 'c. à café', 'c. à soupe', 'pièce(s)', 'tranche(s)', 'feuille(s)', 'pincée', 'au goût'];
 let ft_started = false, ft_ready = false, ft_fiches = [];
-let ft_view = 'list', ft_cur = null, ft_draft = null, ft_q = '', ft_cat = '', ft_portions = 1;
+let ft_openFams = {}, ft_onlyTodo = false, ft_hist = [], ft_view = 'list', ft_cur = null, ft_draft = null, ft_q = '', ft_cat = '', ft_portions = 1;
 
 const ft_e = (v)=>esc(v == null ? '' : String(v));
 const ft_isAdmin = ()=>!!(session && session.isAdmin);
@@ -3085,7 +3164,8 @@ function ft_scaled(f, n){
   const base = Number(f.portions) > 0 ? Number(f.portions) : 1, k = n / base;
   return (f.ingredients || []).map(i=>{
     const q = ft_parseQ(i.q), isTaste = i.u === 'au goût';
-    return { name:i.n || '', unit:isTaste ? '' : (i.u || ''), text:isTaste ? 'au goût' : (q === null ? '' : ft_fmtQ(q * k, i.u)), q: q === null ? null : q * k };
+    const rf = i.ref ? ft_fiches.find(x=>x.id === i.ref) : null;
+    return { ref:rf ? rf.id : '', name:rf ? rf.name : (i.n || ''), unit:isTaste ? '' : (i.u || ''), text:isTaste ? 'au goût' : (q === null ? '' : ft_fmtQ(q * k, i.u)), q: q === null ? null : q * k };
   });
 }
 function ft_catsAll(){
@@ -3095,10 +3175,15 @@ function ft_catsAll(){
 }
 
 /* ---------- navigation ---------- */
-function ft_open(id){ const f = ft_fiches.find(x=>x.id === id); if(!f) return; ft_cur = id; ft_view = 'detail'; ft_portions = Number(f.portions) > 0 ? Number(f.portions) : 1; ft_render(); window.scrollTo && window.scrollTo(0, 0); }
-function ft_back(){ ft_view = 'list'; ft_cur = null; ft_draft = null; ft_render(); }
+function ft_open(id, keep){ const f = ft_fiches.find(x=>x.id === id); if(!f) return; if(!keep) ft_hist = []; ft_cur = id; ft_view = 'detail'; ft_portions = Number(f.portions) > 0 ? Number(f.portions) : 1; ft_render(); window.scrollTo && window.scrollTo(0, 0); }
+function ft_openRef(id){ if(ft_fiches.some(x=>x.id === id)){ ft_hist.push(ft_cur); ft_open(id, true); } }
+function ft_back(){
+  if(ft_view === 'detail' && ft_hist.length){ ft_open(ft_hist.pop(), true); return; }
+  ft_view = 'list'; ft_cur = null; ft_draft = null; ft_hist = []; ft_render();
+}
+function ft_baseByName(v){ const t = String(v || '').trim().toLowerCase(); if(!t) return null; return ft_fiches.find(f=>f.cat === FT_BASE_CAT && String(f.name || '').trim().toLowerCase() === t) || null; }
 function ft_setQ(v){ ft_q = v; ft_renderList(); }
-function ft_setCat(c){ ft_cat = ft_cat === c ? '' : c; ft_render(); }
+function ft_setCat(c){ ft_cat = (ft_cat === c || !c) ? '' : c; ft_render(); }
 function ft_setPortions(n){ n = Math.max(1, Math.min(999, Math.round(Number(n) || 1))); ft_portions = n; ft_renderDetail(); }
 function ft_stepPortions(d){ ft_setPortions(ft_portions + d); }
 
@@ -3106,42 +3191,56 @@ function ft_stepPortions(d){ ft_setPortions(ft_portions + d); }
 function ft_filtered(){
   const q = ft_q.trim().toLowerCase();
   const order = ft_catsAll();
-  return ft_fiches.filter(f=>(!ft_cat || f.cat === ft_cat) && (!q || [f.name, f.cat].concat((f.ingredients || []).map(i=>i.n)).join(' ').toLowerCase().includes(q)))
+  return ft_fiches.filter(f=>(!ft_cat || f.cat === ft_cat) && (!ft_onlyTodo || ft_isTodo(f)) && (!q || [f.name, f.cat].concat((f.ingredients || []).map(i=>i.n)).join(' ').toLowerCase().includes(q)))
     .sort((a, b)=>(order.indexOf(a.cat) - order.indexOf(b.cat)) || String(a.name || '').localeCompare(String(b.name || ''), 'fr'));
 }
+const ft_isTodo = (f)=>!(f.steps || []).length;
+function ft_shortName(f){ const c = String(f.cat || ''); return c && String(f.name || '').startsWith(c + ' ') ? String(f.name).slice(c.length + 1) : (f.name || ''); }
+function ft_toggleFam(c){ ft_openFams[c] = !ft_openFams[c]; ft_renderList(); }
+function ft_toggleTodo(){ ft_onlyTodo = !ft_onlyTodo; ft_render(); }
 function ft_listHtml(){
   const list = ft_filtered();
-  if(!ft_fiches.length) return `<div class="empty-state">${ft_isAdmin() ? 'Aucune fiche pour l’instant. Crée la première avec « Nouvelle fiche ».' : 'Aucune fiche technique pour l’instant.'}</div>`;
+  if(!ft_fiches.length) return `<div class="empty-state">${ft_isAdmin() ? 'Aucune fiche pour l’instant. Crée la première avec « Nouvelle fiche », ou importe ton menu.' : 'Aucune fiche technique pour l’instant.'}</div>`;
   if(!list.length) return '<div class="empty-state">Aucune fiche ne correspond.</div>';
-  let h = '', last = null;
-  list.forEach(f=>{
-    if(f.cat !== last){ last = f.cat; h += `<div class="section-label" style="margin:14px 0 6px;">${ft_e(f.cat || 'Sans catégorie')}</div>`; }
-    const meta = [Number(f.portions) > 0 ? f.portions + ' portion' + (f.portions > 1 ? 's' : '') : '', ft_fmtMin(f.prepMin) ? 'prép. ' + ft_fmtMin(f.prepMin) : ''].filter(Boolean).join(' · ');
-    h += `<div class="ticket ft-item" style="margin-bottom:8px;cursor:pointer;" onclick="ft_open('${f.id}')"><div class="row-between"><div><div style="font-weight:700;font-size:16px;">${ft_e(f.name)}</div><div class="pt-muted">${ft_e(meta)}</div></div><span class="pt-chevron">▸</span></div></div>`;
-  });
-  return h;
+  const auto = !!(ft_q.trim() || ft_cat); // recherche ou famille choisie : tout est déplié
+  const groups = [], map = {};
+  list.forEach(f=>{ const c = f.cat || 'Sans catégorie'; if(!map[c]){ map[c] = { cat:c, items:[] }; groups.push(map[c]); } map[c].items.push(f); });
+  return groups.map(g=>{
+    const open = auto || !!ft_openFams[g.cat];
+    const pcs = Array.from(new Set(g.items.map(f=>Number(f.pieces) > 0 ? Number(f.pieces) : 0))), pc = pcs.length === 1 && pcs[0] ? pcs[0] : 0;
+    const sub = g.items.length + ' plat' + (g.items.length > 1 ? 's' : '') + (pc ? ' · ' + pc + ' pièce' + (pc > 1 ? 's' : '') : '');
+    const todo = g.items.some(ft_isTodo);
+    const head = `<div class="ft-fam ${open ? 'open' : ''}" onclick="ft_toggleFam(${ft_e(JSON.stringify(g.cat))})"><div>${ft_e(g.cat)}<span class="s">${ft_e(sub)}</span></div><div class="r">${todo ? '<span class="ft-dot"></span>' : ''}<span>${open ? '▾' : '▸'}</span></div></div>`;
+    const rows = open ? '<div class="ft-rows">' + g.items.map(f=>`<div class="ft-row" onclick="ft_open('${f.id}')"><span>${ft_e(ft_shortName(f))}${Number(f.pieces) > 0 && !pc ? `<span class="pt-muted"> · ${f.pieces} pièce${f.pieces > 1 ? 's' : ''}</span>` : ''}</span>${ft_isTodo(f) ? '<span class="ft-dot"></span>' : ''}</div>`).join('') + '</div>' : '';
+    return head + rows;
+  }).join('');
 }
 function ft_renderList(){ const el = document.getElementById('ft-list'); if(el) el.innerHTML = ft_listHtml(); }
 function ft_listView(){
   const cats = ft_catsAll().filter(c=>ft_fiches.some(f=>f.cat === c));
-  return `<div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;font-size:18px;">Fiches techniques</div>${ft_isAdmin() ? '<button class="btn small t-add" onclick="ft_new()">＋ Nouvelle fiche</button>' : ''}</div>
-    <div class="field" style="margin-bottom:10px;"><input type="search" id="ft-search" class="ft-in" placeholder="Rechercher un plat ou un ingrédient" value="${ft_e(ft_q)}" oninput="ft_setQ(this.value)"></div>
-    ${cats.length ? `<div class="ft-chips">${cats.map(c=>`<button class="ft-chip ${ft_cat === c ? 'on' : ''}" onclick="ft_setCat(${ft_e(JSON.stringify(c)).replace(/&quot;/g, '&quot;')})">${ft_e(c)}</button>`).join('')}</div>` : ''}
+  const nTodo = ft_fiches.filter(ft_isTodo).length;
+  return `<div class="ft-top"><div class="row-between" style="margin-bottom:8px;"><div style="font-weight:700;font-size:18px;">Fiches techniques</div>${ft_isAdmin() ? '<button class="btn small t-add" onclick="ft_new()">＋ Nouvelle fiche</button>' : ''}</div>
+    <div class="field" style="margin-bottom:8px;"><input type="search" id="ft-search" class="ft-in" placeholder="Rechercher un plat ou un ingrédient" value="${ft_e(ft_q)}" oninput="ft_setQ(this.value)"></div>
+    ${cats.length ? `<div class="ft-chips ft-scroll"><button class="ft-chip ${ft_cat ? '' : 'on'}" onclick="ft_setCat('')">Tout</button>${cats.map(c=>`<button class="ft-chip ${ft_cat === c ? 'on' : ''}" onclick="ft_setCat(${ft_e(JSON.stringify(c))})">${ft_e(c)}</button>`).join('')}</div>` : ''}
+    ${nTodo ? `<div class="ft-todobar"><span><span class="ft-dot"></span>&nbsp; ${nTodo} fiche${nTodo > 1 ? 's' : ''} à compléter</span><a class="ft-link" style="font-weight:600;" onclick="ft_toggleTodo()">${ft_onlyTodo ? 'Tout afficher ›' : 'Afficher ›'}</a></div>` : ''}</div>
+    ${ft_isAdmin() && ft_seedMissing().length ? `<div class="ticket" style="margin:8px 0;"><div style="font-size:14px;margin-bottom:8px;">Ton menu peut être importé : ${ft_seedMissing().length} fiches (plats et préparations de base), sans quantités ni étapes.</div><button class="btn small t-io" onclick="ft_importMenu()">Importer le menu</button></div>` : ''}
     <div id="ft-list">${ft_listHtml()}</div>`;
 }
 
 /* ---------- fiche ---------- */
 function ft_detailInner(f){
   const items = ft_scaled(f, ft_portions), changed = ft_portions !== (Number(f.portions) > 0 ? Number(f.portions) : 1);
-  const ing = items.length ? items.map(i=>`<li class="ft-ing"><span class="q">${ft_e((i.text + ' ' + i.unit).trim())}</span><span>${ft_e(i.name)}</span></li>`).join('') : '<li class="pt-muted">Aucun ingrédient.</li>';
+  const ing = items.length ? items.map(i=>`<li class="ft-ing"><span class="q">${ft_e((i.text + ' ' + i.unit).trim())}</span>${i.ref ? `<a class="ft-link" onclick="ft_openRef('${i.ref}')">${ft_e(i.name)} ▸</a>` : `<span>${ft_e(i.name)}</span>`}</li>`).join('') : '<li class="pt-muted">Aucun ingrédient.</li>';
   const steps = (f.steps || []).length ? f.steps.map((s, i)=>`<div class="ft-step"><div class="num">${i + 1}</div><div class="txt">${ft_e(s).replace(/\n/g, '<br>')}</div></div>`).join('') : '<div class="pt-muted">Aucune étape.</div>';
+  const usedIn = ft_fiches.filter(x=>x.id !== f.id && (x.ingredients || []).some(i=>i.ref === f.id)).sort((a, b)=>String(a.name).localeCompare(String(b.name), 'fr'));
+  const usedHtml = usedIn.length ? `<div class="ticket"><div class="section-label">Utilisée dans (${usedIn.length})</div><div class="ft-chips">${usedIn.map(x=>`<button class="ft-chip" onclick="ft_openRef('${x.id}')">${ft_e(x.name)}</button>`).join('')}</div></div>` : '';
   const card = (cls, l, n)=>n ? `<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${ft_e(n)}</div></div>` : '';
   const block = (title, txt)=>txt ? `<div class="ticket"><div class="section-label">${title}</div><div class="ft-text">${ft_e(txt).replace(/\n/g, '<br>')}</div></div>` : '';
   const conserv = [f.temp ? 'Température : ' + f.temp : '', f.duree ? 'Durée : ' + f.duree : ''].filter(Boolean).join('\n');
   return `<div class="ticket">
       <div style="font-weight:800;font-size:20px;">${ft_e(f.name)}</div>
       ${f.cat ? `<div style="margin:6px 0;"><span class="ft-cat">${ft_e(f.cat)}</span></div>` : ''}
-      <div class="pt-cards">${card('c-days', 'Portions (fiche)', f.portions)}${card('c-base', 'Préparation', ft_fmtMin(f.prepMin))}${card('c-transport', 'Température', f.temp)}${card('c-bonus', 'Durée de conservation', f.duree)}</div>
+      <div class="pt-cards">${card('c-days', 'Pièces par portion', f.pieces)}${card('c-adv', 'Portions (fiche)', f.portions)}${card('c-base', 'Préparation', ft_fmtMin(f.prepMin))}${card('c-transport', 'Température', f.temp)}${card('c-bonus', 'Durée de conservation', f.duree)}</div>
     </div>
     <div class="ticket">
       <div class="section-label">Ingrédients</div>
@@ -3149,11 +3248,11 @@ function ft_detailInner(f){
       <ul class="ft-ings">${ing}</ul>
     </div>
     <div class="ticket"><div class="section-label">Préparation</div>${steps}</div>
-    ${block('Dressage', f.dressage)}${block('Conservation', conserv)}${block('Notes du chef', f.notes)}`;
+    ${block('Dressage', f.dressage)}${block('Accompagnements', f.accomp)}${block('Conservation', conserv)}${block('Notes du chef', f.notes)}${usedHtml}`;
 }
 function ft_renderDetail(){ const el = document.getElementById('ft-detail'); const f = ft_fiches.find(x=>x.id === ft_cur); if(el && f) el.innerHTML = ft_detailInner(f); }
 function ft_detailView(f){
-  return `<div style="margin-bottom:10px;"><button class="btn ghost small t-view" onclick="ft_back()">← Fiches</button></div>
+  return `<div style="margin-bottom:10px;"><button class="btn ghost small t-view" onclick="ft_back()">← ${ft_hist.length ? ft_e((ft_fiches.find(x=>x.id === ft_hist[ft_hist.length - 1]) || {}).name || 'Retour') : 'Fiches'}</button></div>
       <div class="ft-actions"><button class="btn ghost small t-io" onclick="ft_print()">🖨️ Imprimer</button>${ft_isAdmin() ? `<button class="btn ghost small t-edit" onclick="ft_edit('${f.id}')">Modifier</button><button class="btn ghost small t-view" onclick="ft_dup('${f.id}')">Dupliquer</button><button class="btn ghost small t-del" onclick="ft_del('${f.id}')">Supprimer</button>` : ''}</div>
     <div id="ft-detail">${ft_detailInner(f)}</div>`;
 }
@@ -3161,11 +3260,11 @@ function ft_print(){
   const f = ft_fiches.find(x=>x.id === ft_cur); if(!f) return;
   const items = ft_scaled(f, ft_portions);
   const css = 'body{font-family:Arial,sans-serif;color:#111;margin:22px;}h1{margin:0 0 4px;font-size:24px;}h2{font-size:14px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #999;padding-bottom:3px;margin:18px 0 8px;}.m{color:#555;font-size:13px;}li{margin:3px 0;}ol li{margin:8px 0;}';
-  const meta = [f.cat, 'Pour ' + ft_portions + ' portion' + (ft_portions > 1 ? 's' : ''), ft_fmtMin(f.prepMin) ? 'Préparation : ' + ft_fmtMin(f.prepMin) : '', f.temp ? 'Température : ' + f.temp : '', f.duree ? 'Conservation : ' + f.duree : ''].filter(Boolean).join(' · ');
+  const meta = [f.cat, Number(f.pieces) > 0 ? f.pieces + ' pièces par portion' : '', 'Pour ' + ft_portions + ' portion' + (ft_portions > 1 ? 's' : ''), ft_fmtMin(f.prepMin) ? 'Préparation : ' + ft_fmtMin(f.prepMin) : '', f.temp ? 'Température : ' + f.temp : '', f.duree ? 'Conservation : ' + f.duree : ''].filter(Boolean).join(' · ');
   const html = `<html><head><meta charset="utf-8"><title>${ft_e(f.name)}</title><style>${css}</style></head><body><h1>${ft_e(f.name)}</h1><div class="m">${ft_e(meta)}</div>
     <h2>Ingrédients</h2><ul>${items.map(i=>`<li><b>${ft_e((i.text + ' ' + i.unit).trim())}</b> ${ft_e(i.name)}</li>`).join('')}</ul>
     <h2>Préparation</h2><ol>${(f.steps || []).map(s=>`<li>${ft_e(s).replace(/\n/g, '<br>')}</li>`).join('')}</ol>
-    ${f.dressage ? `<h2>Dressage</h2><div>${ft_e(f.dressage).replace(/\n/g, '<br>')}</div>` : ''}${f.notes ? `<h2>Notes du chef</h2><div>${ft_e(f.notes).replace(/\n/g, '<br>')}</div>` : ''}</body></html>`;
+    ${f.dressage ? `<h2>Dressage</h2><div>${ft_e(f.dressage).replace(/\n/g, '<br>')}</div>` : ''}${f.accomp ? `<h2>Accompagnements</h2><div>${ft_e(f.accomp).replace(/\n/g, '<br>')}</div>` : ''}${f.notes ? `<h2>Notes du chef</h2><div>${ft_e(f.notes).replace(/\n/g, '<br>')}</div>` : ''}</body></html>`;
   let fr = document.getElementById('ft-print-frame');
   if(!fr){ fr = document.createElement('iframe'); fr.id = 'ft-print-frame'; fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'; document.body.appendChild(fr); }
   fr.srcdoc = html;
@@ -3173,16 +3272,20 @@ function ft_print(){
 }
 
 /* ---------- édition (administrateur) ---------- */
-function ft_blank(){ return { name:'', cat:'', portions:1, prepMin:'', ingredients:[{ q:'', u:'g', n:'' }], steps:[''], dressage:'', temp:'', duree:'', notes:'' }; }
-function ft_clone(f){ return JSON.parse(JSON.stringify({ name:f.name || '', cat:f.cat || '', portions:f.portions || 1, prepMin:f.prepMin || '', ingredients:(f.ingredients || []).map(i=>({ q:i.q == null ? '' : String(i.q), u:i.u || '', n:i.n || '' })), steps:(f.steps || []).slice(), dressage:f.dressage || '', temp:f.temp || '', duree:f.duree || '', notes:f.notes || '' })); }
+function ft_blank(){ return { name:'', cat:'', portions:1, prepMin:'', pieces:'', accomp:'', ingredients:[{ q:'', u:'g', n:'', ref:'' }], steps:[''], dressage:'', temp:'', duree:'', notes:'' }; }
+function ft_clone(f){ return JSON.parse(JSON.stringify({ name:f.name || '', cat:f.cat || '', portions:f.portions || 1, pieces:f.pieces || '', accomp:f.accomp || '', prepMin:f.prepMin || '', ingredients:(f.ingredients || []).map(i=>({ q:i.q == null ? '' : String(i.q), u:i.u || '', n:i.n || '', ref:i.ref || '' })), steps:(f.steps || []).slice(), dressage:f.dressage || '', temp:f.temp || '', duree:f.duree || '', notes:f.notes || '' })); }
 function ft_new(){ if(!ft_isAdmin()) return; ft_draft = ft_blank(); ft_cur = null; ft_view = 'edit'; ft_render(); }
 function ft_edit(id){ const f = ft_fiches.find(x=>x.id === id); if(!f || !ft_isAdmin()) return; ft_draft = ft_clone(f); ft_cur = id; ft_view = 'edit'; ft_render(); }
 function ft_dup(id){ const f = ft_fiches.find(x=>x.id === id); if(!f || !ft_isAdmin()) return; ft_draft = ft_clone(f); ft_draft.name = (f.name || '') + ' (copie)'; ft_cur = null; ft_view = 'edit'; ft_render(); }
 function ft_cancelEdit(){ ft_draft = null; if(ft_cur){ ft_view = 'detail'; } else ft_view = 'list'; ft_render(); }
 function ft_dSet(k, v){ if(ft_draft) ft_draft[k] = v; }
-function ft_ingSet(i, k, v){ if(ft_draft && ft_draft.ingredients[i]) ft_draft.ingredients[i][k] = v; }
-function ft_ingAdd(){ ft_draft.ingredients.push({ q:'', u:'g', n:'' }); ft_render(); setTimeout(()=>{ const els = document.querySelectorAll('.ft-ing-name'); if(els.length) els[els.length - 1].focus(); }, 0); }
-function ft_ingDel(i){ ft_draft.ingredients.splice(i, 1); if(!ft_draft.ingredients.length) ft_draft.ingredients.push({ q:'', u:'g', n:'' }); ft_render(); }
+function ft_ingSet(i, k, v){
+  if(!ft_draft || !ft_draft.ingredients[i]) return;
+  const g = ft_draft.ingredients[i]; g[k] = v;
+  if(k === 'n'){ const b = ft_baseByName(v); g.ref = b ? b.id : ''; const el = document.getElementById('ft-lk-' + i); if(el) el.innerHTML = g.ref ? '🔗 lié à la fiche « ' + ft_e(b.name) + ' »' : ''; }
+}
+function ft_ingAdd(){ ft_draft.ingredients.push({ q:'', u:'g', n:'', ref:'' }); ft_render(); setTimeout(()=>{ const els = document.querySelectorAll('.ft-ing-name'); if(els.length) els[els.length - 1].focus(); }, 0); }
+function ft_ingDel(i){ ft_draft.ingredients.splice(i, 1); if(!ft_draft.ingredients.length) ft_draft.ingredients.push({ q:'', u:'g', n:'', ref:'' }); ft_render(); }
 function ft_stepSet(i, v){ if(ft_draft) ft_draft.steps[i] = v; }
 function ft_stepAdd(){ ft_draft.steps.push(''); ft_render(); setTimeout(()=>{ const els = document.querySelectorAll('.ft-step-in'); if(els.length) els[els.length - 1].focus(); }, 0); }
 function ft_stepDel(i){ ft_draft.steps.splice(i, 1); if(!ft_draft.steps.length) ft_draft.steps.push(''); ft_render(); }
@@ -3192,9 +3295,9 @@ async function ft_save(){
   const name = String(d.name || '').trim();
   if(!name){ alert('Donne un nom au plat.'); return; }
   const portions = Math.max(1, Math.round(Number(String(d.portions).replace(',', '.')) || 1));
-  const ingredients = d.ingredients.map(i=>({ n:String(i.n || '').trim(), u:i.u || '', q:ft_parseQ(i.q) })).filter(i=>i.n);
+  const ingredients = d.ingredients.map(i=>{ const n = String(i.n || '').trim(), b = ft_baseByName(n); return { n, u:i.u || '', q:ft_parseQ(i.q), ref:b ? b.id : '' }; }).filter(i=>i.n);
   for(const i of d.ingredients){ if(String(i.q || '').trim() && ft_parseQ(i.q) === null){ alert('Quantité non valide : « ' + i.q + ' ». Écris un nombre (1,5) ou une fraction (1/2).'); return; } }
-  const data = { name, cat:String(d.cat || '').trim(), portions, prepMin:Math.max(0, Math.round(Number(String(d.prepMin).replace(',', '.')) || 0)), ingredients,
+  const data = { name, cat:String(d.cat || '').trim(), portions, pieces:Math.max(0, Math.round(Number(String(d.pieces).replace(',', '.')) || 0)) || '', accomp:String(d.accomp || '').trim(), prepMin:Math.max(0, Math.round(Number(String(d.prepMin).replace(',', '.')) || 0)), ingredients,
     steps:d.steps.map(s=>String(s || '').trim()).filter(Boolean), dressage:String(d.dressage || '').trim(), temp:String(d.temp || '').trim(), duree:String(d.duree || '').trim(), notes:String(d.notes || '').trim(),
     updatedAt:new Date().toISOString(), updatedBy:(typeof currentUser !== 'undefined' ? currentUser : '') };
   try{
@@ -3213,20 +3316,22 @@ async function ft_del(id){
 function ft_editView(){
   const d = ft_draft, a = (k)=>`oninput="ft_dSet('${k}', this.value)"`;
   const ings = d.ingredients.map((i, n)=>`<div class="ft-edrow"><input type="text" inputmode="decimal" class="ft-in ft-q" placeholder="Qté" value="${ft_e(i.q)}" oninput="ft_ingSet(${n},'q',this.value)">
-      <select class="ft-in ft-u" onchange="ft_ingSet(${n},'u',this.value)">${FT_UNITS.concat(FT_UNITS.includes(i.u) || !i.u ? [] : [i.u]).map(u=>`<option ${u === i.u ? 'selected' : ''}>${ft_e(u)}</option>`).join('')}</select>
-      <input type="text" class="ft-in ft-ing-name ft-n" placeholder="Ingrédient" value="${ft_e(i.n)}" oninput="ft_ingSet(${n},'n',this.value)"><button class="btn ghost small t-del" onclick="ft_ingDel(${n})" aria-label="Retirer">✕</button></div>`).join('');
+      <select class="ft-in ft-u" onchange="ft_ingSet(${n},'u',this.value)">${[''].concat(FT_UNITS, FT_UNITS.includes(i.u) || !i.u ? [] : [i.u]).map(u=>`<option value="${ft_e(u)}" ${u === (i.u || '') ? 'selected' : ''}>${u ? ft_e(u) : '—'}</option>`).join('')}</select>
+      <input type="text" class="ft-in ft-ing-name ft-n" list="ft-bases" placeholder="Ingrédient" value="${ft_e(i.n)}" oninput="ft_ingSet(${n},'n',this.value)"><button class="btn ghost small t-del" onclick="ft_ingDel(${n})" aria-label="Retirer">✕</button><div class="ft-lk" id="ft-lk-${n}">${i.ref && ft_fiches.find(x=>x.id === i.ref) ? '🔗 lié à la fiche « ' + ft_e(ft_fiches.find(x=>x.id === i.ref).name) + ' »' : ''}</div></div>`).join('');
   const steps = d.steps.map((s, n)=>`<div class="ft-edrow ft-edstep"><div class="num">${n + 1}</div><textarea class="ft-in ft-step-in" rows="2" placeholder="Décris l’étape" oninput="ft_stepSet(${n}, this.value)">${ft_e(s)}</textarea>
       <div class="ft-mv"><button class="btn ghost small" onclick="ft_stepMove(${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="ft_stepMove(${n},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="ft_stepDel(${n})" aria-label="Retirer">✕</button></div></div>`).join('');
   return `<div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;font-size:18px;">${ft_cur ? 'Modifier la fiche' : 'Nouvelle fiche'}</div></div>
     <div class="ticket">
       <div class="field"><label>Nom du plat</label><input type="text" class="ft-in" id="ft-name" value="${ft_e(d.name)}" ${a('name')}></div>
       <div class="pt-row" style="margin-top:10px;"><div class="field" style="flex:2 1 160px;"><label>Catégorie</label><input type="text" class="ft-in" list="ft-cats" value="${ft_e(d.cat)}" placeholder="Choisis ou écris" ${a('cat')}><datalist id="ft-cats">${ft_catsAll().map(c=>`<option value="${ft_e(c)}">`).join('')}</datalist></div>
+        <div class="field" style="flex:1 1 90px;"><label>Pièces / portion</label><input type="text" inputmode="numeric" class="ft-in" value="${ft_e(d.pieces)}" ${a('pieces')}></div>
         <div class="field" style="flex:1 1 90px;"><label>Portions</label><input type="text" inputmode="numeric" class="ft-in" value="${ft_e(d.portions)}" ${a('portions')}></div>
         <div class="field" style="flex:1 1 110px;"><label>Préparation (min)</label><input type="text" inputmode="numeric" class="ft-in" value="${ft_e(d.prepMin)}" ${a('prepMin')}></div></div>
     </div>
-    <div class="ticket"><div class="section-label">Ingrédients <span class="pt-muted" style="text-transform:none;letter-spacing:0;">(quantités pour ${ft_e(d.portions || 1)} portion${Number(d.portions) > 1 ? 's' : ''})</span></div>${ings}<div class="actions-row"><button class="btn small t-add" onclick="ft_ingAdd()">＋ Ingrédient</button></div></div>
+    <div class="ticket"><div class="section-label">Ingrédients <span class="pt-muted" style="text-transform:none;letter-spacing:0;">(quantités pour ${ft_e(d.portions || 1)} portion${Number(d.portions) > 1 ? 's' : ''} — écris le nom d’une préparation de base pour créer le lien)</span></div><datalist id="ft-bases">${ft_fiches.filter(x=>x.cat === FT_BASE_CAT).map(x=>`<option value="${ft_e(x.name)}">`).join('')}</datalist>${ings}<div class="actions-row"><button class="btn small t-add" onclick="ft_ingAdd()">＋ Ingrédient</button></div></div>
     <div class="ticket"><div class="section-label">Étapes de préparation</div>${steps}<div class="actions-row"><button class="btn small t-add" onclick="ft_stepAdd()">＋ Étape</button></div></div>
     <div class="ticket"><div class="field"><label>Dressage (comment présenter le plat)</label><textarea class="ft-in" rows="3" ${a('dressage')}>${ft_e(d.dressage)}</textarea></div></div>
+    <div class="ticket"><div class="field"><label>Accompagnements (wasabi, gingembre, sauces…)</label><textarea class="ft-in" rows="2" ${a('accomp')}>${ft_e(d.accomp)}</textarea></div></div>
     <div class="ticket"><div class="section-label">Conservation</div><div class="pt-row"><div class="field" style="flex:1 1 140px;"><label>Température</label><input type="text" class="ft-in" placeholder="ex. 0–4 °C" value="${ft_e(d.temp)}" ${a('temp')}></div>
       <div class="field" style="flex:1 1 140px;"><label>Durée</label><input type="text" class="ft-in" placeholder="ex. 48 h" value="${ft_e(d.duree)}" ${a('duree')}></div></div></div>
     <div class="ticket"><div class="field"><label>Notes ou astuces du chef</label><textarea class="ft-in" rows="3" ${a('notes')}>${ft_e(d.notes)}</textarea></div></div>
@@ -3239,7 +3344,148 @@ function ft_render(){
   const f = ft_fiches.find(x=>x.id === ft_cur);
   if(ft_view === 'edit' && ft_draft && ft_isAdmin()) body.innerHTML = ft_editView();
   else if(ft_view === 'detail' && f) body.innerHTML = ft_detailView(f);
-  else { ft_view = 'list'; body.innerHTML = ft_listView(); }
+  else { ft_view = 'list'; body.innerHTML = ft_listView(); try{ const nav = document.querySelector('nav.tabs'), t = body.querySelector('.ft-top'); if(t && nav) t.style.top = nav.offsetHeight + 'px'; }catch(e){} }
+}
+
+/* ==================== MODULE MISE EN PLACE ==================== */
+/* Listes d'ingrédients par section (doc unique) + saisies de fin de service (une par cuisinier et par service).
+   Cuisiniers : saisie seulement (ils ne lisent jamais les saisies). Administrateur : historique, suppression, gestion des listes. */
+const mep_listsRef = db.collection('mise_en_place').doc('listes');
+const mep_saisiesCol = db.collection('mise_en_place_saisies');
+const MEP_SECTIONS = [['sushi', 'Sushi'], ['chaud', 'Chaud'], ['bar', 'Bar']];
+const MEP_UNITS = ['kg', 'g', 'L', 'pièces', 'bacs', 'bouteilles', 'sachets', 'boîtes', 'feuilles', 'portions'];
+let mep_adminStarted = false, mep_started = false, mep_listsReady = false, mep_lists = { sushi:[], chaud:[], bar:[] }, mep_emp = {}, mep_saisies = [], mep_saisiesReady = false;
+let mep_tab = 'hist', mep_sec = 'sushi', mep_date = '', mep_form = null, mep_done = null, mep_draft = null, mep_busy = false;
+const mep_e = (v)=>esc(v == null ? '' : String(v));
+const mep_isAdmin = ()=>!!(session && session.isAdmin);
+const mep_secName = (k)=>(MEP_SECTIONS.find(x=>x[0] === k) || [k, k])[1];
+function mep_ymd(d){ d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function mep_frDate(ymd){ const p = String(ymd || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : ymd; }
+function mep_hm(iso){ const d = new Date(iso); return isNaN(d) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+function mep_newId(){ return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+/* employés proposés : ceux du pointage (noms seulement) */
+function mep_empList(){
+  const codes = new Set(Object.keys(PT_DEFAULT_NAMES).map(Number)); Object.keys(mep_emp).forEach(k=>codes.add(Number(k)));
+  return Array.from(codes).filter(c=>!isNaN(c)).map(c=>({ code:c, name:(mep_emp[c] && mep_emp[c].name) || PT_DEFAULT_NAMES[c] || '' })).filter(x=>x.name).sort((a, b)=>a.name.localeCompare(b.name, 'fr'));
+}
+function mep_typing(){ try{ const a = document.activeElement, b = document.getElementById('mep-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
+function mep_start(){
+  if(mep_isAdmin() && !mep_adminStarted){ mep_adminStarted = true; mep_watchSaisies(); }
+  if(mep_started) return; mep_started = true;
+  mep_listsRef.onSnapshot((doc)=>{
+    const d = doc.exists ? (doc.data() || {}) : {};
+    mep_lists = { sushi:d.sushi || [], chaud:d.chaud || [], bar:d.bar || [] }; mep_listsReady = true;
+    if((mep_tab !== 'listes' || !mep_draft) && !mep_typing()) mep_render();
+  }, (e)=>{ console.error(e); mep_listsReady = true; mep_render(); });
+  pt_configRef.onSnapshot((doc)=>{ const d = doc.exists ? (doc.data() || {}) : {}; mep_emp = d.emp || {}; if(!mep_typing()) mep_render(); }, (e)=>console.error(e));
+}
+function mep_watchSaisies(){
+  // seul l'administrateur lit les saisies
+  {
+    const since = new Date(); since.setDate(since.getDate() - 400);
+    mep_saisiesCol.where('date', '>=', mep_ymd(since)).onSnapshot((snap)=>{
+      const l = []; snap.forEach(d=>l.push({ id:d.id, ...d.data() })); mep_saisies = l; mep_saisiesReady = true; mep_render();
+    }, (e)=>{ console.error(e); mep_saisiesReady = true; mep_render(); });
+  }
+}
+/* ---------- cuisinier : saisie ---------- */
+function mep_resetForm(){ mep_form = { sec:mep_sec, emp:'', vals:{} }; mep_done = null; }
+function mep_pickSec(k){ mep_sec = k; if(mep_form){ mep_form.sec = k; mep_form.vals = {}; } mep_render(); }
+function mep_setEmp(v){ if(!mep_form) mep_resetForm(); mep_form.emp = v; }
+function mep_setVal(id, v){ if(!mep_form) mep_resetForm(); mep_form.vals[id] = v; }
+function mep_entryView(){
+  if(!mep_form && !mep_done) mep_resetForm();
+  if(mep_done) return `<div class="ticket" style="text-align:center;padding:28px 14px;"><div style="font-size:34px;">✅</div><div style="font-weight:800;font-size:18px;margin:8px 0 4px;">Inventaire enregistré</div><div class="pt-muted">${mep_e(mep_secName(mep_done.sec))} · ${mep_e(mep_done.name)} · ${mep_e(mep_done.hm)}</div><div class="actions-row" style="justify-content:center;"><button class="btn t-add" onclick="mep_newEntry()">Nouvelle saisie</button></div></div>`;
+  const list = mep_lists[mep_sec] || [], emps = mep_empList();
+  const rows = list.length ? list.map(i=>`<div class="mep-ing"><div class="n">${mep_e(i.n)}</div><input class="ft-in" type="text" inputmode="decimal" placeholder="0" value="${mep_e(mep_form.vals[i.id] || '')}" oninput="mep_setVal('${i.id}', this.value)"><div class="u">${mep_e(i.u || '')}</div></div>`).join('') : `<div class="pt-muted">Aucun ingrédient défini pour cette section.${mep_isAdmin() ? ' Ajoute-les dans « Listes ».' : ''}</div>`;
+  return `<div class="mep-seg">${MEP_SECTIONS.map(x=>`<button class="${mep_sec === x[0] ? 'on' : ''}" onclick="mep_pickSec('${x[0]}')">${x[1]}</button>`).join('')}</div>
+    <div class="ticket"><div class="field"><label>Cuisinier</label><select class="ft-in" id="mep-emp" onchange="mep_setEmp(this.value)"><option value="">Choisis ton nom</option>${emps.map(x=>`<option value="${x.code}" ${String(mep_form.emp) === String(x.code) ? 'selected' : ''}>${mep_e(x.name)}</option>`).join('')}</select></div></div>
+    <div class="ticket"><div class="section-label">Inventaire de fin de service — ${mep_e(mep_secName(mep_sec))}</div>${rows}</div>
+    ${list.length ? '<div class="actions-row"><button class="btn t-save" style="width:100%;height:48px;" onclick="mep_submit()">Valider mon inventaire</button></div>' : ''}`;
+}
+function mep_newEntry(){ mep_resetForm(); mep_render(); window.scrollTo && window.scrollTo(0, 0); }
+async function mep_submit(){
+  if(mep_busy || !mep_form) return;
+  const f = mep_form, list = mep_lists[f.sec] || [];
+  if(!f.emp){ alert('Choisis ton nom avant de valider.'); return; }
+  const emp = mep_empList().find(x=>String(x.code) === String(f.emp)); if(!emp){ alert('Choisis ton nom avant de valider.'); return; }
+  const items = [], missing = [];
+  for(const i of list){
+    const raw = String(f.vals[i.id] == null ? '' : f.vals[i.id]).trim();
+    if(!raw){ missing.push(i.n); continue; }
+    const q = ft_parseQ(raw);
+    if(q === null || q < 0){ alert('Quantité non valide pour « ' + i.n + ' » : « ' + raw + ' ».'); return; }
+    items.push({ id:i.id, n:i.n, u:i.u || '', q });
+  }
+  if(missing.length){ alert('Il manque ' + missing.length + ' quantité' + (missing.length > 1 ? 's' : '') + ' : ' + missing.slice(0, 5).join(', ') + (missing.length > 5 ? '…' : '') + '\nMets 0 si tu n’en as plus.'); return; }
+  if(!items.length){ alert('Rien à enregistrer.'); return; }
+  const now = new Date();
+  const doc = { section:f.sec, date:mep_ymd(now), at:now.toISOString(), emp:Number(emp.code), name:emp.name, items, by:(typeof currentUser !== 'undefined' ? currentUser : '') };
+  mep_busy = true;
+  try{ await mep_saisiesCol.add(doc); mep_done = { sec:f.sec, name:emp.name, hm:mep_hm(doc.at) }; mep_form = null; mep_render(); window.scrollTo && window.scrollTo(0, 0); }
+  catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e) + '\nRéessaie.'); }
+  mep_busy = false;
+}
+/* ---------- administrateur : historique ---------- */
+function mep_setTab(t){ mep_tab = t; if(t === 'listes' && !mep_draft) mep_draft = JSON.parse(JSON.stringify(mep_lists)); if(t !== 'listes') mep_draft = null; if(t === 'saisie') mep_resetForm(); mep_render(); }
+function mep_setDate(v){ mep_date = v || mep_ymd(); mep_render(); }
+function mep_histSec(k){ mep_sec = k; mep_render(); }
+function mep_daySaisies(sec, date){ return mep_saisies.filter(x=>x.section === sec && x.date === date).sort((a, b)=>String(a.at).localeCompare(String(b.at))); }
+function mep_histView(){
+  if(!mep_date) mep_date = mep_ymd();
+  const sec = mep_sec, all = mep_daySaisies(sec, mep_date);
+  const byCook = {}; all.forEach(x=>{ byCook[x.emp] = x; }); // dernière saisie de chaque cuisinier
+  const cooks = Object.values(byCook).sort((a, b)=>String(a.at).localeCompare(String(b.at)));
+  const rowsIds = [], seen = {}, rowInfo = {};
+  (mep_lists[sec] || []).forEach(i=>{ rowsIds.push(i.id); seen[i.id] = 1; rowInfo[i.id] = i; });
+  cooks.forEach(c=>(c.items || []).forEach(i=>{ if(!seen[i.id]){ seen[i.id] = 1; rowsIds.push(i.id); rowInfo[i.id] = i; } }));
+  const cell = (c, id)=>{ const it = (c.items || []).find(x=>x.id === id); return it ? ft_fmtQ(it.q, '').replace(/\s/g, ' ') : '<span class="pt-muted">—</span>'; };
+  const table = cooks.length ? `<div style="overflow-x:auto;"><table class="mep-g"><tr><th>Ingrédient</th>${cooks.map(c=>`<th>${mep_e(c.name)}<div class="pt-muted" style="font-weight:500;">${mep_e(mep_hm(c.at))}${all.filter(x=>x.emp === c.emp).length > 1 ? ' · ' + all.filter(x=>x.emp === c.emp).length + ' saisies' : ''}</div></th>`).join('')}</tr>${rowsIds.map(id=>`<tr><td>${mep_e(rowInfo[id].n)}<span class="pt-muted"> (${mep_e(rowInfo[id].u || '')})</span></td>${cooks.map(c=>`<td>${cell(c, id)}</td>`).join('')}</tr>`).join('')}</table></div>`
+    : `<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucun inventaire reçu pour cette date.</div>`;
+  const detail = all.length ? `<div class="ticket"><div class="section-label">Saisies du ${mep_e(mep_frDate(mep_date))} — ${mep_e(mep_secName(sec))}</div>${all.map(x=>`<div class="row-between" style="padding:8px 0;border-top:1px solid var(--line);"><div><b>${mep_e(x.name)}</b> <span class="pt-muted">${mep_e(mep_hm(x.at))} · ${(x.items || []).length} ingrédients</span></div><button class="btn ghost small t-del" onclick="mep_delSaisie('${x.id}')">Supprimer</button></div>`).join('')}</div>` : '';
+  // derniers jours
+  const days = []; for(let k = 0; k < 14; k++){ const d = new Date(); d.setDate(d.getDate() - k); days.push(mep_ymd(d)); }
+  const cnt = (sec2, d)=>mep_daySaisies(sec2, d).length;
+  const recent = `<div class="ticket"><div class="section-label">Derniers jours</div><div style="overflow-x:auto;"><table class="mep-g"><tr><th>Date</th>${MEP_SECTIONS.map(x=>`<th>${x[1]}</th>`).join('')}</tr>${days.map(d=>`<tr class="mep-day ${d === mep_date ? 'on' : ''}" onclick="mep_setDate('${d}')"><td>${mep_e(mep_frDate(d))}</td>${MEP_SECTIONS.map(x=>{ const n = cnt(x[0], d); return `<td>${n ? n : '<span class="ft-dot"></span>'}</td>`; }).join('')}</tr>`).join('')}</table></div></div>`;
+  return `<div class="mep-seg">${MEP_SECTIONS.map(x=>`<button class="${sec === x[0] ? 'on' : ''}" onclick="mep_histSec('${x[0]}')">${x[1]}${cnt(x[0], mep_date) ? ' · ' + cnt(x[0], mep_date) : ''}</button>`).join('')}</div>
+    <div class="ticket"><div class="field"><label>Date</label><input type="date" class="ft-in" value="${mep_e(mep_date)}" onchange="mep_setDate(this.value)"></div></div>
+    <div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — inventaires du ${mep_e(mep_frDate(mep_date))}</div>${table}</div>${detail}${recent}`;
+}
+async function mep_delSaisie(id){
+  if(!mep_isAdmin()) return; const x = mep_saisies.find(s=>s.id === id); if(!x) return;
+  if(!confirm('Supprimer la saisie de ' + x.name + ' (' + mep_hm(x.at) + ') ?')) return;
+  try{ await mep_saisiesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+/* ---------- administrateur : listes ---------- */
+function mep_dName(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].n = v; }
+function mep_dUnit(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].u = v; }
+function mep_dAdd(sec){ mep_draft[sec].push({ id:mep_newId(), n:'', u:'kg' }); mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-' + sec); if(els.length) els[els.length - 1].focus(); }, 0); }
+function mep_dDel(sec, i){ mep_draft[sec].splice(i, 1); mep_render(); }
+function mep_dMove(sec, i, d){ const j = i + d, l = mep_draft[sec]; if(j < 0 || j >= l.length) return; const t = l[i]; l[i] = l[j]; l[j] = t; mep_render(); }
+async function mep_saveLists(){
+  if(!mep_isAdmin() || !mep_draft) return;
+  const out = {};
+  MEP_SECTIONS.forEach(([k])=>{ out[k] = (mep_draft[k] || []).map(i=>({ id:i.id, n:String(i.n || '').trim(), u:String(i.u || '').trim() })).filter(i=>i.n); });
+  try{ await mep_listsRef.set({ ...out, updatedAt:new Date().toISOString(), updatedBy:(typeof currentUser !== 'undefined' ? currentUser : '') }); mep_draft = null; mep_tab = 'hist'; mep_render(); if(typeof pt_toast === 'function') pt_toast('Listes enregistrées.'); }
+  catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+function mep_listsView(){
+  const d = mep_draft || mep_lists;
+  return `<datalist id="mep-units">${MEP_UNITS.map(u=>`<option value="${mep_e(u)}">`).join('')}</datalist>
+    <div class="pt-muted" style="margin-bottom:8px;">Les ingrédients que les cuisiniers doivent compter à la fin de leur service. Les anciennes saisies gardent le nom et l’unité d’origine.</div>
+    ${MEP_SECTIONS.map(([k, label])=>`<div class="ticket"><div class="section-label">${label}</div>${(d[k] || []).map((i, n)=>`<div class="ft-edrow"><input type="text" class="ft-in mep-name-${k}" style="flex:1 1 55%;min-width:0;" placeholder="Ingrédient" value="${mep_e(i.n)}" oninput="mep_dName('${k}',${n},this.value)"><input type="text" class="ft-in" list="mep-units" style="flex:1 1 28%;min-width:0;" placeholder="Unité" value="${mep_e(i.u)}" oninput="mep_dUnit('${k}',${n},this.value)">
+      <div class="ft-mv" style="flex:1 1 100%;"><button class="btn ghost small" onclick="mep_dMove('${k}',${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_dMove('${k}',${n},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="mep_dDel('${k}',${n})" aria-label="Retirer">✕</button></div></div>`).join('') || '<div class="pt-muted">Aucun ingrédient.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_dAdd('${k}')">＋ Ingrédient</button></div></div>`).join('')}
+    <div class="actions-row"><button class="btn t-save" onclick="mep_saveLists()">Enregistrer les listes</button><button class="btn ghost t-cancel" onclick="mep_setTab('hist')">Annuler</button></div>`;
+}
+function mep_render(){
+  const body = document.getElementById('mep-body'); if(!body) return;
+  if(!mep_listsReady){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  const admin = mep_isAdmin();
+  const head = `<div style="font-weight:700;font-size:18px;margin-bottom:10px;">Mise en place</div>`;
+  if(!admin){ body.innerHTML = head + mep_entryView(); return; }
+  const tabs = `<div class="mep-seg">${[['hist', 'Historique'], ['saisie', 'Saisie'], ['listes', 'Listes']].map(t=>`<button class="${mep_tab === t[0] ? 'on' : ''}" onclick="mep_setTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
+  const view = mep_tab === 'listes' ? mep_listsView() : mep_tab === 'saisie' ? mep_entryView() : (mep_saisiesReady ? mep_histView() : '<div class="empty-state">Chargement…</div>');
+  body.innerHTML = head + tabs + view;
 }
 
 const dt_dettesCol = db.collection('dettes_perso');
