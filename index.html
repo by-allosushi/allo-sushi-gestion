@@ -482,6 +482,12 @@ textarea.ft-in{font-family:'Inter',sans-serif;font-weight:500;line-height:1.45;r
 .ft-row{display:flex;justify-content:space-between;align-items:center;min-height:44px;padding:0 14px;border-top:1px solid var(--line);font-size:15px;cursor:pointer;}.ft-row:first-child{border-top:0;}
 .mep-num{flex:0 0 28px;height:28px;border-radius:8px;background:color-mix(in srgb,#E7E5E4 14%,#151A17);border:1px solid color-mix(in srgb,#E7E5E4 35%,transparent);color:#E7E5E4;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
 .mep-num.s{flex:none;width:24px;height:24px;font-size:12px;margin-right:8px;vertical-align:middle;}.mep-num.off{opacity:.4;}
+.mep-q{font-weight:700;font-size:15px;}.mep-w{font-size:12px;color:var(--ink-muted,#9aa39d);margin-top:2px;}
+.mep-d{font-size:12px;font-weight:700;}.mep-d.up{color:#FBBF24;}.mep-d.dn{color:#F87171;}
+td.mep-chg{color:#FBBF24;font-weight:800;}
+input.ft-in.chg{border-color:#FBBF24;border-left-color:#FBBF24;background:color-mix(in srgb,#FBBF24 16%,#151A17);color:#FDE68A;}
+.btn[disabled]{opacity:.4;pointer-events:none;}
+table.mep-sticky td:first-child,table.mep-sticky th:first-child{position:sticky;left:0;background:var(--surface);z-index:1;min-width:130px;}
 .mep-seg{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}.mep-seg button{flex:1 1 90px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:15px;font-family:'Inter',sans-serif;cursor:pointer;}
 .mep-seg button.on{background:color-mix(in srgb,#E7E5E4 18%,#151A17);border-color:#E7E5E4;}
 .mep-ing{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);}.mep-ing .n{flex:1;font-size:16px;font-weight:600;}.mep-ing input{width:92px;text-align:center;}.mep-ing .u{width:58px;color:var(--ink-muted,#9aa39d);font-size:14px;}
@@ -3381,35 +3387,74 @@ function mep_start(){
   mep_listsRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
     mep_lists = Object.assign({ sushi:[], chaud:[], bar:[], cooks:[] }, d); mep_listsReady = true;
+    if(mep_formPristine()) mep_initVals();
     if((mep_tab !== 'listes' || !mep_draft) && !mep_typing()) mep_render();
   }, (e)=>{ console.error(e); mep_listsReady = true; mep_render(); });
+  mep_stockRef.onSnapshot((doc)=>{ const d = doc.exists ? (doc.data() || {}) : {}; mep_stock = d.s || {}; mep_stockReady = true; if(mep_formPristine()) mep_initVals(); if(!mep_typing()) mep_render(); mep_maybeBoot(); }, (e)=>{ console.error(e); mep_stockReady = true; });
 }
 function mep_watchSaisies(){
   // seul l'administrateur lit les saisies
   {
     const since = new Date(); since.setDate(since.getDate() - 400);
     mep_saisiesCol.where('date', '>=', mep_ymd(since)).onSnapshot((snap)=>{
-      const l = []; snap.forEach(d=>l.push({ id:d.id, ...d.data() })); mep_saisies = l; mep_saisiesReady = true; mep_render();
+      const l = []; snap.forEach(d=>l.push({ id:d.id, ...d.data() })); mep_saisies = l; mep_saisiesReady = true; mep_render(); mep_maybeBoot();
     }, (e)=>{ console.error(e); mep_saisiesReady = true; mep_render(); });
   }
 }
+/* ---------- stock : dernière valeur inventoriée de chaque article (un seul petit document, lu par tous) ---------- */
+const mep_stockRef = db.collection('mise_en_place').doc('stock');
+let mep_stock = {}, mep_stockReady = false, mep_boot = false, mep_viewId = '';
+const mep_stockOf = (sec)=>mep_stock[sec] || {};
+const mep_fmtIn = (q)=>String(q).replace('.', ',');
+const mep_byAt = (a, b)=>String(a.at).localeCompare(String(b.at));
+function mep_fdt(iso){ const d = new Date(iso); return isNaN(d) ? '' : String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ' ' + mep_hm(iso); }
+const mep_fq = (q)=>ft_fmtQ(Number(q), '').replace(/\s/g, ' ');
+/* les articles qu'une saisie a réellement modifiés (anciennes saisies sans « changed » : tous) */
+const mep_counts = (x, id)=>!x.changed || x.changed.includes(id);
+function mep_stockFrom(exceptId){
+  const s = {};
+  mep_saisies.filter(x=>x.id !== exceptId).sort(mep_byAt).forEach(x=>(x.items || []).forEach(it=>{ if(!mep_counts(x, it.id)) return; (s[x.section] = s[x.section] || {})[it.id] = { q:it.q, by:x.name, emp:String(x.emp), at:x.at }; }));
+  return s;
+}
+async function mep_rebuildStock(exceptId){ await mep_stockRef.set({ s:mep_stockFrom(exceptId), rebuiltAt:new Date().toISOString() }); }
+function mep_maybeBoot(){ // administrateur : crée le stock à partir des saisies existantes (une seule fois)
+  if(!mep_isAdmin() || mep_boot || !mep_stockReady || !mep_saisiesReady) return;
+  mep_boot = true;
+  const from = mep_stockFrom('');
+  const need = Object.keys(from).some(sec=>!Object.keys(mep_stockOf(sec)).length);
+  if(need) mep_rebuildStock('').catch(e=>console.error(e));
+}
 /* ---------- cuisinier : saisie ---------- */
-function mep_resetForm(){ mep_form = { sec:mep_sec, emp:'', vals:{} }; mep_done = null; }
-function mep_pickSec(k){ mep_sec = k; if(mep_form){ mep_form.sec = k; mep_form.vals = {}; } mep_render(); }
+function mep_initVals(){
+  if(!mep_form) return;
+  const st = mep_stockOf(mep_form.sec), list = mep_lists[mep_form.sec] || [];
+  mep_form.base = {}; mep_form.vals = {};
+  list.forEach(i=>{ const v = st[i.id] ? mep_fmtIn(st[i.id].q) : ''; mep_form.base[i.id] = v; mep_form.vals[i.id] = v; });
+}
+function mep_same(a, b){ const x = ft_parseQ(a), y = ft_parseQ(b); return (x !== null && y !== null) ? x === y : String(a || '').trim() === String(b || '').trim(); }
+function mep_chgIds(){ if(!mep_form) return []; return (mep_lists[mep_form.sec] || []).filter(i=>!mep_same(mep_form.vals[i.id], mep_form.base[i.id])).map(i=>i.id); }
+function mep_formPristine(){ return !!mep_form && mep_chgIds().length === 0; }
+function mep_resetForm(){ const emp = mep_form ? mep_form.emp : ''; mep_form = { sec:mep_sec, emp:emp || '', vals:{}, base:{} }; mep_done = null; mep_initVals(); }
+function mep_pickSec(k){ mep_sec = k; mep_resetForm(); mep_render(); }
 function mep_setEmp(v){ if(!mep_form) mep_resetForm(); mep_form.emp = v; }
-function mep_setVal(id, v){ if(!mep_form) mep_resetForm(); mep_form.vals[id] = v; }
+function mep_setVal(id, v){
+  if(!mep_form) mep_resetForm(); mep_form.vals[id] = v;
+  try{ const ch = mep_chgIds(); (mep_lists[mep_form.sec] || []).forEach(i=>{ const el = document.getElementById('mep-in-' + i.id); if(el) el.classList.toggle('chg', ch.includes(i.id)); }); const b = document.getElementById('mep-btn-mod'); if(b) b.disabled = !ch.length; }catch(e){}
+}
 function mep_entryView(){
   if(!mep_form && !mep_done) mep_resetForm();
-  if(mep_done) return `<div class="ticket" style="text-align:center;padding:28px 14px;"><div style="font-size:34px;">✅</div><div style="font-weight:800;font-size:18px;margin:8px 0 4px;">Inventaire enregistré</div><div class="pt-muted">${mep_e(mep_secName(mep_done.sec))} · ${mep_e(mep_done.name)} · ${mep_e(mep_done.hm)}</div><div class="actions-row" style="justify-content:center;"><button class="btn t-add" onclick="mep_newEntry()">Nouvelle saisie</button></div></div>`;
-  const list = mep_lists[mep_sec] || [], emps = mep_empList();
-  const rows = list.length ? list.map((i, k)=>`<div class="mep-ing"><div class="mep-num">${k + 1}</div><div class="n">${mep_e(i.n)}</div><input class="ft-in" type="text" inputmode="decimal" placeholder="0" value="${mep_e(mep_form.vals[i.id] || '')}" oninput="mep_setVal('${i.id}', this.value)"><div class="u">${mep_e(i.u || '')}</div></div>`).join('') : `<div class="pt-muted">Aucun ingrédient défini pour cette section.${mep_isAdmin() ? ' Ajoute-les dans « Listes ».' : ''}</div>`;
+  if(mep_done) return `<div class="ticket" style="text-align:center;padding:28px 14px;"><div style="font-size:34px;">✅</div><div style="font-weight:800;font-size:18px;margin:8px 0 4px;">${mep_done.kind === 'confirm' ? 'Inventaire confirmé' : mep_done.kind === 'change' ? 'Inventaire mis à jour' : 'Inventaire enregistré'}</div><div class="pt-muted">${mep_e(mep_secName(mep_done.sec))} · ${mep_e(mep_done.name)} · ${mep_e(mep_done.hm)}${mep_done.kind === 'change' ? ' · ' + mep_done.n + ' article' + (mep_done.n > 1 ? 's' : '') + ' modifié' + (mep_done.n > 1 ? 's' : '') : ''}</div><div class="actions-row" style="justify-content:center;"><button class="btn t-add" onclick="mep_newEntry()">Nouvelle saisie</button></div></div>`;
+  const list = mep_lists[mep_sec] || [], emps = mep_empList(), st = mep_stockOf(mep_sec), hasStock = list.some(i=>st[i.id]), ch = mep_chgIds();
+  const rows = list.length ? list.map((i, k)=>`<div class="mep-ing"><div class="mep-num">${k + 1}</div><div class="n">${mep_e(i.n)}</div><input id="mep-in-${i.id}" class="ft-in ${ch.includes(i.id) ? 'chg' : ''}" type="text" inputmode="decimal" placeholder="0" value="${mep_e(mep_form.vals[i.id] || '')}" oninput="mep_setVal('${i.id}', this.value)"><div class="u">${mep_e(i.u || '')}</div></div>`).join('') : `<div class="pt-muted">Aucun ingrédient défini pour cette section.${mep_isAdmin() ? ' Ajoute-les dans « Listes ».' : ''}</div>`;
+  const btns = !list.length ? '' : hasStock
+    ? `<div class="actions-row"><button id="mep-btn-mod" class="btn t-edit" style="flex:1 1 60%;height:48px;" ${ch.length ? '' : 'disabled'} onclick="mep_submit()">Modifier l’inventaire</button><button class="btn ghost t-cancel" style="flex:1 1 30%;height:48px;" onclick="mep_submit(true)">Rien n’a changé</button></div>`
+    : '<div class="actions-row"><button class="btn t-save" style="width:100%;height:48px;" onclick="mep_submit()">Valider mon inventaire</button></div>';
   return `<div class="mep-seg">${mep_secs().map(x=>`<button class="${mep_sec === x[0] ? 'on' : ''}" onclick="mep_pickSec('${x[0]}')">${x[1]}</button>`).join('')}</div>
     <div class="ticket"><div class="field"><label>Cuisinier</label><select class="ft-in" id="mep-emp" onchange="mep_setEmp(this.value)"><option value="">Choisis ton nom</option>${emps.map(x=>`<option value="${mep_e(x.code)}" ${String(mep_form.emp) === String(x.code) ? 'selected' : ''}>${mep_e(x.name)}</option>`).join('')}</select></div></div>
-    <div class="ticket"><div class="section-label">Inventaire de fin de service — ${mep_e(mep_secName(mep_sec))}</div>${rows}</div>
-    ${list.length ? '<div class="actions-row"><button class="btn t-save" style="width:100%;height:48px;" onclick="mep_submit()">Valider mon inventaire</button></div>' : ''}`;
+    <div class="ticket"><div class="section-label">Inventaire de fin de service — ${mep_e(mep_secName(mep_sec))}</div>${hasStock ? '<div class="pt-muted" style="margin-bottom:6px;">Les quantités affichées sont celles du dernier inventaire. Change seulement ce qui a bougé.</div>' : ''}${rows}</div>${btns}`;
 }
 function mep_newEntry(){ mep_resetForm(); mep_render(); window.scrollTo && window.scrollTo(0, 0); }
-async function mep_submit(){
+async function mep_submit(confirmOnly){
   if(mep_busy || !mep_form) return;
   const f = mep_form, list = mep_lists[f.sec] || [];
   if(!f.emp){ alert('Choisis ton nom avant de valider.'); return; }
@@ -3424,42 +3469,70 @@ async function mep_submit(){
   }
   if(missing.length){ alert('Il manque ' + missing.length + ' quantité' + (missing.length > 1 ? 's' : '') + ' : ' + missing.slice(0, 5).join(', ') + (missing.length > 5 ? '…' : '') + '\nMets 0 si tu n’en as plus.'); return; }
   if(!items.length){ alert('Rien à enregistrer.'); return; }
-  const now = new Date();
-  const doc = { section:f.sec, date:mep_ymd(now), at:now.toISOString(), emp:String(emp.code), name:emp.name, items, by:(typeof currentUser !== 'undefined' ? currentUser : '') };
+  const st = mep_stockOf(f.sec), hasStock = list.some(i=>st[i.id]);
+  const changed = items.filter(i=>!st[i.id] || Number(st[i.id].q) !== i.q).map(i=>i.id);
+  if(confirmOnly && changed.length){ alert('Certaines quantités ont changé : utilise « Modifier l’inventaire ».'); return; }
+  if(!confirmOnly && hasStock && !changed.length){ alert('Aucune quantité n’a changé. Utilise « Rien n’a changé » pour confirmer.'); return; }
+  const now = new Date(), kind = confirmOnly ? 'confirm' : (hasStock ? 'change' : 'full');
+  const doc = { section:f.sec, date:mep_ymd(now), at:now.toISOString(), emp:String(emp.code), name:emp.name, items, changed, kind, by:(typeof currentUser !== 'undefined' ? currentUser : '') };
   mep_busy = true;
-  try{ await mep_saisiesCol.add(doc); mep_done = { sec:f.sec, name:emp.name, hm:mep_hm(doc.at) }; mep_form = null; mep_render(); window.scrollTo && window.scrollTo(0, 0); }
-  catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e) + '\nRéessaie.'); }
+  try{
+    const b = db.batch(); b.set(mep_saisiesCol.doc(), doc);
+    if(changed.length){ const s = {}; changed.forEach(id=>{ const it = items.find(x=>x.id === id); s[id] = { q:it.q, by:emp.name, emp:String(emp.code), at:doc.at }; }); b.set(mep_stockRef, { s:{ [f.sec]:s } }, { merge:true }); }
+    await b.commit();
+    mep_done = { sec:f.sec, name:emp.name, hm:mep_hm(doc.at), kind, n:changed.length }; mep_form = null; mep_render(); window.scrollTo && window.scrollTo(0, 0);
+  }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e) + '\nRéessaie.'); }
   mep_busy = false;
 }
 /* ---------- administrateur : historique ---------- */
 function mep_setTab(t){ mep_tab = t; if(t === 'listes' && !mep_draft) mep_draft = JSON.parse(JSON.stringify({ cooks:[], ...mep_lists, sections:mep_secList() })); if(t !== 'listes') mep_draft = null; if(t === 'saisie') mep_resetForm(); mep_render(); }
-function mep_setDate(v){ mep_date = v || mep_ymd(); mep_render(); }
-function mep_histSec(k){ mep_sec = k; mep_render(); }
-function mep_daySaisies(sec, date){ return mep_saisies.filter(x=>x.section === sec && x.date === date).sort((a, b)=>String(a.at).localeCompare(String(b.at))); }
+function mep_setDate(v){ mep_date = v || mep_ymd(); mep_viewId = ''; mep_render(); }
+function mep_histSec(k){ mep_sec = k; mep_viewId = ''; mep_render(); }
+function mep_daySaisies(sec, date){ return mep_saisies.filter(x=>x.section === sec && x.date === date).sort(mep_byAt); }
+/* valeurs successives de chaque article (une entrée par modification) */
+function mep_events(sec){
+  const ev = {};
+  mep_saisies.filter(x=>x.section === sec).sort(mep_byAt).forEach(x=>(x.items || []).forEach(it=>{ if(!mep_counts(x, it.id)) return; (ev[it.id] = ev[it.id] || []).push({ q:it.q, by:x.name, at:x.at }); }));
+  return ev;
+}
+/* pour chaque saisie : articles dont la valeur diffère de la valeur précédente de l'article */
+function mep_flags(sec){
+  const run = {}, out = {};
+  mep_saisies.filter(x=>x.section === sec).sort(mep_byAt).forEach(x=>{
+    out[x.id] = {};
+    (x.items || []).forEach(it=>{ if(run[it.id] !== undefined && run[it.id] !== it.q) out[x.id][it.id] = true; if(mep_counts(x, it.id)) run[it.id] = it.q; });
+  });
+  return out;
+}
+function mep_kindLabel(x){ const n = (x.changed || []).length; return x.kind === 'confirm' ? 'confirmé, rien n’a changé' : x.kind === 'full' ? 'premier inventaire' : x.kind === 'change' ? n + ' article' + (n > 1 ? 's' : '') + ' modifié' + (n > 1 ? 's' : '') : (x.items || []).length + ' ingrédients'; }
+function mep_view(id){ mep_viewId = mep_viewId === id ? '' : id; mep_render(); }
 function mep_histView(){
   if(!mep_date) mep_date = mep_ymd();
-  const sec = mep_sec, all = mep_daySaisies(sec, mep_date);
-  const byCook = {}; all.forEach(x=>{ byCook[x.emp] = x; }); // dernière saisie de chaque cuisinier
-  const cooks = Object.values(byCook).sort((a, b)=>String(a.at).localeCompare(String(b.at)));
-  const rowsIds = [], seen = {}, rowInfo = {};
-  (mep_lists[sec] || []).forEach(i=>{ rowsIds.push(i.id); seen[i.id] = 1; rowInfo[i.id] = i; });
-  cooks.forEach(c=>(c.items || []).forEach(i=>{ if(!seen[i.id]){ seen[i.id] = 1; rowsIds.push(i.id); rowInfo[i.id] = i; } }));
-  const cell = (c, id)=>{ const it = (c.items || []).find(x=>x.id === id); return it ? ft_fmtQ(it.q, '').replace(/\s/g, ' ') : '<span class="pt-muted">—</span>'; };
-  const table = cooks.length ? `<div style="overflow-x:auto;"><table class="mep-g"><tr><th>Ingrédient</th>${cooks.map(c=>`<th>${mep_e(c.name)}<div class="pt-muted" style="font-weight:500;">${mep_e(mep_hm(c.at))}${all.filter(x=>x.emp === c.emp).length > 1 ? ' · ' + all.filter(x=>x.emp === c.emp).length + ' saisies' : ''}</div></th>`).join('')}</tr>${rowsIds.map(id=>{ const pos = (mep_lists[sec] || []).findIndex(i=>i.id === id); return `<tr><td>${pos >= 0 ? '<span class="mep-num s">' + (pos + 1) + '</span>' : '<span class="mep-num s off">–</span>'}${mep_e(rowInfo[id].n)}<span class="pt-muted"> (${mep_e(rowInfo[id].u || '')})</span></td>${cooks.map(c=>`<td>${cell(c, id)}</td>`).join('')}</tr>`; }).join('')}</table></div>`
-    : `<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucun inventaire reçu pour cette date.</div>`;
-  const detail = all.length ? `<div class="ticket"><div class="section-label">Saisies du ${mep_e(mep_frDate(mep_date))} — ${mep_e(mep_secName(sec))}</div>${all.map(x=>`<div class="row-between" style="padding:8px 0;border-top:1px solid var(--line);"><div><b>${mep_e(x.name)}</b> <span class="pt-muted">${mep_e(mep_hm(x.at))} · ${(x.items || []).length} ingrédients</span></div><button class="btn ghost small t-del" onclick="mep_delSaisie('${x.id}')">Supprimer</button></div>`).join('')}</div>` : '';
-  // derniers jours
+  const sec = mep_sec, list = mep_lists[sec] || [], all = mep_daySaisies(sec, mep_date), cnt = (sec2, d)=>mep_daySaisies(sec2, d).length;
+  const secBtns = `<div class="mep-seg">${mep_secs().map(x=>`<button class="${sec === x[0] ? 'on' : ''}" onclick="mep_histSec('${x[0]}')">${x[1]}${cnt(x[0], mep_date) ? ' · ' + cnt(x[0], mep_date) : ''}</button>`).join('')}</div>`;
+  // situation actuelle : dernière valeur et valeur précédente de chaque article
+  const ev = mep_events(sec), has = mep_saisies.some(x=>x.section === sec);
+  const cell = (x, u, d)=>x ? `<div class="mep-q">${mep_e(mep_fq(x.q))}<span class="pt-muted"> ${mep_e(u)}</span>${d ? ' <span class="mep-d ' + (d > 0 ? 'up' : 'dn') + '">' + (d > 0 ? '▲ +' : '▼ ') + mep_fq(d) + '</span>' : ''}</div><div class="mep-w">${mep_e(x.by)} · ${mep_e(mep_fdt(x.at))}</div>` : '<span class="pt-muted">—</span>';
+  const situ = !list.length ? '<div class="pt-muted">Aucun ingrédient défini pour cette section.</div>' : !has ? '<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucun inventaire pour cette section.</div>'
+    : `<div style="overflow-x:auto;"><table class="mep-g"><tr><th>Article</th><th>Dernier inventaire</th><th>Avant</th></tr>${list.map((i, k)=>{ const e = ev[i.id] || [], last = e[e.length - 1], prev = e[e.length - 2]; return `<tr><td><span class="mep-num s">${k + 1}</span>${mep_e(i.n)}</td><td>${cell(last, i.u || '', last && prev ? Number(last.q) - Number(prev.q) : 0)}</td><td>${cell(prev, i.u || '', 0)}</td></tr>`; }).join('')}</table></div>`;
+  // historique du jour : une colonne par saisie
+  const flags = mep_flags(sec), rowsIds = [], seen = {}, info = {};
+  list.forEach(i=>{ rowsIds.push(i.id); seen[i.id] = 1; info[i.id] = i; });
+  all.forEach(x=>(x.items || []).forEach(i=>{ if(!seen[i.id]){ seen[i.id] = 1; rowsIds.push(i.id); info[i.id] = i; } }));
+  const qOf = (x, id)=>{ const it = (x.items || []).find(y=>y.id === id); return it ? it.q : null; };
+  const table = all.length ? `<div style="overflow-x:auto;"><table class="mep-g mep-sticky"><tr><th>Article</th>${all.map(x=>`<th>${mep_e(x.name)}<div class="pt-muted" style="font-weight:500;">${mep_e(mep_hm(x.at))}${x.kind === 'confirm' ? ' ✓' : ''}</div></th>`).join('')}</tr>${rowsIds.map(id=>{ const pos = list.findIndex(i=>i.id === id); return `<tr><td>${pos >= 0 ? '<span class="mep-num s">' + (pos + 1) + '</span>' : '<span class="mep-num s off">–</span>'}${mep_e(info[id].n)}<span class="pt-muted"> (${mep_e(info[id].u || '')})</span></td>${all.map(x=>{ const q = qOf(x, id); return `<td class="${q !== null && flags[x.id] && flags[x.id][id] ? 'mep-chg' : ''}">${q === null ? '<span class="pt-muted">—</span>' : mep_e(mep_fq(q))}</td>`; }).join('')}</tr>`; }).join('')}</table></div><div class="pt-muted" style="margin-top:6px;"><span class="mep-d up">orange</span> = valeur différente de l’inventaire précédent · ✓ = confirmé sans changement</div>`
+    : '<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucune saisie à cette date.</div>';
+  const detail = all.length ? `<div class="ticket"><div class="section-label">Saisies du ${mep_e(mep_frDate(mep_date))} — ${mep_e(mep_secName(sec))}</div>${all.map(x=>`<div style="padding:8px 0;border-top:1px solid var(--line);"><div class="row-between"><div><b>${mep_e(x.name)}</b> <span class="pt-muted">${mep_e(mep_hm(x.at))} · ${mep_e(mep_kindLabel(x))}</span></div><div class="pt-row" style="gap:6px;"><button class="btn ghost small t-view" onclick="mep_view('${x.id}')">${mep_viewId === x.id ? 'Masquer' : 'Voir'}</button><button class="btn ghost small t-del" onclick="mep_delSaisie('${x.id}')">Supprimer</button></div></div>${mep_viewId === x.id ? `<div style="margin-top:8px;">${(x.items || []).map((it, k)=>{ const pos = list.findIndex(i=>i.id === it.id); const c = flags[x.id] && flags[x.id][it.id]; return `<div class="row-between" style="padding:5px 0;border-top:1px solid var(--line);"><span><span class="mep-num s">${pos >= 0 ? pos + 1 : '–'}</span>${mep_e(it.n)}</span><span class="${c ? 'mep-d up' : ''}">${mep_e(mep_fq(it.q))} <span class="pt-muted">${mep_e(it.u || '')}</span></span></div>`; }).join('')}</div>` : ''}</div>`).join('')}</div>` : '';
   const days = []; for(let k = 0; k < 14; k++){ const d = new Date(); d.setDate(d.getDate() - k); days.push(mep_ymd(d)); }
-  const cnt = (sec2, d)=>mep_daySaisies(sec2, d).length;
-  const recent = `<div class="ticket"><div class="section-label">Derniers jours</div><div style="overflow-x:auto;"><table class="mep-g"><tr><th>Date</th>${mep_secs().map(x=>`<th>${x[1]}</th>`).join('')}</tr>${days.map(d=>`<tr class="mep-day ${d === mep_date ? 'on' : ''}" onclick="mep_setDate('${d}')"><td>${mep_e(mep_frDate(d))}</td>${mep_secs().map(x=>{ const n = cnt(x[0], d); return `<td>${n ? n : '<span class="ft-dot"></span>'}</td>`; }).join('')}</tr>`).join('')}</table></div></div>`;
-  return `<div class="mep-seg">${mep_secs().map(x=>`<button class="${sec === x[0] ? 'on' : ''}" onclick="mep_histSec('${x[0]}')">${x[1]}${cnt(x[0], mep_date) ? ' · ' + cnt(x[0], mep_date) : ''}</button>`).join('')}</div>
-    <div class="ticket"><div class="field"><label>Date</label><input type="date" class="ft-in" value="${mep_e(mep_date)}" onchange="mep_setDate(this.value)"></div></div>
-    <div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — inventaires du ${mep_e(mep_frDate(mep_date))}</div>${table}</div>${detail}${recent}`;
+  const recent = `<div class="ticket"><div class="section-label">Derniers jours</div><div style="overflow-x:auto;"><table class="mep-g"><tr><th>Date</th>${mep_secs().map(x=>`<th>${mep_e(x[1])}</th>`).join('')}</tr>${days.map(d=>`<tr class="mep-day ${d === mep_date ? 'on' : ''}" onclick="mep_setDate('${d}')"><td>${mep_e(mep_frDate(d))}</td>${mep_secs().map(x=>{ const n = cnt(x[0], d); return `<td>${n ? n : '<span class="ft-dot"></span>'}</td>`; }).join('')}</tr>`).join('')}</table></div></div>`;
+  return `${secBtns}<div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — situation actuelle</div>${situ}</div>
+    <div class="ticket"><div class="field"><label>Historique — date</label><input type="date" class="ft-in" value="${mep_e(mep_date)}" onchange="mep_setDate(this.value)"></div></div>
+    <div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — saisies du ${mep_e(mep_frDate(mep_date))}</div>${table}</div>${detail}${recent}`;
 }
 async function mep_delSaisie(id){
   if(!mep_isAdmin()) return; const x = mep_saisies.find(s=>s.id === id); if(!x) return;
-  if(!confirm('Supprimer la saisie de ' + x.name + ' (' + mep_hm(x.at) + ') ?')) return;
-  try{ await mep_saisiesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  if(!confirm('Supprimer la saisie de ' + x.name + ' (' + mep_hm(x.at) + ') ? Les quantités par défaut sont recalculées.')) return;
+  try{ await mep_saisiesCol.doc(id).delete(); await mep_rebuildStock(id); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 /* ---------- administrateur : listes ---------- */
 function mep_sName(i, v){ if(mep_draft && mep_draft.sections[i]) mep_draft.sections[i].n = v; }
