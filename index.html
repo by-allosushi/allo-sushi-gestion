@@ -3729,11 +3729,28 @@ function mep_stockFrom(exceptId, override){
   return s;
 }
 async function mep_rebuildStock(exceptId, override){ await mep_stockRef.set({ s:mep_stockFrom(exceptId, override), rebuiltAt:new Date().toISOString() }); }
-function mep_maybeBoot(){ // administrateur : crée / met à jour le stock à partir des saisies existantes (une seule fois)
-  if(!mep_isAdmin() || mep_boot || !mep_stockReady || !mep_saisiesReady) return;
-  mep_boot = true;
+const MEP_SNAP_KEYS = ['at', 'name', 'emp', 'items', 'correctedBy', 'correctedAt'];
+function mep_stockStale(from){ // le dernier inventaire stocké ne correspond pas à la dernière saisie (ou ancien format mélangé)
+  const secs = new Set([...Object.keys(from), ...Object.keys(mep_stock)]);
+  for(const sec of secs){
+    const f = from[sec], c = mep_stock[sec];
+    if(!f) continue;
+    if(!c || !Array.isArray(c.items)) return true;
+    if(Object.keys(c).some(k=>!MEP_SNAP_KEYS.includes(k))) return true;
+    if(String(c.at) !== String(f.at) || String(c.correctedAt || '') !== String(f.correctedAt || '')) return true;
+    if(c.items.map(i=>i.id + ':' + i.q).join('|') !== f.items.map(i=>i.id + ':' + i.q).join('|')) return true;
+  }
+  return false;
+}
+let mep_healSig = '';
+function mep_maybeBoot(){ // administrateur : garde le « dernier inventaire » aligné sur les saisies (à chaque mise à jour)
+  if(!mep_isAdmin() || mep_busy || !mep_stockReady || !mep_saisiesReady) return;
   const from = mep_stockFrom('');
-  if(Object.keys(from).some(sec=>!mep_stockOf(sec))) mep_rebuildStock('').catch(e=>console.error(e));
+  if(!mep_stockStale(from)){ mep_healSig = ''; return; }
+  const sig = JSON.stringify(from);
+  if(sig === mep_healSig) return; // déjà tenté avec ces mêmes données
+  mep_healSig = sig;
+  mep_rebuildStock('').catch(e=>console.error(e));
 }
 /* ---------- saisie (cuisinier ; administrateur : onglet « Saisie ») ---------- */
 function mep_resetForm(){ mep_form = { sec:mep_sec, emp:'', vals:{}, mode:'new' }; }
