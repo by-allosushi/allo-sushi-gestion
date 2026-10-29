@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<title>Allo Sushi — Gestion</title>
+<title>Allo Sushi — TEST</title>
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Allo Sushi" />
@@ -480,6 +480,7 @@ textarea.ft-in{font-family:'Inter',sans-serif;font-weight:500;line-height:1.45;r
 .ft-fam.open{border-bottom-left-radius:0;border-bottom-right-radius:0;}
 .ft-rows{border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;background:color-mix(in srgb,var(--surface) 60%,var(--paper));}
 .ft-row{display:flex;justify-content:space-between;align-items:center;min-height:44px;padding:0 14px;border-top:1px solid var(--line);font-size:15px;cursor:pointer;}.ft-row:first-child{border-top:0;}
+.mep-in td.i{padding:6px 4px;}table.mep-in input.ft-in{width:78px;text-align:right;padding:8px;margin:0;}table.mep-in th.l,table.mep-in td.l{border-left:1px solid var(--line);}table.mep-in th{vertical-align:bottom;}
 .mep2-head{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;}.mep2-who{font-weight:700;font-size:14px;margin-top:4px;}.mep2-corr{font-size:12px;color:#FBBF24;margin-top:2px;}
 .mep2-row{padding:10px 0;border-top:1px solid var(--line);}.mep2-name{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;margin-bottom:6px;}
 .mep2-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center;}.mep2-last{font-size:15px;padding-left:4px;}
@@ -580,6 +581,7 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
 
 <!-- ===================== APPLICATION ===================== -->
 <div id="app-shell" style="display:none;">
+<div style="background:#FBBF24;color:#1a1400;text-align:center;font-size:12px;font-weight:700;padding:6px 10px;">VERSION TEST — mêmes données que la version normale.</div>
 <header class="top">
   <div>
     <div class="title display">ALLO SUSHI</div>
@@ -3443,23 +3445,23 @@ function mep_correctStart(){ // administrateur : repart du dernier inventaire
 }
 function mep_correctCancel(){ mep_resetForm(); mep_render(); }
 function mep_lastHead(st){
-  if(!st) return '<div class="pt-muted">Aucun inventaire</div>';
-  return `<div class="mep2-who">${mep_e(st.name)} · ${mep_e(mep_fdt(st.at))}</div>${st.correctedBy ? `<div class="mep2-corr">✎ corrigé par ${mep_e(st.correctedBy)} · ${mep_e(mep_hm(st.correctedAt))}</div>` : ''}`;
+  if(!st) return '<div class="pt-muted" style="font-weight:500;">—</div>';
+  const d = new Date(st.at), dm = isNaN(d) ? '' : String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+  return `<div class="mep2-who">${mep_e(st.name)}</div><div class="pt-muted" style="font-weight:500;">${mep_e(dm)}</div><div class="pt-muted" style="font-weight:500;">${mep_e(mep_hm(st.at))}</div>${st.correctedBy ? `<div class="mep2-corr">✎ ${mep_e(st.correctedBy)} · ${mep_e(mep_hm(st.correctedAt))}</div>` : ''}`;
 }
 function mep_entryView(){
   if(!mep_form) mep_resetForm();
   const list = mep_lists[mep_sec] || [], emps = mep_empList(), st = mep_stockOf(mep_sec), f = mep_form, correct = f.mode === 'correct' && !!st;
-  const lastQ = (id, u)=>{ const it = st && st.items.find(x=>x.id === id); return it ? `<b>${mep_e(mep_fq(it.q))}</b> <span class="pt-muted">${mep_e(u || '')}</span>` : '<span class="pt-muted">—</span>'; };
-  const rows = list.length ? list.map((i, k)=>`<div class="mep2-row"><div class="mep2-name"><span class="mep-num">${k + 1}</span><span>${mep_e(i.n)}${i.u ? ` <span class="pt-muted">(${mep_e(i.u)})</span>` : ''}</span></div>
-      <div class="mep2-cols"><input id="mep-in-${i.id}" class="ft-in ${correct && !mep_same(f.vals[i.id], f.base && f.base[i.id]) ? 'chg' : ''}" type="text" inputmode="decimal" placeholder="0" value="${mep_e(f.vals[i.id] || '')}" oninput="mep_setVal('${i.id}', this.value)"><div class="mep2-last">${lastQ(i.id, i.u)}</div></div></div>`).join('') : `<div class="pt-muted">Aucun ingrédient défini pour cette section.${mep_isAdmin() ? ' Ajoute-les dans « Listes ».' : ''}</div>`;
-  const head = `<div class="mep2-head"><div><div class="section-label" style="margin:0;">${correct ? 'Correction' : 'Inventaire en cours'}</div></div><div><div class="section-label" style="margin:0;">Dernier inventaire</div>${mep_lastHead(st)}</div></div>`;
+  const lastQ = (id)=>{ const it = st && st.items.find(x=>x.id === id); return it ? mep_e(mep_fq(it.q)) : '<span class="pt-muted">—</span>'; };
+  const rows = list.map((i, k)=>`<tr><td><span class="mep-num s">${k + 1}</span>${mep_e(i.n)}${i.u ? ` <span class="pt-muted">(${mep_e(i.u)})</span>` : ''}</td><td class="i"><input id="mep-in-${i.id}" class="ft-in ${correct && !mep_same(f.vals[i.id], f.base && f.base[i.id]) ? 'chg' : ''}" type="text" inputmode="decimal" placeholder="0" value="${mep_e(f.vals[i.id] || '')}" oninput="mep_setVal('${i.id}', this.value)"></td><td class="l">${lastQ(i.id)}</td></tr>`).join('');
+  const table = list.length ? `<div style="overflow-x:auto;"><table class="mep-g mep-in"><tr><th>Article</th><th>${correct ? 'Correction' : 'En cours'}</th><th class="l">${mep_lastHead(st)}</th></tr>${rows}</table></div>` : `<div class="pt-muted">Aucun ingrédient défini pour cette section.${mep_isAdmin() ? ' Ajoute-les dans « Listes ».' : ''}</div>`;
   const nameBox = correct ? `<div class="ticket"><div class="pt-muted">Tu corriges le dernier inventaire de <b>${mep_e(st.name)}</b> (${mep_e(mep_fdt(st.at))}). Change les quantités en erreur, puis enregistre.</div></div>`
     : `<div class="ticket"><div class="field"><label>Cuisinier</label><select class="ft-in" id="mep-emp" onchange="mep_setEmp(this.value)"><option value="">Choisis ton nom</option>${emps.map(x=>`<option value="${mep_e(x.code)}" ${String(f.emp) === String(x.code) ? 'selected' : ''}>${mep_e(x.name)}</option>`).join('')}</select></div></div>`;
   const btns = !list.length ? '' : correct
     ? `<div class="actions-row"><button class="btn t-edit" style="flex:1 1 60%;height:48px;" onclick="mep_submit()">Enregistrer la correction</button><button class="btn ghost t-cancel" style="flex:1 1 30%;height:48px;" onclick="mep_correctCancel()">Annuler</button></div>`
     : `<div class="actions-row"><button class="btn t-save" style="width:100%;height:48px;" onclick="mep_submit()">Valider l’inventaire</button></div>${mep_isAdmin() && st ? '<div class="actions-row"><button class="btn ghost small t-edit" onclick="mep_correctStart()">Corriger le dernier inventaire</button></div>' : ''}`;
   return `<div class="mep-seg">${mep_secs().map(x=>`<button class="${mep_sec === x[0] ? 'on' : ''}" onclick="mep_pickSec('${x[0]}')">${x[1]}</button>`).join('')}</div>
-    ${nameBox}<div class="ticket">${head}${rows}</div>${btns}`;
+    ${nameBox}<div class="ticket"><div class="section-label">${mep_e(mep_secName(mep_sec))} — ${correct ? 'correction' : 'inventaire'}</div>${table}</div>${btns}`;
 }
 function mep_same(a, b){ const x = ft_parseQ(a), y = ft_parseQ(b); return (x !== null && y !== null) ? x === y : String(a || '').trim() === String(b || '').trim(); }
 function mep_readItems(list, vals){ // toutes les quantités sont obligatoires
