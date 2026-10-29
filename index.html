@@ -2823,6 +2823,8 @@ function pt_empCards(q, isAdmin){
     h += card('c-base', 'Salaire de base', pt_fmtMoney(q.baseWage)) + card('c-transport', 'Transport', pt_fmtMoney(q.transportTotal)) + card('c-bonus', 'Primes &amp; bonus', pt_fmtMoney(q.bonusesTotal)) + card('c-adv', 'Avances', pt_fmtMoney(q.advancesTotal));
     if(q.leavesTotal) h += card('c-off', 'Jours off', pt_fmtMoney(q.leavesTotal));
     if(q.loanTotal) h += card('c-loan', 'Prêt', pt_fmtMoney(q.loanTotal));
+    const ri = Number(q.reportIn) || 0;   // dû de la semaine / période précédente, repris dans cette paie
+    h += card(ri < -0.004 ? 'c-adv' : 'c-bonus', 'Dû semaine précédente', ri > 0.004 ? '+' + pt_fmtMoney(ri) : ri < -0.004 ? '−' + pt_fmtMoney(-ri) : pt_fmtMoney(0));
   }
   h += '</div>';
   if(isAdmin) h += `<div class="grid grid-2"><div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span></div><div class="value">${pt_fmtMoney(q.subTotal)}</div></div><div class="result-box final"><div class="label">Net à payer${q.reportOut < -0.004 ? '<br><span style="font-weight:400;font-size:11px;color:var(--rust);">report −' + pt_fmtMoney(-q.reportOut) + '</span>' : q.reportOut > 0.004 ? '<br><span style="font-weight:400;font-size:11px;color:var(--moss);">reste dû +' + pt_fmtMoney(q.reportOut) + '</span>' : ''}</div><div class="value">${pt_fmtMoney(q.net)}</div></div></div>`;
@@ -2836,7 +2838,7 @@ function pt_tabEmployes(codes, sessions, anoms, overlaps){
   let html = '';
   if(pt_selAll){
     const qs = codes.map(x=>pt_displayPayroll(x, sessions)), S = (k)=>qs.reduce((t,q)=>t + (Number(q[k]) || 0), 0);
-    const tot = { totalHours:S('totalHours'), workedDays:S('workedDays'), baseWage:S('baseWage'), transportTotal:S('transportTotal'), bonusesTotal:S('bonusesTotal'), advancesTotal:S('advancesTotal'), leavesTotal:S('leavesTotal'), loanTotal:S('loanTotal'), subTotal:S('subTotal'), reportOut:S('reportOut'), net:S('net') };
+    const tot = { totalHours:S('totalHours'), workedDays:S('workedDays'), baseWage:S('baseWage'), transportTotal:S('transportTotal'), bonusesTotal:S('bonusesTotal'), advancesTotal:S('advancesTotal'), leavesTotal:S('leavesTotal'), loanTotal:S('loanTotal'), subTotal:S('subTotal'), reportIn:S('reportIn'), reportOut:S('reportOut'), net:S('net') };
     return html + `<div class="ticket">${pt_empSelect(codes)}${pt_empCards(tot, isAdmin)}<div class="pt-muted">Totaux de tous les employés sur la période affichée. Choisis un employé pour voir ses pointages et sa paie.</div></div>`
       + (() => { const probs = codes.map(x=>({ x, a:anoms.filter(a=>a.code === x).length, o:overlaps.filter(o=>o.codeA === x || o.codeB === x).length })).filter(r=>r.a || r.o);
           return probs.length ? `<div class="ticket"><div class="section-label">À régler</div>${probs.map(r=>`<div class="pt-an"><div><b>${pt_e(pt_label(r.x))}</b><div class="pt-an-reason">${[r.a ? r.a + ' entrée(s)/sortie(s) manquante(s)' : '', r.o ? r.o + ' chevauchement(s)' : ''].filter(Boolean).join(' · ')}</div></div><button class="btn ghost small b-neutral t-view" onclick="pt_selEmp('${r.x}')">Ouvrir</button></div>`).join('')}</div>` : ''; })()
