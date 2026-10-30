@@ -4079,9 +4079,8 @@ function mep_rpBlock(sec, i, r){
   }
   return `<div class="g2 rp2-r2"><div><label>Article Resto Pro</label><input type="text" id="mep-rpq-${sec}-${i}" class="ft-in" placeholder="🔎 Chercher…" autocomplete="off" oninput="mep_rpQuery('${sec}',${i},this.value)"></div><div><label>État du stock</label><div class="rp2-box pt-muted">Non lié</div></div></div><div id="mep-rpres-${sec}-${i}"></div>`;
 }
-function mep_unitSelect(sec, i, cur){
-  const list = MEP_UNITS.includes(cur) || !cur ? MEP_UNITS : MEP_UNITS.concat([cur]);
-  return `<select class="ft-in" onchange="mep_dUnit('${sec}',${i},this.value)">${list.map(u=>`<option value="${mep_e(u)}" ${u === (cur || 'kg') ? 'selected' : ''}>${mep_e(u)}</option>`).join('')}</select>`;
+function mep_unitSelect(sec, i, cur){ // zone de saisie libre (ex. : kg, g, pièces, boîte…)
+  return `<input type="text" class="ft-in" maxlength="20" autocomplete="off" placeholder="ex. : kg, g, pièces" value="${mep_e(cur || '')}" oninput="mep_dUnit('${sec}',${i},this.value)">`;
 }
 function mep_ingCard(sec, i, r){
   return `<div class="rp2-ing"><div class="rp2-top"><span class="mep-num">${i + 1}</span><div class="rp2-act"><button class="btn ghost small" onclick="mep_dMove('${sec}',${i},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_dMove('${sec}',${i},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="mep_dDel('${sec}',${i})" aria-label="Retirer">✕</button></div></div>
@@ -4112,7 +4111,7 @@ function mep_cAdd(){ mep_draft.cooks.push({ id:mep_newId(), n:'' }); mep_render(
 function mep_cDel(i){ mep_draft.cooks.splice(i, 1); mep_render(); }
 function mep_dName(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].n = v; }
 function mep_dUnit(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].u = v; }
-function mep_dAdd(sec){ mep_draft[sec].push({ id:mep_newId(), n:'', u:'kg', rp:'', rpn:'' }); mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-' + sec); if(els.length) els[els.length - 1].focus(); }, 0); }
+function mep_dAdd(sec){ mep_draft[sec].push({ id:mep_newId(), n:'', u:'', rp:'', rpn:'' }); mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-' + sec); if(els.length) els[els.length - 1].focus(); }, 0); }
 function mep_dDel(sec, i){ mep_draft[sec].splice(i, 1); mep_render(); }
 function mep_dMove(sec, i, d){ const j = i + d, l = mep_draft[sec]; if(j < 0 || j >= l.length) return; const t = l[i]; l[i] = l[j]; l[j] = t; mep_render(); }
 async function mep_saveLists(){
