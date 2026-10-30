@@ -217,7 +217,11 @@
 .home-card .lbl{font-weight:700;font-size:13.5px;font-family:'Manrope',sans-serif;}
 .home-card .desc{font-size:11px;color:var(--ink-muted);margin-top:3px;}
 .home-card.locked{opacity:.4;cursor:not-allowed;}
-.home-card.admin{border-color:var(--forest);background:var(--forest-light);background:linear-gradient(180deg,#EEF2FF,#FFFFFF);}
+.home-card.admin{border-color:var(--forest);background:var(--forest-light);}
+.pa-dt{font-size:11px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink-muted);margin-top:6px;}
+.pa-who{margin:4px 0 2px;font-size:16px;font-weight:700;}
+.pa-week{font-size:12.5px;color:var(--ink-muted);margin-bottom:6px;}
+.pa-emp{width:100%;margin-top:6px;}
 
 /* ===== User management ===== */
 .perm-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:13px;border-bottom:1px solid var(--line);}
@@ -708,12 +712,20 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
         <div class="perm-row"><span>Accès Pointage</span><label class="switch"><input type="checkbox" id="nu-perm-pointage"><span class="slider"></span></label></div>
         <div class="perm-row"><span>Accès Fiches techniques</span><label class="switch"><input type="checkbox" id="nu-perm-fiches"><span class="slider"></span></label></div>
         <div class="perm-row"><span>Accès Mise en place</span><label class="switch"><input type="checkbox" id="nu-perm-mep"><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Ma fiche de paie</span><label class="switch"><input type="checkbox" id="nu-perm-paie"><span class="slider"></span></label></div>
+        <div style="padding:2px 0 8px;"><div style="font-size:12px;color:var(--ink-muted);">Employé correspondant (pointage) — nécessaire pour « Ma fiche de paie »</div><select id="nu-emp" class="pa-emp"><option value="">— Aucun employé —</option></select></div>
       </div>
       <button class="btn moss" style="margin-top:14px;" onclick="uu_createUser()">➕ Créer l'utilisateur</button>
     </div>
 
     <h2 class="section">Utilisateurs existants</h2>
     <div id="users-list"></div>
+  </main>
+</div>
+
+<div id="module-paie" class="module">
+  <main style="max-width:900px;margin:0 auto;padding:18px 16px 40px;">
+    <div id="pa-body"></div>
   </main>
 </div>
 
@@ -739,6 +751,8 @@ function askUserName(){ /* obsolète : l'utilisateur est désormais défini via 
 
 /* ==================== AUTHENTIFICATION & AUTORISATIONS ==================== */
 const appUsersCol = db.collection('app_users');
+const PAIE_LINK = /[?&]paie(\b|=|&|$)/.test(location.search); // lien commun donné aux employés : …/allo-sushi-gestion/?paie
+(function(){ if(PAIE_LINK){ const el = document.getElementById('login-sub'); if(el) el.textContent = 'Ma fiche de paie — connecte-toi'; } })();
 const SESSION_KEY = 'allosushi-session';
 const MODULE_DEFS = [
   { key:'caisse',   label:'Caisse',    ic:'💰', desc:'Sessions de caisse' },
@@ -746,6 +760,7 @@ const MODULE_DEFS = [
   { key:'fiches',   label:'Fiches techniques', ic:'📋', desc:'Recettes & dressage' },
   { key:'mep',      label:'Mise en place', ic:'🧑‍🍳', desc:'Inventaire de fin de service' },
   { key:'restopro', label:'CA Resto Pro', ic:'📈', desc:'Chiffre d’affaires & remises' },
+  { key:'paie',     label:'Ma fiche de paie', ic:'💵', desc:'Ma paie de la semaine' },
 ];
 let session = null; // { username, isAdmin, permissions:{caisse,pointage} }
 let usersCache = [];
@@ -753,6 +768,10 @@ let usersSetupMode = false;
 
 function hasAccess(moduleKey){
   if(!session) return false;
+  if(moduleKey === 'paie'){ // fiche personnelle : l’administrateur ne la voit que s’il est relié à un employé
+    if(session.isAdmin) return session.empCode !== null && session.empCode !== undefined && session.empCode !== '';
+    return !!(session.permissions && session.permissions.paie);
+  }
   if(session.isAdmin) return true;
   return !!(session.permissions && session.permissions[moduleKey]);
 }
@@ -807,7 +826,8 @@ function applySession(userDoc){
     username: userDoc.id,
     displayName: userDoc.username || userDoc.id,
     isAdmin: !!userDoc.isAdmin,
-    permissions: userDoc.permissions || {}
+    permissions: userDoc.permissions || {},
+    empCode: (userDoc.empCode === undefined || userDoc.empCode === null || userDoc.empCode === '') ? null : Number(userDoc.empCode)
   };
   currentUser = session.displayName;
   localStorage.setItem(USER_KEY, currentUser);
@@ -816,7 +836,7 @@ function applySession(userDoc){
   document.getElementById('app-shell').style.display = 'block';
   renderUserChip();
   buildModuleTabs();
-  showModule('home');
+  showModule(PAIE_LINK && hasAccess('paie') ? 'paie' : 'home'); // lien « ?paie » : arrivée directe sur la fiche
   if(session.isAdmin){ uu_subscribeUsers(); }
   try{ if(hasAccess('restopro')){ rp_watchMeta(); rp_requestSync(); } }catch(e){ console.warn('CA Resto Pro :', e); }
 }
@@ -929,6 +949,7 @@ async function uu_createUser(){
   if(pwd.length < 4){ alert("Le mot de passe doit contenir au moins 4 caractères."); return; }
   if(usersCache.some(u=>u.id===uname)){ alert("Ce nom d'utilisateur existe déjà."); return; }
   const isAdmin = document.getElementById('nu-admin').checked;
+  if(!isAdmin && document.getElementById('nu-perm-paie').checked && document.getElementById('nu-emp').value === ''){ alert("Pour « Ma fiche de paie », choisis l'employé correspondant."); return; }
   const userDoc = {
     username: uname,
     password: pwd,
@@ -937,8 +958,10 @@ async function uu_createUser(){
       caisse: document.getElementById('nu-perm-caisse').checked,
       pointage: document.getElementById('nu-perm-pointage').checked,
       fiches: document.getElementById('nu-perm-fiches').checked,
-      mep: document.getElementById('nu-perm-mep').checked
+      mep: document.getElementById('nu-perm-mep').checked,
+      paie: document.getElementById('nu-perm-paie').checked
     },
+    empCode: (document.getElementById('nu-emp').value === '') ? null : Number(document.getElementById('nu-emp').value),
     creeLe: new Date().toISOString(),
     creePar: currentUser
   };
@@ -946,7 +969,8 @@ async function uu_createUser(){
   document.getElementById('nu-username').value = '';
   document.getElementById('nu-password').value = '';
   document.getElementById('nu-admin').checked = false;
-  ['caisse', 'pointage', 'fiches', 'mep'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
+  ['caisse', 'pointage', 'fiches', 'mep', 'paie'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
+  document.getElementById('nu-emp').value = '';
   uu_toggleAdminFields();
 }
 
@@ -991,6 +1015,24 @@ function uu_subscribeUsers(){
   });
 }
 
+function uu_fillNewEmp(){ // liste des employés du formulaire « Nouvel utilisateur »
+  const el = document.getElementById('nu-emp'); if(!el || typeof pt_codes !== 'function') return;
+  const cur = el.value;
+  el.innerHTML = '<option value="">— Aucun employé —</option>' + pt_codes().map(c=>`<option value="${c}">${esc(pt_label(c))} (code ${c})</option>`).join('');
+  el.value = cur;
+}
+function uu_empSelect(u){
+  const codes = (typeof pt_codes === 'function') ? pt_codes() : [];
+  const cur = (u.empCode === undefined || u.empCode === null || u.empCode === '') ? '' : String(u.empCode);
+  const opts = ['<option value="">— Aucun employé —</option>'].concat(codes.map(c=>`<option value="${c}" ${String(c) === cur ? 'selected' : ''}>${esc(pt_label(c))} (code ${c})</option>`));
+  if(cur && !codes.map(String).includes(cur)) opts.push(`<option value="${esc(cur)}" selected>Code ${esc(cur)}</option>`);
+  return `<div style="padding:2px 0 8px;"><div style="font-size:12px;color:var(--ink-muted);">Employé correspondant (pointage) — nécessaire pour « Ma fiche de paie »</div>
+    <select class="pa-emp" onchange="uu_setEmp('${u.id}', this.value)">${opts.join('')}</select></div>`;
+}
+async function uu_setEmp(userId, v){
+  const code = v === '' ? null : Number(v);
+  await appUsersCol.doc(userId).set({ empCode: code }, { merge:true });
+}
 function uu_render(){
   const el = document.getElementById('users-list');
   if(!el) return;
@@ -1000,11 +1042,11 @@ function uu_render(){
       <div class="perm-row">
         <span>${m.ic} ${m.label}</span>
         <label class="switch">
-          <input type="checkbox" ${perms[m.key]?'checked':''} ${u.isAdmin?'disabled':''}
+          <input type="checkbox" ${perms[m.key]?'checked':''} ${(u.isAdmin && m.key !== 'paie')?'disabled':''}
             onchange="uu_togglePerm('${u.id}','${m.key}',this.checked)">
           <span class="slider"></span>
         </label>
-      </div>`).join('');
+      </div>` + (m.key === 'paie' ? uu_empSelect(u) : '')).join('');
     return `<div class="user-card">
       <div class="uh">
         <div class="uname">${esc(u.username||u.id)}${u.isAdmin?'<span class="badge-admin">Admin</span>':''}</div>
@@ -1059,13 +1101,14 @@ function showModule(name){
     b.classList.toggle('active', b.getAttribute('data-mod')===name);
   });
   if(name==='home') renderHome();
-  if(name==='users') uu_render();
+  if(name==='users'){ if(typeof pt_start==='function') pt_start(); uu_render(); uu_fillNewEmp(); }
   if(name==='caisse' && typeof ca_render==='function') ca_render();
   if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
   if(name==='fiches'){ if(typeof ft_start==='function') ft_start(); if(typeof ft_render==='function') ft_render(); }
   if(name==='restopro'){ if(typeof rp_start==='function') rp_start(); }
   if(name==='mep'){ if(typeof mep_start==='function') mep_start(); if(typeof mep_render==='function') mep_render(); }
   if(name==='dettes'){ if(typeof dt_start==='function') dt_start(); if(typeof dt_render==='function') dt_render(); }
+  if(name==='paie'){ if(typeof pt_start==='function') pt_start(); if(typeof pa_render==='function') pa_render(); }
 }
 
 document.getElementById('today-label').textContent =
@@ -1560,7 +1603,7 @@ function pt_groupsToDoc(groups){ return { groups: (groups || []).map(g=>({ codes
 function pt_groupsFromDoc(data){ return ((data && data.groups) || []).map(g=>Array.isArray(g) ? g : ((g && g.codes) || [])); }
 let pt_renderQueued = false;
 // plusieurs écoutes Firestore répondent presque en même temps au chargement : on ne redessine qu'une fois
-function pt_scheduleRender(){ if(pt_renderQueued) return; pt_renderQueued = true; Promise.resolve().then(()=>{ pt_renderQueued = false; pt_render(); }); }
+function pt_scheduleRender(){ if(pt_renderQueued) return; pt_renderQueued = true; Promise.resolve().then(()=>{ pt_renderQueued = false; pt_render(); if(activeModule === 'paie' && typeof pa_render === 'function') pa_render(); if(activeModule === 'users' && typeof uu_render === 'function'){ uu_render(); uu_fillNewEmp(); } }); }
 function pt_start(){
   if(pt_started) return;
   pt_started = true;
@@ -1568,7 +1611,7 @@ function pt_start(){
   setTimeout(()=>{ if(activeModule === 'pointage') pt_render(); }, 5000); // force un nouvel essai d'affichage même si aucune donnée n'est jamais arrivée
   try{ const raw = localStorage.getItem('pt-period'); if(raw) pt_filter = JSON.parse(raw); }catch(e){}
   try{ pt_showClosed = localStorage.getItem('pt-show-closed') === '1'; }catch(e){}
-  const onErr = (err)=>{ console.error(err); pt_error = (err && err.message) || 'Lecture impossible'; pt_render(); };
+  const onErr = (err)=>{ console.error(err); pt_error = (err && err.message) || 'Lecture impossible'; pt_render(); if(typeof pa_render === 'function') pa_render(); };
   pt_eventsCol.onSnapshot((snap)=>{
     const list = [];
     snap.forEach(d=>{
@@ -3125,6 +3168,78 @@ function pt_exportExcel(){
   add('Reglages', ['Code','Nom','Poste','Mode','Taux','Transport actif','Montant transport'], codes.map(c=>{ const t = pt_transport(c); return [c, pt_name(c), pt_poste(c), pt_mode(c) === 'daily' ? 'DA/jour' : 'DA/heure', pt_rate(c), t.enabled ? 'Oui' : 'Non', t.amount]; }));
   XLSX.writeFile(wb, 'pointage_allo_sushi_' + todayISO() + '.xlsx');
 }
+
+/* ==================== MODULE « MA FICHE DE PAIE » — vue personnelle d’un employé (lecture seule) ==================== */
+/* Semaine affichée : du samedi au vendredi, remplacée par la suivante le dimanche (le samedi on voit encore la semaine qui vient de finir).
+   Chiffres = ceux de la vue Pointage pour la même période. Sous chaque rubrique : date de la dernière modification. */
+function pa_weekRange(){
+  // La semaine de paie va du samedi au vendredi, mais la fiche ne bascule que le dimanche : on se repère sur la veille.
+  const ref = pt_addDays(todayISO(), -1), d = new Date(ref + 'T12:00:00'), off = (d.getDay() + 1) % 7; // samedi = 0
+  const from = pt_addDays(ref, -off);
+  return { from, to:pt_addDays(from, 6) };
+}
+function pa_stamp(e){ // { t, time } à partir d’une saisie : heure d’enregistrement si connue, sinon la date saisie
+  if(!e) return null;
+  const iso = e.creeLe || e.savedAt || e.validatedAt;
+  if(iso){ const t = Date.parse(iso); if(!isNaN(t)) return { t, time:true }; }
+  if(e.date){ const t = Date.parse(e.date + 'T00:00:00'); if(!isNaN(t)) return { t, time:false }; }
+  return null;
+}
+function pa_max(list){ let b = null; list.forEach(x=>{ if(x && (!b || x.t > b.t)) b = x; }); return b; }
+function pa_fmt(st){
+  if(!st) return '—';
+  const d = new Date(st.t), ds = d.toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
+  return st.time ? ds + ' ' + pt_hhmm(d) : ds;
+}
+function pa_data(code){
+  const wk = pa_weekRange();
+  return pt_withFilter(wk.from, wk.to, ()=>{
+    const all = pt_compute().sessions.filter(s=>s.code === code);
+    const sessions = all.filter(s=>pt_inRange(pt_day(s.date)));
+    const q = pt_displayPayroll(code, sessions);
+    const ent = (kinds)=>pt_entries.filter(e=>kinds.includes(e.kind) && String(e.code) === String(code) && pt_inRange(e.date)).map(pa_stamp);
+    const manual = ent(['manual']);
+    const pointage = pa_max([ ...sessions.map(s=>({ t:s.end.getTime(), time:true })), ...manual,
+      ...(pt_isAuto(code) ? pt_autoDays(code).slice(-1).map(d=>({ t:Date.parse(d + 'T00:00:00'), time:false })) : []) ]);
+    const primes = pa_max(ent(['prime'])), avances = pa_max(ent(['avance']));
+    const prets = pa_max(pt_repaysOf(code).filter(r=>r.mode !== 'direct' && r.date && pt_inRange(r.date)).map(pa_stamp));
+    const autres = pa_max(ent(['off', 'absent']));
+    const cg = pt_conge(code);
+    const stCongeVerse = pa_max(pt_congePaidList(code).map(pa_stamp));
+    const sinceConge = pa_max(all.filter(s=>pt_day(s.date) >= PT_CONGE_START).map(s=>({ t:s.end.getTime(), time:true })));
+    const stOpen = pa_stamp(pt_entries.find(e=>e.kind === 'congeopen' && e.code === code));
+    const sous = pa_max([pointage, primes]);
+    const valid = pa_stamp(pt_validationFor(code, wk.from, wk.to));
+    return { wk, q, cg, d:{
+      transport:pointage, primes, avances, prets, congeVerse:stCongeVerse,
+      reste:pa_max([stCongeVerse, sinceConge, stOpen]),
+      sous, net:pa_max([pointage, primes, avances, prets, autres, valid])
+    } };
+  });
+}
+function pa_render(){
+  if(activeModule !== 'paie') return;
+  const body = document.getElementById('pa-body'); if(!body) return;
+  if(!session || session.empCode === null || session.empCode === undefined){
+    body.innerHTML = `<div class="ticket"><div class="empty-state">Ton compte n’est pas encore relié à un employé. Demande à l’administrateur de le relier dans « Utilisateurs ».</div></div>`; return;
+  }
+  if(pt_error){ body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
+  if(!Object.keys(pt_ready).every(k=>pt_ready[k])){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  const code = session.empCode, r = pa_data(code), q = r.q, d = r.d;
+  const card = (cls, l, n, st)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div><div class="pa-dt">🕒 ${pa_fmt(st)}</div></div>`;
+  const dl = (iso)=>new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'short' });
+  const yr = r.wk.to.slice(0, 4);
+  const rep = q.reportOut < -0.004 ? `<br><span style="font-weight:400;font-size:11px;color:var(--rust);">report −${pt_fmtMoney(-q.reportOut)}</span>` : q.reportOut > 0.004 ? `<br><span style="font-weight:400;font-size:11px;color:var(--moss);">reste dû +${pt_fmtMoney(q.reportOut)}</span>` : '';
+  body.innerHTML = `<div class="ticket">
+    <div class="section-label">Ma fiche de paie</div>
+    <div class="pa-who">${pt_e(pt_label(code))}</div>
+    <div class="pa-week">Semaine du ${dl(r.wk.from)} au ${dl(r.wk.to)} ${yr}</div>
+    <div class="pt-cards">${card('c-transport','Transport',pt_fmtMoney(q.transportTotal),d.transport)}${card('c-bonus','Primes &amp; bonus',pt_fmtMoney(q.bonusesTotal),d.primes)}${card('c-adv','Avances',pt_fmtMoney(q.advancesTotal),d.avances)}${card('c-loan','Prêt',pt_fmtMoney(q.loanTotal),d.prets)}${card('c-bonus','Congé versé',pt_fmtMoney(r.cg.taken),d.congeVerse)}${card('c-transport','Reste à verser',pt_money2(r.cg.left),d.reste)}</div>
+    <div class="grid grid-2"><div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span><div class="pa-dt">🕒 ${pa_fmt(d.sous)}</div></div><div class="value">${pt_fmtMoney(q.subTotal)}</div></div><div class="result-box final"><div class="label">Net à payer${rep}<div class="pa-dt">🕒 ${pa_fmt(d.net)}</div></div><div class="value">${pt_fmtMoney(q.net)}</div></div></div>
+    <div class="pt-muted" style="margin-top:10px;">La fiche de la nouvelle semaine remplace celle-ci chaque dimanche. 🕒 = date de la dernière modification de la rubrique.</div>
+  </div>`;
+}
+setInterval(()=>{ if(activeModule === 'paie') pa_render(); }, 300000); // bascule automatique de semaine si l’écran reste ouvert
 
 /* ==================== MODULE CARNET — dettes, emprunts & disponible (privé) ==================== */
 /* Visible uniquement par le compte 'soufyane' — jamais par les autres administrateurs.
