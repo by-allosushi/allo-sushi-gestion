@@ -449,6 +449,85 @@ input[id^="pt-"]::placeholder{color:#8B958F;font-weight:400;}
 .btn[class*=" t-"],.btn.ghost[class*=" t-"]{background:color-mix(in srgb,var(--c) 16%,#151A17);border-color:var(--c);color:var(--t);}
 .btn[class*=" t-"]:hover{filter:brightness(1.25);}
 .btn.t-add{--c:#3B82F6;--t:#93C5FD;}.btn.t-save{--c:#22C55E;--t:#86EFAC;}.btn.t-valid{--c:#14B8A6;--t:#5EEAD4;}.btn.t-del{--c:#EF4444;--t:#FCA5A5;}.btn.t-edit{--c:#F59E0B;--t:#FCD34D;}.btn.t-close{--c:#8B5CF6;--t:#C4B5FD;}.btn.t-reopen{--c:#F97316;--t:#FDBA74;}.btn.t-cancel{--c:#A8A29E;--t:#D6D3D1;}.btn.t-mail{--c:#EC4899;--t:#F9A8D4;}.btn.t-io{--c:#06B6D4;--t:#67E8F9;}.btn.t-view{--c:#0EA5E9;--t:#7DD3FC;}
+/* téléphone : formulaires du module pointage sur 2 colonnes, motif et boutons pleine largeur */
+.pt-cl-cards{display:none;}
+@media(max-width:600px){
+  .pt-cl-cards{display:block;}.pt-cl-table{display:none;}
+  .pt-cl-cards .pt-row{flex-wrap:nowrap;gap:6px;}.pt-cl-cards .pt-row > .btn{flex:1 1 0;min-width:0;padding:8px 4px;}
+  .pt-row{align-items:flex-end;}
+  .pt-row > input,.pt-row > select,.pt-row > .field{flex:1 1 calc(50% - 8px);min-width:0;width:auto;}
+  .pt-row > .pt-grow,.pt-row > #pt-rb-mode,.pt-row > #pt-ln-note{flex:1 1 100%;}
+  .pt-row > .btn{flex:1 1 100%;justify-content:center;}
+  #pt-body input:not([type=checkbox]):not([type=file]),#pt-body select,#pt-from,#pt-to{height:44px;min-height:44px;line-height:1.2;-webkit-appearance:none;appearance:none;margin:0;}
+  #pt-body input[type=date],#pt-body input[type=time],#pt-from,#pt-to{display:block;text-align:left;}
+  #pt-body input::-webkit-date-and-time-value,#pt-from::-webkit-date-and-time-value,#pt-to::-webkit-date-and-time-value{text-align:left;min-height:1.2em;margin:0;}
+  #pt-body select{padding-right:30px;background-repeat:no-repeat;background-position:right 11px center;background-size:12px;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23E7E5E4' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");}
+  .pt-table th,.pt-table td{padding:8px 6px;}
+  .pt-table .btn.small{padding:6px 8px;}
+}
+/* fiches techniques */
+.ft-in,textarea.ft-in{--c:#E7E5E4;font-weight:600;color:var(--c);color-scheme:dark;background:color-mix(in srgb,var(--c) 14%,#151A17);border:1px solid color-mix(in srgb,var(--c) 35%,transparent);border-left:3px solid var(--c);border-radius:8px;padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:14px;width:100%;}
+textarea.ft-in{font-family:'Inter',sans-serif;font-weight:500;line-height:1.45;resize:vertical;}
+.ft-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+.ft-chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
+.ft-chip.on{background:color-mix(in srgb,#E7E5E4 18%,#151A17);border-color:#E7E5E4;}
+.ft-top{position:sticky;top:0;z-index:3;background:var(--paper);padding:4px 0 6px;}
+.ft-scroll{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:6px;}.ft-scroll .ft-chip{flex:0 0 auto;padding:6px 12px;}
+.ft-todobar{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#FBBF24;margin:2px 0 4px;}
+.ft-dot{width:9px;height:9px;border-radius:50%;background:#FBBF24;display:inline-block;flex:0 0 auto;}
+.ft-fam{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 14px;min-height:48px;margin:6px 0 0;font-weight:700;font-size:15px;cursor:pointer;}
+.ft-fam .s{font-weight:500;color:var(--ink-muted,#9aa39d);font-size:13px;margin-left:8px;}.ft-fam .r{display:flex;align-items:center;gap:10px;color:var(--ink-muted,#9aa39d);}
+.ft-fam.open{border-bottom-left-radius:0;border-bottom-right-radius:0;}
+.ft-rows{border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;background:color-mix(in srgb,var(--surface) 60%,var(--paper));}
+.ft-row{display:flex;justify-content:space-between;align-items:center;min-height:44px;padding:0 14px;border-top:1px solid var(--line);font-size:15px;cursor:pointer;}.ft-row:first-child{border-top:0;}
+.mep-in td.i{padding:6px 4px;}table.mep-in input.ft-in{width:78px;text-align:right;padding:8px;margin:0;}table.mep-in th.l,table.mep-in td.l{border-left:1px solid var(--line);}table.mep-in th{vertical-align:bottom;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.rp2-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;margin:2px 0 4px;}.rp2-bar .btn{flex:0 0 auto;}
+.rp2-ing{border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:10px;}
+.rp2-ing label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-muted,#9aa39d);margin-bottom:4px;}
+.rp2-ing .g2 .ft-in{width:100%;box-sizing:border-box;height:42px;}
+.rp2-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}.rp2-act{display:flex;gap:6px;}
+.rp2-r2{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);}
+.rp2-box,.rp2-linked{min-height:42px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;display:flex;align-items:center;padding:4px 10px;font-size:13px;line-height:1.25;}
+.rp2-linked{justify-content:space-between;gap:6px;font-weight:600;}.rp2-linked span{flex:1 1 auto;min-width:0;font-size:12.5px;}.rp2-linked .btn{padding:6px 8px;font-size:12px;}.rp2-linked .btn{flex:0 0 auto;}
+.rp2-res{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);color:inherit;padding:8px 4px;font:inherit;font-size:13px;cursor:pointer;}
+.rp2-ok{color:#4ADE80;font-weight:600;}.rp2-bad{color:#F87171;font-weight:600;}
+.rp2-name{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-weight:600;font-size:15px;}
+.rp2-cell{border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center;min-height:62px;box-sizing:border-box;}.rp2-cell.dim{opacity:.5;}
+.rp2-cell .v{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;}
+.rp2-state{margin-top:10px;text-align:center;font-size:12.5px;}
+.mep2-head{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;}.mep2-who{font-weight:700;font-size:14px;margin-top:4px;}.mep2-corr{font-size:12px;color:#FBBF24;margin-top:2px;}
+.mep2-row{padding:10px 0;border-top:1px solid var(--line);}.mep2-name{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;margin-bottom:6px;}
+.mep2-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center;}.mep2-last{font-size:15px;padding-left:4px;}
+.mep-num{flex:0 0 28px;height:28px;border-radius:8px;background:color-mix(in srgb,#E7E5E4 14%,#151A17);border:1px solid color-mix(in srgb,#E7E5E4 35%,transparent);color:#E7E5E4;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+.mep-num.s{flex:none;width:24px;height:24px;font-size:12px;margin-right:8px;vertical-align:middle;}.mep-num.off{opacity:.4;}
+.mep-q{font-weight:700;font-size:15px;}.mep-w{font-size:12px;color:var(--ink-muted,#9aa39d);margin-top:2px;}
+.mep-d{font-size:12px;font-weight:700;}.mep-d.up{color:#FBBF24;}.mep-d.dn{color:#F87171;}
+td.mep-chg{color:#FBBF24;font-weight:800;}
+input.ft-in.chg{border-color:#FBBF24;border-left-color:#FBBF24;background:color-mix(in srgb,#FBBF24 16%,#151A17);color:#FDE68A;}
+.btn[disabled]{opacity:.4;pointer-events:none;}
+table.mep-sticky td:first-child,table.mep-sticky th:first-child{position:sticky;left:0;background:var(--surface);z-index:1;min-width:130px;}
+.mep-seg{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}.mep-seg button{flex:1 1 90px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:15px;font-family:'Inter',sans-serif;cursor:pointer;}
+.mep-seg button.on{background:color-mix(in srgb,#E7E5E4 18%,#151A17);border-color:#E7E5E4;}
+.mep-ing{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);}.mep-ing .n{flex:1;font-size:16px;font-weight:600;}.mep-ing input{width:92px;text-align:center;}.mep-ing .u{width:58px;color:var(--ink-muted,#9aa39d);font-size:14px;}
+table.mep-g{width:100%;border-collapse:collapse;font-size:14px;}table.mep-g th,table.mep-g td{padding:9px 6px;border-top:1px solid var(--line);text-align:right;white-space:nowrap;}table.mep-g th:first-child,table.mep-g td:first-child{text-align:left;white-space:normal;}
+table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;border-top:0;}tr.mep-day{cursor:pointer;}tr.mep-day.on td{background:color-mix(in srgb,#E7E5E4 10%,transparent);}
+.ft-todo{font-size:11px;font-weight:700;color:#FBBF24;border:1px solid color-mix(in srgb,#FBBF24 55%,transparent);border-radius:999px;padding:2px 8px;white-space:nowrap;}
+.ft-link{color:#93C5FD;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+.ft-lk{flex:1 1 100%;font-size:12px;color:#93C5FD;}.ft-lk:empty{display:none;}
+.ft-cat{display:inline-block;border:1px solid #E7E5E4;color:#E7E5E4;border-radius:999px;padding:3px 11px;font-size:12px;font-weight:600;}
+.ft-portions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 10px;}
+.ft-portions input{width:70px;text-align:center;}
+.ft-ings{list-style:none;margin:0;padding:0;}
+.ft-ing{display:flex;gap:12px;padding:9px 0;border-top:1px solid var(--line);font-size:16px;}
+.ft-ing .q{flex:0 0 132px;font-family:'IBM Plex Mono',monospace;font-weight:700;color:#86EFAC;}
+.ft-step{display:flex;gap:12px;margin:12px 0;align-items:flex-start;}
+.ft-step .num,.ft-edstep .num{flex:0 0 30px;height:30px;border-radius:50%;background:color-mix(in srgb,#60A5FA 20%,#151A17);border:1px solid #60A5FA;color:#93C5FD;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;}
+.ft-step .txt,.ft-text{font-size:16px;line-height:1.5;}
+.ft-edrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;}
+.ft-actions{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}.ft-actions .btn{flex:1 1 auto;justify-content:center;}
+.ft-edrow .ft-q{flex:1 1 28%;min-width:0;}.ft-edrow .ft-u{flex:1 1 60%;min-width:0;}.ft-edrow .ft-n{flex:1 1 calc(100% - 56px);min-width:0;}.ft-edrow > .btn{flex:0 0 46px;padding:8px 0;}
+.ft-edstep{align-items:flex-start;}.ft-edstep textarea{flex:1 1 calc(100% - 44px);min-width:0;}.ft-mv{display:flex;gap:6px;flex:1 1 100%;justify-content:flex-end;}.ft-mv .btn{flex:0 0 46px;padding:8px 0;}
 .pt-card.c-adv{--c:#F87171;}.pt-card.c-loan{--c:#FB923C;}
 .pt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .pt-table{width:100%;border-collapse:collapse;font-size:12.5px;}
@@ -560,6 +639,18 @@ input[id^="pt-"]::placeholder{color:#8B958F;font-weight:400;}
   </main>
 </div>
 
+<div id="module-fiches" class="module">
+  <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
+    <div id="ft-body"></div>
+  </main>
+</div>
+
+<div id="module-mep" class="module">
+  <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
+    <div id="mep-body"></div>
+  </main>
+</div>
+
 <div id="module-restopro" class="module">
   <style>
     #module-restopro .rp-hero{text-align:center;padding:18px 14px;margin-bottom:10px;}
@@ -613,8 +704,10 @@ input[id^="pt-"]::placeholder{color:#8B958F;font-weight:400;}
         <label class="switch"><input type="checkbox" id="nu-admin" onchange="uu_toggleAdminFields()"><span class="slider"></span></label>
       </div>
       <div id="nu-perm-detail">
-        <div class="perm-row"><span>Accès Caisse</span><label class="switch"><input type="checkbox" id="nu-perm-caisse" checked><span class="slider"></span></label></div>
-        <div class="perm-row"><span>Accès Pointage</span><label class="switch"><input type="checkbox" id="nu-perm-pointage" checked><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Caisse</span><label class="switch"><input type="checkbox" id="nu-perm-caisse"><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Pointage</span><label class="switch"><input type="checkbox" id="nu-perm-pointage"><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Fiches techniques</span><label class="switch"><input type="checkbox" id="nu-perm-fiches"><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Mise en place</span><label class="switch"><input type="checkbox" id="nu-perm-mep"><span class="slider"></span></label></div>
       </div>
       <button class="btn moss" style="margin-top:14px;" onclick="uu_createUser()">➕ Créer l'utilisateur</button>
     </div>
@@ -650,6 +743,8 @@ const SESSION_KEY = 'allosushi-session';
 const MODULE_DEFS = [
   { key:'caisse',   label:'Caisse',    ic:'💰', desc:'Sessions de caisse' },
   { key:'pointage', label:'Pointage',  ic:'⏱️', desc:'Heures, anomalies & paie' },
+  { key:'fiches',   label:'Fiches techniques', ic:'📋', desc:'Recettes & dressage' },
+  { key:'mep',      label:'Mise en place', ic:'🧑‍🍳', desc:'Inventaire de fin de service' },
   { key:'restopro', label:'CA Resto Pro', ic:'📈', desc:'Chiffre d’affaires & remises' },
 ];
 let session = null; // { username, isAdmin, permissions:{caisse,pointage} }
@@ -838,9 +933,11 @@ async function uu_createUser(){
     username: uname,
     password: pwd,
     isAdmin,
-    permissions: isAdmin ? { caisse:true, pointage:true } : {
+    permissions: isAdmin ? { caisse:true, pointage:true, fiches:true, mep:true } : {
       caisse: document.getElementById('nu-perm-caisse').checked,
-      pointage: document.getElementById('nu-perm-pointage').checked
+      pointage: document.getElementById('nu-perm-pointage').checked,
+      fiches: document.getElementById('nu-perm-fiches').checked,
+      mep: document.getElementById('nu-perm-mep').checked
     },
     creeLe: new Date().toISOString(),
     creePar: currentUser
@@ -849,8 +946,7 @@ async function uu_createUser(){
   document.getElementById('nu-username').value = '';
   document.getElementById('nu-password').value = '';
   document.getElementById('nu-admin').checked = false;
-  document.getElementById('nu-perm-caisse').checked = true;
-  document.getElementById('nu-perm-pointage').checked = true;
+  ['caisse', 'pointage', 'fiches', 'mep'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
   uu_toggleAdminFields();
 }
 
@@ -966,7 +1062,9 @@ function showModule(name){
   if(name==='users') uu_render();
   if(name==='caisse' && typeof ca_render==='function') ca_render();
   if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
+  if(name==='fiches'){ if(typeof ft_start==='function') ft_start(); if(typeof ft_render==='function') ft_render(); }
   if(name==='restopro'){ if(typeof rp_start==='function') rp_start(); }
+  if(name==='mep'){ if(typeof mep_start==='function') mep_start(); if(typeof mep_render==='function') mep_render(); }
   if(name==='dettes'){ if(typeof dt_start==='function') dt_start(); if(typeof dt_render==='function') dt_render(); }
 }
 
@@ -1787,18 +1885,36 @@ function pt_closureStale(sessions){
 }
 /* Net à payer : arrondi vers le haut au multiple de 10 DA (1182,3 → 1190). La petite différence est offerte : elle n'est pas reportée. */
 function pt_ceil10(x){ x = Math.round((Number(x) || 0) * 100) / 100; return x <= 0 ? 0 : Math.ceil(x / 10 - 1e-9) * 10; }
+/* Solde de la période : toujours arrondi au multiple de 10 DA supérieur, dans les deux sens (1182,3 → 1190 ; −152,4 → −150). */
+function pt_roundSolde(x){ x = Math.round((Number(x) || 0) * 100) / 100; return (Math.ceil(x / 10 - 1e-9) * 10) || 0; }
 function pt_netOf(solde){ return solde > 0 ? pt_ceil10(solde) : 0; }
 function pt_reportOf(solde, paid){
   solde = Math.round((Number(solde) || 0) * 100) / 100; paid = Math.max(0, Number(paid) || 0);
   if(solde > 0 && paid >= solde - 1e-9 && paid <= pt_netOf(solde) + 1e-9) return 0;   // versé = solde ou net arrondi : rien à reporter
   return Math.round((solde - paid) * 100) / 100 || 0;
 }
+/* Présence automatique (employé qui ne pointe pas, ex. Sidahmed) : présent tous les jours à partir du 24/10/2026, sauf absences saisies (kind 'absent').
+   Les jours à venir ne sont pas comptés. Avant le 24/10, les jours restent ceux du pointage. */
+const PT_AUTO_START = '2026-10-24';
+function pt_isAuto(code){ const e = pt_emp[code] || {}; return e.autoPresent !== undefined ? !!e.autoPresent : (Number(code) === 15 || /sidahmed|sid ahmed/i.test(String(pt_name(code) || ''))); }
+function pt_autoDays(code){
+  if(!pt_isAuto(code)) return [];
+  const today = todayISO();
+  let from = pt_filter.from || PT_AUTO_START, to = pt_filter.to || today;
+  if(from < PT_AUTO_START) from = PT_AUTO_START;
+  if(to > today) to = today;
+  const abs = new Set(pt_entries.filter(e=>e.kind === 'absent' && e.code === code).map(e=>e.date)), out = [];
+  for(let d = from; d <= to && out.length < 400; d = pt_addDays(d, 1)) if(!abs.has(d)) out.push(d);
+  return out;
+}
 function pt_baseOf(code, sessions){
   const mySess = sessions.filter(s=>s.code === code);
   const myManual = pt_entries.filter(e=>e.kind === 'manual' && e.code === code && pt_inRange(e.date));
   const totalHours = mySess.reduce((s,x)=>s+x.hours, 0) + myManual.reduce((s,x)=>s+(Number(x.hours)||0), 0);
   const rate = pt_rate(code), mode = pt_mode(code);
-  const workedDays = new Set([...mySess.map(s=>pt_day(s.date)), ...myManual.map(m=>m.date)]).size;
+  let dset = new Set([...mySess.map(s=>pt_day(s.date)), ...myManual.map(m=>m.date)]);
+  if(pt_isAuto(code)){ dset = new Set([...dset].filter(d=>d < PT_AUTO_START)); pt_autoDays(code).forEach(d=>dset.add(d)); }
+  const workedDays = dset.size;
   const baseWage = mode === 'daily' ? workedDays * rate : totalHours * rate;
   return { totalHours, rate, mode, workedDays, baseWage };
 }
@@ -1837,15 +1953,15 @@ function pt_payroll(code, sessions){
   const tr = pt_transport(code);
   const transportTotal = tr.enabled ? b.workedDays * tr.amount : 0;
   const bonuses = pt_entriesOf('prime', code), leaves = pt_entriesOf('off', code);
-  const advances = pt_entriesOf('avance', code), loans = pt_loanDues(code);
+  const advances = pt_entriesOf('avance', code), loans = pt_loanDues(code), absences = pt_entriesOf('absent', code);
   const sum = (arr)=>arr.reduce((s,x)=>s+x.amount, 0);
   const bonusesTotal = sum(bonuses), leavesTotal = sum(leaves), advancesTotal = sum(advances), loanTotal = sum(loans);
   const subTotal = b.baseWage + transportTotal + bonusesTotal;
   const reportIn = pt_reportIn(code, pt_filter.from);
-  const solde = Math.round((subTotal + leavesTotal - advancesTotal - loanTotal + reportIn) * 100) / 100; // peut être négatif
+  const solde = pt_roundSolde(subTotal + leavesTotal - advancesTotal - loanTotal + reportIn); // arrondi au multiple de 10 supérieur ; peut être négatif
   const net = pt_netOf(solde), v = pt_validationFor(code, pt_filter.from, pt_filter.to);
   const paidAmt = v ? Math.max(0, Number(v.paidAmt) || 0) : net, reportOut = pt_reportOf(solde, paidAmt); // report = solde − versé (versé par défaut : tout le solde positif)
-  return { ...b, transport:tr, transportTotal, bonuses, leaves, advances, loans, bonusesTotal, leavesTotal, advancesTotal, loanTotal, subTotal, reportIn, solde, net, paidAmt, reportOut, validated:v };
+  return { ...b, transport:tr, transportTotal, bonuses, leaves, advances, loans, absences, bonusesTotal, leavesTotal, advancesTotal, loanTotal, subTotal, reportIn, solde, net, paidAmt, reportOut, validated:v };
 }
 /* ---- congé : 1/12 du salaire de base (heures × taux, sans transport ni primes) de la période de calcul ; perçu = « Jours off » payés ---- */
 /* Congé : calcul depuis le 24/10/2026 (date fixe). Congé de la période = arrondi↑10 de (1/12 × salaire de base) ;
@@ -1854,9 +1970,16 @@ function pt_payroll(code, sessions){
 const PT_CONGE_START = '2026-10-24';
 function pt_congeOpen(code){ const d = pt_entries.find(e=>e.kind === 'congeopen' && e.code === code); return d ? (Number(d.amount) || 0) : 0; }
 function pt_congePaidList(code){ return pt_entries.filter(e=>e.kind === 'congepaid' && e.code === code).sort((a,b)=>String(b.date).localeCompare(String(a.date))); }
+/* Employé payé au jour (paie forfaitaire) : son congé n'est pas calculé sur son taux journalier mais, pour chaque jour travaillé, sur 8 h × 250 DA (1/12 × 8 h × 250 DA = 166,67 DA par jour). Modifiable via congeHours / congeRate de la fiche employé. */
+function pt_congeForfait(code){
+  if(pt_mode(code) !== 'daily') return null;
+  const e = pt_emp[code] || {}, h = Number(e.congeHours) > 0 ? Number(e.congeHours) : 8, r = Number(e.congeRate) > 0 ? Number(e.congeRate) : 250;
+  return { hours:h, rate:r };
+}
 function pt_conge(code, asOf){
   const to = asOf || todayISO(), from = PT_CONGE_START;
-  const base = to < from ? 0 : pt_withFilter(from, to, ()=>pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))).baseWage);
+  const forfait = pt_congeForfait(code);
+  const base = to < from ? 0 : pt_withFilter(from, to, ()=>{ const b = pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))); return forfait ? b.workedDays * forfait.hours * forfait.rate : b.baseWage; });
   const computed = pt_ceil10(base / 12), open = pt_congeOpen(code);
   const taken = pt_congePaidList(code).filter(e=>e.date <= to).reduce((t,e)=>t + (Number(e.amount) || 0), 0);
   const total = Math.round((open + computed) * 100) / 100;
@@ -2146,6 +2269,13 @@ function pt_closeFreeRange(){
   const f = document.getElementById('pt-cl-from').value, t = document.getElementById('pt-cl-to').value;
   pt_closeRange(f, t, 'period');
 }
+let pt_clFrom = null, pt_clTo = null, pt_clOpenG = {}; // filtre de date propre à la liste des clôtures (null = suit la période affichée)
+function pt_clSetRange(){
+  const f = document.getElementById('pt-cl-from'), t = document.getElementById('pt-cl-to');
+  pt_clFrom = (f && f.value) || null; pt_clTo = (t && t.value) || null; pt_render(true);
+}
+function pt_clResetRange(){ pt_clFrom = null; pt_clTo = null; pt_render(true); }
+function pt_clGrpToggle(key, def){ pt_clOpenG[key] = !(pt_clOpenG[key] !== undefined ? pt_clOpenG[key] : def); pt_render(true); }
 let pt_clScope = 'emp';
 function pt_clSetScope(v){ pt_clScope = v === 'all' ? 'all' : 'emp'; pt_render(true); }
 function pt_cloturesSection(){
@@ -2169,14 +2299,34 @@ function pt_cloturesSection(){
   const scope = (sel === null) ? 'all' : pt_clScope;
   let list = pt_clotures.slice();
   if(scope === 'emp' && sel !== null) list = list.filter(c=>pt_isGlobalCl(c) || String(c.code) === String(sel));
+  const custom = pt_clFrom !== null || pt_clTo !== null, rf = pt_clFrom || pt_filter.from || '', rt = pt_clTo || pt_filter.to || '';
+  if(rf && rt) list = list.filter(c=>(c.from || '') <= rt && (c.to || '') >= rf);
   list.sort((a,b)=>(b.from || '').localeCompare(a.from || '') || (b.to || '').localeCompare(a.to || ''));
   const rows = list.map(c=>{
     const r = Object.keys(c.rows || {}).map(k=>c.rows[k]), nPaid = r.filter(x=>x.paid).length;
     return `<tr><td>${PT_KIND_LABEL[c.kind] || 'Période'}</td><td>${pt_e(pt_rangeLabel(c.from, c.to))}</td><td>${pt_isGlobalCl(c) ? 'Tous' : pt_e(pt_name(c.code))}</td><td>${fmtDateShort(String(c.createdAt || '').slice(0,10))}</td><td>${nPaid} / ${r.length} <button class="btn ghost small t-view" onclick="pt_clPayToggle('${c.id}')">${pt_clPay === c.id ? 'Masquer' : 'Versements'}</button></td><td>${c.mailedAt ? '<span class="pt-muted">✉️ ' + fmtDateShort(String(c.mailedAt).slice(0,10)) + '</span> ' : ''}<button class="btn ghost small t-mail" onclick="pt_mailClosure('${c.id}')">${c.mailedAt ? 'Renvoyer' : 'Envoyer'}</button></td><td><button class="btn ghost small b-reopen t-reopen" onclick="pt_reopenRange('${c.id}')">Rouvrir</button></td></tr>${pt_payRows(c)}`;
   }).join('');
   const filter = sel !== null ? `<div class="field" style="max-width:260px;margin:10px 0;"><label>Afficher</label><select id="pt-cl-scope" onchange="pt_clSetScope(this.value)"><option value="emp" ${scope === 'emp' ? 'selected' : ''}>Clôtures de ${pt_e(pt_name(sel))}</option><option value="all" ${scope === 'all' ? 'selected' : ''}>Toutes les clôtures</option></select></div>` : '';
-  return `${head}${filter}
-    ${list.length ? `<div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Type</th><th>Période</th><th>Employé</th><th>Créée le</th><th>Payé</th><th>Mail</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="pt-muted" style="margin-top:8px;">Aucune clôture enregistrée.</div>'}`;
+  const groups = []; list.forEach(c=>{ const k = c.from + '|' + c.to; let g = groups.find(x=>x.k === k); if(!g){ g = { k, from:c.from, to:c.to, items:[] }; groups.push(g); } g.items.push(c); });
+  const cards = groups.map((g, gi)=>{
+    const open = pt_clOpenG[g.k] !== undefined ? pt_clOpenG[g.k] : gi === 0;
+    let emps = 0, paid = 0, mails = 0;
+    g.items.forEach(c=>{ const r = Object.keys(c.rows || {}).map(k=>c.rows[k]); emps += r.length; paid += r.filter(x=>x.paid).length; if(c.mailedAt) mails++; });
+    const lines = open ? g.items.map(c=>{
+      const r = Object.keys(c.rows || {}).map(k=>c.rows[k]), nP = r.filter(x=>x.paid).length, all = r.length > 0 && nP === r.length;
+      const badge = r.length > 1 ? `<span class="pt-badge ${all ? 'pt-b-prime' : 'pt-b-off'}">${nP} / ${r.length} payés</span>` : `<span class="pt-badge ${all ? 'pt-b-prime' : 'pt-b-off'}">${all ? 'Payé' : 'Non payé'}</span>`;
+      return `<div style="padding:9px 0;border-top:1px solid var(--line);"><div class="row-between"><b>${pt_isGlobalCl(c) ? 'Tous les employés' : pt_e(pt_name(c.code))}</b>${badge}</div>
+        <div class="pt-muted" style="margin-top:2px;">Créée le ${fmtDateShort(String(c.createdAt || '').slice(0,10))}${c.mailedAt ? ' · ✉️ envoyé le ' + fmtDateShort(String(c.mailedAt).slice(0,10)) : ''}</div>
+        <div class="pt-row" style="margin-top:7px;"><button class="btn ghost small t-view" onclick="pt_clPayToggle('${c.id}')">${pt_clPay === c.id ? 'Masquer' : 'Versements'}</button>
+          <button class="btn ghost small t-mail" onclick="pt_mailClosure('${c.id}')">${c.mailedAt ? 'Renvoyer' : 'Envoyer'}</button>
+          <button class="btn ghost small t-reopen" onclick="pt_reopenRange('${c.id}')">Rouvrir</button></div>
+        ${pt_clPay === c.id ? `<div class="pt-scroll"><table class="pt-table"><tbody>${pt_payRows(c)}</tbody></table></div>` : ''}</div>`; }).join('') : '';
+    return `<div class="ticket" style="margin:8px 0 0;"><div class="row-between" style="cursor:pointer;" onclick="pt_clGrpToggle('${g.k}', ${gi === 0})"><div><div style="font-weight:700;">Semaine du ${pt_e(pt_rangeLabel(g.from, g.to)).replace(/^du /, '')}</div><div class="pt-muted">${emps} employé${emps > 1 ? 's' : ''} · ${paid} / ${emps} payé${paid > 1 ? 's' : ''} · ${mails ? mails + ' mail' + (mails > 1 ? 's envoyés' : ' envoyé') : 'aucun mail'}</div></div><span class="pt-chevron">${open ? '▾' : '▸'}</span></div>${lines}</div>`;
+  }).join('');
+  const range = `<div class="pt-row" style="margin:10px 0 4px;"><div class="field"><label>Clôtures du</label><input type="date" id="pt-cl-from" value="${pt_e(rf)}" onchange="pt_clSetRange()"></div><div class="field"><label>au</label><input type="date" id="pt-cl-to" value="${pt_e(rt)}" onchange="pt_clSetRange()"></div>${custom ? '<button class="btn ghost small t-cancel" onclick="pt_clResetRange()">Période affichée</button>' : ''}</div>
+    <div class="pt-muted" style="margin-bottom:4px;">${rf && rt ? list.length + ' clôture' + (list.length > 1 ? 's' : '') + ' du ' + pt_e(fmtDateShort(rf)) + ' au ' + pt_e(fmtDateShort(rt)) + (custom ? '' : ' (période affichée)') : 'Toutes les clôtures (renseigne les dates Du / Au pour filtrer).'}</div>`;
+  return `${head}${range}${filter}
+    ${list.length ? `<div class="pt-cl-cards">${cards}</div><div class="pt-scroll pt-cl-table" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Type</th><th>Période</th><th>Employé</th><th>Créée le</th><th>Payé</th><th>Mail</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="pt-muted" style="margin-top:8px;">Aucune clôture enregistrée.</div>'}`;
 }
 
 /* ---------- onglet Paie ---------- */
@@ -2188,6 +2338,20 @@ function pt_formRow(k, label){
     <input type="text" id="pt-f-${k}-note" class="pt-draft" placeholder="Motif" ${enter}>
     <button class="btn small b-add t-add" onclick="pt_addEntry('${k}')">Ajouter</button>
   </div>`;
+}
+function pt_absenceRow(){
+  return `<div class="pt-form"><div class="pt-form-title"><label>Absence</label></div>
+    <input type="text" id="pt-f-absent-note" class="pt-draft" style="grid-column:span 2;" placeholder="Motif (jour non travaillé)" onkeydown="if(event.key==='Enter')pt_addAbsence()">
+    <button class="btn small t-add" onclick="pt_addAbsence()">Ajouter</button></div>`;
+}
+async function pt_addAbsence(){
+  if(pt_sel === null || !pt_isAuto(pt_sel)) return;
+  const dEl = document.getElementById('pt-f-date'), nEl = document.getElementById('pt-f-absent-note'), date = (dEl && dEl.value) || todayISO();
+  if(date < PT_AUTO_START){ alert('Avant le ' + fmtDateShort(PT_AUTO_START) + ', les jours suivent le pointage : une absence n’a pas d’effet.'); return; }
+  if(pt_guardDay(date, 'Cette absence', pt_sel)) return;
+  if(pt_entries.some(e=>e.kind === 'absent' && e.code === pt_sel && e.date === date)){ alert('Une absence est déjà enregistrée le ' + fmtDateShort(date) + '.'); return; }
+  const note = nEl ? nEl.value.trim() : ''; if(nEl) nEl.value = '';
+  try{ await pt_addEntryDoc({ kind:'absent', code:pt_sel, date, amount:0, note }); pt_toast('Absence enregistrée.'); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
 }
 async function pt_addEntry(kind){
   if(pt_sel === null) return;
@@ -2208,7 +2372,8 @@ function pt_histRows(p){
   return [
     ...p.bonuses.map(x=>({ ...x, cat:'Prime', cls:'pt-b-prime', sign:1 })),
     ...p.leaves.map(x=>({ ...x, cat:'Jour Off', cls:'pt-b-off', sign:1 })),
-    ...p.advances.map(x=>({ ...x, cat:'Avance', cls:'pt-b-avance', sign:-1 }))
+    ...p.advances.map(x=>({ ...x, cat:'Avance', cls:'pt-b-avance', sign:-1 })),
+    ...(p.absences || []).map(x=>({ ...x, cat:'Absence', cls:'pt-b-avance', sign:0 }))
   ].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 }
 const pt_r2 = (x)=>Math.round((Number(x) || 0) * 100) / 100;
@@ -2307,13 +2472,13 @@ async function pt_mailSend(params){
   if(!r.ok){ let t = ''; try{ t = await r.text(); }catch(e){} throw new Error('EmailJS a refusé l’envoi (' + r.status + ') ' + t); }
 }
 const PT_TD = (v, right, bold)=>'<td' + (right ? ' align="right"' : '') + '>' + (bold ? '<b>' + v + '</b>' : v) + '</td>';
-function pt_recapHtml(from, to, closure){
+function pt_recapHtml(from, to, closure, only){
   return pt_withFilter(from, to, ()=>{
     const sessions = pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)));
     const money = (n)=>n ? pt_fmtMoney(n) : '';
     const dayLabel = (d)=>PT_DOW[new Date(d + 'T12:00:00').getDay()] + ' ' + pt_dm(new Date(d + 'T12:00:00'));
     const emps = [];
-    pt_codes().filter(code=>!closure || pt_isGlobalCl(closure) || String(closure.code) === String(code)).forEach(code=>{
+    pt_codes().filter(code=>(only === undefined || String(code) === String(only)) && (!closure || pt_isGlobalCl(closure) || String(closure.code) === String(code))).forEach(code=>{
       const p = pt_payroll(code, sessions), fz = closure && closure.rows && closure.rows[code];
       const tot = fz ? { hours:fz.hours, transport:fz.transportTotal, bonuses:fz.bonusesTotal, leaves:fz.leavesTotal, advances:fz.advancesTotal, loans:Number(fz.loanTotal) || 0, report:Number(fz.reportIn) || 0, carry:Number(fz.reportOut) || 0, net:fz.net }
                      : { hours:p.totalHours, transport:p.transportTotal, bonuses:p.bonusesTotal, leaves:p.leavesTotal, advances:p.advancesTotal, loans:p.loanTotal, report:p.reportIn, carry:p.reportOut, net:p.net };
@@ -2321,6 +2486,7 @@ function pt_recapHtml(from, to, closure){
       sessions.filter(s=>s.code === code).forEach(s=>get(pt_day(s.date)).sess.push(s));
       pt_entries.filter(e=>e.kind === 'manual' && e.code === code && pt_inRange(e.date)).forEach(m=>get(m.date).manual.push(m));
       p.bonuses.forEach(x=>{ get(x.date).prime += x.amount; }); p.leaves.forEach(x=>{ get(x.date).off += x.amount; }); p.advances.forEach(x=>{ get(x.date).avance += x.amount; }); p.loans.forEach(x=>{ get(x.date).pret += x.amount; });
+      pt_autoDays(code).forEach(d=>{ get(d).auto = true; }); (p.absences || []).forEach(a=>{ get(a.date).absent = true; });
       if(!Object.keys(days).length && !tot.net && !tot.carry) return;
       emps.push({ code, name:pt_e(pt_name(code)), rate:p.rate, mode:p.mode, tr:p.transport, days, tot });
     });
@@ -2332,9 +2498,9 @@ function pt_recapHtml(from, to, closure){
         const x = e.days[d];
         const lines = x.sess.map(s=>({ a:pt_hhmm(s.start), b:pt_hhmm(s.end) + (pt_day(s.end) !== pt_day(s.start) ? ' (+1)' : ''), h:s.hours }))
           .concat(x.manual.map(m=>({ a:'Manuel', b:'Manuel', h:Number(m.hours) || 0 })));
-        if(!lines.length) lines.push({ a:'', b:'', h:0 });
+        if(!lines.length) lines.push(x.auto ? { a:'Présent', b:'', h:0 } : x.absent ? { a:'Absent', b:'', h:0 } : { a:'', b:'', h:0 });
         lines.forEach((l, i)=>{
-          const first = i === 0, worked = x.sess.length + x.manual.length > 0;
+          const first = i === 0, worked = x.sess.length + x.manual.length > 0 || !!x.auto;
           body += '<tr>' + PT_TD(dayLabel(d)) + PT_TD(e.name) + PT_TD(l.a) + PT_TD(l.b) + PT_TD(l.h ? pt_fmtH(l.h) : '', true) + PT_TD(first ? price : '', true)
             + PT_TD(first && worked && e.tr.enabled ? pt_fmtMoney(e.tr.amount) : '', true) + PT_TD(first ? money(x.prime) : '', true) + PT_TD(first ? money(x.off) : '', true)
             + PT_TD(first && x.avance ? '−' + pt_fmtMoney(x.avance) : '', true) + PT_TD(first && x.pret ? '−' + pt_fmtMoney(x.pret) : '', true) + '<td></td><td></td></tr>';
@@ -2354,7 +2520,7 @@ function pt_recapHtml(from, to, closure){
     const soldesHtml = soldes.length ? '<p style="margin-bottom:4px;"><b>Soldes au ' + fmtDateShort(to) + '</b></p><table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;font-size:12px;border-color:#bbb;"><tr bgcolor="#2d4a35" style="color:#fff;"><th align="left">Employé</th><th>Congé de la période</th><th>Congé versé</th><th>Reste à verser</th><th>Prêt : reste dû</th></tr>'
       + soldes.map(x=>'<tr>' + PT_TD(x.name) + PT_TD(pt_fmtMoney(x.k.total), true) + PT_TD(pt_fmtMoney(x.k.taken), true) + PT_TD((x.k.left < 0 ? '−' : '') + pt_fmtMoney(Math.abs(x.k.left)), true) + PT_TD(x.loans ? pt_fmtMoney(x.loans) : '', true) + '</tr>').join('') + '</table>' : '';
     const html = '<div style="font-family:Arial,sans-serif;font-size:13px;color:#222;">'
-      + '<p>Récapitulatif ' + pt_e(pt_rangeLabel(from, to)) + (closure && closure.createdAt ? ' — clôturé le ' + fmtDateShort(String(closure.createdAt).slice(0,10)) : '') + '.</p>'
+      + '<p>Récapitulatif ' + pt_e(pt_rangeLabel(from, to)) + (closure && closure.createdAt ? ' — clôturé le ' + fmtDateShort(String(closure.createdAt).slice(0,10)) : (only !== undefined ? ' — situation au ' + fmtDateShort(todayISO()) + ', période non clôturée (chiffres du moment)' : '')) + '.</p>'
       + '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;font-size:12px;border-color:#bbb;"><tr bgcolor="#2d4a35" style="color:#fff;"><th align="left">Date</th><th align="left">Employé</th><th>Entrée</th><th>Sortie</th><th>Heures (hh:mm)</th><th>Prix unitaire</th><th>Transport</th><th>Prime</th><th>Jour off</th><th>Avance</th><th>Prêt</th><th>Report</th><th>Total</th></tr>'
       + body + '</table>' + carryHtml + '<p style="color:#666;font-size:11px;">Total = base + transport + primes + jours off (congé) − avances − prêt − report précédent.</p>' + soldesHtml + '</div>';
     return { html, totals:G, count:emps.length };
@@ -2368,6 +2534,17 @@ async function pt_mailClosureSend(c, id){
   await pt_mailSend({ semaine:label, tableau_html:r.html });
   if(id) pt_cloturesCol.doc(id).set({ mailedAt:new Date().toISOString() }, { merge:true }).catch(()=>{});
   pt_toast('Récapitulatif envoyé par mail.');
+}
+async function pt_mailEmployee(){
+  if(pt_sel === null || pt_selAll) return;
+  const code = pt_sel, from = pt_filter.from, to = pt_filter.to;
+  if(!from || !to){ alert('Renseigne les dates Du / Au (en haut) : la situation est envoyée pour la période affichée.'); return; }
+  try{
+    const cl = pt_closureFor(from, to, code), r = pt_recapHtml(from, to, cl || null, code);
+    if(r.html.length > 48000) throw new Error('Le récapitulatif est trop volumineux pour un seul envoi (' + Math.round(r.html.length / 1000) + ' Ko, limite EmailJS gratuite : 50 Ko). Choisis une période plus courte.');
+    await pt_mailSend({ semaine:'Situation de ' + pt_name(code) + ' · ' + pt_dm(new Date(from + 'T12:00:00')) + ' → ' + fmtDateShort(to), tableau_html:r.html });
+    pt_toast('Situation de ' + pt_name(code) + ' envoyée par mail.');
+  }catch(e){ console.error(e); alert('Envoi impossible : ' + (e.message || e)); }
 }
 async function pt_mailClosure(id){
   const c = pt_clotures.find(x=>x.id === id); if(!c) return;
@@ -2482,7 +2659,7 @@ function pt_pretsHtml(code){
   const reps = pt_repaysOf(code).sort((a,b2)=>String(b2.date || '').localeCompare(String(a.date || '')));
   const lrows = loans.map(l=>`<tr><td>${fmtDateShort(l.date)}</td><td>${pt_e(l.note || '')}</td><td>${pt_fmtMoney(l.amount)}</td><td><button class="btn ghost small t-del" onclick="pt_loanDel('${l.id}')">Supprimer</button></td></tr>`).join('');
   const rrows = reps.map(r=>{ const lock = r.mode !== 'direct' && pt_dayClosed(r.date, code);
-    return `<tr><td>${fmtDateShort(r.date)}${lock ? ' 🔒' : ''}</td><td>${pt_e(r.note || '')}</td><td>${r.mode === 'direct' ? 'Versement direct' : 'Sur salaire'}</td><td>${pt_fmtMoney(r.amount)}</td><td><button class="btn ghost small t-del" onclick="pt_repayDel('${r.id}')">Supprimer</button></td></tr>`; }).join('');
+    return `<tr><td>${fmtDateShort(r.date)}${lock ? ' 🔒' : ''}</td><td>${pt_e(r.note || '')}</td><td>${r.mode === 'direct' ? 'Direct' : 'Salaire'}</td><td>${pt_fmtMoney(r.amount)}</td><td><button class="btn ghost small t-del" onclick="pt_repayDel('${r.id}')">Supprimer</button></td></tr>`; }).join('');
   const state = b.lent > 0 || b.repaid > 0 ? (b.due <= 0.004 ? '<span class="pt-badge pt-b-prime">Tout remboursé</span>' : '') : '';
   return `<div class="pt-muted">Plusieurs prêts possibles. Les remboursements se cumulent sur un seul solde. « Sur salaire » : déduit de la paie de la semaine qui contient la date ; « Versement direct » : sans effet sur la paie.</div>
     <div class="pt-cards" style="margin-top:10px;">${card('c-days', 'Total emprunté', pt_fmtMoney(b.lent))}${card('c-transport', 'Total remboursé', pt_fmtMoney(b.repaid))}${card(b.due > 0.004 ? 'c-loan' : 'c-transport', 'Reste dû', b.due > 0.004 ? pt_fmtMoney(b.due) : (b.due < -0.004 ? pt_money2(b.due) : '0'))}</div>
@@ -2523,12 +2700,13 @@ function pt_congeEmpHtml(code){
   const k = pt_conge(code), list = pt_congePaidList(code);
   const card = (cls, l, n)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div></div>`;
   const mode = pt_mode(code) === 'daily';
+  const fo = pt_congeForfait(code);
   const rows = list.map(e=>`<tr><td>${fmtDateShort(e.date)}</td><td>${pt_e(e.note || '')}</td><td>${pt_fmtMoney(e.amount)}</td><td><button class="btn ghost small t-del" onclick="pt_congePayDel('${e.id}')">Supprimer</button></td></tr>`).join('');
-  return `<div class="pt-muted">Période de calcul : du <b>${fmtDateShort(k.from)}</b> au <b>${fmtDateShort(k.to)}</b> (aujourd’hui). Congé = 1/12 × ${mode ? 'jours travaillés × taux journalier' : 'heures travaillées × taux'}, arrondi vers le haut au multiple de 10 DA. Le Jour Off n’est pas compté.</div>
+  return `<div class="pt-muted">Période de calcul : du <b>${fmtDateShort(k.from)}</b> au <b>${fmtDateShort(k.to)}</b> (aujourd’hui). Congé = 1/12 × ${mode ? (fo ? 'jours travaillés × ' + fo.hours + ' h × ' + fo.rate + ' DA (paie forfaitaire)' : 'jours travaillés × taux journalier') : 'heures travaillées × taux'}, arrondi vers le haut au multiple de 10 DA. Le Jour Off n’est pas compté.</div>
     <div class="pt-row" style="margin-top:10px;"><div class="field"><label>Solde initial de congé (DA)</label><input type="text" inputmode="decimal" id="pt-co-open" class="pt-w90" value="${pt_e(k.open || '')}" placeholder="0"></div><button class="btn small t-save" onclick="pt_congeSaveOpen(${code})">Enregistrer</button></div>
     <div class="pt-muted" style="margin:4px 0 8px;">À saisir une fois (tu peux le modifier). Mets un montant négatif si l’employé te doit déjà du congé.</div>
     <div class="pt-cards">${card('c-hours', 'Solde initial', pt_money2(k.open))}${card('c-base', 'Congé calculé (1/12, arrondi)', pt_fmtMoney(k.computed))}${card('c-days', 'Congé de toute la période', pt_money2(k.total))}${card('c-bonus', 'Congé versé', pt_fmtMoney(k.taken))}${card(k.left < 0 ? 'c-adv' : 'c-transport', 'Reste à verser', pt_money2(k.left))}</div>
-    <div class="pt-muted">Calcul : salaire de base ${pt_fmtMoney(k.base)} ÷ 12 = ${(k.base / 12).toLocaleString('fr-FR', { maximumFractionDigits:2 })} DA → arrondi ${pt_fmtMoney(k.computed)}. Total = solde initial + congé calculé.</div>
+    <div class="pt-muted">Calcul : ${fo ? 'base forfaitaire (jours travaillés × ' + fo.hours + ' h × ' + fo.rate + ' DA)' : 'salaire de base'} ${pt_fmtMoney(k.base)} ÷ 12 = ${(k.base / 12).toLocaleString('fr-FR', { maximumFractionDigits:2 })} DA → arrondi ${pt_fmtMoney(k.computed)}. Total = solde initial + congé calculé.</div>
     <h2 class="section" style="margin-top:16px;">Congés versés</h2>
     <div class="pt-row"><input type="date" id="pt-cp-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-cp-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-cp-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small b-add t-add" onclick="pt_congePayAdd(${code})">Ajouter</button></div>
     <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="pt-muted">Aucun congé versé.</td></tr>'}${list.length ? `<tr class="pt-total"><td colspan="2">Total versé</td><td>${pt_fmtMoney(k.taken)}</td><td></td></tr>` : ''}</tbody></table></div>`;
@@ -2581,7 +2759,7 @@ function pt_versementHtml(p, sessions){
   const cl = pt_currentClosure(pt_sel), v = p.validated, solde = p.solde;
   const paid = v ? Number(v.paidAmt) || 0 : pt_netOf(solde), r = pt_reportOf(solde, paid);
   const rep = r > 0.004 ? '<span style="color:var(--moss);">Reste dû reporté sur la semaine suivante : +' + pt_fmtMoney(r) + '</span>' : r < -0.004 ? '<span style="color:var(--rust);">Solde négatif reporté sur la semaine suivante : −' + pt_fmtMoney(-r) + '</span>' : 'Rien à reporter.';
-  const stale = v && !cl && Math.abs((Number(v.solde) || 0) - solde) > 0.5;
+  const stale = v && !cl && Math.abs(pt_roundSolde(v.solde) - solde) > 0.5;
   const status = cl ? '<span class="pt-badge pt-b-off">🔒 Période clôturée</span>' : v ? '<span class="pt-badge pt-b-prime">✓ Validé le ' + fmtDateShort(String(v.validatedAt || '').slice(0,10)) + '</span>' : '<span class="pt-muted">Non validé</span>';
   return `<h2 class="section" style="margin-top:20px;">Versement de la période</h2>
     <div class="pt-muted" style="margin-bottom:8px;">${status}${stale ? ' · <span style="color:var(--rust);">⚠️ les chiffres ont changé depuis la validation (solde validé : ' + pt_fmtMoney(v.solde) + ') — valide à nouveau</span>' : ''}</div>
@@ -2591,6 +2769,7 @@ function pt_versementHtml(p, sessions){
     <div class="pt-muted" style="margin-bottom:8px;">Solde négatif : il est reporté tel quel. Solde positif : la différence entre le solde et le versé est reportée sur la semaine suivante. « Clôturer cet employé » fige sa paie et verrouille ses jours, sans toucher aux autres employés.</div>
     <div class="actions-row">
       ${cl ? `<button class="btn ghost small b-reopen t-reopen" onclick="pt_reopenPeriod(${pt_sel})">Rouvrir la période</button>` : `<button class="btn small b-valid t-valid" onclick="pt_validate()">${v ? 'Valider à nouveau' : 'Valider'}</button>${v ? `<button class="btn ghost small b-neutral t-cancel" onclick="pt_unvalidate()">Annuler la validation</button>` : ''}<button class="btn small t-close" onclick="pt_closeEmployee()">Clôturer cet employé</button>`}
+      <button class="btn ghost small t-mail" onclick="pt_mailEmployee()">✉️ Envoyer sa situation par mail</button>
     </div>`;
 }
 function pt_paieSection(c, sessions, codes){
@@ -2602,15 +2781,15 @@ function pt_paieSection(c, sessions, codes){
       <td>${fmtDateShort(r.date)}</td>
       <td><span class="pt-badge ${r.cls}">${r.cat}</span></td>
       <td>${pt_e(r.note)}</td>
-      <td class="${r.sign<0?'pt-minus':'pt-plus'}">${r.sign<0?'−':'+'}${pt_fmtMoney(r.amount)}</td>
+      <td class="${r.sign<0?'pt-minus':'pt-plus'}">${r.sign === 0 ? '1 jour' : (r.sign<0?'−':'+') + pt_fmtMoney(r.amount)}</td>
       <td><button class="btn ghost small t-del" onclick="pt_delEntryConfirm('${r.id}','cette entrée')">Supprimer</button></td></tr>`).join('')
     : `<tr><td colspan="5" class="pt-muted">Aucune entrée sur cette période.</td></tr>`;
   const rateLine = `Taux : ${pt_fmtMoney(p.rate)}${p.mode==='daily'?' / jour':' / heure'} · ${p.transport.enabled ? 'Transport : ' + pt_fmtMoney(p.transport.amount) + ' / jour' : 'Transport désactivé'} · <a href="#" class="pt-link" onclick="pt_setTab('reglages');return false;">Modifier dans Réglages</a>`;
   const repLine = (p.reportIn || p.reportOut) ? `<div class="pt-muted" style="margin-bottom:8px;">${[p.reportIn > 0.004 ? '<span style="color:var(--moss);">Report précédent : +' + pt_fmtMoney(p.reportIn) + ' (non versé, repris dans cette paie)</span>' : p.reportIn < -0.004 ? '<span style="color:var(--rust);">Report précédent : −' + pt_fmtMoney(-p.reportIn) + ' (déduit de cette paie)</span>' : '', p.reportOut > 0.004 ? '<span style="color:var(--moss);">Reste dû reporté : +' + pt_fmtMoney(p.reportOut) + '</span>' : p.reportOut < -0.004 ? '<span style="color:var(--rust);">Solde négatif reporté : −' + pt_fmtMoney(-p.reportOut) + '</span>' : ''].filter(Boolean).join(' · ')}</div>` : '';
   return `${lockLine}${repLine}
-    <div class="pt-muted">${rateLine}</div>
+    <div class="pt-muted">${rateLine}</div>${pt_isAuto(c) ? `<div class="pt-muted" style="margin-top:4px;">Présent tous les jours depuis le ${fmtDateShort(PT_AUTO_START)}, sans pointage : <b>${p.workedDays} jour${p.workedDays > 1 ? 's' : ''}</b> sur la période${(p.absences || []).length ? ' · ' + p.absences.length + ' absence' + (p.absences.length > 1 ? 's' : '') : ''}. Marque un jour d’absence ci-dessous pour qu’il ne soit ni payé ni compté pour le congé.</div>` : ''}
     <div class="pt-row" style="margin-top:10px;"><div class="field"><label>Date</label><input type="date" id="pt-f-date" class="pt-draft pt-auto" value="${todayISO()}"></div></div>
-    ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off')}${pt_formRow('avance','Avance')}
+    ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off')}${pt_formRow('avance','Avance')}${pt_isAuto(c) ? pt_absenceRow() : ''}
     <h2 class="section" style="margin-top:20px;">Historique</h2>
     <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Date</th><th>Catégorie</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${hist}</tbody></table></div>
     ${pt_versementHtml(p, sessions)}`;
@@ -2741,6 +2920,7 @@ function pt_tabReglages(codes){
         <div class="field"><label>Nom</label><input type="text" list="pt-names" value="${pt_e(e.name || PT_DEFAULT_NAMES[c] || '')}" placeholder="Nom de l’employé" onchange="pt_setField(${c},'name',this.value)"></div>
         <div class="field"><label>Poste</label><input type="text" value="${pt_e(e.poste || '')}" placeholder="Cuisinier, Serveur…" onchange="pt_setField(${c},'poste',this.value)"></div>
         <div class="field"><label>Mode de salaire</label><select onchange="pt_setField(${c},'payMode',this.value)"><option value="hourly" ${pt_mode(c)==='hourly'?'selected':''}>DA / heure</option><option value="daily" ${pt_mode(c)==='daily'?'selected':''}>DA / jour travaillé</option></select></div>
+        <div class="field"><label>Présence</label><select onchange="pt_setEmp(${c},{autoPresent:this.value==='1'})"><option value="0" ${pt_isAuto(c)?'':'selected'}>Selon le pointage</option><option value="1" ${pt_isAuto(c)?'selected':''}>Présent tous les jours (sans pointage)</option></select></div>
         <div class="field"><label>Taux (DA)</label><input type="text" inputmode="decimal" value="${pt_rate(c) || ''}" placeholder="0" onchange="pt_setRate(${c},this.value)"></div>
       </div>
       <div class="perm-row" style="margin-top:8px;"><span>Prime de transport par jour travaillé</span><label class="switch"><input type="checkbox" ${tr.enabled?'checked':''} onchange="pt_setTransport(${c},{enabled:this.checked})"><span class="slider"></span></label></div>
@@ -2944,6 +3124,290 @@ function pt_exportExcel(){
   add('Corrections', ['Code','Nom','Anomalie d\'origine','Motif','Corrige le'], pt_entries.filter(e=>e.kind === 'resolved').map(r=>[r.code, pt_name(r.code), pt_fmtDT(new Date(r.dt)), r.reason, String(r.resolvedAt || '').slice(0,10)]));
   add('Reglages', ['Code','Nom','Poste','Mode','Taux','Transport actif','Montant transport'], codes.map(c=>{ const t = pt_transport(c); return [c, pt_name(c), pt_poste(c), pt_mode(c) === 'daily' ? 'DA/jour' : 'DA/heure', pt_rate(c), t.enabled ? 'Oui' : 'Non', t.amount]; }));
   XLSX.writeFile(wb, 'pointage_allo_sushi_' + todayISO() + '.xlsx');
+}
+
+/* ==================== MODULE CARNET — dettes, emprunts & disponible (privé) ==================== */
+/* Visible uniquement par le compte 'soufyane' — jamais par les autres administrateurs.
+   Une seule collection (aucune règle Firestore supplémentaire à ajouter) avec 3 sortes de documents :
+   - sans champ « kind »        : une ligne de dette / emprunt        { personne, montant, devise, type, date, note }
+   - kind:'avoir'               : un endroit où tu as de l'argent      { nom, devise, montant, maj }   (un SOLDE, pas un mouvement)
+   - kind:'avoir_histo'         : une mise à jour d'un de ces endroits { avoirId, date, ancien, montant }
+   Dette = je dois · Emprunt = on me doit · Position = disponible + emprunts − dettes (devise par devise). */
+function hasDettesAccess(){ return !!(session && session.username === 'soufyane'); }
+/* ==================== MODULE FICHES TECHNIQUES ==================== */
+/* Une fiche = { name, cat, portions, prepMin, ingredients:[{q,u,n}], steps:[texte], dressage, temp, duree, notes }.
+   Collection 'fiches_techniques'. Lecture : tous les utilisateurs autorisés ; création / modification / suppression : administrateur seulement. */
+const ft_col = db.collection('fiches_techniques');
+const FT_BASE_CAT = 'Sauces & préparations';
+const FT_CATS = ['Nigiri', 'Hoso Maki', 'Uramaki', 'Futomaki', 'Crispy', 'Temaki', 'Sashimi', 'Création', 'Gyoza', 'Nem', 'Yakitori', 'Ebi Fry', 'Wok', 'Spring Roll', 'Tartare', FT_BASE_CAT];
+/* préparations de base (fiches liées depuis les plats) */
+const FT_BASES = [['base_riz', 'Riz vinaigré'], ['base_tempura', 'Crevette tempura'], ['base_oignon', 'Oignon frit'], ['base_spicy', 'Spicy tartare de saumon'], ['base_marine', 'Saumon mariné']];
+/* menu : [famille, pièces par portion, ingrédients ajoutés d'office, [[nom, [ingrédients], description du menu]]] */
+const FT_MENU = [
+ ['Nigiri', 2, [], [['Abokado', ['Avocat', 'Riz vinaigré']], ['Pickled Radish', ['Oshinko', 'Riz vinaigré']], ['Shiromizakana', ['Poisson blanc', 'Riz vinaigré']], ['Saké', ['Saumon', 'Riz vinaigré']], ['Ebi Tempura', ['Crevette tempura', 'Riz vinaigré']]]],
+ ['Hoso Maki', 6, [], [['Avocado', ['Avocat', 'Riz vinaigré', 'Algue']], ['Oshinko', ['Oshinko', 'Riz vinaigré', 'Algue']], ['Kanikama', ['Surimi', 'Riz vinaigré', 'Algue']], ['White Fish', ['Poisson blanc', 'Riz vinaigré', 'Algue']], ['Salmon', ['Saumon', 'Riz vinaigré', 'Algue']], ['Shrimp Tempura', ['Crevette tempura', 'Riz vinaigré', 'Algue']]]],
+ ['Uramaki', 4, ['Riz vinaigré', 'Algue'], [['Katsu', ['Poulet', 'Avocat', 'Oignon frit']], ['California', ['Surimi', 'Avocat', 'Oignon frit']], ['White Fish', ['Poisson blanc', 'Oshinko', 'Sésame']], ['Philadelphia', ['Saumon', 'Avocat', 'Fromage', 'Sésame']], ['Ebi Tempura', ['Crevette', 'Avocat', 'Sésame']]]],
+ ['Futomaki', 5, ['Riz vinaigré', 'Algue'], [['Yasai Végétarien', ['Avocat', 'Oshinko', 'Carotte', 'Concombre']], ['MoriTori Tempura', ['Poulet', 'Oshinko', 'Concombre', 'Fromage']], ['Spicy Kanikama', ['Surimi', 'Oshinko', 'Concombre']], ['FutoSaké', ['Saumon', 'Avocat', 'Concombre']], ['EbiMori Tempura', ['Crevette', 'Oshinko', 'Concombre']]]],
+ ['Crispy', 4, ['Riz vinaigré', 'Algue'], [['Chicken', ['Poulet', 'Avocat', 'Concombre', 'Fromage']], ['Surimi', ['Surimi', 'Oshinko', 'Concombre', 'Fromage']], ['White Fish', ['Poisson blanc', 'Oshinko', 'Concombre', 'Fromage']], ['Shrimp', ['Crevette', 'Avocat', 'Concombre', 'Fromage']], ['Salmon', ['Saumon', 'Avocat', 'Concombre', 'Fromage']]]],
+ ['Temaki', 1, ['Riz vinaigré', 'Algue'], [['Chicken', ['Poulet', 'Oshinko', 'Concombre', 'Sésame']], ['Salmon', ['Saumon', 'Avocat', 'Concombre', 'Sésame']]]],
+ ['Sashimi', 6, [], [['Salmon', ['Saumon mariné']]]],
+ ['Création', 8, ['Riz vinaigré', 'Algue'], [['Saporo', ['Crevette', 'Oshinko', 'Avocat']], ['Sunset', ['Surimi', 'Avocat', 'Enrobage œufs de lump']], ['Turnado Salmon', ['Saumon', 'Fromage Philadelphia']], ['Dragon Roll', ['Crevette', 'Fromage', 'Enrobage avocat']], ['Las Vegas', ['Saumon', 'Avocat', 'Fromage Philadelphia', 'Enrobage saumon']], ['Spicy Sahara Roll', ['Crevette', 'Oshinko', 'Concombre', 'Spicy tartare de saumon']]]],
+ ['Gyoza', 5, [], [['Chicken', ['Poulet haché tendre']], ['Beef', ['Viande hachée fraîche']]]],
+ ['Nem', 3, [], [['Chicken', ['Poulet haché tendre']], ['Shrimp', ['Crevette fraîche']]]],
+ ['Yakitori', 3, [], [['Beef', ['Filet de bœuf', 'Fromage fondant'], 'Brochettes de filet de bœuf au cœur de fromage fondant, accompagnées de garniture']]],
+ ['Ebi Fry', 0, [], [['Shrimp', ['Crevettes royales', 'Panko japonais'], 'Crevettes royales panées au panko japonais, parfaitement croustillantes']]],
+ ['Wok', 0, [], [['Chicken', ['Poulet', 'Légumes croquants', 'Sauce asiatique'], 'Poulet sauté au wok avec légumes croquants, relevé d’une sauce asiatique parfumée'], ['Beef', ['Bœuf', 'Légumes croquants', 'Sauce asiatique'], 'Bœuf sauté au wok avec légumes croquants, nappé d’une sauce asiatique savoureuse'], ['Shrimp', ['Crevettes', 'Légumes croquants', 'Sauce asiatique'], 'Crevettes sautées au wok avec légumes croquants, sublimées par une sauce asiatique délicate']]],
+ ['Spring Roll', 2, [], [['Salmon', ['Saumon', 'Légumes croquants', 'Herbes fraîches'], 'Rouleaux de printemps frais au saumon, légumes croquants et herbes fraîches'], ['Shrimp', ['Crevettes', 'Légumes croquants', 'Herbes aromatiques'], 'Rouleaux de printemps frais garnis de crevettes, accompagnés de légumes croquants et d’herbes aromatiques']]],
+ ['Tartare', 0, [], [['Salmon', ['Saumon', 'Avocat'], 'Saumon et avocat frais, assaisonnement délicat et saveurs fraîches']]]
+];
+function ft_slug(t){ return String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''); }
+/* fiches du menu : plats + préparations de base, avec leur identifiant stable */
+function ft_menuSeed(){
+  const baseId = {}; FT_BASES.forEach(b=>baseId[b[1].toLowerCase()] = b[0]);
+  const out = [];
+  FT_BASES.forEach(b=>out.push({ id:b[0], name:b[1], cat:FT_BASE_CAT, portions:1, pieces:'', prepMin:0, ingredients:[], steps:[], dressage:'', accomp:'', temp:'', duree:'', notes:'' }));
+  FT_MENU.forEach(fam=>{
+    const cat = fam[0], pieces = fam[1], add = fam[2];
+    fam[3].forEach(it=>{
+      const generic = cat !== 'Création', names = it[1].slice();
+      add.forEach(a=>{ if(!names.includes(a)) names.push(a); });
+      out.push({ id:'menu_' + ft_slug(cat) + '_' + ft_slug(it[0]), name:generic ? cat + ' ' + it[0] : it[0], cat, portions:1, pieces:pieces || '', prepMin:0,
+        ingredients:names.map(n=>({ n, u:'', q:null, ref:baseId[n.toLowerCase()] || '' })), steps:[], dressage:'', accomp:'', temp:'', duree:'',
+        notes:it[2] ? 'Description du menu : ' + it[2] : '' });
+    });
+  });
+  return out;
+}
+function ft_seedMissing(){ return ft_menuSeed().filter(x=>!ft_fiches.some(f=>f.id === x.id)); }
+async function ft_importMenu(){
+  if(!ft_isAdmin()) return;
+  const miss = ft_seedMissing(); if(!miss.length) return;
+  if(!confirm('Importer ' + miss.length + ' fiche(s) du menu ? Les fiches déjà présentes ne sont pas modifiées.')) return;
+  try{
+    const now = new Date().toISOString();
+    for(let i = 0; i < miss.length; i += 400){
+      const b = db.batch();
+      miss.slice(i, i + 400).forEach(x=>{ const d = { ...x, createdAt:now, updatedAt:now, updatedBy:(typeof currentUser !== 'undefined' ? currentUser : ''), seeded:true }; delete d.id; b.set(ft_col.doc(x.id), d); });
+      await b.commit();
+    }
+    if(typeof pt_toast === 'function') pt_toast(miss.length + ' fiches importées.');
+  }catch(e){ console.error(e); alert('Erreur d’import : ' + (e.message || e)); }
+}
+const FT_UNITS = ['g', 'kg', 'ml', 'cl', 'l', 'c. à café', 'c. à soupe', 'pièce(s)', 'tranche(s)', 'feuille(s)', 'pincée', 'au goût'];
+let ft_started = false, ft_ready = false, ft_fiches = [];
+let ft_openFams = {}, ft_onlyTodo = false, ft_hist = [], ft_view = 'list', ft_cur = null, ft_draft = null, ft_q = '', ft_cat = '', ft_portions = 1;
+
+const ft_e = (v)=>esc(v == null ? '' : String(v));
+const ft_isAdmin = ()=>!!(session && session.isAdmin);
+function ft_start(){
+  if(ft_started) return; ft_started = true;
+  ft_col.onSnapshot((snap)=>{
+    const list = []; snap.forEach(d=>list.push({ id:d.id, ...d.data() }));
+    ft_fiches = list; ft_ready = true;
+    if(ft_view === 'detail' && !ft_fiches.some(f=>f.id === ft_cur)){ ft_view = 'list'; ft_cur = null; }
+    if(ft_view !== 'edit') ft_render(); // pas de rafraîchissement pendant la saisie d'une fiche
+  }, (e)=>{ console.error(e); ft_ready = true; ft_render(); });
+}
+/* quantité saisie : « 1,5 », « 1/2 », « 1 1/2 » → nombre ; vide → null */
+function ft_parseQ(v){
+  let s = String(v == null ? '' : v).trim().replace(',', '.');
+  if(!s) return null;
+  const mix = s.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/); if(mix && Number(mix[3])) return Number(mix[1]) + Number(mix[2]) / Number(mix[3]);
+  const fr = s.match(/^(\d+)\s*\/\s*(\d+)$/); if(fr && Number(fr[2])) return Number(fr[1]) / Number(fr[2]);
+  const n = Number(s); return isNaN(n) ? null : n;
+}
+function ft_fmtQ(n, unit){
+  const d = /pièce|tranche|feuille/.test(unit || '') ? 1 : 2;
+  const k = Math.pow(10, d), r = Math.round(n * k) / k;
+  return r.toLocaleString('fr-FR', { maximumFractionDigits:d });
+}
+function ft_fmtMin(m){ m = Math.round(Number(m) || 0); if(!m) return ''; return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + String(m % 60).padStart(2, '0') : ''); }
+/* ingrédient mis à l'échelle pour N portions */
+function ft_scaled(f, n){
+  const base = Number(f.portions) > 0 ? Number(f.portions) : 1, k = n / base;
+  return (f.ingredients || []).map(i=>{
+    const q = ft_parseQ(i.q), isTaste = i.u === 'au goût';
+    const rf = i.ref ? ft_fiches.find(x=>x.id === i.ref) : null;
+    return { ref:rf ? rf.id : '', name:rf ? rf.name : (i.n || ''), unit:isTaste ? '' : (i.u || ''), text:isTaste ? 'au goût' : (q === null ? '' : ft_fmtQ(q * k, i.u)), q: q === null ? null : q * k };
+  });
+}
+function ft_catsAll(){
+  const used = ft_fiches.map(f=>f.cat).filter(Boolean), out = FT_CATS.slice();
+  used.forEach(c=>{ if(!out.includes(c)) out.push(c); });
+  return out;
+}
+
+/* ---------- navigation ---------- */
+function ft_open(id, keep){ const f = ft_fiches.find(x=>x.id === id); if(!f) return; if(!keep) ft_hist = []; ft_cur = id; ft_view = 'detail'; ft_portions = Number(f.portions) > 0 ? Number(f.portions) : 1; ft_render(); window.scrollTo && window.scrollTo(0, 0); }
+function ft_openRef(id){ if(ft_fiches.some(x=>x.id === id)){ ft_hist.push(ft_cur); ft_open(id, true); } }
+function ft_back(){
+  if(ft_view === 'detail' && ft_hist.length){ ft_open(ft_hist.pop(), true); return; }
+  ft_view = 'list'; ft_cur = null; ft_draft = null; ft_hist = []; ft_render();
+}
+function ft_baseByName(v){ const t = String(v || '').trim().toLowerCase(); if(!t) return null; return ft_fiches.find(f=>f.cat === FT_BASE_CAT && String(f.name || '').trim().toLowerCase() === t) || null; }
+function ft_setQ(v){ ft_q = v; ft_renderList(); }
+function ft_setCat(c){ ft_cat = (ft_cat === c || !c) ? '' : c; ft_render(); }
+function ft_setPortions(n){ n = Math.max(1, Math.min(999, Math.round(Number(n) || 1))); ft_portions = n; ft_renderDetail(); }
+function ft_stepPortions(d){ ft_setPortions(ft_portions + d); }
+
+/* ---------- liste ---------- */
+function ft_filtered(){
+  const q = ft_q.trim().toLowerCase();
+  const order = ft_catsAll();
+  return ft_fiches.filter(f=>(!ft_cat || f.cat === ft_cat) && (!ft_onlyTodo || ft_isTodo(f)) && (!q || [f.name, f.cat].concat((f.ingredients || []).map(i=>i.n)).join(' ').toLowerCase().includes(q)))
+    .sort((a, b)=>(order.indexOf(a.cat) - order.indexOf(b.cat)) || String(a.name || '').localeCompare(String(b.name || ''), 'fr'));
+}
+const ft_isTodo = (f)=>!(f.steps || []).length;
+function ft_shortName(f){ const c = String(f.cat || ''); return c && String(f.name || '').startsWith(c + ' ') ? String(f.name).slice(c.length + 1) : (f.name || ''); }
+function ft_toggleFam(c){ ft_openFams[c] = !ft_openFams[c]; ft_renderList(); }
+function ft_toggleTodo(){ ft_onlyTodo = !ft_onlyTodo; ft_render(); }
+function ft_listHtml(){
+  const list = ft_filtered();
+  if(!ft_fiches.length) return `<div class="empty-state">${ft_isAdmin() ? 'Aucune fiche pour l’instant. Crée la première avec « Nouvelle fiche », ou importe ton menu.' : 'Aucune fiche technique pour l’instant.'}</div>`;
+  if(!list.length) return '<div class="empty-state">Aucune fiche ne correspond.</div>';
+  const auto = !!(ft_q.trim() || ft_cat); // recherche ou famille choisie : tout est déplié
+  const groups = [], map = {};
+  list.forEach(f=>{ const c = f.cat || 'Sans catégorie'; if(!map[c]){ map[c] = { cat:c, items:[] }; groups.push(map[c]); } map[c].items.push(f); });
+  return groups.map(g=>{
+    const open = auto || !!ft_openFams[g.cat];
+    const pcs = Array.from(new Set(g.items.map(f=>Number(f.pieces) > 0 ? Number(f.pieces) : 0))), pc = pcs.length === 1 && pcs[0] ? pcs[0] : 0;
+    const sub = g.items.length + ' plat' + (g.items.length > 1 ? 's' : '') + (pc ? ' · ' + pc + ' pièce' + (pc > 1 ? 's' : '') : '');
+    const todo = g.items.some(ft_isTodo);
+    const head = `<div class="ft-fam ${open ? 'open' : ''}" onclick="ft_toggleFam(${ft_e(JSON.stringify(g.cat))})"><div>${ft_e(g.cat)}<span class="s">${ft_e(sub)}</span></div><div class="r">${todo ? '<span class="ft-dot"></span>' : ''}<span>${open ? '▾' : '▸'}</span></div></div>`;
+    const rows = open ? '<div class="ft-rows">' + g.items.map(f=>`<div class="ft-row" onclick="ft_open('${f.id}')"><span>${ft_e(ft_shortName(f))}${Number(f.pieces) > 0 && !pc ? `<span class="pt-muted"> · ${f.pieces} pièce${f.pieces > 1 ? 's' : ''}</span>` : ''}</span>${ft_isTodo(f) ? '<span class="ft-dot"></span>' : ''}</div>`).join('') + '</div>' : '';
+    return head + rows;
+  }).join('');
+}
+function ft_renderList(){ const el = document.getElementById('ft-list'); if(el) el.innerHTML = ft_listHtml(); }
+function ft_listView(){
+  const cats = ft_catsAll().filter(c=>ft_fiches.some(f=>f.cat === c));
+  const nTodo = ft_fiches.filter(ft_isTodo).length;
+  return `<div class="ft-top"><div class="row-between" style="margin-bottom:8px;"><div style="font-weight:700;font-size:18px;">Fiches techniques</div>${ft_isAdmin() ? '<button class="btn small t-add" onclick="ft_new()">＋ Nouvelle fiche</button>' : ''}</div>
+    <div class="field" style="margin-bottom:8px;"><input type="search" id="ft-search" class="ft-in" placeholder="Rechercher un plat ou un ingrédient" value="${ft_e(ft_q)}" oninput="ft_setQ(this.value)"></div>
+    ${cats.length ? `<div class="ft-chips ft-scroll"><button class="ft-chip ${ft_cat ? '' : 'on'}" onclick="ft_setCat('')">Tout</button>${cats.map(c=>`<button class="ft-chip ${ft_cat === c ? 'on' : ''}" onclick="ft_setCat(${ft_e(JSON.stringify(c))})">${ft_e(c)}</button>`).join('')}</div>` : ''}
+    ${nTodo ? `<div class="ft-todobar"><span><span class="ft-dot"></span>&nbsp; ${nTodo} fiche${nTodo > 1 ? 's' : ''} à compléter</span><a class="ft-link" style="font-weight:600;" onclick="ft_toggleTodo()">${ft_onlyTodo ? 'Tout afficher ›' : 'Afficher ›'}</a></div>` : ''}</div>
+    ${ft_isAdmin() && ft_seedMissing().length ? `<div class="ticket" style="margin:8px 0;"><div style="font-size:14px;margin-bottom:8px;">Ton menu peut être importé : ${ft_seedMissing().length} fiches (plats et préparations de base), sans quantités ni étapes.</div><button class="btn small t-io" onclick="ft_importMenu()">Importer le menu</button></div>` : ''}
+    <div id="ft-list">${ft_listHtml()}</div>`;
+}
+
+/* ---------- fiche ---------- */
+function ft_detailInner(f){
+  const items = ft_scaled(f, ft_portions), changed = ft_portions !== (Number(f.portions) > 0 ? Number(f.portions) : 1);
+  const ing = items.length ? items.map(i=>`<li class="ft-ing"><span class="q">${ft_e((i.text + ' ' + i.unit).trim())}</span>${i.ref ? `<a class="ft-link" onclick="ft_openRef('${i.ref}')">${ft_e(i.name)} ▸</a>` : `<span>${ft_e(i.name)}</span>`}</li>`).join('') : '<li class="pt-muted">Aucun ingrédient.</li>';
+  const steps = (f.steps || []).length ? f.steps.map((s, i)=>`<div class="ft-step"><div class="num">${i + 1}</div><div class="txt">${ft_e(s).replace(/\n/g, '<br>')}</div></div>`).join('') : '<div class="pt-muted">Aucune étape.</div>';
+  const usedIn = ft_fiches.filter(x=>x.id !== f.id && (x.ingredients || []).some(i=>i.ref === f.id)).sort((a, b)=>String(a.name).localeCompare(String(b.name), 'fr'));
+  const usedHtml = usedIn.length ? `<div class="ticket"><div class="section-label">Utilisée dans (${usedIn.length})</div><div class="ft-chips">${usedIn.map(x=>`<button class="ft-chip" onclick="ft_openRef('${x.id}')">${ft_e(x.name)}</button>`).join('')}</div></div>` : '';
+  const card = (cls, l, n)=>n ? `<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${ft_e(n)}</div></div>` : '';
+  const block = (title, txt)=>txt ? `<div class="ticket"><div class="section-label">${title}</div><div class="ft-text">${ft_e(txt).replace(/\n/g, '<br>')}</div></div>` : '';
+  const conserv = [f.temp ? 'Température : ' + f.temp : '', f.duree ? 'Durée : ' + f.duree : ''].filter(Boolean).join('\n');
+  return `<div class="ticket">
+      <div style="font-weight:800;font-size:20px;">${ft_e(f.name)}</div>
+      ${f.cat ? `<div style="margin:6px 0;"><span class="ft-cat">${ft_e(f.cat)}</span></div>` : ''}
+      <div class="pt-cards">${card('c-days', 'Pièces par portion', f.pieces)}${card('c-adv', 'Portions (fiche)', f.portions)}${card('c-base', 'Préparation', ft_fmtMin(f.prepMin))}${card('c-transport', 'Température', f.temp)}${card('c-bonus', 'Durée de conservation', f.duree)}</div>
+    </div>
+    <div class="ticket">
+      <div class="section-label">Ingrédients</div>
+      <div class="ft-portions"><span>Pour</span><button class="btn ghost small" onclick="ft_stepPortions(-1)" aria-label="moins">−</button><input type="text" inputmode="numeric" id="ft-portions" class="ft-in" value="${ft_portions}" onchange="ft_setPortions(this.value)"><button class="btn ghost small" onclick="ft_stepPortions(1)" aria-label="plus">＋</button><span>portion${ft_portions > 1 ? 's' : ''}</span>${changed ? `<button class="btn ghost small t-cancel" onclick="ft_setPortions(${Number(f.portions) > 0 ? Number(f.portions) : 1})">Quantités de la fiche</button>` : ''}</div>
+      <ul class="ft-ings">${ing}</ul>
+    </div>
+    <div class="ticket"><div class="section-label">Préparation</div>${steps}</div>
+    ${block('Dressage', f.dressage)}${block('Accompagnements', f.accomp)}${block('Conservation', conserv)}${block('Notes du chef', f.notes)}${usedHtml}`;
+}
+function ft_renderDetail(){ const el = document.getElementById('ft-detail'); const f = ft_fiches.find(x=>x.id === ft_cur); if(el && f) el.innerHTML = ft_detailInner(f); }
+function ft_detailView(f){
+  return `<div style="margin-bottom:10px;"><button class="btn ghost small t-view" onclick="ft_back()">← ${ft_hist.length ? ft_e((ft_fiches.find(x=>x.id === ft_hist[ft_hist.length - 1]) || {}).name || 'Retour') : 'Fiches'}</button></div>
+      <div class="ft-actions"><button class="btn ghost small t-io" onclick="ft_print()">🖨️ Imprimer</button>${ft_isAdmin() ? `<button class="btn ghost small t-edit" onclick="ft_edit('${f.id}')">Modifier</button><button class="btn ghost small t-view" onclick="ft_dup('${f.id}')">Dupliquer</button><button class="btn ghost small t-del" onclick="ft_del('${f.id}')">Supprimer</button>` : ''}</div>
+    <div id="ft-detail">${ft_detailInner(f)}</div>`;
+}
+function ft_print(){
+  const f = ft_fiches.find(x=>x.id === ft_cur); if(!f) return;
+  const items = ft_scaled(f, ft_portions);
+  const css = 'body{font-family:Arial,sans-serif;color:#111;margin:22px;}h1{margin:0 0 4px;font-size:24px;}h2{font-size:14px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #999;padding-bottom:3px;margin:18px 0 8px;}.m{color:#555;font-size:13px;}li{margin:3px 0;}ol li{margin:8px 0;}';
+  const meta = [f.cat, Number(f.pieces) > 0 ? f.pieces + ' pièces par portion' : '', 'Pour ' + ft_portions + ' portion' + (ft_portions > 1 ? 's' : ''), ft_fmtMin(f.prepMin) ? 'Préparation : ' + ft_fmtMin(f.prepMin) : '', f.temp ? 'Température : ' + f.temp : '', f.duree ? 'Conservation : ' + f.duree : ''].filter(Boolean).join(' · ');
+  const html = `<html><head><meta charset="utf-8"><title>${ft_e(f.name)}</title><style>${css}</style></head><body><h1>${ft_e(f.name)}</h1><div class="m">${ft_e(meta)}</div>
+    <h2>Ingrédients</h2><ul>${items.map(i=>`<li><b>${ft_e((i.text + ' ' + i.unit).trim())}</b> ${ft_e(i.name)}</li>`).join('')}</ul>
+    <h2>Préparation</h2><ol>${(f.steps || []).map(s=>`<li>${ft_e(s).replace(/\n/g, '<br>')}</li>`).join('')}</ol>
+    ${f.dressage ? `<h2>Dressage</h2><div>${ft_e(f.dressage).replace(/\n/g, '<br>')}</div>` : ''}${f.accomp ? `<h2>Accompagnements</h2><div>${ft_e(f.accomp).replace(/\n/g, '<br>')}</div>` : ''}${f.notes ? `<h2>Notes du chef</h2><div>${ft_e(f.notes).replace(/\n/g, '<br>')}</div>` : ''}</body></html>`;
+  let fr = document.getElementById('ft-print-frame');
+  if(!fr){ fr = document.createElement('iframe'); fr.id = 'ft-print-frame'; fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'; document.body.appendChild(fr); }
+  fr.srcdoc = html;
+  fr.onload = ()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ console.error(e); } };
+}
+
+/* ---------- édition (administrateur) ---------- */
+function ft_blank(){ return { name:'', cat:'', portions:1, prepMin:'', pieces:'', accomp:'', ingredients:[{ q:'', u:'g', n:'', ref:'' }], steps:[''], dressage:'', temp:'', duree:'', notes:'' }; }
+function ft_clone(f){ return JSON.parse(JSON.stringify({ name:f.name || '', cat:f.cat || '', portions:f.portions || 1, pieces:f.pieces || '', accomp:f.accomp || '', prepMin:f.prepMin || '', ingredients:(f.ingredients || []).map(i=>({ q:i.q == null ? '' : String(i.q), u:i.u || '', n:i.n || '', ref:i.ref || '' })), steps:(f.steps || []).slice(), dressage:f.dressage || '', temp:f.temp || '', duree:f.duree || '', notes:f.notes || '' })); }
+function ft_new(){ if(!ft_isAdmin()) return; ft_draft = ft_blank(); ft_cur = null; ft_view = 'edit'; ft_render(); }
+function ft_edit(id){ const f = ft_fiches.find(x=>x.id === id); if(!f || !ft_isAdmin()) return; ft_draft = ft_clone(f); ft_cur = id; ft_view = 'edit'; ft_render(); }
+function ft_dup(id){ const f = ft_fiches.find(x=>x.id === id); if(!f || !ft_isAdmin()) return; ft_draft = ft_clone(f); ft_draft.name = (f.name || '') + ' (copie)'; ft_cur = null; ft_view = 'edit'; ft_render(); }
+function ft_cancelEdit(){ ft_draft = null; if(ft_cur){ ft_view = 'detail'; } else ft_view = 'list'; ft_render(); }
+function ft_dSet(k, v){ if(ft_draft) ft_draft[k] = v; }
+function ft_ingSet(i, k, v){
+  if(!ft_draft || !ft_draft.ingredients[i]) return;
+  const g = ft_draft.ingredients[i]; g[k] = v;
+  if(k === 'n'){ const b = ft_baseByName(v); g.ref = b ? b.id : ''; const el = document.getElementById('ft-lk-' + i); if(el) el.innerHTML = g.ref ? '🔗 lié à la fiche « ' + ft_e(b.name) + ' »' : ''; }
+}
+function ft_ingAdd(){ ft_draft.ingredients.push({ q:'', u:'g', n:'', ref:'' }); ft_render(); setTimeout(()=>{ const els = document.querySelectorAll('.ft-ing-name'); if(els.length) els[els.length - 1].focus(); }, 0); }
+function ft_ingDel(i){ ft_draft.ingredients.splice(i, 1); if(!ft_draft.ingredients.length) ft_draft.ingredients.push({ q:'', u:'g', n:'', ref:'' }); ft_render(); }
+function ft_stepSet(i, v){ if(ft_draft) ft_draft.steps[i] = v; }
+function ft_stepAdd(){ ft_draft.steps.push(''); ft_render(); setTimeout(()=>{ const els = document.querySelectorAll('.ft-step-in'); if(els.length) els[els.length - 1].focus(); }, 0); }
+function ft_stepDel(i){ ft_draft.steps.splice(i, 1); if(!ft_draft.steps.length) ft_draft.steps.push(''); ft_render(); }
+function ft_stepMove(i, d){ const j = i + d, s = ft_draft.steps; if(j < 0 || j >= s.length) return; const t = s[i]; s[i] = s[j]; s[j] = t; ft_render(); }
+async function ft_save(){
+  const d = ft_draft; if(!d || !ft_isAdmin()) return;
+  const name = String(d.name || '').trim();
+  if(!name){ alert('Donne un nom au plat.'); return; }
+  const portions = Math.max(1, Math.round(Number(String(d.portions).replace(',', '.')) || 1));
+  const ingredients = d.ingredients.map(i=>{ const n = String(i.n || '').trim(), b = ft_baseByName(n); return { n, u:i.u || '', q:ft_parseQ(i.q), ref:b ? b.id : '' }; }).filter(i=>i.n);
+  for(const i of d.ingredients){ if(String(i.q || '').trim() && ft_parseQ(i.q) === null){ alert('Quantité non valide : « ' + i.q + ' ». Écris un nombre (1,5) ou une fraction (1/2).'); return; } }
+  const data = { name, cat:String(d.cat || '').trim(), portions, pieces:Math.max(0, Math.round(Number(String(d.pieces).replace(',', '.')) || 0)) || '', accomp:String(d.accomp || '').trim(), prepMin:Math.max(0, Math.round(Number(String(d.prepMin).replace(',', '.')) || 0)), ingredients,
+    steps:d.steps.map(s=>String(s || '').trim()).filter(Boolean), dressage:String(d.dressage || '').trim(), temp:String(d.temp || '').trim(), duree:String(d.duree || '').trim(), notes:String(d.notes || '').trim(),
+    updatedAt:new Date().toISOString(), updatedBy:(typeof currentUser !== 'undefined' ? currentUser : '') };
+  try{
+    let id = ft_cur;
+    if(id) await ft_col.doc(id).set(data, { merge:true });
+    else { data.createdAt = data.updatedAt; const ref = await ft_col.add(data); id = ref.id; }
+    ft_draft = null; ft_cur = id; ft_view = 'detail'; ft_portions = portions; ft_render(); window.scrollTo && window.scrollTo(0, 0);
+    if(typeof pt_toast === 'function') pt_toast('Fiche enregistrée.');
+  }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+async function ft_del(id){
+  const f = ft_fiches.find(x=>x.id === id); if(!f || !ft_isAdmin()) return;
+  if(!confirm('Supprimer la fiche « ' + f.name + ' » ? Cette action est définitive.')) return;
+  try{ await ft_col.doc(id).delete(); ft_back(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+function ft_editView(){
+  const d = ft_draft, a = (k)=>`oninput="ft_dSet('${k}', this.value)"`;
+  const ings = d.ingredients.map((i, n)=>`<div class="ft-edrow"><input type="text" inputmode="decimal" class="ft-in ft-q" placeholder="Qté" value="${ft_e(i.q)}" oninput="ft_ingSet(${n},'q',this.value)">
+      <select class="ft-in ft-u" onchange="ft_ingSet(${n},'u',this.value)">${[''].concat(FT_UNITS, FT_UNITS.includes(i.u) || !i.u ? [] : [i.u]).map(u=>`<option value="${ft_e(u)}" ${u === (i.u || '') ? 'selected' : ''}>${u ? ft_e(u) : '—'}</option>`).join('')}</select>
+      <input type="text" class="ft-in ft-ing-name ft-n" list="ft-bases" placeholder="Ingrédient" value="${ft_e(i.n)}" oninput="ft_ingSet(${n},'n',this.value)"><button class="btn ghost small t-del" onclick="ft_ingDel(${n})" aria-label="Retirer">✕</button><div class="ft-lk" id="ft-lk-${n}">${i.ref && ft_fiches.find(x=>x.id === i.ref) ? '🔗 lié à la fiche « ' + ft_e(ft_fiches.find(x=>x.id === i.ref).name) + ' »' : ''}</div></div>`).join('');
+  const steps = d.steps.map((s, n)=>`<div class="ft-edrow ft-edstep"><div class="num">${n + 1}</div><textarea class="ft-in ft-step-in" rows="2" placeholder="Décris l’étape" oninput="ft_stepSet(${n}, this.value)">${ft_e(s)}</textarea>
+      <div class="ft-mv"><button class="btn ghost small" onclick="ft_stepMove(${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="ft_stepMove(${n},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="ft_stepDel(${n})" aria-label="Retirer">✕</button></div></div>`).join('');
+  return `<div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;font-size:18px;">${ft_cur ? 'Modifier la fiche' : 'Nouvelle fiche'}</div></div>
+    <div class="ticket">
+      <div class="field"><label>Nom du plat</label><input type="text" class="ft-in" id="ft-name" value="${ft_e(d.name)}" ${a('name')}></div>
+      <div class="pt-row" style="margin-top:10px;"><div class="field" style="flex:2 1 160px;"><label>Catégorie</label><input type="text" class="ft-in" list="ft-cats" value="${ft_e(d.cat)}" placeholder="Choisis ou écris" ${a('cat')}><datalist id="ft-cats">${ft_catsAll().map(c=>`<option value="${ft_e(c)}">`).join('')}</datalist></div>
+        <div class="field" style="flex:1 1 90px;"><label>Pièces / portion</label><input type="text" inputmode="numeric" class="ft-in" value="${ft_e(d.pieces)}" ${a('pieces')}></div>
+        <div class="field" style="flex:1 1 90px;"><label>Portions</label><input type="text" inputmode="numeric" class="ft-in" value="${ft_e(d.portions)}" ${a('portions')}></div>
+        <div class="field" style="flex:1 1 110px;"><label>Préparation (min)</label><input type="text" inputmode="numeric" class="ft-in" value="${ft_e(d.prepMin)}" ${a('prepMin')}></div></div>
+    </div>
+    <div class="ticket"><div class="section-label">Ingrédients <span class="pt-muted" style="text-transform:none;letter-spacing:0;">(quantités pour ${ft_e(d.portions || 1)} portion${Number(d.portions) > 1 ? 's' : ''} — écris le nom d’une préparation de base pour créer le lien)</span></div><datalist id="ft-bases">${ft_fiches.filter(x=>x.cat === FT_BASE_CAT).map(x=>`<option value="${ft_e(x.name)}">`).join('')}</datalist>${ings}<div class="actions-row"><button class="btn small t-add" onclick="ft_ingAdd()">＋ Ingrédient</button></div></div>
+    <div class="ticket"><div class="section-label">Étapes de préparation</div>${steps}<div class="actions-row"><button class="btn small t-add" onclick="ft_stepAdd()">＋ Étape</button></div></div>
+    <div class="ticket"><div class="field"><label>Dressage (comment présenter le plat)</label><textarea class="ft-in" rows="3" ${a('dressage')}>${ft_e(d.dressage)}</textarea></div></div>
+    <div class="ticket"><div class="field"><label>Accompagnements (wasabi, gingembre, sauces…)</label><textarea class="ft-in" rows="2" ${a('accomp')}>${ft_e(d.accomp)}</textarea></div></div>
+    <div class="ticket"><div class="section-label">Conservation</div><div class="pt-row"><div class="field" style="flex:1 1 140px;"><label>Température</label><input type="text" class="ft-in" placeholder="ex. 0–4 °C" value="${ft_e(d.temp)}" ${a('temp')}></div>
+      <div class="field" style="flex:1 1 140px;"><label>Durée</label><input type="text" class="ft-in" placeholder="ex. 48 h" value="${ft_e(d.duree)}" ${a('duree')}></div></div></div>
+    <div class="ticket"><div class="field"><label>Notes ou astuces du chef</label><textarea class="ft-in" rows="3" ${a('notes')}>${ft_e(d.notes)}</textarea></div></div>
+    <div class="actions-row"><button class="btn t-save" onclick="ft_save()">Enregistrer la fiche</button><button class="btn ghost t-cancel" onclick="ft_cancelEdit()">Annuler</button></div>`;
+}
+
+function ft_render(){
+  const body = document.getElementById('ft-body'); if(!body) return;
+  if(!ft_ready){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  const f = ft_fiches.find(x=>x.id === ft_cur);
+  if(ft_view === 'edit' && ft_draft && ft_isAdmin()) body.innerHTML = ft_editView();
+  else if(ft_view === 'detail' && f) body.innerHTML = ft_detailView(f);
+  else { ft_view = 'list'; body.innerHTML = ft_listView(); try{ const nav = document.querySelector('nav.tabs'), t = body.querySelector('.ft-top'); if(t && nav) t.style.top = nav.offsetHeight + 'px'; }catch(e){} }
 }
 
 /* ==================== MODULE CA RESTO PRO — chiffre d'affaires synchronisé depuis le PC du restaurant ====================
@@ -3163,6 +3627,11 @@ function rp_render(){
     <div class="stat-box"><div class="stat-label">Remises (tickets fermés)</div>
       <div class="rp-mid" style="color:${c.rSum?'var(--rust)':'var(--ink)'};">${rp_money(c.rSum)}</div>
       <div class="stat-label">${c.rem.length} ticket${c.rem.length>1?'s':''} avec remise</div></div>
+  </div>
+  <div class="ticket rp-hero" style="margin-top:10px;">
+    <div class="stat-label">Total des bons — fermés + non fermés</div>
+    <div class="rp-big" style="font-size:26px;">${rp_money(c.cCa + c.oCa)}</div>
+    <div class="stat-label"><b>${c.cNb + c.oNb}</b> bon${(c.cNb + c.oNb)>1?'s':''} : ${c.cNb} fermé${c.cNb>1?'s':''} · ${c.oNb} non fermé${c.oNb>1?'s':''}</div>
   </div>`;
 
   // --- Détail par jour ---
@@ -3213,14 +3682,360 @@ function rp_render(){
   body.innerHTML = h;
 }
 
-/* ==================== MODULE CARNET — dettes, emprunts & disponible (privé) ==================== */
-/* Visible uniquement par le compte 'soufyane' — jamais par les autres administrateurs.
-   Une seule collection (aucune règle Firestore supplémentaire à ajouter) avec 3 sortes de documents :
-   - sans champ « kind »        : une ligne de dette / emprunt        { personne, montant, devise, type, date, note }
-   - kind:'avoir'               : un endroit où tu as de l'argent      { nom, devise, montant, maj }   (un SOLDE, pas un mouvement)
-   - kind:'avoir_histo'         : une mise à jour d'un de ces endroits { avoirId, date, ancien, montant }
-   Dette = je dois · Emprunt = on me doit · Position = disponible + emprunts − dettes (devise par devise). */
-function hasDettesAccess(){ return !!(session && session.username === 'soufyane'); }
+/* ==================== MODULE MISE EN PLACE ==================== */
+/* Listes d'ingrédients par section (doc unique) + saisies de fin de service (une par cuisinier et par service).
+   Cuisiniers : saisie seulement (ils ne lisent jamais les saisies). Administrateur : historique, suppression, gestion des listes. */
+const mep_listsRef = db.collection('mise_en_place').doc('listes');
+const mep_saisiesCol = db.collection('mise_en_place_saisies');
+const MEP_DEFAULT_SECS = [{ id:'sushi', n:'Sushi' }, { id:'chaud', n:'Chaud' }, { id:'bar', n:'Bar' }];
+const MEP_UNITS = ['pièces', 'kg', 'g', 'L', 'cl', 'boîte', 'carton', 'bouteille', 'canette', 'sachet'];
+let mep_adminStarted = false, mep_started = false, mep_listsReady = false, mep_lists = { sushi:[], chaud:[], bar:[], cooks:[] }, mep_saisies = [], mep_saisiesReady = false;
+let mep_tab = 'hist', mep_sec = 'sushi', mep_date = '', mep_form = null, mep_draft = null, mep_busy = false;
+const mep_e = (v)=>esc(v == null ? '' : String(v));
+const mep_isAdmin = ()=>!!(session && session.isAdmin);
+const mep_secList = ()=>(mep_lists.sections && mep_lists.sections.length ? mep_lists.sections : MEP_DEFAULT_SECS);
+const mep_secs = ()=>mep_secList().map(x=>[x.id, x.n]);
+const mep_secName = (k)=>(mep_secs().find(x=>x[0] === k) || [k, k])[1];
+function mep_secOk(){ const l = mep_secs(); if(!l.some(x=>x[0] === mep_sec)) mep_sec = l.length ? l[0][0] : ''; }
+const mep_hasSaisies = (id)=>mep_saisies.some(x=>x.section === id);
+function mep_ymd(d){ d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function mep_frDate(ymd){ const p = String(ymd || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : ymd; }
+function mep_hm(iso){ const d = new Date(iso); return isNaN(d) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+function mep_newId(){ return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+/* cuisiniers proposés : la liste gérée par l'administrateur (Listes) */
+function mep_empList(){ return (mep_lists.cooks || []).filter(c=>c && c.n).map(c=>({ code:c.id, name:c.n })).sort((a, b)=>a.name.localeCompare(b.name, 'fr')); }
+function mep_typing(){ try{ const a = document.activeElement, b = document.getElementById('mep-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
+function mep_start(){
+  if(mep_isAdmin() && !mep_adminStarted){ mep_adminStarted = true; mep_watchSaisies(); mep_watchRp(); }
+  if(mep_started) return; mep_started = true;
+  mep_listsRef.onSnapshot((doc)=>{
+    const d = doc.exists ? (doc.data() || {}) : {};
+    mep_lists = Object.assign({ sushi:[], chaud:[], bar:[], cooks:[] }, d); mep_listsReady = true;
+    if((mep_tab !== 'listes' || !mep_draft) && !mep_typing()) mep_render();
+  }, (e)=>{ console.error(e); mep_listsReady = true; mep_render(); });
+  mep_stockRef.onSnapshot((doc)=>{ const d = doc.exists ? (doc.data() || {}) : {}; mep_stock = d.s || {}; mep_stockReady = true; if(!mep_typing()) mep_render(); mep_maybeBoot(); }, (e)=>{ console.error(e); mep_stockReady = true; });
+}
+function mep_watchSaisies(){
+  // seul l'administrateur lit les saisies
+  {
+    const since = new Date(); since.setDate(since.getDate() - 400);
+    mep_saisiesCol.where('date', '>=', mep_ymd(since)).onSnapshot((snap)=>{
+      const l = []; snap.forEach(d=>l.push({ id:d.id, ...d.data() })); mep_saisies = l; mep_saisiesReady = true; mep_render(); mep_maybeBoot();
+    }, (e)=>{ console.error(e); mep_saisiesReady = true; mep_render(); });
+  }
+}
+/* ---------- dernier inventaire de chaque section (un petit document lu par tous) ---------- */
+/* mise_en_place/stock : { s: { <section>: { at, name, emp, items:[{id,n,u,q}], correctedBy, correctedAt } } } */
+const mep_stockRef = db.collection('mise_en_place').doc('stock');
+let mep_stock = {}, mep_stockReady = false, mep_boot = false, mep_viewId = '', mep_edit = null;
+const mep_stockOf = (sec)=>{ const x = mep_stock[sec]; return x && Array.isArray(x.items) ? x : null; };
+const mep_fmtIn = (q)=>String(q).replace('.', ',');
+const mep_byAt = (a, b)=>String(a.at).localeCompare(String(b.at));
+const mep_who = ()=>(typeof currentUser !== 'undefined' && currentUser) ? currentUser : 'administrateur';
+function mep_fdt(iso){ const d = new Date(iso); return isNaN(d) ? '' : String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ' ' + mep_hm(iso); }
+const mep_fq = (q)=>ft_fmtQ(Number(q), '').replace(/\s/g, ' ');
+const mep_counts = (x, id)=>!x.changed || x.changed.includes(id); // anciennes saisies partielles
+/* heure « d'origine » d'une saisie (une correction garde l'heure de l'inventaire corrigé) */
+const mep_shownAt = (x)=>x.origAt || x.at;
+function mep_snapshotOf(x){ return { at:mep_shownAt(x), name:x.name, emp:String(x.emp), items:(x.items || []).map(i=>({ id:i.id, n:i.n, u:i.u || '', q:i.q })), correctedBy:x.correctedBy || '', correctedAt:x.correctedAt || '' }; }
+/* recalcule le « dernier inventaire » de chaque section à partir des saisies (administrateur) */
+function mep_stockFrom(exceptId, override){
+  const s = {};
+  mep_saisies.filter(x=>x.id !== exceptId).map(x=>override && override[x.id] ? { ...x, ...override[x.id] } : x).sort(mep_byAt).forEach(x=>{ s[x.section] = mep_snapshotOf(x); });
+  return s;
+}
+async function mep_rebuildStock(exceptId, override){ await mep_stockRef.set({ s:mep_stockFrom(exceptId, override), rebuiltAt:new Date().toISOString() }); }
+const MEP_SNAP_KEYS = ['at', 'name', 'emp', 'items', 'correctedBy', 'correctedAt'];
+function mep_stockStale(from){ // le dernier inventaire stocké ne correspond pas à la dernière saisie (ou ancien format mélangé)
+  const secs = new Set([...Object.keys(from), ...Object.keys(mep_stock)]);
+  for(const sec of secs){
+    const f = from[sec], c = mep_stock[sec];
+    if(!f) continue;
+    if(!c || !Array.isArray(c.items)) return true;
+    if(Object.keys(c).some(k=>!MEP_SNAP_KEYS.includes(k))) return true;
+    if(String(c.at) !== String(f.at) || String(c.correctedAt || '') !== String(f.correctedAt || '')) return true;
+    if(c.items.map(i=>i.id + ':' + i.q).join('|') !== f.items.map(i=>i.id + ':' + i.q).join('|')) return true;
+  }
+  return false;
+}
+let mep_healSig = '';
+function mep_maybeBoot(){ // administrateur : garde le « dernier inventaire » aligné sur les saisies (à chaque mise à jour)
+  if(!mep_isAdmin() || mep_busy || !mep_stockReady || !mep_saisiesReady) return;
+  const from = mep_stockFrom('');
+  if(!mep_stockStale(from)){ mep_healSig = ''; return; }
+  const sig = JSON.stringify(from);
+  if(sig === mep_healSig) return; // déjà tenté avec ces mêmes données
+  mep_healSig = sig;
+  mep_rebuildStock('').catch(e=>console.error(e));
+}
+/* ---------- saisie (cuisinier ; administrateur : onglet « Saisie ») ---------- */
+function mep_resetForm(){ mep_form = { sec:mep_sec, emp:'', vals:{}, mode:'new' }; }
+function mep_pickSec(k){ mep_sec = k; mep_resetForm(); mep_render(); }
+function mep_setEmp(v){ if(!mep_form) mep_resetForm(); mep_form.emp = v; }
+function mep_setVal(id, v){ if(!mep_form) mep_resetForm(); mep_form.vals[id] = v; }
+function mep_correctStart(){ // administrateur : repart du dernier inventaire
+  const st = mep_stockOf(mep_sec); if(!mep_isAdmin() || !st) return;
+  mep_form = { sec:mep_sec, emp:'', vals:{}, mode:'correct', base:{} };
+  (mep_lists[mep_sec] || []).forEach(i=>{ const it = st.items.find(x=>x.id === i.id); const v = it ? mep_fmtIn(it.q) : ''; mep_form.vals[i.id] = v; mep_form.base[i.id] = v; });
+  mep_render();
+}
+function mep_correctCancel(){ mep_resetForm(); mep_render(); }
+function mep_lastHead(st){
+  if(!st) return '<div class="pt-muted" style="font-weight:500;">—</div>';
+  const d = new Date(st.at), dm = isNaN(d) ? '' : String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+  return `<div class="mep2-who">${mep_e(st.name)}</div><div class="pt-muted" style="font-weight:500;">${mep_e(dm)}</div><div class="pt-muted" style="font-weight:500;">${mep_e(mep_hm(st.at))}</div>${st.correctedBy ? `<div class="mep2-corr">✎ ${mep_e(st.correctedBy)} · ${mep_e(mep_hm(st.correctedAt))}</div>` : ''}`;
+}
+function mep_entryView(){
+  if(!mep_form) mep_resetForm();
+  const list = mep_lists[mep_sec] || [], emps = mep_empList(), st = mep_stockOf(mep_sec), f = mep_form, correct = f.mode === 'correct' && !!st;
+  const lastQ = (id)=>{ const it = st && st.items.find(x=>x.id === id); return it ? mep_e(mep_fq(it.q)) : '<span class="pt-muted">—</span>'; };
+  const rows = list.map((i, k)=>`<tr><td><span class="mep-num s">${k + 1}</span>${mep_e(i.n)}${i.u ? ` <span class="pt-muted">(${mep_e(i.u)})</span>` : ''}</td><td class="i"><input id="mep-in-${i.id}" class="ft-in ${correct && !mep_same(f.vals[i.id], f.base && f.base[i.id]) ? 'chg' : ''}" type="text" inputmode="decimal" placeholder="0" value="${mep_e(f.vals[i.id] || '')}" oninput="mep_setVal('${i.id}', this.value)"></td><td class="l">${lastQ(i.id)}</td></tr>`).join('');
+  const table = list.length ? `<div style="overflow-x:auto;"><table class="mep-g mep-in"><tr><th>Article</th><th>${correct ? 'Correction' : 'En cours'}</th><th class="l">${mep_lastHead(st)}</th></tr>${rows}</table></div>` : `<div class="pt-muted">Aucun ingrédient défini pour cette section.${mep_isAdmin() ? ' Ajoute-les dans « Listes ».' : ''}</div>`;
+  const nameBox = correct ? `<div class="ticket"><div class="pt-muted">Tu corriges le dernier inventaire de <b>${mep_e(st.name)}</b> (${mep_e(mep_fdt(st.at))}). Change les quantités en erreur, puis enregistre.</div></div>`
+    : `<div class="ticket"><div class="field"><label>Cuisinier</label><select class="ft-in" id="mep-emp" onchange="mep_setEmp(this.value)"><option value="">Choisis ton nom</option>${emps.map(x=>`<option value="${mep_e(x.code)}" ${String(f.emp) === String(x.code) ? 'selected' : ''}>${mep_e(x.name)}</option>`).join('')}</select></div></div>`;
+  const btns = !list.length ? '' : correct
+    ? `<div class="actions-row"><button class="btn t-edit" style="flex:1 1 60%;height:48px;" onclick="mep_submit()">Enregistrer la correction</button><button class="btn ghost t-cancel" style="flex:1 1 30%;height:48px;" onclick="mep_correctCancel()">Annuler</button></div>`
+    : `<div class="actions-row"><button class="btn t-save" style="width:100%;height:48px;" onclick="mep_submit()">Valider l’inventaire</button></div>${mep_isAdmin() && st ? '<div class="actions-row"><button class="btn ghost small t-edit" onclick="mep_correctStart()">Corriger le dernier inventaire</button></div>' : ''}`;
+  return `<div class="mep-seg">${mep_secs().map(x=>`<button class="${mep_sec === x[0] ? 'on' : ''}" onclick="mep_pickSec('${x[0]}')">${x[1]}</button>`).join('')}</div>
+    ${nameBox}<div class="ticket"><div class="section-label">${mep_e(mep_secName(mep_sec))} — ${correct ? 'correction' : 'inventaire'}</div>${table}</div>${btns}`;
+}
+function mep_same(a, b){ const x = ft_parseQ(a), y = ft_parseQ(b); return (x !== null && y !== null) ? x === y : String(a || '').trim() === String(b || '').trim(); }
+function mep_readItems(list, vals){ // toutes les quantités sont obligatoires
+  const items = [], missing = [];
+  for(const i of list){
+    const raw = String(vals[i.id] == null ? '' : vals[i.id]).trim();
+    if(!raw){ missing.push(i.n); continue; }
+    const q = ft_parseQ(raw);
+    if(q === null || q < 0){ alert('Quantité non valide pour « ' + i.n + ' » : « ' + raw + ' ».'); return null; }
+    items.push({ id:i.id, n:i.n, u:i.u || '', q });
+  }
+  if(missing.length){ alert('Il manque ' + missing.length + ' quantité' + (missing.length > 1 ? 's' : '') + ' : ' + missing.slice(0, 5).join(', ') + (missing.length > 5 ? '…' : '') + '\nMets 0 si tu n’en as plus.'); return null; }
+  return items.length ? items : null;
+}
+async function mep_submit(){
+  if(mep_busy || !mep_form) return;
+  const f = mep_form, list = mep_lists[f.sec] || [], st = mep_stockOf(f.sec), correct = f.mode === 'correct' && !!st;
+  let emp = null;
+  if(!correct){
+    if(!f.emp){ alert('Choisis ton nom avant de valider.'); return; }
+    emp = mep_empList().find(x=>String(x.code) === String(f.emp)); if(!emp){ alert('Choisis ton nom avant de valider.'); return; }
+  }
+  const items = mep_readItems(list, f.vals); if(!items) return;
+  const now = new Date(), nowIso = now.toISOString();
+  let doc, snap;
+  if(correct){
+    if(!items.some(i=>{ const o = st.items.find(x=>x.id === i.id); return !o || Number(o.q) !== i.q; })){ alert('Aucune quantité n’a changé.'); return; }
+    doc = { section:f.sec, date:mep_ymd(new Date(st.at)), at:nowIso, origAt:st.at, emp:String(st.emp), name:st.name, items, kind:'correction', correctedBy:mep_who(), correctedAt:nowIso, by:mep_who() };
+    snap = { at:st.at, name:st.name, emp:String(st.emp), items, correctedBy:mep_who(), correctedAt:nowIso };
+  }else{
+    doc = { section:f.sec, date:mep_ymd(now), at:nowIso, emp:String(emp.code), name:emp.name, items, kind:'full', by:mep_who() };
+    snap = { at:nowIso, name:emp.name, emp:String(emp.code), items, correctedBy:'', correctedAt:'' };
+  }
+  mep_busy = true;
+  try{
+    const b = db.batch(); b.set(mep_saisiesCol.doc(), doc); b.set(mep_stockRef, { s:{ [f.sec]:snap } }, { merge:true });
+    await b.commit();
+    mep_stock[f.sec] = snap; mep_resetForm(); mep_render(); window.scrollTo && window.scrollTo(0, 0);
+    if(typeof pt_toast === 'function') pt_toast(correct ? 'Correction enregistrée.' : 'Inventaire enregistré.');
+  }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e) + '\nRéessaie.'); }
+  mep_busy = false;
+}
+/* ---------- administrateur : historique ---------- */
+function mep_setTab(t){ mep_tab = t; mep_edit = null; if(t === 'listes' && !mep_draft) mep_draft = JSON.parse(JSON.stringify({ cooks:[], ...mep_lists, sections:mep_secList() })); if(t !== 'listes') mep_draft = null; if(t === 'saisie') mep_resetForm(); mep_render(); }
+function mep_setDate(v){ mep_date = v || mep_ymd(); mep_viewId = ''; mep_edit = null; mep_render(); }
+function mep_histSec(k){ mep_sec = k; mep_viewId = ''; mep_edit = null; mep_render(); }
+function mep_daySaisies(sec, date){ return mep_saisies.filter(x=>x.section === sec && x.date === date).sort(mep_byAt); }
+/* valeurs successives de chaque article (une entrée par inventaire) */
+function mep_events(sec){
+  const ev = {};
+  mep_saisies.filter(x=>x.section === sec).sort(mep_byAt).forEach(x=>(x.items || []).forEach(it=>{ if(!mep_counts(x, it.id)) return; (ev[it.id] = ev[it.id] || []).push({ q:it.q, by:x.name, at:mep_shownAt(x), corr:x.correctedBy || '' }); }));
+  return ev;
+}
+/* pour chaque saisie : articles dont la valeur diffère de l'inventaire précédent */
+function mep_flags(sec){
+  const run = {}, out = {};
+  mep_saisies.filter(x=>x.section === sec).sort(mep_byAt).forEach(x=>{
+    out[x.id] = {};
+    (x.items || []).forEach(it=>{ if(run[it.id] !== undefined && run[it.id] !== it.q) out[x.id][it.id] = true; if(mep_counts(x, it.id)) run[it.id] = it.q; });
+  });
+  return out;
+}
+function mep_kindLabel(x){ const n = (x.items || []).length; return x.kind === 'correction' ? 'correction par ' + x.correctedBy : (n + ' article' + (n > 1 ? 's' : '')) + (x.correctedBy ? ' · modifié par ' + x.correctedBy + ' ' + mep_hm(x.correctedAt) : ''); }
+function mep_view(id){ mep_viewId = mep_viewId === id ? '' : id; mep_render(); }
+/* modifier une saisie en place */
+function mep_editStart(id){ const x = mep_saisies.find(s=>s.id === id); if(!x || !mep_isAdmin()) return; mep_edit = { id, vals:{} }; (x.items || []).forEach(i=>{ mep_edit.vals[i.id] = mep_fmtIn(i.q); }); mep_viewId = ''; mep_render(); }
+function mep_editVal(itemId, v){ if(mep_edit) mep_edit.vals[itemId] = v; }
+function mep_editCancel(){ mep_edit = null; mep_render(); }
+async function mep_editSave(){
+  if(!mep_edit || !mep_isAdmin() || mep_busy) return;
+  const x = mep_saisies.find(s=>s.id === mep_edit.id); if(!x) return;
+  const items = mep_readItems((x.items || []).map(i=>({ id:i.id, n:i.n, u:i.u })), mep_edit.vals); if(!items) return;
+  if(!items.some(i=>{ const o = (x.items || []).find(y=>y.id === i.id); return !o || Number(o.q) !== i.q; })){ alert('Aucune quantité n’a changé.'); return; }
+  const nowIso = new Date().toISOString();
+  const patch = { items, origItems:x.origItems || x.items, correctedBy:mep_who(), correctedAt:nowIso };
+  mep_busy = true;
+  try{ await mep_saisiesCol.doc(x.id).set(patch, { merge:true }); await mep_rebuildStock('', { [x.id]:patch }); mep_edit = null; mep_render(); if(typeof pt_toast === 'function') pt_toast('Saisie modifiée.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  mep_busy = false;
+}
+function mep_editView(){
+  const x = mep_saisies.find(s=>s.id === mep_edit.id); if(!x){ mep_edit = null; return ''; }
+  const list = mep_lists[x.section] || [];
+  return `<div class="ticket"><div class="section-label">Modifier la saisie de ${mep_e(x.name)} · ${mep_e(mep_fdt(mep_shownAt(x)))}</div><div class="pt-muted" style="margin-bottom:6px;">La saisie est modifiée en place et porte la mention « modifié par ${mep_e(mep_who())} ». Les quantités d’origine sont conservées.</div>
+    ${(x.items || []).map(i=>{ const pos = list.findIndex(l=>l.id === i.id); return `<div class="mep2-row"><div class="mep2-name"><span class="mep-num">${pos >= 0 ? pos + 1 : '–'}</span><span>${mep_e(i.n)} <span class="pt-muted">(${mep_e(i.u || '')})</span></span></div><div class="mep2-cols"><input class="ft-in" type="text" inputmode="decimal" value="${mep_e(mep_edit.vals[i.id] || '')}" oninput="mep_editVal('${i.id}', this.value)"><div class="mep2-last pt-muted">avant : ${mep_e(mep_fq(i.q))}</div></div></div>`; }).join('')}
+    <div class="actions-row"><button class="btn t-save" onclick="mep_editSave()">Enregistrer la modification</button><button class="btn ghost t-cancel" onclick="mep_editCancel()">Annuler</button></div></div>`;
+}
+function mep_histView(){
+  if(!mep_date) mep_date = mep_ymd();
+  const sec = mep_sec, list = mep_lists[sec] || [], all = mep_daySaisies(sec, mep_date), cnt = (sec2, d)=>mep_daySaisies(sec2, d).length;
+  const secBtns = `<div class="mep-seg">${mep_secs().map(x=>`<button class="${sec === x[0] ? 'on' : ''}" onclick="mep_histSec('${x[0]}')">${x[1]}${cnt(x[0], mep_date) ? ' · ' + cnt(x[0], mep_date) : ''}</button>`).join('')}</div>`;
+  // situation actuelle : dernier et avant-dernier inventaire de chaque article
+  const ev = mep_events(sec), has = mep_saisies.some(x=>x.section === sec);
+  const cell = (x, u, d)=>x ? `<div class="mep-q">${mep_e(mep_fq(x.q))}<span class="pt-muted"> ${mep_e(u)}</span>${d ? ' <span class="mep-d ' + (d > 0 ? 'up' : 'dn') + '">' + (d > 0 ? '▲ +' : '▼ ') + mep_fq(d) + '</span>' : ''}</div><div class="mep-w">${mep_e(x.by)} · ${mep_e(mep_fdt(x.at))}${x.corr ? ' ✎' : ''}</div>` : '<span class="pt-muted">—</span>';
+  const situ = !list.length ? '<div class="pt-muted">Aucun ingrédient défini pour cette section.</div>' : !has ? '<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucun inventaire pour cette section.</div>'
+    : `<div style="overflow-x:auto;"><table class="mep-g"><tr><th>Article</th><th>Dernier inventaire</th><th>Avant</th></tr>${list.map((i, k)=>{ const e = ev[i.id] || [], last = e[e.length - 1], prev = e[e.length - 2]; return `<tr><td><span class="mep-num s">${k + 1}</span>${mep_e(i.n)}</td><td>${cell(last, i.u || '', last && prev ? Number(last.q) - Number(prev.q) : 0)}</td><td>${cell(prev, i.u || '', 0)}</td></tr>`; }).join('')}</table></div>`;
+  // historique de la date : une colonne par saisie
+  const flags = mep_flags(sec), rowsIds = [], seen = {}, info = {};
+  list.forEach(i=>{ rowsIds.push(i.id); seen[i.id] = 1; info[i.id] = i; });
+  all.forEach(x=>(x.items || []).forEach(i=>{ if(!seen[i.id]){ seen[i.id] = 1; rowsIds.push(i.id); info[i.id] = i; } }));
+  const qOf = (x, id)=>{ const it = (x.items || []).find(y=>y.id === id); return it ? it.q : null; };
+  const table = all.length ? `<div style="overflow-x:auto;"><table class="mep-g mep-sticky"><tr><th>Article</th>${all.map(x=>`<th>${mep_e(x.name)}<div class="pt-muted" style="font-weight:500;">${mep_e(mep_hm(mep_shownAt(x)))}${x.correctedBy ? ' ✎' : ''}</div></th>`).join('')}</tr>${rowsIds.map(id=>{ const pos = list.findIndex(i=>i.id === id); return `<tr><td>${pos >= 0 ? '<span class="mep-num s">' + (pos + 1) + '</span>' : '<span class="mep-num s off">–</span>'}${mep_e(info[id].n)}<span class="pt-muted"> (${mep_e(info[id].u || '')})</span></td>${all.map(x=>{ const q = qOf(x, id); return `<td class="${q !== null && flags[x.id] && flags[x.id][id] ? 'mep-chg' : ''}">${q === null ? '<span class="pt-muted">—</span>' : mep_e(mep_fq(q))}</td>`; }).join('')}</tr>`; }).join('')}</table></div><div class="pt-muted" style="margin-top:6px;"><span class="mep-d up">orange</span> = différent de l’inventaire précédent · ✎ = corrigé</div>`
+    : '<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucune saisie à cette date.</div>';
+  const detail = all.length ? `<div class="ticket"><div class="section-label">Saisies du ${mep_e(mep_frDate(mep_date))} — ${mep_e(mep_secName(sec))}</div>${all.map(x=>`<div style="padding:8px 0;border-top:1px solid var(--line);"><div style="margin-bottom:6px;"><b>${mep_e(x.name)}</b> <span class="pt-muted">${mep_e(mep_hm(mep_shownAt(x)))} · ${mep_e(mep_kindLabel(x))}</span></div><div class="pt-row" style="gap:6px;flex-wrap:wrap;"><button class="btn ghost small t-view" onclick="mep_view('${x.id}')">${mep_viewId === x.id ? 'Masquer' : 'Voir'}</button><button class="btn ghost small t-edit" onclick="mep_editStart('${x.id}')">Modifier</button><button class="btn ghost small t-del" onclick="mep_delSaisie('${x.id}')">Supprimer</button></div>${mep_viewId === x.id ? `<div style="margin-top:8px;">${(x.items || []).map(it=>{ const pos = list.findIndex(i=>i.id === it.id); const c = flags[x.id] && flags[x.id][it.id]; return `<div class="row-between" style="padding:5px 0;border-top:1px solid var(--line);"><span><span class="mep-num s">${pos >= 0 ? pos + 1 : '–'}</span>${mep_e(it.n)}</span><span class="${c ? 'mep-d up' : ''}">${mep_e(mep_fq(it.q))} <span class="pt-muted">${mep_e(it.u || '')}</span></span></div>`; }).join('')}</div>` : ''}</div>`).join('')}</div>` : '';
+  if(mep_edit) return secBtns + mep_editView();
+  return `${secBtns}<div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — situation actuelle</div>${situ}</div>${mep_rpCompareView(sec)}
+    <div class="ticket"><div class="field"><label>Historique — date</label><input type="date" class="ft-in" value="${mep_e(mep_date)}" onchange="mep_setDate(this.value)"></div></div>
+    <div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — saisies du ${mep_e(mep_frDate(mep_date))}</div>${table}</div>${detail}`;
+}
+async function mep_delSaisie(id){
+  if(!mep_isAdmin()) return; const x = mep_saisies.find(s=>s.id === id); if(!x) return;
+  if(!confirm('Supprimer la saisie de ' + x.name + ' (' + mep_hm(mep_shownAt(x)) + ') ? Le dernier inventaire est recalculé.')) return;
+  try{ await mep_saisiesCol.doc(id).delete(); await mep_rebuildStock(id); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+/* ---------- stock Resto Pro (administrateur) : restopro_meta/stock = { at, items:[{c:code, n:nom, f:famille, s:stock, a:dernier achat AAAA-MM-JJ}] } ---------- */
+const MEP_RP_FRESH_DAYS = 30;
+let mep_rp = { at:'', items:[] }, mep_rpReady = false, mep_rpSearch = {}, mep_rpPending = false, mep_rpNoReply = false, mep_rpPrevAt = '', mep_rpReqId = 0;
+function mep_watchRp(){
+  db.collection('restopro_meta').doc('stock').onSnapshot((doc)=>{ const d = doc.exists ? (doc.data() || {}) : {}; mep_rp = { at:d.at || '', items:Array.isArray(d.items) ? d.items : [] }; mep_rpReady = true; if(mep_rpPending && mep_rp.at && mep_rp.at !== mep_rpPrevAt){ mep_rpPending = false; mep_rpNoReply = false; } if(!mep_typing()) mep_render(); }, (e)=>{ console.error(e); mep_rpReady = true; });
+}
+function mep_refreshRp(){
+  if(mep_rpPending) return;
+  mep_rpPending = true; mep_rpNoReply = false; mep_rpPrevAt = mep_rp.at || ''; const id = ++mep_rpReqId;
+  try{ rp_requestSync(true); }catch(e){ console.warn(e); }
+  mep_render();
+  setTimeout(()=>{ if(mep_rpPending && mep_rpReqId === id){ mep_rpPending = false; mep_rpNoReply = true; mep_render(); } }, 180000); // sans réponse du PC au bout de 3 minutes
+}
+function mep_rpBar(){
+  const up = mep_rp.at ? 'Stock Resto Pro mis à jour le ' + mep_fdt(mep_rp.at) : 'Aucun stock reçu de Resto Pro pour l’instant';
+  const msg = mep_rpPending ? '⏳ Mise à jour demandée au PC du restaurant… (moins d’une minute)' : mep_rpNoReply ? '⚠ Le PC du restaurant n’a pas répondu (éteint, sans internet ou écoute arrêtée ?). ' + up + '.' : up + '.';
+  return `<div class="rp2-bar"><span class="${mep_rpNoReply ? 'rp2-bad' : 'pt-muted'}">${mep_e(msg)}</span><button type="button" class="btn ghost small" onclick="mep_refreshRp()" ${mep_rpPending ? 'disabled' : ''}>↻ Actualiser</button></div>`;
+}
+const mep_rpItem = (code)=>mep_rp.items.find(x=>String(x.c) === String(code)) || null;
+function mep_rpDm(iso){ const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : ''; }
+function mep_rpState(it){ // { ok, label, sub }
+  if(!it) return { ok:false, none:true, label:'Introuvable', sub:'article absent de la dernière synchro' };
+  const s = Number(it.s), hasS = it.s !== null && it.s !== undefined && it.s !== '' && !isNaN(s);
+  const days = it.a ? Math.floor((Date.now() - new Date(it.a + 'T12:00:00').getTime()) / 86400000) : null;
+  const sub = (hasS ? mep_fq(s) : '—') + ' · ' + (it.a ? 'achat ' + mep_rpDm(it.a) : 'aucun achat');
+  const ok = hasS && s >= 0 && days !== null && days <= MEP_RP_FRESH_DAYS;
+  return { ok, label:ok ? '● à jour' : '⚠ peu fiable', sub, s:hasS ? s : null, a:it.a || '' };
+}
+function mep_rpDraftSet(sec, i, code){ const it = mep_rpItem(code); const r = mep_draft[sec][i]; r.rp = String(code); r.rpn = it ? it.n : (r.rpn || ''); mep_rpSearch = {}; mep_render(); }
+function mep_rpDraftClear(sec, i){ const r = mep_draft[sec][i]; r.rp = ''; r.rpn = ''; mep_rpSearch = {}; mep_render(); setTimeout(()=>{ const el = document.getElementById('mep-rpq-' + sec + '-' + i); if(el) el.focus(); }, 0); }
+function mep_rpQuery(sec, i, v){
+  const q = String(v || '').trim().toLowerCase(), box = document.getElementById('mep-rpres-' + sec + '-' + i); if(!box) return;
+  if(q.length < 2){ box.innerHTML = ''; return; }
+  const words = q.split(/\s+/);
+  const res = mep_rp.items.filter(x=>{ const t = (String(x.n) + ' ' + String(x.f || '')).toLowerCase(); return words.every(w=>t.includes(w)); }).slice(0, 8);
+  box.innerHTML = res.length ? res.map(x=>`<button type="button" class="rp2-res" onclick="mep_rpDraftSet('${sec}',${i},'${mep_e(String(x.c).replace(/'/g, ''))}')"><b>${mep_e(x.n)}</b><span class="pt-muted"> · ${mep_e(x.f || '')}</span></button>`).join('') : '<div class="pt-muted" style="padding:6px 2px;">Aucun article trouvé.</div>';
+}
+function mep_rpBlock(sec, i, r){
+  if(r.rp){
+    const it = mep_rpItem(r.rp), st = mep_rpState(it);
+    const stateHtml = !mep_rpReady || !mep_rp.items.length ? '<span class="pt-muted">stock non reçu</span>' : `<span class="${st.ok ? 'rp2-ok' : 'rp2-bad'}">${mep_e(st.label)}</span><br><span class="pt-muted">${mep_e(st.sub)}</span>`;
+    return `<div class="g2 rp2-r2"><div><label>Article Resto Pro</label><div class="rp2-linked"><span>${mep_e(it ? it.n : r.rpn || r.rp)}</span><button type="button" class="btn ghost small" onclick="mep_rpDraftClear('${sec}',${i})">Changer</button></div></div><div><label>État du stock</label><div class="rp2-box"><div>${stateHtml}</div></div></div></div>`;
+  }
+  return `<div class="g2 rp2-r2"><div><label>Article Resto Pro</label><input type="text" id="mep-rpq-${sec}-${i}" class="ft-in" placeholder="🔎 Chercher…" autocomplete="off" oninput="mep_rpQuery('${sec}',${i},this.value)"></div><div><label>État du stock</label><div class="rp2-box pt-muted">Non lié</div></div></div><div id="mep-rpres-${sec}-${i}"></div>`;
+}
+function mep_unitSelect(sec, i, cur){
+  const list = MEP_UNITS.includes(cur) || !cur ? MEP_UNITS : MEP_UNITS.concat([cur]);
+  return `<select class="ft-in" onchange="mep_dUnit('${sec}',${i},this.value)">${list.map(u=>`<option value="${mep_e(u)}" ${u === (cur || 'kg') ? 'selected' : ''}>${mep_e(u)}</option>`).join('')}</select>`;
+}
+function mep_ingCard(sec, i, r){
+  return `<div class="rp2-ing"><div class="rp2-top"><span class="mep-num">${i + 1}</span><div class="rp2-act"><button class="btn ghost small" onclick="mep_dMove('${sec}',${i},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_dMove('${sec}',${i},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="mep_dDel('${sec}',${i})" aria-label="Retirer">✕</button></div></div>
+    <div class="g2"><div><label>Ingrédient</label><input type="text" class="ft-in mep-name-${sec}" placeholder="Ingrédient" value="${mep_e(r.n)}" oninput="mep_dName('${sec}',${i},this.value)"></div><div><label>Unité</label>${mep_unitSelect(sec, i, r.u)}</div></div>${mep_rpBlock(sec, i, r)}</div>`;
+}
+/* comparaison avec Resto Pro (historique administrateur) */
+function mep_rpCompareView(sec){
+  const list = (mep_lists[sec] || []).filter(i=>i.rp); if(!list.length) return '';
+  const st = mep_stockOf(sec);
+  const head = st ? `Dernier inventaire : <b>${mep_e(st.name)}</b> · ${mep_e(mep_fdt(st.at))}` : 'Aucun inventaire pour cette section';
+  const cards = list.map(i=>{
+    const pos = (mep_lists[sec] || []).findIndex(x=>x.id === i.id) + 1, it = mep_rpItem(i.rp), rs = mep_rpState(it);
+    const inv = st && st.items.find(x=>x.id === i.id), iq = inv ? Number(inv.q) : null;
+    const hasRs = it && rs.s !== null;
+    const ec = (rs.ok && iq !== null && hasRs) ? Math.round((rs.s - iq) * 100) / 100 : null;
+    const ecHtml = ec === null ? '—' : ec === 0 ? '0' : `<span class="mep-d ${ec > 0 ? 'up' : 'dn'}">${ec > 0 ? '+' : '−'}${mep_e(mep_fq(Math.abs(ec)))}</span>`;
+    const state = !it ? `<span class="rp2-bad">⚠ introuvable</span> <span class="pt-muted">· ${mep_e(i.rpn || '')}</span>` : `<span class="${rs.ok ? 'rp2-ok' : 'rp2-bad'}">${mep_e(rs.label)}</span> <span class="pt-muted">· ${rs.a ? 'dernier achat ' + mep_e(mep_rpDm(rs.a)) : 'aucun achat enregistré'}</span>`;
+    return `<div class="rp2-ing"><div class="rp2-name"><span class="mep-num">${pos}</span><span>${mep_e(i.n)}${i.u ? ` <span class="pt-muted">(${mep_e(i.u)})</span>` : ''}</span></div>
+      <div class="g3"><div class="rp2-cell"><label>Inventaire</label><div class="v">${iq === null ? '—' : mep_e(mep_fq(iq))}</div></div><div class="rp2-cell"><label>Resto Pro</label><div class="v">${hasRs ? mep_e(mep_fq(rs.s)) : '—'}</div></div><div class="rp2-cell ${ec === null ? 'dim' : ''}"><label>Écart</label><div class="v">${ecHtml}</div></div></div>
+      <div class="rp2-state">${state}</div></div>`;
+  }).join('');
+  return `<div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — comparaison avec Resto Pro</div><div class="pt-muted" style="text-align:center;font-size:13px;">${head}</div>${mep_rpReady && mep_rp.items.length ? cards : '<div class="pt-muted" style="padding:8px 0;text-align:center;">Clique sur « Actualiser » pour recevoir le stock de Resto Pro.</div>'}
+    ${mep_rpBar()}<div class="pt-muted" style="margin-top:8px;font-size:12px;text-align:center;">Écart = Resto Pro − dernier inventaire. Article « peu fiable » : stock négatif ou dernier achat de plus de ${MEP_RP_FRESH_DAYS} jours.</div></div>`;
+}
+/* ---------- administrateur : listes ---------- */
+function mep_sName(i, v){ if(mep_draft && mep_draft.sections[i]) mep_draft.sections[i].n = v; }
+function mep_sAdd(){ const id = 'sec_' + mep_newId(); mep_draft.sections.push({ id, n:'' }); mep_draft[id] = []; mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-secs'); if(els.length) els[els.length - 1].focus(); }, 0); }
+function mep_sDel(i){
+  const sc = mep_draft.sections[i]; if(!sc) return;
+  if(mep_hasSaisies(sc.id)){ alert('Cette section a déjà des saisies : tu peux la renommer, pas la supprimer.'); return; }
+  if(mep_draft.sections.length <= 1){ alert('Garde au moins une section.'); return; }
+  if((mep_draft[sc.id] || []).length && !confirm('Supprimer la section « ' + (sc.n || 'sans nom') + ' » et sa liste d’ingrédients ?')) return;
+  mep_draft.sections.splice(i, 1); delete mep_draft[sc.id]; mep_render();
+}
+function mep_sMove(i, d){ const j = i + d, l = mep_draft.sections; if(j < 0 || j >= l.length) return; const t = l[i]; l[i] = l[j]; l[j] = t; mep_render(); }
+function mep_cName(i, v){ if(mep_draft && mep_draft.cooks[i]) mep_draft.cooks[i].n = v; }
+function mep_cAdd(){ mep_draft.cooks.push({ id:mep_newId(), n:'' }); mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-cooks'); if(els.length) els[els.length - 1].focus(); }, 0); }
+function mep_cDel(i){ mep_draft.cooks.splice(i, 1); mep_render(); }
+function mep_dName(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].n = v; }
+function mep_dUnit(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].u = v; }
+function mep_dAdd(sec){ mep_draft[sec].push({ id:mep_newId(), n:'', u:'kg', rp:'', rpn:'' }); mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-' + sec); if(els.length) els[els.length - 1].focus(); }, 0); }
+function mep_dDel(sec, i){ mep_draft[sec].splice(i, 1); mep_render(); }
+function mep_dMove(sec, i, d){ const j = i + d, l = mep_draft[sec]; if(j < 0 || j >= l.length) return; const t = l[i]; l[i] = l[j]; l[j] = t; mep_render(); }
+async function mep_saveLists(){
+  if(!mep_isAdmin() || !mep_draft) return;
+  const secs = (mep_draft.sections || []).map(x=>({ id:x.id, n:String(x.n || '').trim() }));
+  if(!secs.length){ alert('Garde au moins une section.'); return; }
+  if(secs.some(x=>!x.n)){ alert('Donne un nom à chaque section.'); return; }
+  if(new Set(secs.map(x=>x.n.toLowerCase())).size !== secs.length){ alert('Deux sections portent le même nom.'); return; }
+  const out = { sections:secs };
+  secs.forEach(x=>{ out[x.id] = (mep_draft[x.id] || []).map(i=>({ id:i.id, n:String(i.n || '').trim(), u:String(i.u || '').trim(), rp:String(i.rp || ''), rpn:i.rp ? String(i.rpn || '') : '' })).filter(i=>i.n); });
+  out.cooks = (mep_draft.cooks || []).map(c=>({ id:c.id, n:String(c.n || '').trim() })).filter(c=>c.n);
+  try{ await mep_listsRef.set({ ...out, updatedAt:new Date().toISOString(), updatedBy:(typeof currentUser !== 'undefined' ? currentUser : '') }); mep_draft = null; mep_tab = 'hist'; mep_render(); if(typeof pt_toast === 'function') pt_toast('Listes enregistrées.'); }
+  catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+function mep_listsView(){
+  const d = mep_draft || { ...mep_lists, sections:mep_secList() };
+  return `<div class="pt-muted" style="margin-bottom:8px;">Les ingrédients que les cuisiniers doivent compter à la fin de leur service. Les anciennes saisies gardent le nom et l’unité d’origine.</div>
+    <div class="ticket"><div class="section-label">Cuisiniers</div><div class="pt-muted" style="margin-bottom:8px;">Les noms proposés aux cuisiniers dans « Choisis ton nom ».</div>${(d.cooks || []).map((c, n)=>`<div class="ft-edrow"><input type="text" class="ft-in mep-name-cooks" style="flex:1 1 calc(100% - 56px);min-width:0;" placeholder="Prénom" value="${mep_e(c.n)}" oninput="mep_cName(${n},this.value)"><button class="btn ghost small t-del" onclick="mep_cDel(${n})" aria-label="Retirer">✕</button></div>`).join('') || '<div class="pt-muted">Aucun cuisinier.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_cAdd()">＋ Cuisinier</button></div></div>
+    <div class="ticket"><div class="section-label">Sections</div><div class="pt-muted" style="margin-bottom:8px;">Une section qui a déjà des saisies peut être renommée mais pas supprimée (🔒).</div>${(d.sections || []).map((x, n)=>`<div class="ft-edrow"><input type="text" class="ft-in mep-name-secs" style="flex:1 1 calc(100% - 56px);min-width:0;" placeholder="Nom de la section" value="${mep_e(x.n)}" oninput="mep_sName(${n},this.value)">${mep_hasSaisies(x.id) ? '<button class="btn ghost small" disabled title="Historique conservé" aria-label="Verrouillée">🔒</button>' : `<button class="btn ghost small t-del" onclick="mep_sDel(${n})" aria-label="Retirer">✕</button>`}
+      <div class="ft-mv" style="flex:1 1 100%;"><button class="btn ghost small" onclick="mep_sMove(${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_sMove(${n},1)" aria-label="Descendre">↓</button></div></div>`).join('')}<div class="actions-row"><button class="btn small t-add" onclick="mep_sAdd()">＋ Section</button></div></div>
+    ${(d.sections || []).map(sc=>{ const k = sc.id; return `<div class="ticket"><div class="section-label">Ingrédients — ${mep_e(sc.n || 'Nouvelle section')}</div>${mep_rpBar()}${(d[k] || []).map((i, n)=>mep_ingCard(k, n, i)).join('') || '<div class="pt-muted">Aucun ingrédient.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_dAdd('${k}')">＋ Ingrédient</button></div></div>`; }).join('')}
+    <div class="actions-row"><button class="btn t-save" onclick="mep_saveLists()">Enregistrer les listes</button><button class="btn ghost t-cancel" onclick="mep_setTab('hist')">Annuler</button></div>`;
+}
+function mep_render(){
+  const body = document.getElementById('mep-body'); if(!body) return;
+  mep_secOk();
+  if(!mep_listsReady){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  const admin = mep_isAdmin();
+  const head = `<div style="font-weight:700;font-size:18px;margin-bottom:10px;">Mise en place</div>`;
+  if(!admin){ body.innerHTML = head + mep_entryView(); return; }
+  const tabs = `<div class="mep-seg">${[['hist', 'Historique'], ['saisie', 'Saisie'], ['listes', 'Listes']].map(t=>`<button class="${mep_tab === t[0] ? 'on' : ''}" onclick="mep_setTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
+  const view = mep_tab === 'listes' ? mep_listsView() : mep_tab === 'saisie' ? mep_entryView() : (mep_saisiesReady ? mep_histView() : '<div class="empty-state">Chargement…</div>');
+  body.innerHTML = head + tabs + view;
+}
+
 const dt_dettesCol = db.collection('dettes_perso');
 
 let dt_dettes = [], dt_avoirs = [], dt_avoirHisto = [];
