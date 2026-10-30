@@ -481,6 +481,21 @@ textarea.ft-in{font-family:'Inter',sans-serif;font-weight:500;line-height:1.45;r
 .ft-rows{border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;background:color-mix(in srgb,var(--surface) 60%,var(--paper));}
 .ft-row{display:flex;justify-content:space-between;align-items:center;min-height:44px;padding:0 14px;border-top:1px solid var(--line);font-size:15px;cursor:pointer;}.ft-row:first-child{border-top:0;}
 .mep-in td.i{padding:6px 4px;}table.mep-in input.ft-in{width:78px;text-align:right;padding:8px;margin:0;}table.mep-in th.l,table.mep-in td.l{border-left:1px solid var(--line);}table.mep-in th{vertical-align:bottom;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.rp2-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;margin:2px 0 4px;}.rp2-bar .btn{flex:0 0 auto;}
+.rp2-ing{border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:10px;}
+.rp2-ing label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-muted,#9aa39d);margin-bottom:4px;}
+.rp2-ing .g2 .ft-in{width:100%;box-sizing:border-box;height:42px;}
+.rp2-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}.rp2-act{display:flex;gap:6px;}
+.rp2-r2{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);}
+.rp2-box,.rp2-linked{min-height:42px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;display:flex;align-items:center;padding:4px 10px;font-size:13px;line-height:1.25;}
+.rp2-linked{justify-content:space-between;gap:6px;font-weight:600;}.rp2-linked span{flex:1 1 auto;min-width:0;font-size:12.5px;}.rp2-linked .btn{padding:6px 8px;font-size:12px;}.rp2-linked .btn{flex:0 0 auto;}
+.rp2-res{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);color:inherit;padding:8px 4px;font:inherit;font-size:13px;cursor:pointer;}
+.rp2-ok{color:#4ADE80;font-weight:600;}.rp2-bad{color:#F87171;font-weight:600;}
+.rp2-name{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-weight:600;font-size:15px;}
+.rp2-cell{border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center;min-height:62px;box-sizing:border-box;}.rp2-cell.dim{opacity:.5;}
+.rp2-cell .v{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;}
+.rp2-state{margin-top:10px;text-align:center;font-size:12.5px;}
 .mep2-head{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;}.mep2-who{font-weight:700;font-size:14px;margin-top:4px;}.mep2-corr{font-size:12px;color:#FBBF24;margin-top:2px;}
 .mep2-row{padding:10px 0;border-top:1px solid var(--line);}.mep2-name{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;margin-bottom:6px;}
 .mep2-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center;}.mep2-last{font-size:15px;padding-left:4px;}
@@ -3672,7 +3687,7 @@ function rp_render(){
 const mep_listsRef = db.collection('mise_en_place').doc('listes');
 const mep_saisiesCol = db.collection('mise_en_place_saisies');
 const MEP_DEFAULT_SECS = [{ id:'sushi', n:'Sushi' }, { id:'chaud', n:'Chaud' }, { id:'bar', n:'Bar' }];
-const MEP_UNITS = ['kg', 'g', 'L', 'pièces', 'bacs', 'bouteilles', 'sachets', 'boîtes', 'feuilles', 'portions'];
+const MEP_UNITS = ['pièces', 'kg', 'g', 'L', 'cl', 'boîte', 'carton', 'bouteille', 'canette', 'sachet'];
 let mep_adminStarted = false, mep_started = false, mep_listsReady = false, mep_lists = { sushi:[], chaud:[], bar:[], cooks:[] }, mep_saisies = [], mep_saisiesReady = false;
 let mep_tab = 'hist', mep_sec = 'sushi', mep_date = '', mep_form = null, mep_draft = null, mep_busy = false;
 const mep_e = (v)=>esc(v == null ? '' : String(v));
@@ -3690,7 +3705,7 @@ function mep_newId(){ return 'i' + Date.now().toString(36) + Math.random().toStr
 function mep_empList(){ return (mep_lists.cooks || []).filter(c=>c && c.n).map(c=>({ code:c.id, name:c.n })).sort((a, b)=>a.name.localeCompare(b.name, 'fr')); }
 function mep_typing(){ try{ const a = document.activeElement, b = document.getElementById('mep-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
 function mep_start(){
-  if(mep_isAdmin() && !mep_adminStarted){ mep_adminStarted = true; mep_watchSaisies(); }
+  if(mep_isAdmin() && !mep_adminStarted){ mep_adminStarted = true; mep_watchSaisies(); mep_watchRp(); }
   if(mep_started) return; mep_started = true;
   mep_listsRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
@@ -3887,7 +3902,7 @@ function mep_histView(){
     : '<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucune saisie à cette date.</div>';
   const detail = all.length ? `<div class="ticket"><div class="section-label">Saisies du ${mep_e(mep_frDate(mep_date))} — ${mep_e(mep_secName(sec))}</div>${all.map(x=>`<div style="padding:8px 0;border-top:1px solid var(--line);"><div style="margin-bottom:6px;"><b>${mep_e(x.name)}</b> <span class="pt-muted">${mep_e(mep_hm(mep_shownAt(x)))} · ${mep_e(mep_kindLabel(x))}</span></div><div class="pt-row" style="gap:6px;flex-wrap:wrap;"><button class="btn ghost small t-view" onclick="mep_view('${x.id}')">${mep_viewId === x.id ? 'Masquer' : 'Voir'}</button><button class="btn ghost small t-edit" onclick="mep_editStart('${x.id}')">Modifier</button><button class="btn ghost small t-del" onclick="mep_delSaisie('${x.id}')">Supprimer</button></div>${mep_viewId === x.id ? `<div style="margin-top:8px;">${(x.items || []).map(it=>{ const pos = list.findIndex(i=>i.id === it.id); const c = flags[x.id] && flags[x.id][it.id]; return `<div class="row-between" style="padding:5px 0;border-top:1px solid var(--line);"><span><span class="mep-num s">${pos >= 0 ? pos + 1 : '–'}</span>${mep_e(it.n)}</span><span class="${c ? 'mep-d up' : ''}">${mep_e(mep_fq(it.q))} <span class="pt-muted">${mep_e(it.u || '')}</span></span></div>`; }).join('')}</div>` : ''}</div>`).join('')}</div>` : '';
   if(mep_edit) return secBtns + mep_editView();
-  return `${secBtns}<div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — situation actuelle</div>${situ}</div>
+  return `${secBtns}<div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — situation actuelle</div>${situ}</div>${mep_rpCompareView(sec)}
     <div class="ticket"><div class="field"><label>Historique — date</label><input type="date" class="ft-in" value="${mep_e(mep_date)}" onchange="mep_setDate(this.value)"></div></div>
     <div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — saisies du ${mep_e(mep_frDate(mep_date))}</div>${table}</div>${detail}`;
 }
@@ -3895,6 +3910,78 @@ async function mep_delSaisie(id){
   if(!mep_isAdmin()) return; const x = mep_saisies.find(s=>s.id === id); if(!x) return;
   if(!confirm('Supprimer la saisie de ' + x.name + ' (' + mep_hm(mep_shownAt(x)) + ') ? Le dernier inventaire est recalculé.')) return;
   try{ await mep_saisiesCol.doc(id).delete(); await mep_rebuildStock(id); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+/* ---------- stock Resto Pro (administrateur) : restopro_meta/stock = { at, items:[{c:code, n:nom, f:famille, s:stock, a:dernier achat AAAA-MM-JJ}] } ---------- */
+const MEP_RP_FRESH_DAYS = 30;
+let mep_rp = { at:'', items:[] }, mep_rpReady = false, mep_rpSearch = {}, mep_rpPending = false, mep_rpNoReply = false, mep_rpPrevAt = '', mep_rpReqId = 0;
+function mep_watchRp(){
+  db.collection('restopro_meta').doc('stock').onSnapshot((doc)=>{ const d = doc.exists ? (doc.data() || {}) : {}; mep_rp = { at:d.at || '', items:Array.isArray(d.items) ? d.items : [] }; mep_rpReady = true; if(mep_rpPending && mep_rp.at && mep_rp.at !== mep_rpPrevAt){ mep_rpPending = false; mep_rpNoReply = false; } if(!mep_typing()) mep_render(); }, (e)=>{ console.error(e); mep_rpReady = true; });
+}
+function mep_refreshRp(){
+  if(mep_rpPending) return;
+  mep_rpPending = true; mep_rpNoReply = false; mep_rpPrevAt = mep_rp.at || ''; const id = ++mep_rpReqId;
+  try{ rp_requestSync(true); }catch(e){ console.warn(e); }
+  mep_render();
+  setTimeout(()=>{ if(mep_rpPending && mep_rpReqId === id){ mep_rpPending = false; mep_rpNoReply = true; mep_render(); } }, 180000); // sans réponse du PC au bout de 3 minutes
+}
+function mep_rpBar(){
+  const up = mep_rp.at ? 'Stock Resto Pro mis à jour le ' + mep_fdt(mep_rp.at) : 'Aucun stock reçu de Resto Pro pour l’instant';
+  const msg = mep_rpPending ? '⏳ Mise à jour demandée au PC du restaurant… (moins d’une minute)' : mep_rpNoReply ? '⚠ Le PC du restaurant n’a pas répondu (éteint, sans internet ou écoute arrêtée ?). ' + up + '.' : up + '.';
+  return `<div class="rp2-bar"><span class="${mep_rpNoReply ? 'rp2-bad' : 'pt-muted'}">${mep_e(msg)}</span><button type="button" class="btn ghost small" onclick="mep_refreshRp()" ${mep_rpPending ? 'disabled' : ''}>↻ Actualiser</button></div>`;
+}
+const mep_rpItem = (code)=>mep_rp.items.find(x=>String(x.c) === String(code)) || null;
+function mep_rpDm(iso){ const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : ''; }
+function mep_rpState(it){ // { ok, label, sub }
+  if(!it) return { ok:false, none:true, label:'Introuvable', sub:'article absent de la dernière synchro' };
+  const s = Number(it.s), hasS = it.s !== null && it.s !== undefined && it.s !== '' && !isNaN(s);
+  const days = it.a ? Math.floor((Date.now() - new Date(it.a + 'T12:00:00').getTime()) / 86400000) : null;
+  const sub = (hasS ? mep_fq(s) : '—') + ' · ' + (it.a ? 'achat ' + mep_rpDm(it.a) : 'aucun achat');
+  const ok = hasS && s >= 0 && days !== null && days <= MEP_RP_FRESH_DAYS;
+  return { ok, label:ok ? '● à jour' : '⚠ peu fiable', sub, s:hasS ? s : null, a:it.a || '' };
+}
+function mep_rpDraftSet(sec, i, code){ const it = mep_rpItem(code); const r = mep_draft[sec][i]; r.rp = String(code); r.rpn = it ? it.n : (r.rpn || ''); mep_rpSearch = {}; mep_render(); }
+function mep_rpDraftClear(sec, i){ const r = mep_draft[sec][i]; r.rp = ''; r.rpn = ''; mep_rpSearch = {}; mep_render(); setTimeout(()=>{ const el = document.getElementById('mep-rpq-' + sec + '-' + i); if(el) el.focus(); }, 0); }
+function mep_rpQuery(sec, i, v){
+  const q = String(v || '').trim().toLowerCase(), box = document.getElementById('mep-rpres-' + sec + '-' + i); if(!box) return;
+  if(q.length < 2){ box.innerHTML = ''; return; }
+  const words = q.split(/\s+/);
+  const res = mep_rp.items.filter(x=>{ const t = (String(x.n) + ' ' + String(x.f || '')).toLowerCase(); return words.every(w=>t.includes(w)); }).slice(0, 8);
+  box.innerHTML = res.length ? res.map(x=>`<button type="button" class="rp2-res" onclick="mep_rpDraftSet('${sec}',${i},'${mep_e(String(x.c).replace(/'/g, ''))}')"><b>${mep_e(x.n)}</b><span class="pt-muted"> · ${mep_e(x.f || '')}</span></button>`).join('') : '<div class="pt-muted" style="padding:6px 2px;">Aucun article trouvé.</div>';
+}
+function mep_rpBlock(sec, i, r){
+  if(r.rp){
+    const it = mep_rpItem(r.rp), st = mep_rpState(it);
+    const stateHtml = !mep_rpReady || !mep_rp.items.length ? '<span class="pt-muted">stock non reçu</span>' : `<span class="${st.ok ? 'rp2-ok' : 'rp2-bad'}">${mep_e(st.label)}</span><br><span class="pt-muted">${mep_e(st.sub)}</span>`;
+    return `<div class="g2 rp2-r2"><div><label>Article Resto Pro</label><div class="rp2-linked"><span>${mep_e(it ? it.n : r.rpn || r.rp)}</span><button type="button" class="btn ghost small" onclick="mep_rpDraftClear('${sec}',${i})">Changer</button></div></div><div><label>État du stock</label><div class="rp2-box"><div>${stateHtml}</div></div></div></div>`;
+  }
+  return `<div class="g2 rp2-r2"><div><label>Article Resto Pro</label><input type="text" id="mep-rpq-${sec}-${i}" class="ft-in" placeholder="🔎 Chercher…" autocomplete="off" oninput="mep_rpQuery('${sec}',${i},this.value)"></div><div><label>État du stock</label><div class="rp2-box pt-muted">Non lié</div></div></div><div id="mep-rpres-${sec}-${i}"></div>`;
+}
+function mep_unitSelect(sec, i, cur){
+  const list = MEP_UNITS.includes(cur) || !cur ? MEP_UNITS : MEP_UNITS.concat([cur]);
+  return `<select class="ft-in" onchange="mep_dUnit('${sec}',${i},this.value)">${list.map(u=>`<option value="${mep_e(u)}" ${u === (cur || 'kg') ? 'selected' : ''}>${mep_e(u)}</option>`).join('')}</select>`;
+}
+function mep_ingCard(sec, i, r){
+  return `<div class="rp2-ing"><div class="rp2-top"><span class="mep-num">${i + 1}</span><div class="rp2-act"><button class="btn ghost small" onclick="mep_dMove('${sec}',${i},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_dMove('${sec}',${i},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="mep_dDel('${sec}',${i})" aria-label="Retirer">✕</button></div></div>
+    <div class="g2"><div><label>Ingrédient</label><input type="text" class="ft-in mep-name-${sec}" placeholder="Ingrédient" value="${mep_e(r.n)}" oninput="mep_dName('${sec}',${i},this.value)"></div><div><label>Unité</label>${mep_unitSelect(sec, i, r.u)}</div></div>${mep_rpBlock(sec, i, r)}</div>`;
+}
+/* comparaison avec Resto Pro (historique administrateur) */
+function mep_rpCompareView(sec){
+  const list = (mep_lists[sec] || []).filter(i=>i.rp); if(!list.length) return '';
+  const st = mep_stockOf(sec);
+  const head = st ? `Dernier inventaire : <b>${mep_e(st.name)}</b> · ${mep_e(mep_fdt(st.at))}` : 'Aucun inventaire pour cette section';
+  const cards = list.map(i=>{
+    const pos = (mep_lists[sec] || []).findIndex(x=>x.id === i.id) + 1, it = mep_rpItem(i.rp), rs = mep_rpState(it);
+    const inv = st && st.items.find(x=>x.id === i.id), iq = inv ? Number(inv.q) : null;
+    const hasRs = it && rs.s !== null;
+    const ec = (rs.ok && iq !== null && hasRs) ? Math.round((rs.s - iq) * 100) / 100 : null;
+    const ecHtml = ec === null ? '—' : ec === 0 ? '0' : `<span class="mep-d ${ec > 0 ? 'up' : 'dn'}">${ec > 0 ? '+' : '−'}${mep_e(mep_fq(Math.abs(ec)))}</span>`;
+    const state = !it ? `<span class="rp2-bad">⚠ introuvable</span> <span class="pt-muted">· ${mep_e(i.rpn || '')}</span>` : `<span class="${rs.ok ? 'rp2-ok' : 'rp2-bad'}">${mep_e(rs.label)}</span> <span class="pt-muted">· ${rs.a ? 'dernier achat ' + mep_e(mep_rpDm(rs.a)) : 'aucun achat enregistré'}</span>`;
+    return `<div class="rp2-ing"><div class="rp2-name"><span class="mep-num">${pos}</span><span>${mep_e(i.n)}${i.u ? ` <span class="pt-muted">(${mep_e(i.u)})</span>` : ''}</span></div>
+      <div class="g3"><div class="rp2-cell"><label>Inventaire</label><div class="v">${iq === null ? '—' : mep_e(mep_fq(iq))}</div></div><div class="rp2-cell"><label>Resto Pro</label><div class="v">${hasRs ? mep_e(mep_fq(rs.s)) : '—'}</div></div><div class="rp2-cell ${ec === null ? 'dim' : ''}"><label>Écart</label><div class="v">${ecHtml}</div></div></div>
+      <div class="rp2-state">${state}</div></div>`;
+  }).join('');
+  return `<div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — comparaison avec Resto Pro</div><div class="pt-muted" style="text-align:center;font-size:13px;">${head}</div>${mep_rpReady && mep_rp.items.length ? cards : '<div class="pt-muted" style="padding:8px 0;text-align:center;">Clique sur « Actualiser » pour recevoir le stock de Resto Pro.</div>'}
+    ${mep_rpBar()}<div class="pt-muted" style="margin-top:8px;font-size:12px;text-align:center;">Écart = Resto Pro − dernier inventaire. Article « peu fiable » : stock négatif ou dernier achat de plus de ${MEP_RP_FRESH_DAYS} jours.</div></div>`;
 }
 /* ---------- administrateur : listes ---------- */
 function mep_sName(i, v){ if(mep_draft && mep_draft.sections[i]) mep_draft.sections[i].n = v; }
@@ -3912,7 +3999,7 @@ function mep_cAdd(){ mep_draft.cooks.push({ id:mep_newId(), n:'' }); mep_render(
 function mep_cDel(i){ mep_draft.cooks.splice(i, 1); mep_render(); }
 function mep_dName(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].n = v; }
 function mep_dUnit(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].u = v; }
-function mep_dAdd(sec){ mep_draft[sec].push({ id:mep_newId(), n:'', u:'kg' }); mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-' + sec); if(els.length) els[els.length - 1].focus(); }, 0); }
+function mep_dAdd(sec){ mep_draft[sec].push({ id:mep_newId(), n:'', u:'kg', rp:'', rpn:'' }); mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-' + sec); if(els.length) els[els.length - 1].focus(); }, 0); }
 function mep_dDel(sec, i){ mep_draft[sec].splice(i, 1); mep_render(); }
 function mep_dMove(sec, i, d){ const j = i + d, l = mep_draft[sec]; if(j < 0 || j >= l.length) return; const t = l[i]; l[i] = l[j]; l[j] = t; mep_render(); }
 async function mep_saveLists(){
@@ -3922,20 +4009,18 @@ async function mep_saveLists(){
   if(secs.some(x=>!x.n)){ alert('Donne un nom à chaque section.'); return; }
   if(new Set(secs.map(x=>x.n.toLowerCase())).size !== secs.length){ alert('Deux sections portent le même nom.'); return; }
   const out = { sections:secs };
-  secs.forEach(x=>{ out[x.id] = (mep_draft[x.id] || []).map(i=>({ id:i.id, n:String(i.n || '').trim(), u:String(i.u || '').trim() })).filter(i=>i.n); });
+  secs.forEach(x=>{ out[x.id] = (mep_draft[x.id] || []).map(i=>({ id:i.id, n:String(i.n || '').trim(), u:String(i.u || '').trim(), rp:String(i.rp || ''), rpn:i.rp ? String(i.rpn || '') : '' })).filter(i=>i.n); });
   out.cooks = (mep_draft.cooks || []).map(c=>({ id:c.id, n:String(c.n || '').trim() })).filter(c=>c.n);
   try{ await mep_listsRef.set({ ...out, updatedAt:new Date().toISOString(), updatedBy:(typeof currentUser !== 'undefined' ? currentUser : '') }); mep_draft = null; mep_tab = 'hist'; mep_render(); if(typeof pt_toast === 'function') pt_toast('Listes enregistrées.'); }
   catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
 }
 function mep_listsView(){
   const d = mep_draft || { ...mep_lists, sections:mep_secList() };
-  return `<datalist id="mep-units">${MEP_UNITS.map(u=>`<option value="${mep_e(u)}">`).join('')}</datalist>
-    <div class="pt-muted" style="margin-bottom:8px;">Les ingrédients que les cuisiniers doivent compter à la fin de leur service. Les anciennes saisies gardent le nom et l’unité d’origine.</div>
+  return `<div class="pt-muted" style="margin-bottom:8px;">Les ingrédients que les cuisiniers doivent compter à la fin de leur service. Les anciennes saisies gardent le nom et l’unité d’origine.</div>
     <div class="ticket"><div class="section-label">Cuisiniers</div><div class="pt-muted" style="margin-bottom:8px;">Les noms proposés aux cuisiniers dans « Choisis ton nom ».</div>${(d.cooks || []).map((c, n)=>`<div class="ft-edrow"><input type="text" class="ft-in mep-name-cooks" style="flex:1 1 calc(100% - 56px);min-width:0;" placeholder="Prénom" value="${mep_e(c.n)}" oninput="mep_cName(${n},this.value)"><button class="btn ghost small t-del" onclick="mep_cDel(${n})" aria-label="Retirer">✕</button></div>`).join('') || '<div class="pt-muted">Aucun cuisinier.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_cAdd()">＋ Cuisinier</button></div></div>
     <div class="ticket"><div class="section-label">Sections</div><div class="pt-muted" style="margin-bottom:8px;">Une section qui a déjà des saisies peut être renommée mais pas supprimée (🔒).</div>${(d.sections || []).map((x, n)=>`<div class="ft-edrow"><input type="text" class="ft-in mep-name-secs" style="flex:1 1 calc(100% - 56px);min-width:0;" placeholder="Nom de la section" value="${mep_e(x.n)}" oninput="mep_sName(${n},this.value)">${mep_hasSaisies(x.id) ? '<button class="btn ghost small" disabled title="Historique conservé" aria-label="Verrouillée">🔒</button>' : `<button class="btn ghost small t-del" onclick="mep_sDel(${n})" aria-label="Retirer">✕</button>`}
       <div class="ft-mv" style="flex:1 1 100%;"><button class="btn ghost small" onclick="mep_sMove(${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_sMove(${n},1)" aria-label="Descendre">↓</button></div></div>`).join('')}<div class="actions-row"><button class="btn small t-add" onclick="mep_sAdd()">＋ Section</button></div></div>
-    ${(d.sections || []).map(sc=>{ const k = sc.id; return `<div class="ticket"><div class="section-label">Ingrédients — ${mep_e(sc.n || 'Nouvelle section')}</div>${(d[k] || []).map((i, n)=>`<div class="ft-edrow"><span class="mep-num">${n + 1}</span><input type="text" class="ft-in mep-name-${k}" style="flex:1 1 40%;min-width:0;" placeholder="Ingrédient" value="${mep_e(i.n)}" oninput="mep_dName('${k}',${n},this.value)"><input type="text" class="ft-in" list="mep-units" style="flex:1 1 24%;min-width:0;" placeholder="Unité" value="${mep_e(i.u)}" oninput="mep_dUnit('${k}',${n},this.value)">
-      <div class="ft-mv" style="flex:1 1 100%;"><button class="btn ghost small" onclick="mep_dMove('${k}',${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_dMove('${k}',${n},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="mep_dDel('${k}',${n})" aria-label="Retirer">✕</button></div></div>`).join('') || '<div class="pt-muted">Aucun ingrédient.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_dAdd('${k}')">＋ Ingrédient</button></div></div>`; }).join('')}
+    ${(d.sections || []).map(sc=>{ const k = sc.id; return `<div class="ticket"><div class="section-label">Ingrédients — ${mep_e(sc.n || 'Nouvelle section')}</div>${mep_rpBar()}${(d[k] || []).map((i, n)=>mep_ingCard(k, n, i)).join('') || '<div class="pt-muted">Aucun ingrédient.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_dAdd('${k}')">＋ Ingrédient</button></div></div>`; }).join('')}
     <div class="actions-row"><button class="btn t-save" onclick="mep_saveLists()">Enregistrer les listes</button><button class="btn ghost t-cancel" onclick="mep_setTab('hist')">Annuler</button></div>`;
 }
 function mep_render(){
