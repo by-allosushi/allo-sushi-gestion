@@ -3971,7 +3971,7 @@ function mep_rpCell(i, last){
   const it = mep_rpItem(i.rp), rs = mep_rpState(it);
   if(!it || rs.s === null) return '<span class="pt-muted">—</span>';
   const ec = last ? Math.round((rs.s - Number(last.q)) * 100) / 100 : null;
-  const ecTxt = ec === null ? '' : ec === 0 ? 'écart 0' : `<span class="mep-d ${ec > 0 ? 'up' : 'dn'}">${ec > 0 ? '▲ +' : '▼ −'}${mep_e(mep_fq(Math.abs(ec)))}</span> d’écart`;
+  const ecTxt = ec === null ? '' : ec === 0 ? '<span class="rp2-ok">✓ écart 0</span>' : `<span class="mep-d ${ec > 0 ? 'up' : 'dn'}">${ec > 0 ? '▲ +' : '▼ −'}${mep_e(mep_fq(Math.abs(ec)))}</span> d’écart`;
   return `<div class="${rs.ok ? '' : 'rp2-dim'}"><div class="mep-q">${mep_e(mep_fq(rs.s))}<span class="pt-muted"> ${mep_e(i.u || '')}</span></div><div class="mep-w">${ecTxt}</div></div>`;
 }
 /* ---------- administrateur : listes ---------- */
