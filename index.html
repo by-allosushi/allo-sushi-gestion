@@ -870,7 +870,12 @@ async function handleAuthSubmit(){
     return;
   }
 
-  const match = usersCache.find(u => u.id === uname);
+  const find = ()=>usersCache.find(u => u.id === uname || String(u.username || '').toLowerCase() === uname);
+  let match = find();
+  if(!match || match.password !== pwd){
+    // la liste des comptes est lue à l'ouverture de la page : si le compte a été créé ou modifié depuis, on la relit avant de refuser
+    try{ const snap = await appUsersCol.get(); usersCache = snap.docs.map(d=>({ id:d.id, ...d.data() })); match = find(); }catch(e){}
+  }
   if(!match || match.password !== pwd){
     showAuthError("Nom d'utilisateur ou mot de passe incorrect.");
     return;
