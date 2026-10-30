@@ -491,6 +491,7 @@ textarea.ft-in{font-family:'Inter',sans-serif;font-weight:500;line-height:1.45;r
 .rp2-box,.rp2-linked{min-height:42px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;display:flex;align-items:center;padding:4px 10px;font-size:13px;line-height:1.25;}
 .rp2-linked{justify-content:space-between;gap:6px;font-weight:600;}.rp2-linked span{flex:1 1 auto;min-width:0;font-size:12.5px;}.rp2-linked .btn{padding:6px 8px;font-size:12px;}.rp2-linked .btn{flex:0 0 auto;}
 .rp2-res{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);color:inherit;padding:8px 4px;font:inherit;font-size:13px;cursor:pointer;}
+.rp2-dim{opacity:.45;}
 .rp2-ok{color:#4ADE80;font-weight:600;}.rp2-bad{color:#F87171;font-weight:600;}
 .rp2-name{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-weight:600;font-size:15px;}
 .rp2-cell{border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center;min-height:62px;box-sizing:border-box;}.rp2-cell.dim{opacity:.5;}
@@ -3889,10 +3890,10 @@ function mep_histView(){
   const sec = mep_sec, list = mep_lists[sec] || [], all = mep_daySaisies(sec, mep_date), cnt = (sec2, d)=>mep_daySaisies(sec2, d).length;
   const secBtns = `<div class="mep-seg">${mep_secs().map(x=>`<button class="${sec === x[0] ? 'on' : ''}" onclick="mep_histSec('${x[0]}')">${x[1]}${cnt(x[0], mep_date) ? ' · ' + cnt(x[0], mep_date) : ''}</button>`).join('')}</div>`;
   // situation actuelle : dernier et avant-dernier inventaire de chaque article
-  const ev = mep_events(sec), has = mep_saisies.some(x=>x.section === sec);
+  const ev = mep_events(sec), has = mep_saisies.some(x=>x.section === sec), anyRp = list.some(i=>i.rp);
   const cell = (x, u, d)=>x ? `<div class="mep-q">${mep_e(mep_fq(x.q))}<span class="pt-muted"> ${mep_e(u)}</span>${d ? ' <span class="mep-d ' + (d > 0 ? 'up' : 'dn') + '">' + (d > 0 ? '▲ +' : '▼ ') + mep_fq(d) + '</span>' : ''}</div><div class="mep-w">${mep_e(x.by)} · ${mep_e(mep_fdt(x.at))}${x.corr ? ' ✎' : ''}</div>` : '<span class="pt-muted">—</span>';
   const situ = !list.length ? '<div class="pt-muted">Aucun ingrédient défini pour cette section.</div>' : !has ? '<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucun inventaire pour cette section.</div>'
-    : `<div style="overflow-x:auto;"><table class="mep-g"><tr><th>Article</th><th>Dernier inventaire</th><th>Avant</th></tr>${list.map((i, k)=>{ const e = ev[i.id] || [], last = e[e.length - 1], prev = e[e.length - 2]; return `<tr><td><span class="mep-num s">${k + 1}</span>${mep_e(i.n)}</td><td>${cell(last, i.u || '', last && prev ? Number(last.q) - Number(prev.q) : 0)}</td><td>${cell(prev, i.u || '', 0)}</td></tr>`; }).join('')}</table></div>`;
+    : `<div style="overflow-x:auto;"><table class="mep-g"><tr><th>Article</th><th>Dernier inventaire</th>${anyRp ? '<th>Resto Pro</th>' : '<th>Avant</th>'}</tr>${list.map((i, k)=>{ const e = ev[i.id] || [], last = e[e.length - 1], prev = e[e.length - 2]; return `<tr><td><span class="mep-num s">${k + 1}</span>${mep_e(i.n)}</td><td>${cell(last, i.u || '', last && prev ? Number(last.q) - Number(prev.q) : 0)}</td><td>${anyRp ? mep_rpCell(i, last) : cell(prev, i.u || '', 0)}</td></tr>`; }).join('')}</table></div>${anyRp ? mep_rpBar() : ''}`;
   // historique de la date : une colonne par saisie
   const flags = mep_flags(sec), rowsIds = [], seen = {}, info = {};
   list.forEach(i=>{ rowsIds.push(i.id); seen[i.id] = 1; info[i.id] = i; });
@@ -3902,7 +3903,7 @@ function mep_histView(){
     : '<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucune saisie à cette date.</div>';
   const detail = all.length ? `<div class="ticket"><div class="section-label">Saisies du ${mep_e(mep_frDate(mep_date))} — ${mep_e(mep_secName(sec))}</div>${all.map(x=>`<div style="padding:8px 0;border-top:1px solid var(--line);"><div style="margin-bottom:6px;"><b>${mep_e(x.name)}</b> <span class="pt-muted">${mep_e(mep_hm(mep_shownAt(x)))} · ${mep_e(mep_kindLabel(x))}</span></div><div class="pt-row" style="gap:6px;flex-wrap:wrap;"><button class="btn ghost small t-view" onclick="mep_view('${x.id}')">${mep_viewId === x.id ? 'Masquer' : 'Voir'}</button><button class="btn ghost small t-edit" onclick="mep_editStart('${x.id}')">Modifier</button><button class="btn ghost small t-del" onclick="mep_delSaisie('${x.id}')">Supprimer</button></div>${mep_viewId === x.id ? `<div style="margin-top:8px;">${(x.items || []).map(it=>{ const pos = list.findIndex(i=>i.id === it.id); const c = flags[x.id] && flags[x.id][it.id]; return `<div class="row-between" style="padding:5px 0;border-top:1px solid var(--line);"><span><span class="mep-num s">${pos >= 0 ? pos + 1 : '–'}</span>${mep_e(it.n)}</span><span class="${c ? 'mep-d up' : ''}">${mep_e(mep_fq(it.q))} <span class="pt-muted">${mep_e(it.u || '')}</span></span></div>`; }).join('')}</div>` : ''}</div>`).join('')}</div>` : '';
   if(mep_edit) return secBtns + mep_editView();
-  return `${secBtns}<div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — situation actuelle</div>${situ}</div>${mep_rpCompareView(sec)}
+  return `${secBtns}<div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — situation actuelle</div>${situ}</div>
     <div class="ticket"><div class="field"><label>Historique — date</label><input type="date" class="ft-in" value="${mep_e(mep_date)}" onchange="mep_setDate(this.value)"></div></div>
     <div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — saisies du ${mep_e(mep_frDate(mep_date))}</div>${table}</div>${detail}`;
 }
@@ -3964,24 +3965,14 @@ function mep_ingCard(sec, i, r){
   return `<div class="rp2-ing"><div class="rp2-top"><span class="mep-num">${i + 1}</span><div class="rp2-act"><button class="btn ghost small" onclick="mep_dMove('${sec}',${i},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_dMove('${sec}',${i},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="mep_dDel('${sec}',${i})" aria-label="Retirer">✕</button></div></div>
     <div class="g2"><div><label>Ingrédient</label><input type="text" class="ft-in mep-name-${sec}" placeholder="Ingrédient" value="${mep_e(r.n)}" oninput="mep_dName('${sec}',${i},this.value)"></div><div><label>Unité</label>${mep_unitSelect(sec, i, r.u)}</div></div>${mep_rpBlock(sec, i, r)}</div>`;
 }
-/* comparaison avec Resto Pro (historique administrateur) */
-function mep_rpCompareView(sec){
-  const list = (mep_lists[sec] || []).filter(i=>i.rp); if(!list.length) return '';
-  const st = mep_stockOf(sec);
-  const head = st ? `Dernier inventaire : <b>${mep_e(st.name)}</b> · ${mep_e(mep_fdt(st.at))}` : 'Aucun inventaire pour cette section';
-  const cards = list.map(i=>{
-    const pos = (mep_lists[sec] || []).findIndex(x=>x.id === i.id) + 1, it = mep_rpItem(i.rp), rs = mep_rpState(it);
-    const inv = st && st.items.find(x=>x.id === i.id), iq = inv ? Number(inv.q) : null;
-    const hasRs = it && rs.s !== null;
-    const ec = (rs.ok && iq !== null && hasRs) ? Math.round((rs.s - iq) * 100) / 100 : null;
-    const ecHtml = ec === null ? '—' : ec === 0 ? '0' : `<span class="mep-d ${ec > 0 ? 'up' : 'dn'}">${ec > 0 ? '+' : '−'}${mep_e(mep_fq(Math.abs(ec)))}</span>`;
-    const state = !it ? `<span class="rp2-bad">⚠ introuvable</span> <span class="pt-muted">· ${mep_e(i.rpn || '')}</span>` : `<span class="${rs.ok ? 'rp2-ok' : 'rp2-bad'}">${mep_e(rs.label)}</span> <span class="pt-muted">· ${rs.a ? 'dernier achat ' + mep_e(mep_rpDm(rs.a)) : 'aucun achat enregistré'}</span>`;
-    return `<div class="rp2-ing"><div class="rp2-name"><span class="mep-num">${pos}</span><span>${mep_e(i.n)}${i.u ? ` <span class="pt-muted">(${mep_e(i.u)})</span>` : ''}</span></div>
-      <div class="g3"><div class="rp2-cell"><label>Inventaire</label><div class="v">${iq === null ? '—' : mep_e(mep_fq(iq))}</div></div><div class="rp2-cell"><label>Resto Pro</label><div class="v">${hasRs ? mep_e(mep_fq(rs.s)) : '—'}</div></div><div class="rp2-cell ${ec === null ? 'dim' : ''}"><label>Écart</label><div class="v">${ecHtml}</div></div></div>
-      <div class="rp2-state">${state}</div></div>`;
-  }).join('');
-  return `<div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — comparaison avec Resto Pro</div><div class="pt-muted" style="text-align:center;font-size:13px;">${head}</div>${mep_rpReady && mep_rp.items.length ? cards : '<div class="pt-muted" style="padding:8px 0;text-align:center;">Clique sur « Actualiser » pour recevoir le stock de Resto Pro.</div>'}
-    ${mep_rpBar()}<div class="pt-muted" style="margin-top:8px;font-size:12px;text-align:center;">Écart = Resto Pro − dernier inventaire. Article « peu fiable » : stock négatif ou dernier achat de plus de ${MEP_RP_FRESH_DAYS} jours.</div></div>`;
+/* colonne « Resto Pro » de la situation actuelle : quantité Resto Pro + écart en dessous (article peu fiable : grisé) */
+function mep_rpCell(i, last){
+  if(!i.rp) return '<span class="pt-muted">—</span>';
+  const it = mep_rpItem(i.rp), rs = mep_rpState(it);
+  if(!it || rs.s === null) return '<span class="pt-muted">—</span>';
+  const ec = last ? Math.round((rs.s - Number(last.q)) * 100) / 100 : null;
+  const ecTxt = ec === null ? '' : ec === 0 ? 'écart 0' : `<span class="mep-d ${ec > 0 ? 'up' : 'dn'}">${ec > 0 ? '▲ +' : '▼ −'}${mep_e(mep_fq(Math.abs(ec)))}</span> d’écart`;
+  return `<div class="${rs.ok ? '' : 'rp2-dim'}"><div class="mep-q">${mep_e(mep_fq(rs.s))}<span class="pt-muted"> ${mep_e(i.u || '')}</span></div><div class="mep-w">${ecTxt}</div></div>`;
 }
 /* ---------- administrateur : listes ---------- */
 function mep_sName(i, v){ if(mep_draft && mep_draft.sections[i]) mep_draft.sections[i].n = v; }
