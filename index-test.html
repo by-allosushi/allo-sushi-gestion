@@ -713,6 +713,8 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
         <div class="perm-row"><span>Accès Pointage</span><label class="switch"><input type="checkbox" id="nu-perm-pointage"><span class="slider"></span></label></div>
         <div class="perm-row"><span>Accès Fiches techniques</span><label class="switch"><input type="checkbox" id="nu-perm-fiches"><span class="slider"></span></label></div>
         <div class="perm-row"><span>Accès Mise en place</span><label class="switch"><input type="checkbox" id="nu-perm-mep"><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Ma fiche de paie</span><label class="switch"><input type="checkbox" id="nu-perm-paie"><span class="slider"></span></label></div>
+        <div style="padding:2px 0 8px;"><div style="font-size:12px;color:var(--ink-muted);">Employé correspondant (pointage) — nécessaire pour « Ma fiche de paie »</div><select id="nu-emp" class="pa-emp"><option value="">— Aucun employé —</option></select></div>
       </div>
       <button class="btn moss" style="margin-top:14px;" onclick="uu_createUser()">➕ Créer l'utilisateur</button>
     </div>
@@ -948,6 +950,7 @@ async function uu_createUser(){
   if(pwd.length < 4){ alert("Le mot de passe doit contenir au moins 4 caractères."); return; }
   if(usersCache.some(u=>u.id===uname)){ alert("Ce nom d'utilisateur existe déjà."); return; }
   const isAdmin = document.getElementById('nu-admin').checked;
+  if(!isAdmin && document.getElementById('nu-perm-paie').checked && document.getElementById('nu-emp').value === ''){ alert("Pour « Ma fiche de paie », choisis l'employé correspondant."); return; }
   const userDoc = {
     username: uname,
     password: pwd,
@@ -956,8 +959,10 @@ async function uu_createUser(){
       caisse: document.getElementById('nu-perm-caisse').checked,
       pointage: document.getElementById('nu-perm-pointage').checked,
       fiches: document.getElementById('nu-perm-fiches').checked,
-      mep: document.getElementById('nu-perm-mep').checked
+      mep: document.getElementById('nu-perm-mep').checked,
+      paie: document.getElementById('nu-perm-paie').checked
     },
+    empCode: (document.getElementById('nu-emp').value === '') ? null : Number(document.getElementById('nu-emp').value),
     creeLe: new Date().toISOString(),
     creePar: currentUser
   };
@@ -965,7 +970,8 @@ async function uu_createUser(){
   document.getElementById('nu-username').value = '';
   document.getElementById('nu-password').value = '';
   document.getElementById('nu-admin').checked = false;
-  ['caisse', 'pointage', 'fiches', 'mep'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
+  ['caisse', 'pointage', 'fiches', 'mep', 'paie'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
+  document.getElementById('nu-emp').value = '';
   uu_toggleAdminFields();
 }
 
@@ -1010,6 +1016,12 @@ function uu_subscribeUsers(){
   });
 }
 
+function uu_fillNewEmp(){ // liste des employés du formulaire « Nouvel utilisateur »
+  const el = document.getElementById('nu-emp'); if(!el || typeof pt_codes !== 'function') return;
+  const cur = el.value;
+  el.innerHTML = '<option value="">— Aucun employé —</option>' + pt_codes().map(c=>`<option value="${c}">${esc(pt_label(c))} (code ${c})</option>`).join('');
+  el.value = cur;
+}
 function uu_empSelect(u){
   const codes = (typeof pt_codes === 'function') ? pt_codes() : [];
   const cur = (u.empCode === undefined || u.empCode === null || u.empCode === '') ? '' : String(u.empCode);
@@ -1090,7 +1102,7 @@ function showModule(name){
     b.classList.toggle('active', b.getAttribute('data-mod')===name);
   });
   if(name==='home') renderHome();
-  if(name==='users'){ if(typeof pt_start==='function') pt_start(); uu_render(); }
+  if(name==='users'){ if(typeof pt_start==='function') pt_start(); uu_render(); uu_fillNewEmp(); }
   if(name==='caisse' && typeof ca_render==='function') ca_render();
   if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
   if(name==='fiches'){ if(typeof ft_start==='function') ft_start(); if(typeof ft_render==='function') ft_render(); }
@@ -1592,7 +1604,7 @@ function pt_groupsToDoc(groups){ return { groups: (groups || []).map(g=>({ codes
 function pt_groupsFromDoc(data){ return ((data && data.groups) || []).map(g=>Array.isArray(g) ? g : ((g && g.codes) || [])); }
 let pt_renderQueued = false;
 // plusieurs écoutes Firestore répondent presque en même temps au chargement : on ne redessine qu'une fois
-function pt_scheduleRender(){ if(pt_renderQueued) return; pt_renderQueued = true; Promise.resolve().then(()=>{ pt_renderQueued = false; pt_render(); if(activeModule === 'paie' && typeof pa_render === 'function') pa_render(); if(activeModule === 'users' && typeof uu_render === 'function') uu_render(); }); }
+function pt_scheduleRender(){ if(pt_renderQueued) return; pt_renderQueued = true; Promise.resolve().then(()=>{ pt_renderQueued = false; pt_render(); if(activeModule === 'paie' && typeof pa_render === 'function') pa_render(); if(activeModule === 'users' && typeof uu_render === 'function'){ uu_render(); uu_fillNewEmp(); } }); }
 function pt_start(){
   if(pt_started) return;
   pt_started = true;
