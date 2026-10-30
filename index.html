@@ -3226,7 +3226,9 @@ function pa_render(){
   if(pt_error){ body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
   if(!Object.keys(pt_ready).every(k=>pt_ready[k])){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
   const code = session.empCode, r = pa_data(code), q = r.q, d = r.d;
-  const card = (cls, l, n, st)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div><div class="pa-dt">🕒 ${pa_fmt(st)}</div></div>`;
+  const card = (cls, l, n, st, extra)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div><div class="pa-dt">🕒 ${pa_fmt(st)}</div>${extra ? `<div class="pa-dt" style="font-weight:600;">${extra}</div>` : ''}</div>`;
+  const lb = pt_loanBalance(code), resteDu = (lb.lent > 0.004 || Math.abs(lb.due) > 0.004) ? 'Reste dû : ' + (lb.due < -0.004 ? pt_money2(lb.due) : pt_fmtMoney(Math.max(0, lb.due))) : '';
+  const showTransport = pt_transport(code).enabled; // rubrique affichée seulement si le transport est accordé à cet employé
   const dl = (iso)=>new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'short' });
   const yr = r.wk.to.slice(0, 4);
   const rep = q.reportOut < -0.004 ? `<br><span style="font-weight:400;font-size:11px;color:var(--rust);">report −${pt_fmtMoney(-q.reportOut)}</span>` : q.reportOut > 0.004 ? `<br><span style="font-weight:400;font-size:11px;color:var(--moss);">reste dû +${pt_fmtMoney(q.reportOut)}</span>` : '';
@@ -3234,7 +3236,7 @@ function pa_render(){
     <div class="section-label">Ma fiche de paie</div>
     <div class="pa-who">${pt_e(pt_label(code))}</div>
     <div class="pa-week">Semaine du ${dl(r.wk.from)} au ${dl(r.wk.to)} ${yr}</div>
-    <div class="pt-cards">${card('c-transport','Transport',pt_fmtMoney(q.transportTotal),d.transport)}${card('c-bonus','Primes &amp; bonus',pt_fmtMoney(q.bonusesTotal),d.primes)}${card('c-adv','Avances',pt_fmtMoney(q.advancesTotal),d.avances)}${card('c-loan','Prêt',pt_fmtMoney(q.loanTotal),d.prets)}${card('c-bonus','Congé versé',pt_fmtMoney(r.cg.taken),d.congeVerse)}${card('c-transport','Reste à verser',pt_money2(r.cg.left),d.reste)}</div>
+    <div class="pt-cards">${showTransport ? card('c-transport','Transport',pt_fmtMoney(q.transportTotal),d.transport) : ''}${card('c-bonus','Primes &amp; bonus',pt_fmtMoney(q.bonusesTotal),d.primes)}${card('c-adv','Avances',pt_fmtMoney(q.advancesTotal),d.avances)}${card('c-loan','Prêt',pt_fmtMoney(q.loanTotal),d.prets,resteDu)}${card('c-bonus','Congé versé',pt_fmtMoney(r.cg.taken),d.congeVerse)}${card('c-transport','Reste à verser',pt_money2(r.cg.left),d.reste)}</div>
     <div class="grid grid-2"><div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span><div class="pa-dt">🕒 ${pa_fmt(d.sous)}</div></div><div class="value">${pt_fmtMoney(q.subTotal)}</div></div><div class="result-box final"><div class="label">Net à payer${rep}<div class="pa-dt">🕒 ${pa_fmt(d.net)}</div></div><div class="value">${pt_fmtMoney(q.net)}</div></div></div>
     <div class="pt-muted" style="margin-top:10px;">La fiche de la nouvelle semaine remplace celle-ci chaque dimanche. 🕒 = date de la dernière modification de la rubrique.</div>
   </div>`;
