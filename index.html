@@ -218,6 +218,19 @@
 .home-card .desc{font-size:11px;color:var(--ink-muted);margin-top:3px;}
 .home-card.locked{opacity:.4;cursor:not-allowed;}
 .home-card.admin{border-color:var(--forest);background:var(--forest-light);}
+.rp-tk{cursor:pointer;}
+.rp-tk .chev{color:var(--ink-muted);font-size:18px;margin-left:8px;}
+.rp-rc{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px 16px 12px;}
+.rp-rc h3{margin:0 0 2px;font-size:16px;}
+.rp-rc .meta{font-size:11.5px;color:var(--ink-muted);margin-bottom:10px;}
+.rp-rc .ln{display:grid;grid-template-columns:38px 1fr auto;gap:8px;padding:7px 0;border-top:1px dashed var(--line);font-size:13px;}
+.rp-rc .ln .q{color:var(--ink-muted);}
+.rp-rc .ln .nm{font-weight:600;}
+.rp-rc .ln .pu{display:block;font-size:11px;color:var(--ink-muted);font-weight:400;}
+.rp-rc .note{grid-column:2/4;font-size:12px;color:var(--amber);margin-top:-2px;}
+.rp-rc .tot{display:flex;justify-content:space-between;border-top:2px solid var(--line);margin-top:6px;padding-top:10px;font-weight:700;font-size:15px;}
+.rp-rc .sm{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-muted);padding-top:6px;}
+.rp-back{display:inline-block;margin-bottom:10px;font-size:13px;color:var(--ink-muted);cursor:pointer;background:none;border:none;padding:0;font-family:inherit;}
 .pa-dt{font-size:11px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink-muted);margin-top:6px;}
 .pa-who{margin:4px 0 2px;font-size:16px;font-weight:700;}
 .pa-week{font-size:12.5px;color:var(--ink-muted);margin-bottom:6px;}
@@ -3541,6 +3554,8 @@ const rp_metaRef = db.collection('restopro_meta').doc('synchro');
 const rp_demandeRef = db.collection('restopro_meta').doc('demande');
 let rp_from = '', rp_to = '', rp_preset = 'today';
 let rp_days = [], rp_meta = null, rp_err = '', rp_loading = false, rp_tok = 0, rp_timer = null, rp_ready = false;
+const RP_LIGNES_DEPUIS = '2026-10-31'; // le détail des tickets n'est enregistré qu'à partir de cette date (même valeur que dans sync_restopro.ps1)
+let rp_openTk = null, rp_allMax = 40;
 let rp_lastReq = 0, rp_pending = false, rp_noReply = false, rp_reqAt = 0, rp_unsub = null, rp_lastSynced = '', rp_metaSeen = false;
 
 const RP_PRESETS = [
@@ -3640,7 +3655,7 @@ function rp_load(silent){
   if(!rp_from || !rp_to) return;
   if(rp_unsubDays){ try{ rp_unsubDays(); }catch(e){} rp_unsubDays = null; }
   const tok = ++rp_tok;
-  if(!silent){ rp_loading = true; rp_render(); }
+  if(!silent){ rp_openTk = null; rp_loading = true; rp_render(); }
   const FP = firebase.firestore.FieldPath.documentId();
   rp_unsubDays = rp_col.where(FP, '>=', rp_from).where(FP, '<=', rp_to).onSnapshot(snap=>{
     if(tok !== rp_tok) return;
@@ -3656,14 +3671,15 @@ function rp_load(silent){
 }
 
 function rp_compute(){
-  const perDay = [], open = [], rem = [];
+  const perDay = [], open = [], rem = [], all = [];
   let cNb=0, cCa=0, oNb=0, oCa=0, rSum=0, rAll=0;
   rp_days.forEach(day=>{
     let a=0, b=0, c=0, d=0, r=0;
     (day.tickets || []).forEach(t=>{
       const ttc = Number(t.ttc)||0, rm = Number(t.rem)||0;
       const closed = String(t.blo||'').toUpperCase() === 'F';
-      const row = Object.assign({ date:day.id }, t);
+      const row = Object.assign({ date:day.id, dayLignes:!!day.lignes }, t);
+      all.push(row);
       if(closed){ a++; b += ttc; r += rm; }
       else { c++; d += ttc; open.push(row); }
       if(rm > 0){ rem.push(row); rAll += rm; }
@@ -3672,8 +3688,8 @@ function rp_compute(){
     cNb+=a; cCa+=b; oNb+=c; oCa+=d; rSum+=r;
   });
   const recent = (x,y)=> (y.date+' '+(y.h||'')).localeCompare(x.date+' '+(x.h||''));
-  open.sort(recent); rem.sort(recent);
-  return { perDay, open, rem, cNb, cCa, oNb, oCa, rSum, rAll, avg: cNb ? cCa/cNb : 0 };
+  open.sort(recent); rem.sort(recent); all.sort(recent);
+  return { perDay, open, rem, all, cNb, cCa, oNb, oCa, rSum, rAll, avg: cNb ? cCa/cNb : 0 };
 }
 
 function rp_syncHtml(){
@@ -3705,6 +3721,45 @@ function rp_syncHtml(){
   return `<div class="row-between" style="margin-top:12px;gap:8px;"><span style="font-size:12px;color:${col};">${txt}</span>${btn}</div>`;
 }
 
+function rp_findTicket(date, n){
+  const d = rp_days.find(x=>x.id === date);
+  return d ? (d.tickets || []).map(t=>Object.assign({ date:d.id, dayLignes:!!d.lignes }, t)).find(t=>String(t.n) === String(n)) : null;
+}
+function rp_openTicket(date, n){ rp_openTk = { date:String(date), n:String(n) }; rp_render(); try{ window.scrollTo(0, 0); }catch(e){} }
+function rp_closeTicket(){ rp_openTk = null; rp_render(); }
+function rp_moreTickets(){ rp_allMax += 40; rp_render(); }
+function rp_qty(q){ q = Number(q) || 0; return (Math.abs(q - Math.round(q)) < 0.005 ? String(Math.round(q)) : String(Math.round(q * 100) / 100).replace('.', ',')) + ' ×'; }
+function rp_ticketView(t){
+  const closed = String(t.blo || '').toUpperCase() === 'F';
+  const chip = closed ? '<span class="chip" style="background:var(--moss-bg);color:var(--moss);">fermé</span>' : '<span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span>';
+  const meta = [rp_fmtDate(t.date) + (t.h ? ' · ' + esc(t.h) : ''), rp_ticketLabel(t), t.mode ? 'paiement : ' + esc(t.mode) : ''].filter(Boolean).join(' · ');
+  let lines = Array.isArray(t.l) ? t.l.slice() : [];
+  let body = '';
+  if(!lines.length){
+    body = `<div class="stat-label" style="padding:12px 0;border-top:1px dashed var(--line);">${t.date < RP_LIGNES_DEPUIS || !t.dayLignes ? 'Détail non disponible : les lignes des tickets ne sont enregistrées qu’à partir du ' + rp_fmtDate(RP_LIGNES_DEPUIS) + '.' : 'Aucune ligne enregistrée pour ce ticket.'}</div>`;
+  } else {
+    const ids = new Set(lines.map(l=>String(l.i)));
+    const isNote = (l)=>l.p && String(l.p) !== String(l.i);
+    const notes = {}; const orphan = [];
+    lines.filter(isNote).forEach(l=>{ if(ids.has(String(l.p))) (notes[l.p] = notes[l.p] || []).push(l); else orphan.push(l); });
+    const main = lines.filter(l=>!isNote(l)).concat(orphan);
+    body = main.map(l=>{
+      const free = !(Number(l.m) > 0);
+      const nt = (notes[l.i] || []).map(x=>`<span class="note">📝 ${esc(x.n)}</span>`).join('');
+      return `<div class="ln"><span class="q mono">${rp_qty(l.q)}</span><span class="nm">${esc(l.n)}${free ? '<span class="pu">inclus</span>' : (Number(l.q) !== 1 ? `<span class="pu">${rp_money(l.pu)} l’unité</span>` : '')}</span><span class="mono">${free ? '—' : rp_money(l.m)}</span>${nt}</div>`;
+    }).join('');
+  }
+  return `<button class="rp-back" onclick="rp_closeTicket()">‹ Retour aux tickets</button>
+    <div class="rp-rc"><h3>Ticket ${esc(t.n)} ${chip}</h3><div class="meta">${meta}</div>${body}
+      <div class="sm"><span>Total avant remise</span><span class="mono">${rp_money(t.brut != null ? t.brut : t.ttc)}</span></div>
+      <div class="sm"><span>Remise</span><span class="mono" style="color:${Number(t.rem) > 0 ? 'var(--rust)' : 'inherit'};">${Number(t.rem) > 0 ? '− ' : ''}${rp_money(t.rem)}</span></div>
+      <div class="tot"><span>Total à payer</span><span class="mono">${rp_money(t.ttc)}</span></div></div>`;
+}
+function rp_ticketRow(t, extraHtml, right){
+  return `<div class="movement-row rp-tk" onclick="rp_openTicket('${esc(t.date)}','${esc(t.n)}')"><div><div style="font-weight:600;">Ticket ${esc(t.n)} ${extraHtml}</div>
+    <div class="sub">${rp_fmtDate(t.date)} ${esc(t.h||'')}${rp_ticketLabel(t) ? ' · ' + rp_ticketLabel(t) : ''}</div></div>
+    <div style="display:flex;align-items:center;">${right}<span class="chev">›</span></div></div>`;
+}
 function rp_ticketLabel(t){
   const bits = [];
   if(t.srv) bits.push(esc(t.srv));
@@ -3733,6 +3788,11 @@ function rp_render(){
     return;
   }
 
+  if(rp_openTk){
+    const tk = rp_findTicket(rp_openTk.date, rp_openTk.n);
+    if(tk){ body.innerHTML = rp_ticketView(tk); return; }
+    rp_openTk = null;
+  }
   const c = rp_compute();
   let h = '';
 
@@ -3779,9 +3839,7 @@ function rp_render(){
     h += `<div class="stat-label" style="padding:4px 2px 10px;">Aucun ticket non fermé sur cette période.</div>`;
   } else {
     c.open.forEach(t=>{
-      h += `<div class="movement-row"><div><div style="font-weight:600;">Ticket ${esc(t.n)} <span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span></div>
-        <div class="sub">${rp_fmtDate(t.date)} ${esc(t.h||'')}${rp_ticketLabel(t) ? ' · ' + rp_ticketLabel(t) : ''}</div></div>
-        <div class="mono" style="font-weight:700;">${rp_money(t.ttc)}</div></div>`;
+      h += rp_ticketRow(t, '<span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span>', `<div class="mono" style="font-weight:700;">${rp_money(t.ttc)}</div>`);
     });
   }
 
@@ -3792,13 +3850,20 @@ function rp_render(){
   } else {
     c.rem.forEach(t=>{
       const closed = String(t.blo||'').toUpperCase() === 'F';
-      h += `<div class="movement-row"><div><div style="font-weight:600;">Ticket ${esc(t.n)}
-          ${closed ? '' : '<span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span>'}</div>
-        <div class="sub">${rp_fmtDate(t.date)} ${esc(t.h||'')}${rp_ticketLabel(t) ? ' · ' + rp_ticketLabel(t) : ''}</div></div>
-        <div style="text-align:right;"><div class="mono" style="font-weight:700;color:var(--rust);">− ${rp_money(t.rem)}</div>
-        <div class="sub">ticket : ${rp_money(t.ttc)}</div></div></div>`;
+      h += rp_ticketRow(t, closed ? '' : '<span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span>', `<div style="text-align:right;"><div class="mono" style="font-weight:700;color:var(--rust);">− ${rp_money(t.rem)}</div>
+        <div class="sub">ticket : ${rp_money(t.ttc)}</div></div>`);
     });
   }
+
+  // --- Tous les tickets (détail au clic) ---
+  h += `<h2 class="section">Tous les tickets (${c.all.length})</h2><div class="stat-label" style="padding:0 2px 8px;">Touche un ticket pour voir son contenu.</div>`;
+  c.all.slice(0, rp_allMax).forEach(t=>{
+    const closed = String(t.blo||'').toUpperCase() === 'F';
+    const chips = (closed ? '<span class="chip" style="background:var(--moss-bg);color:var(--moss);">fermé</span>' : '<span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span>')
+      + (Number(t.rem) > 0 ? ' <span class="chip" style="background:var(--rust-bg);color:var(--rust);">remise</span>' : '');
+    h += rp_ticketRow(t, chips, `<div class="mono" style="font-weight:700;">${rp_money(t.ttc)}</div>`);
+  });
+  if(c.all.length > rp_allMax) h += `<div style="text-align:center;margin:8px 0;"><button class="btn ghost small" onclick="rp_moreTickets()">Afficher plus (${c.all.length - rp_allMax} restants)</button></div>`;
 
   h += `<div class="stat-label" style="margin-top:14px;text-align:center;">Source : Resto Pro (tickets BON1) — montants après remises, comme l’écran Statistiques.</div>`;
   body.innerHTML = h;
