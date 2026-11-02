@@ -3296,7 +3296,7 @@ function pa_render(){
     <div class="pa-week">Semaine du ${dl(r.wk.from)} au ${dl(r.wk.to)} ${yr}</div>
     <div class="pt-cards">${showTransport ? card('c-transport','Transport',pt_fmtMoney(q.transportTotal),d.transport) : ''}${card('c-bonus','Primes &amp; bonus',pt_fmtMoney(q.bonusesTotal),d.primes)}${card('c-adv','Avances',pt_fmtMoney(q.advancesTotal),d.avances)}${card('c-loan','Prêt',pt_fmtMoney(q.loanTotal),d.prets,resteDu)}${card('c-bonus','Congé versé',pt_fmtMoney(r.cg.taken),d.congeVerse)}${card('c-transport','Reste à verser',pt_money2(r.cg.left),d.reste)}</div>
     <div class="grid grid-2"><div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span><div class="pa-dt">🕒 ${pa_fmt(d.sous)}</div></div><div class="value">${pt_fmtMoney(q.subTotal)}</div></div><div class="result-box final"><div class="label">Net à payer${rep}<div class="pa-dt">🕒 ${pa_fmt(d.net)}</div></div><div class="value">${pt_fmtMoney(q.net)}</div></div></div>
-    <div class="pt-muted" style="margin-top:10px;">La fiche de la nouvelle semaine remplace celle-ci chaque dimanche. Les consultations de ta fiche sont enregistrées. 🕒 = date de la dernière modification de la rubrique.</div>
+    <div class="pt-muted" style="margin-top:10px;">La fiche de la nouvelle semaine remplace celle-ci chaque dimanche. 🕒 = date de la dernière modification de la rubrique.</div>
   </div>`;
   pa_logVue(code, r.wk.from);
 }
