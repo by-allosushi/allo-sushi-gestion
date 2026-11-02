@@ -220,6 +220,8 @@
 .home-card.admin{border-color:var(--forest);background:var(--forest-light);}
 .rp-tk{cursor:pointer;}
 .rp-tk .chev{color:var(--ink-muted);font-size:18px;margin-left:8px;}
+.rp-pl{display:grid;grid-template-columns:48px 1fr auto;gap:8px;align-items:baseline;padding:8px 0;border-top:1px dashed var(--line);font-size:13px;}
+.rp-pl .q{font-weight:700;color:var(--forest-light);}.rp-pl .nm small{display:block;font-size:10.5px;color:var(--ink-muted);margin-top:1px;}
 .rp-rc{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px 16px 12px;}
 .rp-rc h3{margin:0 0 2px;font-size:16px;}
 .rp-rc .meta{font-size:11.5px;color:var(--ink-muted);margin-bottom:10px;}
@@ -3572,6 +3574,7 @@ let rp_from = '', rp_to = '', rp_preset = 'today';
 let rp_days = [], rp_meta = null, rp_err = '', rp_loading = false, rp_tok = 0, rp_timer = null, rp_ready = false;
 const RP_LIGNES_DEPUIS = '2026-10-31'; // le détail des tickets n'est enregistré qu'à partir de cette date (même valeur que dans sync_restopro.ps1)
 let rp_openTk = null, rp_allMax = 40;
+let rp_prodQ = '', rp_prodMax = 15, rp_prod = null;   // ventes par plat : recherche, nombre affiché, résultat calculé
 let rp_lastReq = 0, rp_pending = false, rp_noReply = false, rp_reqAt = 0, rp_unsub = null, rp_lastSynced = '', rp_metaSeen = false;
 
 const RP_PRESETS = [
@@ -3705,7 +3708,50 @@ function rp_compute(){
   });
   const recent = (x,y)=> (y.date+' '+(y.h||'')).localeCompare(x.date+' '+(x.h||''));
   open.sort(recent); rem.sort(recent); all.sort(recent);
-  return { perDay, open, rem, all, cNb, cCa, oNb, oCa, rSum, rAll, avg: cNb ? cCa/cNb : 0 };
+  return { perDay, open, rem, all, cNb, cCa, oNb, oCa, rSum, rAll, avg: cNb ? cCa/cNb : 0, prod: rp_products() };
+}
+
+/* ---- Ventes par plat : cumul des quantités vendues sur la période (tickets fermés ET non fermés) ---- */
+function rp_normName(n){ return String(n || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+function rp_products(){
+  const map = {}; let daysNoDetail = 0, daysDetail = 0;
+  rp_days.forEach(day=>{
+    if(!day.lignes) { if((day.tickets || []).length) daysNoDetail++; } else daysDetail++;
+    (day.tickets || []).forEach(t=>{
+      const closed = String(t.blo || '').toUpperCase() === 'F';
+      (Array.isArray(t.l) ? t.l : []).forEach(l=>{
+        if(l.p && String(l.p) !== String(l.i)) return;            // commentaire attaché à un article, pas un plat
+        const k = rp_normName(l.n); if(!k) return;
+        const q = Number(l.q) || 0, m = Number(l.m) || 0;
+        const o = map[k] || (map[k] = { name:String(l.n).replace(/\s+/g, ' ').trim(), q:0, m:0, qOpen:0, qFree:0 });
+        o.q += q; o.m += m;
+        if(!closed) o.qOpen += q;
+        if(!(m > 0)) o.qFree += q;                                  // inclus dans une formule (prix 0)
+      });
+    });
+  });
+  const list = Object.keys(map).map(k=>map[k]).sort((a,b)=> b.q - a.q || a.name.localeCompare(b.name));
+  return { list, daysNoDetail, daysDetail };
+}
+function rp_prodSearch(v){ rp_prodQ = v; rp_prodMax = 15; rp_renderProd(); }
+function rp_prodMore(){ rp_prodMax += 25; rp_renderProd(); }
+function rp_renderProd(){
+  const box = document.getElementById('rp-prod-list'); if(!box || !rp_prod) return;
+  const q = rp_normName(rp_prodQ);
+  const all = rp_prod.list, list = q ? all.filter(x=>rp_normName(x.name).indexOf(q) >= 0) : all;
+  const totQ = list.reduce((s,x)=>s + x.q, 0), totM = list.reduce((s,x)=>s + x.m, 0);
+  if(!all.length){
+    box.innerHTML = `<div class="stat-label" style="padding:8px 2px;">${rp_prod.daysNoDetail ? 'Le détail des plats n’est enregistré qu’à partir du ' + rp_fmtDate(RP_LIGNES_DEPUIS) + '.' : 'Aucun article sur cette période.'}</div>`;
+    return;
+  }
+  let h = `<div class="stat-label" style="padding:2px 2px 8px;">${q ? '<b>' + list.length + '</b> plat' + (list.length>1?'s':'') + ' trouvé' + (list.length>1?'s':'') + ' · ' : ''}<b>${rp_qty(totQ).replace(' ×','')}</b> article${totQ>1?'s':''} vendu${totQ>1?'s':''} · ${rp_money(totM)}</div>`;
+  if(!list.length) h += `<div class="stat-label" style="padding:8px 2px;">Aucun plat ne correspond à « ${esc(rp_prodQ)} ».</div>`;
+  list.slice(0, rp_prodMax).forEach(x=>{
+    const sub = [x.qOpen > 0 ? 'dont ' + rp_qty(x.qOpen).replace(' ×','') + ' en cours' : '', x.qFree > 0 ? 'dont ' + rp_qty(x.qFree).replace(' ×','') + ' inclus (formule)' : ''].filter(Boolean).join(' · ');
+    h += `<div class="rp-pl"><span class="q mono">${rp_qty(x.q)}</span><span class="nm">${esc(x.name)}${sub ? '<small>' + sub + '</small>' : ''}</span><span class="mono">${x.m > 0 ? rp_money(x.m) : '—'}</span></div>`;
+  });
+  if(list.length > rp_prodMax) h += `<div style="text-align:center;margin:8px 0;"><button class="btn ghost small" onclick="rp_prodMore()">Afficher plus (${list.length - rp_prodMax} restants)</button></div>`;
+  box.innerHTML = h;
 }
 
 function rp_syncHtml(){
@@ -3849,6 +3895,13 @@ function rp_render(){
       <span class="mono">${c.oNb ? rp_money(c.oCa) : '—'}</span><span class="mono">${c.rSum ? rp_money(c.rSum) : '—'}</span></div></div>`;
   }
 
+  // --- Ventes par plat ---
+  rp_prod = c.prod;
+  h += `<h2 class="section">Ventes par plat</h2><div class="ticket" style="padding:10px 12px;">
+    <input id="rp-prod-q" type="search" placeholder="Chercher un plat…" value="${esc(rp_prodQ)}" oninput="rp_prodSearch(this.value)" style="margin-bottom:8px;">
+    <div id="rp-prod-list"></div>
+    <div class="stat-label" style="margin-top:6px;font-size:10.5px;">Tickets fermés et non fermés. ${c.prod.daysNoDetail ? '⚠ ' + c.prod.daysNoDetail + ' jour' + (c.prod.daysNoDetail>1?'s':'') + ' de la période sans détail (disponible depuis le ' + rp_fmtDate(RP_LIGNES_DEPUIS) + ').' : ''}</div></div>`;
+
   // --- Tickets non fermés ---
   h += `<h2 class="section">Tickets non fermés (${c.open.length})</h2>`;
   if(!c.open.length){
@@ -3883,6 +3936,7 @@ function rp_render(){
 
   h += `<div class="stat-label" style="margin-top:14px;text-align:center;">Source : Resto Pro (tickets BON1) — montants après remises, comme l’écran Statistiques.</div>`;
   body.innerHTML = h;
+  rp_renderProd();
 }
 
 /* ==================== MODULE MISE EN PLACE ==================== */
