@@ -217,7 +217,24 @@
 .home-card .lbl{font-weight:700;font-size:13.5px;font-family:'Manrope',sans-serif;}
 .home-card .desc{font-size:11px;color:var(--ink-muted);margin-top:3px;}
 .home-card.locked{opacity:.4;cursor:not-allowed;}
-.home-card.admin{border-color:var(--forest);background:var(--forest-light);background:linear-gradient(180deg,#EEF2FF,#FFFFFF);}
+.home-card.admin{border-color:var(--forest);background:var(--forest-light);}
+.rp-tk{cursor:pointer;}
+.rp-tk .chev{color:var(--ink-muted);font-size:18px;margin-left:8px;}
+.rp-rc{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px 16px 12px;}
+.rp-rc h3{margin:0 0 2px;font-size:16px;}
+.rp-rc .meta{font-size:11.5px;color:var(--ink-muted);margin-bottom:10px;}
+.rp-rc .ln{display:grid;grid-template-columns:38px 1fr auto;gap:8px;padding:7px 0;border-top:1px dashed var(--line);font-size:13px;}
+.rp-rc .ln .q{color:var(--ink-muted);}
+.rp-rc .ln .nm{font-weight:600;}
+.rp-rc .ln .pu{display:block;font-size:11px;color:var(--ink-muted);font-weight:400;}
+.rp-rc .note{grid-column:2/4;font-size:12px;color:var(--amber);margin-top:-2px;}
+.rp-rc .tot{display:flex;justify-content:space-between;border-top:2px solid var(--line);margin-top:6px;padding-top:10px;font-weight:700;font-size:15px;}
+.rp-rc .sm{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-muted);padding-top:6px;}
+.rp-back{display:inline-block;margin-bottom:10px;font-size:13px;color:var(--ink-muted);cursor:pointer;background:none;border:none;padding:0;font-family:inherit;}
+.pa-dt{font-size:11px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink-muted);margin-top:6px;}
+.pa-who{margin:4px 0 2px;font-size:16px;font-weight:700;}
+.pa-week{font-size:12.5px;color:var(--ink-muted);margin-bottom:6px;}
+.pa-emp{width:100%;margin-top:6px;}
 
 /* ===== User management ===== */
 .perm-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:13px;border-bottom:1px solid var(--line);}
@@ -480,8 +497,34 @@ textarea.ft-in{font-family:'Inter',sans-serif;font-weight:500;line-height:1.45;r
 .ft-fam.open{border-bottom-left-radius:0;border-bottom-right-radius:0;}
 .ft-rows{border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;background:color-mix(in srgb,var(--surface) 60%,var(--paper));}
 .ft-row{display:flex;justify-content:space-between;align-items:center;min-height:44px;padding:0 14px;border-top:1px solid var(--line);font-size:15px;cursor:pointer;}.ft-row:first-child{border-top:0;}
+.mep-in td.i{padding:6px 4px;}table.mep-in input.ft-in{width:78px;text-align:right;padding:8px;margin:0;}table.mep-in th.l,table.mep-in td.l{border-left:1px solid var(--line);}table.mep-in th{vertical-align:bottom;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.rp2-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;margin:2px 0 4px;}.rp2-bar .btn{flex:0 0 auto;}
+.rp2-ing{border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:10px;}
+.rp2-ing label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-muted,#9aa39d);margin-bottom:4px;}
+.rp2-ing .g2 .ft-in{width:100%;box-sizing:border-box;height:42px;}
+.rp2-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}.rp2-act{display:flex;gap:6px;}
+.rp2-r2{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);}
+.rp2-box,.rp2-linked{min-height:42px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;display:flex;align-items:center;padding:4px 10px;font-size:13px;line-height:1.25;}
+.rp2-linked{justify-content:space-between;gap:6px;font-weight:600;}.rp2-linked span{flex:1 1 auto;min-width:0;font-size:12.5px;}.rp2-linked .btn{padding:6px 8px;font-size:12px;}.rp2-linked .btn{flex:0 0 auto;}
+.rp2-res{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);color:inherit;padding:8px 4px;font:inherit;font-size:13px;cursor:pointer;}
+.rp2-dim{opacity:.45;}
+.rp2-ok{color:#4ADE80;font-weight:600;}.rp2-bad{color:#F87171;font-weight:600;}
+.rp2-name{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-weight:600;font-size:15px;}
+.rp2-cell{border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center;min-height:62px;box-sizing:border-box;}.rp2-cell.dim{opacity:.5;}
+.rp2-cell .v{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;}
+.rp2-state{margin-top:10px;text-align:center;font-size:12.5px;}
+.mep2-head{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;}.mep2-who{font-weight:700;font-size:14px;margin-top:4px;}.mep2-corr{font-size:12px;color:#FBBF24;margin-top:2px;}
+.mep2-row{padding:10px 0;border-top:1px solid var(--line);}.mep2-name{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;margin-bottom:6px;}
+.mep2-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center;}.mep2-last{font-size:15px;padding-left:4px;}
 .mep-num{flex:0 0 28px;height:28px;border-radius:8px;background:color-mix(in srgb,#E7E5E4 14%,#151A17);border:1px solid color-mix(in srgb,#E7E5E4 35%,transparent);color:#E7E5E4;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
 .mep-num.s{flex:none;width:24px;height:24px;font-size:12px;margin-right:8px;vertical-align:middle;}.mep-num.off{opacity:.4;}
+.mep-q{font-weight:700;font-size:15px;}.mep-w{font-size:12px;color:var(--ink-muted,#9aa39d);margin-top:2px;}
+.mep-d{font-size:12px;font-weight:700;}.mep-d.up{color:#FBBF24;}.mep-d.dn{color:#F87171;}
+td.mep-chg{color:#FBBF24;font-weight:800;}
+input.ft-in.chg{border-color:#FBBF24;border-left-color:#FBBF24;background:color-mix(in srgb,#FBBF24 16%,#151A17);color:#FDE68A;}
+.btn[disabled]{opacity:.4;pointer-events:none;}
+table.mep-sticky td:first-child,table.mep-sticky th:first-child{position:sticky;left:0;background:var(--surface);z-index:1;min-width:130px;}
 .mep-seg{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}.mep-seg button{flex:1 1 90px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:15px;font-family:'Inter',sans-serif;cursor:pointer;}
 .mep-seg button.on{background:color-mix(in srgb,#E7E5E4 18%,#151A17);border-color:#E7E5E4;}
 .mep-ing{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);}.mep-ing .n{flex:1;font-size:16px;font-weight:600;}.mep-ing input{width:92px;text-align:center;}.mep-ing .u{width:58px;color:var(--ink-muted,#9aa39d);font-size:14px;}
@@ -540,7 +583,6 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
 .pt-fix{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px;margin:-2px 0 10px;}
 .pt-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--surface);border:1px solid var(--moss);color:var(--moss);padding:10px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:60;}
 .pt-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-
   /* ---- Caisse : grille de saisie ---- */
   .cg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 12px;align-items:start;}
   .cg-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0;}
@@ -701,12 +743,20 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
         <div class="perm-row"><span>Accès Pointage</span><label class="switch"><input type="checkbox" id="nu-perm-pointage"><span class="slider"></span></label></div>
         <div class="perm-row"><span>Accès Fiches techniques</span><label class="switch"><input type="checkbox" id="nu-perm-fiches"><span class="slider"></span></label></div>
         <div class="perm-row"><span>Accès Mise en place</span><label class="switch"><input type="checkbox" id="nu-perm-mep"><span class="slider"></span></label></div>
+        <div class="perm-row"><span>Accès Ma fiche de paie</span><label class="switch"><input type="checkbox" id="nu-perm-paie"><span class="slider"></span></label></div>
+        <div style="padding:2px 0 8px;"><div style="font-size:12px;color:var(--ink-muted);">Employé correspondant (pointage) — nécessaire pour « Ma fiche de paie »</div><select id="nu-emp" class="pa-emp"><option value="">— Aucun employé —</option></select></div>
       </div>
       <button class="btn moss" style="margin-top:14px;" onclick="uu_createUser()">➕ Créer l'utilisateur</button>
     </div>
 
     <h2 class="section">Utilisateurs existants</h2>
     <div id="users-list"></div>
+  </main>
+</div>
+
+<div id="module-paie" class="module">
+  <main style="max-width:900px;margin:0 auto;padding:18px 16px 40px;">
+    <div id="pa-body"></div>
   </main>
 </div>
 
@@ -732,6 +782,8 @@ function askUserName(){ /* obsolète : l'utilisateur est désormais défini via 
 
 /* ==================== AUTHENTIFICATION & AUTORISATIONS ==================== */
 const appUsersCol = db.collection('app_users');
+const PAIE_LINK = /[?&]paie(\b|=|&|$)/.test(location.search); // lien commun donné aux employés : …/allo-sushi-gestion/?paie
+(function(){ if(PAIE_LINK){ const el = document.getElementById('login-sub'); if(el) el.textContent = 'Ma fiche de paie — connecte-toi'; } })();
 const SESSION_KEY = 'allosushi-session';
 const MODULE_DEFS = [
   { key:'caisse',   label:'Caisse',    ic:'💰', desc:'Sessions de caisse' },
@@ -739,6 +791,7 @@ const MODULE_DEFS = [
   { key:'fiches',   label:'Fiches techniques', ic:'📋', desc:'Recettes & dressage' },
   { key:'mep',      label:'Mise en place', ic:'🧑‍🍳', desc:'Inventaire de fin de service' },
   { key:'restopro', label:'CA Resto Pro', ic:'📈', desc:'Chiffre d’affaires & remises' },
+  { key:'paie',     label:'Ma fiche de paie', ic:'💵', desc:'Ma paie de la semaine' },
 ];
 let session = null; // { username, isAdmin, permissions:{caisse,pointage} }
 let usersCache = [];
@@ -746,6 +799,10 @@ let usersSetupMode = false;
 
 function hasAccess(moduleKey){
   if(!session) return false;
+  if(moduleKey === 'paie'){ // fiche personnelle : l’administrateur ne la voit que s’il est relié à un employé
+    if(session.isAdmin) return session.empCode !== null && session.empCode !== undefined && session.empCode !== '';
+    return !!(session.permissions && session.permissions.paie);
+  }
   if(session.isAdmin) return true;
   return !!(session.permissions && session.permissions[moduleKey]);
 }
@@ -800,7 +857,8 @@ function applySession(userDoc){
     username: userDoc.id,
     displayName: userDoc.username || userDoc.id,
     isAdmin: !!userDoc.isAdmin,
-    permissions: userDoc.permissions || {}
+    permissions: userDoc.permissions || {},
+    empCode: (userDoc.empCode === undefined || userDoc.empCode === null || userDoc.empCode === '') ? null : Number(userDoc.empCode)
   };
   currentUser = session.displayName;
   localStorage.setItem(USER_KEY, currentUser);
@@ -809,7 +867,7 @@ function applySession(userDoc){
   document.getElementById('app-shell').style.display = 'block';
   renderUserChip();
   buildModuleTabs();
-  showModule('home');
+  showModule(PAIE_LINK && hasAccess('paie') ? 'paie' : 'home'); // lien « ?paie » : arrivée directe sur la fiche
   if(session.isAdmin){ uu_subscribeUsers(); }
   try{ if(hasAccess('restopro')){ rp_watchMeta(); rp_requestSync(); } }catch(e){ console.warn('CA Resto Pro :', e); }
 }
@@ -843,7 +901,12 @@ async function handleAuthSubmit(){
     return;
   }
 
-  const match = usersCache.find(u => u.id === uname);
+  const find = ()=>usersCache.find(u => u.id === uname || String(u.username || '').toLowerCase() === uname);
+  let match = find();
+  if(!match || match.password !== pwd){
+    // la liste des comptes est lue à l'ouverture de la page : si le compte a été créé ou modifié depuis, on la relit avant de refuser
+    try{ const snap = await appUsersCol.get(); usersCache = snap.docs.map(d=>({ id:d.id, ...d.data() })); match = find(); }catch(e){}
+  }
   if(!match || match.password !== pwd){
     showAuthError("Nom d'utilisateur ou mot de passe incorrect.");
     return;
@@ -922,6 +985,7 @@ async function uu_createUser(){
   if(pwd.length < 4){ alert("Le mot de passe doit contenir au moins 4 caractères."); return; }
   if(usersCache.some(u=>u.id===uname)){ alert("Ce nom d'utilisateur existe déjà."); return; }
   const isAdmin = document.getElementById('nu-admin').checked;
+  if(!isAdmin && document.getElementById('nu-perm-paie').checked && document.getElementById('nu-emp').value === ''){ alert("Pour « Ma fiche de paie », choisis l'employé correspondant."); return; }
   const userDoc = {
     username: uname,
     password: pwd,
@@ -930,8 +994,10 @@ async function uu_createUser(){
       caisse: document.getElementById('nu-perm-caisse').checked,
       pointage: document.getElementById('nu-perm-pointage').checked,
       fiches: document.getElementById('nu-perm-fiches').checked,
-      mep: document.getElementById('nu-perm-mep').checked
+      mep: document.getElementById('nu-perm-mep').checked,
+      paie: document.getElementById('nu-perm-paie').checked
     },
+    empCode: (document.getElementById('nu-emp').value === '') ? null : Number(document.getElementById('nu-emp').value),
     creeLe: new Date().toISOString(),
     creePar: currentUser
   };
@@ -939,7 +1005,8 @@ async function uu_createUser(){
   document.getElementById('nu-username').value = '';
   document.getElementById('nu-password').value = '';
   document.getElementById('nu-admin').checked = false;
-  ['caisse', 'pointage', 'fiches', 'mep'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
+  ['caisse', 'pointage', 'fiches', 'mep', 'paie'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
+  document.getElementById('nu-emp').value = '';
   uu_toggleAdminFields();
 }
 
@@ -984,6 +1051,24 @@ function uu_subscribeUsers(){
   });
 }
 
+function uu_fillNewEmp(){ // liste des employés du formulaire « Nouvel utilisateur »
+  const el = document.getElementById('nu-emp'); if(!el || typeof pt_codes !== 'function') return;
+  const cur = el.value;
+  el.innerHTML = '<option value="">— Aucun employé —</option>' + pt_codes().map(c=>`<option value="${c}">${esc(pt_label(c))} (code ${c})</option>`).join('');
+  el.value = cur;
+}
+function uu_empSelect(u){
+  const codes = (typeof pt_codes === 'function') ? pt_codes() : [];
+  const cur = (u.empCode === undefined || u.empCode === null || u.empCode === '') ? '' : String(u.empCode);
+  const opts = ['<option value="">— Aucun employé —</option>'].concat(codes.map(c=>`<option value="${c}" ${String(c) === cur ? 'selected' : ''}>${esc(pt_label(c))} (code ${c})</option>`));
+  if(cur && !codes.map(String).includes(cur)) opts.push(`<option value="${esc(cur)}" selected>Code ${esc(cur)}</option>`);
+  return `<div style="padding:2px 0 8px;"><div style="font-size:12px;color:var(--ink-muted);">Employé correspondant (pointage) — nécessaire pour « Ma fiche de paie »</div>
+    <select class="pa-emp" onchange="uu_setEmp('${u.id}', this.value)">${opts.join('')}</select></div>`;
+}
+async function uu_setEmp(userId, v){
+  const code = v === '' ? null : Number(v);
+  await appUsersCol.doc(userId).set({ empCode: code }, { merge:true });
+}
 function uu_render(){
   const el = document.getElementById('users-list');
   if(!el) return;
@@ -993,11 +1078,11 @@ function uu_render(){
       <div class="perm-row">
         <span>${m.ic} ${m.label}</span>
         <label class="switch">
-          <input type="checkbox" ${perms[m.key]?'checked':''} ${u.isAdmin?'disabled':''}
+          <input type="checkbox" ${perms[m.key]?'checked':''} ${(u.isAdmin && m.key !== 'paie')?'disabled':''}
             onchange="uu_togglePerm('${u.id}','${m.key}',this.checked)">
           <span class="slider"></span>
         </label>
-      </div>`).join('');
+      </div>` + (m.key === 'paie' ? uu_empSelect(u) : '')).join('');
     return `<div class="user-card">
       <div class="uh">
         <div class="uname">${esc(u.username||u.id)}${u.isAdmin?'<span class="badge-admin">Admin</span>':''}</div>
@@ -1052,13 +1137,14 @@ function showModule(name){
     b.classList.toggle('active', b.getAttribute('data-mod')===name);
   });
   if(name==='home') renderHome();
-  if(name==='users') uu_render();
+  if(name==='users'){ if(typeof pt_start==='function') pt_start(); uu_render(); uu_fillNewEmp(); }
   if(name==='caisse' && typeof ca_render==='function') ca_render();
   if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
   if(name==='fiches'){ if(typeof ft_start==='function') ft_start(); if(typeof ft_render==='function') ft_render(); }
-  if(name==='mep'){ if(typeof mep_start==='function') mep_start(); if(typeof mep_render==='function') mep_render(); }
   if(name==='restopro'){ if(typeof rp_start==='function') rp_start(); }
+  if(name==='mep'){ if(typeof mep_start==='function') mep_start(); if(typeof mep_render==='function') mep_render(); }
   if(name==='dettes'){ if(typeof dt_start==='function') dt_start(); if(typeof dt_render==='function') dt_render(); }
+  if(name==='paie'){ if(typeof pt_start==='function') pt_start(); if(typeof pa_render==='function') pa_render(); }
 }
 
 document.getElementById('today-label').textContent =
@@ -1549,7 +1635,7 @@ function pt_groupsToDoc(groups){ return { groups: (groups || []).map(g=>({ codes
 function pt_groupsFromDoc(data){ return ((data && data.groups) || []).map(g=>Array.isArray(g) ? g : ((g && g.codes) || [])); }
 let pt_renderQueued = false;
 // plusieurs écoutes Firestore répondent presque en même temps au chargement : on ne redessine qu'une fois
-function pt_scheduleRender(){ if(pt_renderQueued) return; pt_renderQueued = true; Promise.resolve().then(()=>{ pt_renderQueued = false; pt_render(); }); }
+function pt_scheduleRender(){ if(pt_renderQueued) return; pt_renderQueued = true; Promise.resolve().then(()=>{ pt_renderQueued = false; pt_render(); if(activeModule === 'paie' && typeof pa_render === 'function') pa_render(); if(activeModule === 'users' && typeof uu_render === 'function'){ uu_render(); uu_fillNewEmp(); } }); }
 function pt_start(){
   if(pt_started) return;
   pt_started = true;
@@ -1557,7 +1643,7 @@ function pt_start(){
   setTimeout(()=>{ if(activeModule === 'pointage') pt_render(); }, 5000); // force un nouvel essai d'affichage même si aucune donnée n'est jamais arrivée
   try{ const raw = localStorage.getItem('pt-period'); if(raw) pt_filter = JSON.parse(raw); }catch(e){}
   try{ pt_showClosed = localStorage.getItem('pt-show-closed') === '1'; }catch(e){}
-  const onErr = (err)=>{ console.error(err); pt_error = (err && err.message) || 'Lecture impossible'; pt_render(); };
+  const onErr = (err)=>{ console.error(err); pt_error = (err && err.message) || 'Lecture impossible'; pt_render(); if(typeof pa_render === 'function') pa_render(); };
   pt_eventsCol.onSnapshot((snap)=>{
     const list = [];
     snap.forEach(d=>{
@@ -3117,272 +3203,79 @@ function pt_exportExcel(){
   XLSX.writeFile(wb, 'pointage_allo_sushi_' + todayISO() + '.xlsx');
 }
 
-/* ==================== MODULE CA RESTO PRO — chiffre d'affaires synchronisé depuis le PC du restaurant ====================
-   Source : collection Firestore « restopro_jours » (un document par jour, id = AAAA-MM-JJ) alimentée par sync_restopro.ps1.
-   Règles : CA = somme des tickets FERMÉS (BLOCAGE = 'F'), montant APRÈS remises (champ TTC de Resto Pro).
-            Tickets non fermés = tous les autres, comptés à part. Remises listées avec leur numéro de ticket. */
-const rp_col = db.collection('restopro_jours');
-const rp_metaRef = db.collection('restopro_meta').doc('synchro');
-const rp_demandeRef = db.collection('restopro_meta').doc('demande');
-let rp_from = '', rp_to = '', rp_preset = 'today';
-let rp_days = [], rp_meta = null, rp_err = '', rp_loading = false, rp_tok = 0, rp_timer = null, rp_ready = false;
-let rp_lastReq = 0, rp_pending = false, rp_noReply = false, rp_reqAt = 0, rp_unsub = null, rp_lastSynced = '', rp_metaSeen = false;
-
-const RP_PRESETS = [
-  { k:'today',     l:"Aujourd'hui" },
-  { k:'yesterday', l:'Hier' },
-  { k:'7d',        l:'7 derniers jours' },
-  { k:'month',     l:'Ce mois' },
-  { k:'lastmonth', l:'Mois dernier' }
-];
-
-function rp_pad(n){ return String(n).padStart(2,'0'); }
-function rp_iso(d){ return d.getFullYear()+'-'+rp_pad(d.getMonth()+1)+'-'+rp_pad(d.getDate()); }
-function rp_fmtDate(iso){ const p=String(iso||'').split('-'); return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : String(iso||''); }
-function rp_money(n){ return Number(n||0).toLocaleString('fr-FR',{maximumFractionDigits:2}) + ' DA'; }
-
-function rp_range(k){
-  const now = new Date(), t = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if(k==='yesterday'){ const y=new Date(t); y.setDate(y.getDate()-1); return [rp_iso(y), rp_iso(y)]; }
-  if(k==='7d'){ const s=new Date(t); s.setDate(s.getDate()-6); return [rp_iso(s), rp_iso(t)]; }
-  if(k==='month'){ return [rp_iso(new Date(t.getFullYear(), t.getMonth(), 1)), rp_iso(t)]; }
-  if(k==='lastmonth'){ return [rp_iso(new Date(t.getFullYear(), t.getMonth()-1, 1)), rp_iso(new Date(t.getFullYear(), t.getMonth(), 0))]; }
-  return [rp_iso(t), rp_iso(t)];
+/* ==================== MODULE « MA FICHE DE PAIE » — vue personnelle d’un employé (lecture seule) ==================== */
+/* Semaine affichée : du samedi au vendredi, remplacée par la suivante le dimanche (le samedi on voit encore la semaine qui vient de finir).
+   Chiffres = ceux de la vue Pointage pour la même période. Sous chaque rubrique : date de la dernière modification. */
+function pa_weekRange(){
+  // La semaine de paie va du samedi au vendredi, mais la fiche ne bascule que le dimanche : on se repère sur la veille.
+  const ref = pt_addDays(todayISO(), -1), d = new Date(ref + 'T12:00:00'), off = (d.getDay() + 1) % 7; // samedi = 0
+  const from = pt_addDays(ref, -off);
+  return { from, to:pt_addDays(from, 6) };
 }
-
-function rp_renderPresets(){
-  const el = document.getElementById('rp-presets');
-  if(!el) return;
-  el.innerHTML = RP_PRESETS.map(p =>
-    `<button type="button" class="filter-chip ${rp_preset===p.k?'active':''}" onclick="rp_setPreset('${p.k}')">${esc(p.l)}</button>`
-  ).join('');
+function pa_stamp(e){ // { t, time } à partir d’une saisie : heure d’enregistrement si connue, sinon la date saisie
+  if(!e) return null;
+  const iso = e.creeLe || e.savedAt || e.validatedAt;
+  if(iso){ const t = Date.parse(iso); if(!isNaN(t)) return { t, time:true }; }
+  if(e.date){ const t = Date.parse(e.date + 'T00:00:00'); if(!isNaN(t)) return { t, time:false }; }
+  return null;
 }
-
-function rp_setPreset(k){
-  const r = rp_range(k);
-  rp_from = r[0]; rp_to = r[1]; rp_preset = k;
-  document.getElementById('rp-from').value = rp_from;
-  document.getElementById('rp-to').value = rp_to;
-  rp_renderPresets();
-  rp_load();
+function pa_max(list){ let b = null; list.forEach(x=>{ if(x && (!b || x.t > b.t)) b = x; }); return b; }
+function pa_fmt(st){
+  if(!st) return '—';
+  const d = new Date(st.t), ds = d.toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
+  return st.time ? ds + ' ' + pt_hhmm(d) : ds;
 }
-
-function rp_dateInput(){
-  let f = document.getElementById('rp-from').value, t = document.getElementById('rp-to').value;
-  if(!f && !t) return;
-  if(!f) f = t;
-  if(!t) t = f;
-  if(f > t){ const x = f; f = t; t = x; }
-  rp_from = f; rp_to = t; rp_preset = '';
-  document.getElementById('rp-from').value = f;
-  document.getElementById('rp-to').value = t;
-  rp_renderPresets();
-  rp_load();
-}
-
-/* Demande au PC du restaurant de synchroniser maintenant (le PC surveille ce document environ toutes les 45 s).
-   Appelée à l'ouverture de l'application, à l'ouverture de l'onglet et au clic sur « Actualiser ». */
-function rp_requestSync(force){
-  const now = Date.now();
-  if(!force && now - rp_lastReq < 90000) return;
-  rp_lastReq = now; rp_reqAt = now; rp_pending = true; rp_noReply = false;
-  rp_demandeRef.set({ at: new Date().toISOString(), by: (typeof currentUser !== 'undefined' && currentUser) ? currentUser : '' })
-    .catch(e=>{ rp_pending = false; console.warn('Demande de synchro Resto Pro impossible :', e); if(document.getElementById('rp-sync')) rp_render(); });
-  if(document.getElementById('rp-sync')) rp_render();
-  /* Sans réponse du PC au bout de 3 minutes : on le signale (PC éteint, sans internet, ou écoute arrêtée). */
-  const mine = now;
-  setTimeout(()=>{ if(rp_pending && rp_reqAt === mine){ rp_pending = false; rp_noReply = true; if(document.getElementById('rp-sync')) rp_render(); } }, 180000);
-}
-
-/* Écoute le « signal de vie » du PC : met à jour le message « dernière synchro » et retire l'attente. Les chiffres, eux, arrivent en direct (écoute de la période). */
-function rp_watchMeta(){
-  if(rp_unsub) return;
-  rp_unsub = rp_metaRef.onSnapshot(snap=>{
-    const m = snap.exists ? snap.data() : null;
-    const synced = (m && m.syncedAt) ? m.syncedAt : '';
-    const changed = synced && synced !== rp_lastSynced && rp_metaSeen;
-    rp_lastSynced = synced; rp_metaSeen = true; rp_meta = m;
-    if(changed){ rp_pending = false; rp_noReply = false; }
-    if(document.getElementById('rp-sync')) rp_render();
-  }, e=>console.warn('Écoute synchro Resto Pro :', e));
-}
-
-function rp_refreshClick(){ rp_requestSync(true); }
-
-function rp_start(){
-  rp_watchMeta();
-  if(!rp_ready){ rp_ready = true; rp_setPreset('today'); }
-  else if(!rp_unsubDays) rp_load(true);
-  rp_requestSync();
-  /* Simple mise à jour de l'affichage « dernière synchro : il y a X min » : aucune lecture Firestore. */
-  if(!rp_timer) rp_timer = setInterval(()=>{ if(activeModule === 'restopro') rp_render(); }, 60000);
-}
-
-/* Écoute EN DIRECT de la période choisie : Firestore lit chaque jour une seule fois à l'ouverture,
-   puis ne relit que les jours qui changent réellement (au lieu de tout recharger à intervalle régulier). */
-let rp_unsubDays = null;
-function rp_load(silent){
-  if(!rp_from || !rp_to) return;
-  if(rp_unsubDays){ try{ rp_unsubDays(); }catch(e){} rp_unsubDays = null; }
-  const tok = ++rp_tok;
-  if(!silent){ rp_loading = true; rp_render(); }
-  const FP = firebase.firestore.FieldPath.documentId();
-  rp_unsubDays = rp_col.where(FP, '>=', rp_from).where(FP, '<=', rp_to).onSnapshot(snap=>{
-    if(tok !== rp_tok) return;
-    rp_days = snap.docs.map(d => Object.assign({ id:d.id }, d.data())).sort((a,b)=> a.id < b.id ? -1 : 1);
-    rp_err = ''; rp_loading = false;
-    rp_render();
-  }, e=>{
-    if(tok !== rp_tok) return;
-    rp_err = (e && e.message) ? e.message : String(e);
-    rp_loading = false;
-    rp_render();
+function pa_data(code){
+  const wk = pa_weekRange();
+  return pt_withFilter(wk.from, wk.to, ()=>{
+    const all = pt_compute().sessions.filter(s=>s.code === code);
+    const sessions = all.filter(s=>pt_inRange(pt_day(s.date)));
+    const q = pt_displayPayroll(code, sessions);
+    const ent = (kinds)=>pt_entries.filter(e=>kinds.includes(e.kind) && String(e.code) === String(code) && pt_inRange(e.date)).map(pa_stamp);
+    const manual = ent(['manual']);
+    const pointage = pa_max([ ...sessions.map(s=>({ t:s.end.getTime(), time:true })), ...manual,
+      ...(pt_isAuto(code) ? pt_autoDays(code).slice(-1).map(d=>({ t:Date.parse(d + 'T00:00:00'), time:false })) : []) ]);
+    const primes = pa_max(ent(['prime'])), avances = pa_max(ent(['avance']));
+    const prets = pa_max(pt_repaysOf(code).filter(r=>r.mode !== 'direct' && r.date && pt_inRange(r.date)).map(pa_stamp));
+    const autres = pa_max(ent(['off', 'absent']));
+    const cg = pt_conge(code);
+    const stCongeVerse = pa_max(pt_congePaidList(code).map(pa_stamp));
+    const sinceConge = pa_max(all.filter(s=>pt_day(s.date) >= PT_CONGE_START).map(s=>({ t:s.end.getTime(), time:true })));
+    const stOpen = pa_stamp(pt_entries.find(e=>e.kind === 'congeopen' && e.code === code));
+    const sous = pa_max([pointage, primes]);
+    const valid = pa_stamp(pt_validationFor(code, wk.from, wk.to));
+    return { wk, q, cg, d:{
+      transport:pointage, primes, avances, prets, congeVerse:stCongeVerse,
+      reste:pa_max([stCongeVerse, sinceConge, stOpen]),
+      sous, net:pa_max([pointage, primes, avances, prets, autres, valid])
+    } };
   });
 }
-
-function rp_compute(){
-  const perDay = [], open = [], rem = [];
-  let cNb=0, cCa=0, oNb=0, oCa=0, rSum=0, rAll=0;
-  rp_days.forEach(day=>{
-    let a=0, b=0, c=0, d=0, r=0;
-    (day.tickets || []).forEach(t=>{
-      const ttc = Number(t.ttc)||0, rm = Number(t.rem)||0;
-      const closed = String(t.blo||'').toUpperCase() === 'F';
-      const row = Object.assign({ date:day.id }, t);
-      if(closed){ a++; b += ttc; r += rm; }
-      else { c++; d += ttc; open.push(row); }
-      if(rm > 0){ rem.push(row); rAll += rm; }
-    });
-    perDay.push({ date:day.id, cNb:a, cCa:b, oNb:c, oCa:d, rSum:r });
-    cNb+=a; cCa+=b; oNb+=c; oCa+=d; rSum+=r;
-  });
-  const recent = (x,y)=> (y.date+' '+(y.h||'')).localeCompare(x.date+' '+(x.h||''));
-  open.sort(recent); rem.sort(recent);
-  return { perDay, open, rem, cNb, cCa, oNb, oCa, rSum, rAll, avg: cNb ? cCa/cNb : 0 };
-}
-
-function rp_syncHtml(){
-  const m = rp_meta;
-  const btn = `<button type="button" class="btn ghost small" onclick="rp_refreshClick()">↻ Actualiser</button>`;
-  if(rp_pending){
-    return `<div class="row-between" style="margin-top:12px;gap:8px;">
-      <span style="font-size:12px;color:var(--forest-light);">⏳ Mise à jour demandée au PC du restaurant… (moins d’une minute)</span>${btn}</div>`;
+function pa_render(){
+  if(activeModule !== 'paie') return;
+  const body = document.getElementById('pa-body'); if(!body) return;
+  if(!session || session.empCode === null || session.empCode === undefined){
+    body.innerHTML = `<div class="ticket"><div class="empty-state">Ton compte n’est pas encore relié à un employé. Demande à l’administrateur de le relier dans « Utilisateurs ».</div></div>`; return;
   }
-  let ago = '';
-  if(m && m.syncedAt){
-    const ts = new Date(m.syncedAt).getTime();
-    if(isNaN(ts)){ ago = esc(m.syncedAt); }
-    else {
-      const mins = Math.max(0, Math.round((Date.now() - ts)/60000));
-      ago = mins < 1 ? 'à l’instant' : mins < 60 ? `il y a ${mins} min` : mins < 1440 ? `il y a ${Math.floor(mins/60)} h ${rp_pad(mins%60)}` : `le ${rp_fmtDate(String(m.syncedAt).slice(0,10))}`;
-    }
-  }
-  let txt, col = 'var(--ink-muted)';
-  if(rp_noReply){
-    col = 'var(--rust)';
-    txt = '⚠ Le PC du restaurant n’a pas répondu (éteint, sans internet ou écoute arrêtée ?).' + (ago ? ' Chiffres de la dernière synchro : ' + ago + '.' : '');
-  } else if(!ago){
-    col = 'var(--amber)'; txt = 'Aucune synchronisation reçue du PC du restaurant pour l’instant.';
-  } else {
-    txt = 'Dernière synchro : ' + ago;
-    if(ago === 'à l’instant' || /^il y a \d+ min$/.test(ago)) col = 'var(--moss)';
-  }
-  return `<div class="row-between" style="margin-top:12px;gap:8px;"><span style="font-size:12px;color:${col};">${txt}</span>${btn}</div>`;
-}
-
-function rp_ticketLabel(t){
-  const bits = [];
-  if(t.srv) bits.push(esc(t.srv));
-  if(t.tab) bits.push('table ' + esc(t.tab));
-  if(String(t.emp||'') === '1') bits.push('à emporter');
-  return bits.join(' · ');
-}
-
-function rp_render(){
-  const syncEl = document.getElementById('rp-sync');
-  if(syncEl) syncEl.innerHTML = rp_syncHtml();
-  const body = document.getElementById('rp-body');
-  if(!body) return;
-
-  if(rp_loading && !rp_days.length){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
-  if(rp_err){
-    body.innerHTML = `<div class="ticket" style="border-color:var(--rust);">
-      <div style="font-weight:600;">Impossible de charger les données.</div>
-      <div class="stat-label" style="margin-top:6px;">${esc(rp_err)}</div></div>`;
-    return;
-  }
-  if(!rp_days.length){
-    body.innerHTML = `<div class="empty-state"><div style="font-size:30px;">📭</div>
-      <div style="margin-top:8px;font-weight:600;">Aucune donnée pour cette période</div>
-      <div class="stat-label" style="margin-top:6px;">Aucun ticket ce jour-là, ou la synchronisation n’a pas encore envoyé cette période.</div></div>`;
-    return;
-  }
-
-  const c = rp_compute();
-  let h = '';
-
-  // --- Chiffres clés ---
-  h += `<div class="ticket rp-hero">
-    <div class="stat-label">CA — tickets fermés (après remises)</div>
-    <div class="rp-big">${rp_money(c.cCa)}</div>
-    <div class="stat-label">${c.cNb} ticket${c.cNb>1?'s':''} fermé${c.cNb>1?'s':''}${c.cNb ? ' · ticket moyen ' + rp_money(c.avg) : ''}</div>
-  </div>
-  <div class="grid grid-2">
-    <div class="stat-box"><div class="stat-label">CA tickets non fermés</div>
-      <div class="rp-mid" style="color:${c.oNb?'var(--amber)':'var(--ink)'};">${rp_money(c.oCa)}</div>
-      <div class="stat-label">${c.oNb} ticket${c.oNb>1?'s':''}</div></div>
-    <div class="stat-box"><div class="stat-label">Remises (tickets fermés)</div>
-      <div class="rp-mid" style="color:${c.rSum?'var(--rust)':'var(--ink)'};">${rp_money(c.rSum)}</div>
-      <div class="stat-label">${c.rem.length} ticket${c.rem.length>1?'s':''} avec remise</div></div>
+  if(pt_error){ body.innerHTML = `<div class="alert-banner"><b>Erreur de chargement</b>${pt_e(pt_error)}</div>`; return; }
+  if(!Object.keys(pt_ready).every(k=>pt_ready[k])){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  const code = session.empCode, r = pa_data(code), q = r.q, d = r.d;
+  const card = (cls, l, n, st, extra)=>`<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${n}</div><div class="pa-dt">🕒 ${pa_fmt(st)}</div>${extra ? `<div class="pa-dt" style="font-weight:600;">${extra}</div>` : ''}</div>`;
+  const lb = pt_loanBalance(code), resteDu = (lb.lent > 0.004 || Math.abs(lb.due) > 0.004) ? 'Reste dû : ' + (lb.due < -0.004 ? pt_money2(lb.due) : pt_fmtMoney(Math.max(0, lb.due))) : '';
+  const showTransport = pt_transport(code).enabled; // rubrique affichée seulement si le transport est accordé à cet employé
+  const dl = (iso)=>new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'short' });
+  const yr = r.wk.to.slice(0, 4);
+  const rep = q.reportOut < -0.004 ? `<br><span style="font-weight:400;font-size:11px;color:var(--rust);">report −${pt_fmtMoney(-q.reportOut)}</span>` : q.reportOut > 0.004 ? `<br><span style="font-weight:400;font-size:11px;color:var(--moss);">reste dû +${pt_fmtMoney(q.reportOut)}</span>` : '';
+  body.innerHTML = `<div class="ticket">
+    <div class="section-label">Ma fiche de paie</div>
+    <div class="pa-who">${pt_e(pt_label(code))}</div>
+    <div class="pa-week">Semaine du ${dl(r.wk.from)} au ${dl(r.wk.to)} ${yr}</div>
+    <div class="pt-cards">${showTransport ? card('c-transport','Transport',pt_fmtMoney(q.transportTotal),d.transport) : ''}${card('c-bonus','Primes &amp; bonus',pt_fmtMoney(q.bonusesTotal),d.primes)}${card('c-adv','Avances',pt_fmtMoney(q.advancesTotal),d.avances)}${card('c-loan','Prêt',pt_fmtMoney(q.loanTotal),d.prets,resteDu)}${card('c-bonus','Congé versé',pt_fmtMoney(r.cg.taken),d.congeVerse)}${card('c-transport','Reste à verser',pt_money2(r.cg.left),d.reste)}</div>
+    <div class="grid grid-2"><div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span><div class="pa-dt">🕒 ${pa_fmt(d.sous)}</div></div><div class="value">${pt_fmtMoney(q.subTotal)}</div></div><div class="result-box final"><div class="label">Net à payer${rep}<div class="pa-dt">🕒 ${pa_fmt(d.net)}</div></div><div class="value">${pt_fmtMoney(q.net)}</div></div></div>
+    <div class="pt-muted" style="margin-top:10px;">La fiche de la nouvelle semaine remplace celle-ci chaque dimanche. 🕒 = date de la dernière modification de la rubrique.</div>
   </div>`;
-
-  // --- Détail par jour ---
-  if(c.perDay.length > 1){
-    const max = Math.max.apply(null, c.perDay.map(d=>d.cCa).concat([1]));
-    h += `<h2 class="section">Par jour</h2><div class="ticket" style="padding:6px 12px;">
-      <div class="rp-row rp-head"><span>Jour</span><span>CA fermé</span><span>Non fermé</span><span>Remises</span></div>`;
-    c.perDay.slice().reverse().forEach(d=>{
-      const w = Math.round(d.cCa / max * 100);
-      h += `<div class="rp-row"><span>${rp_fmtDate(d.date)}<small>${d.cNb} ticket${d.cNb>1?'s':''}</small>
-          <i class="rp-bar" style="width:${w}%"></i></span>
-        <span class="mono">${rp_money(d.cCa)}</span>
-        <span class="mono" style="color:${d.oNb?'var(--amber)':'var(--ink-muted)'};">${d.oNb ? rp_money(d.oCa) : '—'}</span>
-        <span class="mono" style="color:${d.rSum?'var(--rust)':'var(--ink-muted)'};">${d.rSum ? rp_money(d.rSum) : '—'}</span></div>`;
-    });
-    h += `<div class="rp-row rp-total"><span>Total</span><span class="mono">${rp_money(c.cCa)}</span>
-      <span class="mono">${c.oNb ? rp_money(c.oCa) : '—'}</span><span class="mono">${c.rSum ? rp_money(c.rSum) : '—'}</span></div></div>`;
-  }
-
-  // --- Tickets non fermés ---
-  h += `<h2 class="section">Tickets non fermés (${c.open.length})</h2>`;
-  if(!c.open.length){
-    h += `<div class="stat-label" style="padding:4px 2px 10px;">Aucun ticket non fermé sur cette période.</div>`;
-  } else {
-    c.open.forEach(t=>{
-      h += `<div class="movement-row"><div><div style="font-weight:600;">Ticket ${esc(t.n)} <span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span></div>
-        <div class="sub">${rp_fmtDate(t.date)} ${esc(t.h||'')}${rp_ticketLabel(t) ? ' · ' + rp_ticketLabel(t) : ''}</div></div>
-        <div class="mono" style="font-weight:700;">${rp_money(t.ttc)}</div></div>`;
-    });
-  }
-
-  // --- Remises avec numéro de ticket ---
-  h += `<h2 class="section">Remises (${c.rem.length})${c.rem.length ? ' — total ' + rp_money(c.rAll) : ''}</h2>`;
-  if(!c.rem.length){
-    h += `<div class="stat-label" style="padding:4px 2px 10px;">Aucune remise sur cette période.</div>`;
-  } else {
-    c.rem.forEach(t=>{
-      const closed = String(t.blo||'').toUpperCase() === 'F';
-      h += `<div class="movement-row"><div><div style="font-weight:600;">Ticket ${esc(t.n)}
-          ${closed ? '' : '<span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span>'}</div>
-        <div class="sub">${rp_fmtDate(t.date)} ${esc(t.h||'')}${rp_ticketLabel(t) ? ' · ' + rp_ticketLabel(t) : ''}</div></div>
-        <div style="text-align:right;"><div class="mono" style="font-weight:700;color:var(--rust);">− ${rp_money(t.rem)}</div>
-        <div class="sub">ticket : ${rp_money(t.ttc)}</div></div></div>`;
-    });
-  }
-
-  h += `<div class="stat-label" style="margin-top:14px;text-align:center;">Source : Resto Pro (tickets BON1) — montants après remises, comme l’écran Statistiques.</div>`;
-  body.innerHTML = h;
 }
+setInterval(()=>{ if(activeModule === 'paie') pa_render(); }, 300000); // bascule automatique de semaine si l’écran reste ouvert
 
 /* ==================== MODULE CARNET — dettes, emprunts & disponible (privé) ==================== */
 /* Visible uniquement par le compte 'soufyane' — jamais par les autres administrateurs.
@@ -3668,15 +3561,339 @@ function ft_render(){
   else { ft_view = 'list'; body.innerHTML = ft_listView(); try{ const nav = document.querySelector('nav.tabs'), t = body.querySelector('.ft-top'); if(t && nav) t.style.top = nav.offsetHeight + 'px'; }catch(e){} }
 }
 
+/* ==================== MODULE CA RESTO PRO — chiffre d'affaires synchronisé depuis le PC du restaurant ====================
+   Source : collection Firestore « restopro_jours » (un document par jour, id = AAAA-MM-JJ) alimentée par sync_restopro.ps1.
+   Règles : CA = somme des tickets FERMÉS (BLOCAGE = 'F'), montant APRÈS remises (champ TTC de Resto Pro).
+            Tickets non fermés = tous les autres, comptés à part. Remises listées avec leur numéro de ticket. */
+const rp_col = db.collection('restopro_jours');
+const rp_metaRef = db.collection('restopro_meta').doc('synchro');
+const rp_demandeRef = db.collection('restopro_meta').doc('demande');
+let rp_from = '', rp_to = '', rp_preset = 'today';
+let rp_days = [], rp_meta = null, rp_err = '', rp_loading = false, rp_tok = 0, rp_timer = null, rp_ready = false;
+const RP_LIGNES_DEPUIS = '2026-10-31'; // le détail des tickets n'est enregistré qu'à partir de cette date (même valeur que dans sync_restopro.ps1)
+let rp_openTk = null, rp_allMax = 40;
+let rp_lastReq = 0, rp_pending = false, rp_noReply = false, rp_reqAt = 0, rp_unsub = null, rp_lastSynced = '', rp_metaSeen = false;
+
+const RP_PRESETS = [
+  { k:'today',     l:"Aujourd'hui" },
+  { k:'yesterday', l:'Hier' },
+  { k:'7d',        l:'7 derniers jours' },
+  { k:'month',     l:'Ce mois' },
+  { k:'lastmonth', l:'Mois dernier' }
+];
+
+function rp_pad(n){ return String(n).padStart(2,'0'); }
+function rp_iso(d){ return d.getFullYear()+'-'+rp_pad(d.getMonth()+1)+'-'+rp_pad(d.getDate()); }
+function rp_fmtDate(iso){ const p=String(iso||'').split('-'); return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : String(iso||''); }
+function rp_money(n){ return Number(n||0).toLocaleString('fr-FR',{maximumFractionDigits:2}) + ' DA'; }
+
+function rp_range(k){
+  const now = new Date(), t = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if(k==='yesterday'){ const y=new Date(t); y.setDate(y.getDate()-1); return [rp_iso(y), rp_iso(y)]; }
+  if(k==='7d'){ const s=new Date(t); s.setDate(s.getDate()-6); return [rp_iso(s), rp_iso(t)]; }
+  if(k==='month'){ return [rp_iso(new Date(t.getFullYear(), t.getMonth(), 1)), rp_iso(t)]; }
+  if(k==='lastmonth'){ return [rp_iso(new Date(t.getFullYear(), t.getMonth()-1, 1)), rp_iso(new Date(t.getFullYear(), t.getMonth(), 0))]; }
+  return [rp_iso(t), rp_iso(t)];
+}
+
+function rp_renderPresets(){
+  const el = document.getElementById('rp-presets');
+  if(!el) return;
+  el.innerHTML = RP_PRESETS.map(p =>
+    `<button type="button" class="filter-chip ${rp_preset===p.k?'active':''}" onclick="rp_setPreset('${p.k}')">${esc(p.l)}</button>`
+  ).join('');
+}
+
+function rp_setPreset(k){
+  const r = rp_range(k);
+  rp_from = r[0]; rp_to = r[1]; rp_preset = k;
+  document.getElementById('rp-from').value = rp_from;
+  document.getElementById('rp-to').value = rp_to;
+  rp_renderPresets();
+  rp_load();
+}
+
+function rp_dateInput(){
+  let f = document.getElementById('rp-from').value, t = document.getElementById('rp-to').value;
+  if(!f && !t) return;
+  if(!f) f = t;
+  if(!t) t = f;
+  if(f > t){ const x = f; f = t; t = x; }
+  rp_from = f; rp_to = t; rp_preset = '';
+  document.getElementById('rp-from').value = f;
+  document.getElementById('rp-to').value = t;
+  rp_renderPresets();
+  rp_load();
+}
+
+/* Demande au PC du restaurant de synchroniser maintenant (le PC surveille ce document environ toutes les 45 s).
+   Appelée à l'ouverture de l'application, à l'ouverture de l'onglet et au clic sur « Actualiser ». */
+function rp_requestSync(force){
+  const now = Date.now();
+  if(!force && now - rp_lastReq < 90000) return;
+  rp_lastReq = now; rp_reqAt = now; rp_pending = true; rp_noReply = false;
+  rp_demandeRef.set({ at: new Date().toISOString(), by: (typeof currentUser !== 'undefined' && currentUser) ? currentUser : '' })
+    .catch(e=>{ rp_pending = false; console.warn('Demande de synchro Resto Pro impossible :', e); if(document.getElementById('rp-sync')) rp_render(); });
+  if(document.getElementById('rp-sync')) rp_render();
+  /* Sans réponse du PC au bout de 3 minutes : on le signale (PC éteint, sans internet, ou écoute arrêtée). */
+  const mine = now;
+  setTimeout(()=>{ if(rp_pending && rp_reqAt === mine){ rp_pending = false; rp_noReply = true; if(document.getElementById('rp-sync')) rp_render(); } }, 180000);
+}
+
+/* Écoute le « signal de vie » du PC : met à jour le message « dernière synchro » et retire l'attente. Les chiffres, eux, arrivent en direct (écoute de la période). */
+function rp_watchMeta(){
+  if(rp_unsub) return;
+  rp_unsub = rp_metaRef.onSnapshot(snap=>{
+    const m = snap.exists ? snap.data() : null;
+    const synced = (m && m.syncedAt) ? m.syncedAt : '';
+    const changed = synced && synced !== rp_lastSynced && rp_metaSeen;
+    rp_lastSynced = synced; rp_metaSeen = true; rp_meta = m;
+    if(changed){ rp_pending = false; rp_noReply = false; }
+    if(document.getElementById('rp-sync')) rp_render();
+  }, e=>console.warn('Écoute synchro Resto Pro :', e));
+}
+
+function rp_refreshClick(){ rp_requestSync(true); }
+
+function rp_start(){
+  rp_watchMeta();
+  if(!rp_ready){ rp_ready = true; rp_setPreset('today'); }
+  else if(!rp_unsubDays) rp_load(true);
+  rp_requestSync();
+  /* Simple mise à jour de l'affichage « dernière synchro : il y a X min » : aucune lecture Firestore. */
+  if(!rp_timer) rp_timer = setInterval(()=>{ if(activeModule === 'restopro') rp_render(); }, 60000);
+}
+
+/* Écoute EN DIRECT de la période choisie : Firestore lit chaque jour une seule fois à l'ouverture,
+   puis ne relit que les jours qui changent réellement (au lieu de tout recharger à intervalle régulier). */
+let rp_unsubDays = null;
+function rp_load(silent){
+  if(!rp_from || !rp_to) return;
+  if(rp_unsubDays){ try{ rp_unsubDays(); }catch(e){} rp_unsubDays = null; }
+  const tok = ++rp_tok;
+  if(!silent){ rp_openTk = null; rp_loading = true; rp_render(); }
+  const FP = firebase.firestore.FieldPath.documentId();
+  rp_unsubDays = rp_col.where(FP, '>=', rp_from).where(FP, '<=', rp_to).onSnapshot(snap=>{
+    if(tok !== rp_tok) return;
+    rp_days = snap.docs.map(d => Object.assign({ id:d.id }, d.data())).sort((a,b)=> a.id < b.id ? -1 : 1);
+    rp_err = ''; rp_loading = false;
+    rp_render();
+  }, e=>{
+    if(tok !== rp_tok) return;
+    rp_err = (e && e.message) ? e.message : String(e);
+    rp_loading = false;
+    rp_render();
+  });
+}
+
+function rp_compute(){
+  const perDay = [], open = [], rem = [], all = [];
+  let cNb=0, cCa=0, oNb=0, oCa=0, rSum=0, rAll=0;
+  rp_days.forEach(day=>{
+    let a=0, b=0, c=0, d=0, r=0;
+    (day.tickets || []).forEach(t=>{
+      const ttc = Number(t.ttc)||0, rm = Number(t.rem)||0;
+      const closed = String(t.blo||'').toUpperCase() === 'F';
+      const row = Object.assign({ date:day.id, dayLignes:!!day.lignes }, t);
+      all.push(row);
+      if(closed){ a++; b += ttc; r += rm; }
+      else { c++; d += ttc; open.push(row); }
+      if(rm > 0){ rem.push(row); rAll += rm; }
+    });
+    perDay.push({ date:day.id, cNb:a, cCa:b, oNb:c, oCa:d, rSum:r });
+    cNb+=a; cCa+=b; oNb+=c; oCa+=d; rSum+=r;
+  });
+  const recent = (x,y)=> (y.date+' '+(y.h||'')).localeCompare(x.date+' '+(x.h||''));
+  open.sort(recent); rem.sort(recent); all.sort(recent);
+  return { perDay, open, rem, all, cNb, cCa, oNb, oCa, rSum, rAll, avg: cNb ? cCa/cNb : 0 };
+}
+
+function rp_syncHtml(){
+  const m = rp_meta;
+  const btn = `<button type="button" class="btn ghost small" onclick="rp_refreshClick()">↻ Actualiser</button>`;
+  if(rp_pending){
+    return `<div class="row-between" style="margin-top:12px;gap:8px;">
+      <span style="font-size:12px;color:var(--forest-light);">⏳ Mise à jour demandée au PC du restaurant… (moins d’une minute)</span>${btn}</div>`;
+  }
+  let ago = '';
+  if(m && m.syncedAt){
+    const ts = new Date(m.syncedAt).getTime();
+    if(isNaN(ts)){ ago = esc(m.syncedAt); }
+    else {
+      const mins = Math.max(0, Math.round((Date.now() - ts)/60000));
+      ago = mins < 1 ? 'à l’instant' : mins < 60 ? `il y a ${mins} min` : mins < 1440 ? `il y a ${Math.floor(mins/60)} h ${rp_pad(mins%60)}` : `le ${rp_fmtDate(String(m.syncedAt).slice(0,10))}`;
+    }
+  }
+  let txt, col = 'var(--ink-muted)';
+  if(rp_noReply){
+    col = 'var(--rust)';
+    txt = '⚠ Le PC du restaurant n’a pas répondu (éteint, sans internet ou écoute arrêtée ?).' + (ago ? ' Chiffres de la dernière synchro : ' + ago + '.' : '');
+  } else if(!ago){
+    col = 'var(--amber)'; txt = 'Aucune synchronisation reçue du PC du restaurant pour l’instant.';
+  } else {
+    txt = 'Dernière synchro : ' + ago;
+    if(ago === 'à l’instant' || /^il y a \d+ min$/.test(ago)) col = 'var(--moss)';
+  }
+  return `<div class="row-between" style="margin-top:12px;gap:8px;"><span style="font-size:12px;color:${col};">${txt}</span>${btn}</div>`;
+}
+
+function rp_findTicket(date, n){
+  const d = rp_days.find(x=>x.id === date);
+  return d ? (d.tickets || []).map(t=>Object.assign({ date:d.id, dayLignes:!!d.lignes }, t)).find(t=>String(t.n) === String(n)) : null;
+}
+function rp_openTicket(date, n){ rp_openTk = { date:String(date), n:String(n) }; rp_render(); try{ window.scrollTo(0, 0); }catch(e){} }
+function rp_closeTicket(){ rp_openTk = null; rp_render(); }
+function rp_moreTickets(){ rp_allMax += 40; rp_render(); }
+function rp_qty(q){ q = Number(q) || 0; return (Math.abs(q - Math.round(q)) < 0.005 ? String(Math.round(q)) : String(Math.round(q * 100) / 100).replace('.', ',')) + ' ×'; }
+function rp_ticketView(t){
+  const closed = String(t.blo || '').toUpperCase() === 'F';
+  const chip = closed ? '<span class="chip" style="background:var(--moss-bg);color:var(--moss);">fermé</span>' : '<span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span>';
+  const meta = [rp_fmtDate(t.date) + (t.h ? ' · ' + esc(t.h) : ''), rp_ticketLabel(t), t.mode ? 'paiement : ' + esc(t.mode) : ''].filter(Boolean).join(' · ');
+  let lines = Array.isArray(t.l) ? t.l.slice() : [];
+  let body = '';
+  if(!lines.length){
+    body = `<div class="stat-label" style="padding:12px 0;border-top:1px dashed var(--line);">${t.date < RP_LIGNES_DEPUIS || !t.dayLignes ? 'Détail non disponible : les lignes des tickets ne sont enregistrées qu’à partir du ' + rp_fmtDate(RP_LIGNES_DEPUIS) + '.' : 'Aucune ligne enregistrée pour ce ticket.'}</div>`;
+  } else {
+    const ids = new Set(lines.map(l=>String(l.i)));
+    const isNote = (l)=>l.p && String(l.p) !== String(l.i);
+    const notes = {}; const orphan = [];
+    lines.filter(isNote).forEach(l=>{ if(ids.has(String(l.p))) (notes[l.p] = notes[l.p] || []).push(l); else orphan.push(l); });
+    const main = lines.filter(l=>!isNote(l)).concat(orphan);
+    body = main.map(l=>{
+      const free = !(Number(l.m) > 0);
+      const nt = (notes[l.i] || []).map(x=>`<span class="note">📝 ${esc(x.n)}</span>`).join('');
+      return `<div class="ln"><span class="q mono">${rp_qty(l.q)}</span><span class="nm">${esc(l.n)}${free ? '<span class="pu">inclus</span>' : (Number(l.q) !== 1 ? `<span class="pu">${rp_money(l.pu)} l’unité</span>` : '')}</span><span class="mono">${free ? '—' : rp_money(l.m)}</span>${nt}</div>`;
+    }).join('');
+  }
+  return `<button class="rp-back" onclick="rp_closeTicket()">‹ Retour aux tickets</button>
+    <div class="rp-rc"><h3>Ticket ${esc(t.n)} ${chip}</h3><div class="meta">${meta}</div>${body}
+      <div class="sm"><span>Total avant remise</span><span class="mono">${rp_money(t.brut != null ? t.brut : t.ttc)}</span></div>
+      <div class="sm"><span>Remise</span><span class="mono" style="color:${Number(t.rem) > 0 ? 'var(--rust)' : 'inherit'};">${Number(t.rem) > 0 ? '− ' : ''}${rp_money(t.rem)}</span></div>
+      <div class="tot"><span>Total à payer</span><span class="mono">${rp_money(t.ttc)}</span></div></div>`;
+}
+function rp_ticketRow(t, extraHtml, right){
+  return `<div class="movement-row rp-tk" onclick="rp_openTicket('${esc(t.date)}','${esc(t.n)}')"><div><div style="font-weight:600;">Ticket ${esc(t.n)} ${extraHtml}</div>
+    <div class="sub">${rp_fmtDate(t.date)} ${esc(t.h||'')}${rp_ticketLabel(t) ? ' · ' + rp_ticketLabel(t) : ''}</div></div>
+    <div style="display:flex;align-items:center;">${right}<span class="chev">›</span></div></div>`;
+}
+function rp_ticketLabel(t){
+  const bits = [];
+  if(t.srv) bits.push(esc(t.srv));
+  if(t.tab) bits.push('table ' + esc(t.tab));
+  if(String(t.emp||'') === '1') bits.push('à emporter');
+  return bits.join(' · ');
+}
+
+function rp_render(){
+  const syncEl = document.getElementById('rp-sync');
+  if(syncEl) syncEl.innerHTML = rp_syncHtml();
+  const body = document.getElementById('rp-body');
+  if(!body) return;
+
+  if(rp_loading && !rp_days.length){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  if(rp_err){
+    body.innerHTML = `<div class="ticket" style="border-color:var(--rust);">
+      <div style="font-weight:600;">Impossible de charger les données.</div>
+      <div class="stat-label" style="margin-top:6px;">${esc(rp_err)}</div></div>`;
+    return;
+  }
+  if(!rp_days.length){
+    body.innerHTML = `<div class="empty-state"><div style="font-size:30px;">📭</div>
+      <div style="margin-top:8px;font-weight:600;">Aucune donnée pour cette période</div>
+      <div class="stat-label" style="margin-top:6px;">Aucun ticket ce jour-là, ou la synchronisation n’a pas encore envoyé cette période.</div></div>`;
+    return;
+  }
+
+  if(rp_openTk){
+    const tk = rp_findTicket(rp_openTk.date, rp_openTk.n);
+    if(tk){ body.innerHTML = rp_ticketView(tk); return; }
+    rp_openTk = null;
+  }
+  const c = rp_compute();
+  let h = '';
+
+  // --- Chiffres clés ---
+  h += `<div class="ticket rp-hero">
+    <div class="stat-label">CA — tickets fermés (après remises)</div>
+    <div class="rp-big">${rp_money(c.cCa)}</div>
+    <div class="stat-label">${c.cNb} ticket${c.cNb>1?'s':''} fermé${c.cNb>1?'s':''}${c.cNb ? ' · ticket moyen ' + rp_money(c.avg) : ''}</div>
+  </div>
+  <div class="grid grid-2">
+    <div class="stat-box"><div class="stat-label">CA tickets non fermés</div>
+      <div class="rp-mid" style="color:${c.oNb?'var(--amber)':'var(--ink)'};">${rp_money(c.oCa)}</div>
+      <div class="stat-label">${c.oNb} ticket${c.oNb>1?'s':''}</div></div>
+    <div class="stat-box"><div class="stat-label">Remises (tickets fermés)</div>
+      <div class="rp-mid" style="color:${c.rSum?'var(--rust)':'var(--ink)'};">${rp_money(c.rSum)}</div>
+      <div class="stat-label">${c.rem.length} ticket${c.rem.length>1?'s':''} avec remise</div></div>
+  </div>
+  <div class="ticket rp-hero" style="margin-top:10px;">
+    <div class="stat-label">Total des bons — fermés + non fermés</div>
+    <div class="rp-big" style="font-size:26px;">${rp_money(c.cCa + c.oCa)}</div>
+    <div class="stat-label"><b>${c.cNb + c.oNb}</b> bon${(c.cNb + c.oNb)>1?'s':''} : ${c.cNb} fermé${c.cNb>1?'s':''} · ${c.oNb} non fermé${c.oNb>1?'s':''}</div>
+  </div>`;
+
+  // --- Détail par jour ---
+  if(c.perDay.length > 1){
+    const max = Math.max.apply(null, c.perDay.map(d=>d.cCa).concat([1]));
+    h += `<h2 class="section">Par jour</h2><div class="ticket" style="padding:6px 12px;">
+      <div class="rp-row rp-head"><span>Jour</span><span>CA fermé</span><span>Non fermé</span><span>Remises</span></div>`;
+    c.perDay.slice().reverse().forEach(d=>{
+      const w = Math.round(d.cCa / max * 100);
+      h += `<div class="rp-row"><span>${rp_fmtDate(d.date)}<small>${d.cNb} ticket${d.cNb>1?'s':''}</small>
+          <i class="rp-bar" style="width:${w}%"></i></span>
+        <span class="mono">${rp_money(d.cCa)}</span>
+        <span class="mono" style="color:${d.oNb?'var(--amber)':'var(--ink-muted)'};">${d.oNb ? rp_money(d.oCa) : '—'}</span>
+        <span class="mono" style="color:${d.rSum?'var(--rust)':'var(--ink-muted)'};">${d.rSum ? rp_money(d.rSum) : '—'}</span></div>`;
+    });
+    h += `<div class="rp-row rp-total"><span>Total</span><span class="mono">${rp_money(c.cCa)}</span>
+      <span class="mono">${c.oNb ? rp_money(c.oCa) : '—'}</span><span class="mono">${c.rSum ? rp_money(c.rSum) : '—'}</span></div></div>`;
+  }
+
+  // --- Tickets non fermés ---
+  h += `<h2 class="section">Tickets non fermés (${c.open.length})</h2>`;
+  if(!c.open.length){
+    h += `<div class="stat-label" style="padding:4px 2px 10px;">Aucun ticket non fermé sur cette période.</div>`;
+  } else {
+    c.open.forEach(t=>{
+      h += rp_ticketRow(t, '<span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span>', `<div class="mono" style="font-weight:700;">${rp_money(t.ttc)}</div>`);
+    });
+  }
+
+  // --- Remises avec numéro de ticket ---
+  h += `<h2 class="section">Remises (${c.rem.length})${c.rem.length ? ' — total ' + rp_money(c.rAll) : ''}</h2>`;
+  if(!c.rem.length){
+    h += `<div class="stat-label" style="padding:4px 2px 10px;">Aucune remise sur cette période.</div>`;
+  } else {
+    c.rem.forEach(t=>{
+      const closed = String(t.blo||'').toUpperCase() === 'F';
+      h += rp_ticketRow(t, closed ? '' : '<span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span>', `<div style="text-align:right;"><div class="mono" style="font-weight:700;color:var(--rust);">− ${rp_money(t.rem)}</div>
+        <div class="sub">ticket : ${rp_money(t.ttc)}</div></div>`);
+    });
+  }
+
+  // --- Tous les tickets (détail au clic) ---
+  h += `<h2 class="section">Tous les tickets (${c.all.length})</h2><div class="stat-label" style="padding:0 2px 8px;">Touche un ticket pour voir son contenu.</div>`;
+  c.all.slice(0, rp_allMax).forEach(t=>{
+    const closed = String(t.blo||'').toUpperCase() === 'F';
+    const chips = (closed ? '<span class="chip" style="background:var(--moss-bg);color:var(--moss);">fermé</span>' : '<span class="chip" style="background:var(--amber-bg);color:var(--amber);">non fermé</span>')
+      + (Number(t.rem) > 0 ? ' <span class="chip" style="background:var(--rust-bg);color:var(--rust);">remise</span>' : '');
+    h += rp_ticketRow(t, chips, `<div class="mono" style="font-weight:700;">${rp_money(t.ttc)}</div>`);
+  });
+  if(c.all.length > rp_allMax) h += `<div style="text-align:center;margin:8px 0;"><button class="btn ghost small" onclick="rp_moreTickets()">Afficher plus (${c.all.length - rp_allMax} restants)</button></div>`;
+
+  h += `<div class="stat-label" style="margin-top:14px;text-align:center;">Source : Resto Pro (tickets BON1) — montants après remises, comme l’écran Statistiques.</div>`;
+  body.innerHTML = h;
+}
+
 /* ==================== MODULE MISE EN PLACE ==================== */
 /* Listes d'ingrédients par section (doc unique) + saisies de fin de service (une par cuisinier et par service).
    Cuisiniers : saisie seulement (ils ne lisent jamais les saisies). Administrateur : historique, suppression, gestion des listes. */
 const mep_listsRef = db.collection('mise_en_place').doc('listes');
 const mep_saisiesCol = db.collection('mise_en_place_saisies');
 const MEP_DEFAULT_SECS = [{ id:'sushi', n:'Sushi' }, { id:'chaud', n:'Chaud' }, { id:'bar', n:'Bar' }];
-const MEP_UNITS = ['kg', 'g', 'L', 'pièces', 'bacs', 'bouteilles', 'sachets', 'boîtes', 'feuilles', 'portions'];
+const MEP_UNITS = ['pièces', 'kg', 'g', 'L', 'cl', 'boîte', 'carton', 'bouteille', 'canette', 'sachet'];
 let mep_adminStarted = false, mep_started = false, mep_listsReady = false, mep_lists = { sushi:[], chaud:[], bar:[], cooks:[] }, mep_saisies = [], mep_saisiesReady = false;
-let mep_tab = 'hist', mep_sec = 'sushi', mep_date = '', mep_form = null, mep_done = null, mep_draft = null, mep_busy = false;
+let mep_tab = 'hist', mep_sec = 'sushi', mep_date = '', mep_form = null, mep_draft = null, mep_busy = false;
 const mep_e = (v)=>esc(v == null ? '' : String(v));
 const mep_isAdmin = ()=>!!(session && session.isAdmin);
 const mep_secList = ()=>(mep_lists.sections && mep_lists.sections.length ? mep_lists.sections : MEP_DEFAULT_SECS);
@@ -3692,90 +3909,272 @@ function mep_newId(){ return 'i' + Date.now().toString(36) + Math.random().toStr
 function mep_empList(){ return (mep_lists.cooks || []).filter(c=>c && c.n).map(c=>({ code:c.id, name:c.n })).sort((a, b)=>a.name.localeCompare(b.name, 'fr')); }
 function mep_typing(){ try{ const a = document.activeElement, b = document.getElementById('mep-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
 function mep_start(){
-  if(mep_isAdmin() && !mep_adminStarted){ mep_adminStarted = true; mep_watchSaisies(); }
+  if(mep_isAdmin() && !mep_adminStarted){ mep_adminStarted = true; mep_watchSaisies(); mep_watchRp(); }
   if(mep_started) return; mep_started = true;
   mep_listsRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
     mep_lists = Object.assign({ sushi:[], chaud:[], bar:[], cooks:[] }, d); mep_listsReady = true;
     if((mep_tab !== 'listes' || !mep_draft) && !mep_typing()) mep_render();
   }, (e)=>{ console.error(e); mep_listsReady = true; mep_render(); });
+  mep_stockRef.onSnapshot((doc)=>{ const d = doc.exists ? (doc.data() || {}) : {}; mep_stock = d.s || {}; mep_stockReady = true; if(!mep_typing()) mep_render(); mep_maybeBoot(); }, (e)=>{ console.error(e); mep_stockReady = true; });
 }
 function mep_watchSaisies(){
   // seul l'administrateur lit les saisies
   {
     const since = new Date(); since.setDate(since.getDate() - 400);
     mep_saisiesCol.where('date', '>=', mep_ymd(since)).onSnapshot((snap)=>{
-      const l = []; snap.forEach(d=>l.push({ id:d.id, ...d.data() })); mep_saisies = l; mep_saisiesReady = true; mep_render();
+      const l = []; snap.forEach(d=>l.push({ id:d.id, ...d.data() })); mep_saisies = l; mep_saisiesReady = true; mep_render(); mep_maybeBoot();
     }, (e)=>{ console.error(e); mep_saisiesReady = true; mep_render(); });
   }
 }
-/* ---------- cuisinier : saisie ---------- */
-function mep_resetForm(){ mep_form = { sec:mep_sec, emp:'', vals:{} }; mep_done = null; }
-function mep_pickSec(k){ mep_sec = k; if(mep_form){ mep_form.sec = k; mep_form.vals = {}; } mep_render(); }
+/* ---------- dernier inventaire de chaque section (un petit document lu par tous) ---------- */
+/* mise_en_place/stock : { s: { <section>: { at, name, emp, items:[{id,n,u,q}], correctedBy, correctedAt } } } */
+const mep_stockRef = db.collection('mise_en_place').doc('stock');
+let mep_stock = {}, mep_stockReady = false, mep_boot = false, mep_viewId = '', mep_edit = null;
+const mep_stockOf = (sec)=>{ const x = mep_stock[sec]; return x && Array.isArray(x.items) ? x : null; };
+const mep_fmtIn = (q)=>String(q).replace('.', ',');
+const mep_byAt = (a, b)=>String(a.at).localeCompare(String(b.at));
+const mep_who = ()=>(typeof currentUser !== 'undefined' && currentUser) ? currentUser : 'administrateur';
+function mep_fdt(iso){ const d = new Date(iso); return isNaN(d) ? '' : String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ' ' + mep_hm(iso); }
+const mep_fq = (q)=>ft_fmtQ(Number(q), '').replace(/\s/g, ' ');
+const mep_counts = (x, id)=>!x.changed || x.changed.includes(id); // anciennes saisies partielles
+/* heure « d'origine » d'une saisie (une correction garde l'heure de l'inventaire corrigé) */
+const mep_shownAt = (x)=>x.origAt || x.at;
+function mep_snapshotOf(x){ return { at:mep_shownAt(x), name:x.name, emp:String(x.emp), items:(x.items || []).map(i=>({ id:i.id, n:i.n, u:i.u || '', q:i.q })), correctedBy:x.correctedBy || '', correctedAt:x.correctedAt || '' }; }
+/* recalcule le « dernier inventaire » de chaque section à partir des saisies (administrateur) */
+function mep_stockFrom(exceptId, override){
+  const s = {};
+  mep_saisies.filter(x=>x.id !== exceptId).map(x=>override && override[x.id] ? { ...x, ...override[x.id] } : x).sort(mep_byAt).forEach(x=>{ s[x.section] = mep_snapshotOf(x); });
+  return s;
+}
+async function mep_rebuildStock(exceptId, override){ await mep_stockRef.set({ s:mep_stockFrom(exceptId, override), rebuiltAt:new Date().toISOString() }); }
+const MEP_SNAP_KEYS = ['at', 'name', 'emp', 'items', 'correctedBy', 'correctedAt'];
+function mep_stockStale(from){ // le dernier inventaire stocké ne correspond pas à la dernière saisie (ou ancien format mélangé)
+  const secs = new Set([...Object.keys(from), ...Object.keys(mep_stock)]);
+  for(const sec of secs){
+    const f = from[sec], c = mep_stock[sec];
+    if(!f) continue;
+    if(!c || !Array.isArray(c.items)) return true;
+    if(Object.keys(c).some(k=>!MEP_SNAP_KEYS.includes(k))) return true;
+    if(String(c.at) !== String(f.at) || String(c.correctedAt || '') !== String(f.correctedAt || '')) return true;
+    if(c.items.map(i=>i.id + ':' + i.q).join('|') !== f.items.map(i=>i.id + ':' + i.q).join('|')) return true;
+  }
+  return false;
+}
+let mep_healSig = '';
+function mep_maybeBoot(){ // administrateur : garde le « dernier inventaire » aligné sur les saisies (à chaque mise à jour)
+  if(!mep_isAdmin() || mep_busy || !mep_stockReady || !mep_saisiesReady) return;
+  const from = mep_stockFrom('');
+  if(!mep_stockStale(from)){ mep_healSig = ''; return; }
+  const sig = JSON.stringify(from);
+  if(sig === mep_healSig) return; // déjà tenté avec ces mêmes données
+  mep_healSig = sig;
+  mep_rebuildStock('').catch(e=>console.error(e));
+}
+/* ---------- saisie (cuisinier ; administrateur : onglet « Saisie ») ---------- */
+function mep_resetForm(){ mep_form = { sec:mep_sec, emp:'', vals:{}, mode:'new' }; }
+function mep_pickSec(k){ mep_sec = k; mep_resetForm(); mep_render(); }
 function mep_setEmp(v){ if(!mep_form) mep_resetForm(); mep_form.emp = v; }
 function mep_setVal(id, v){ if(!mep_form) mep_resetForm(); mep_form.vals[id] = v; }
-function mep_entryView(){
-  if(!mep_form && !mep_done) mep_resetForm();
-  if(mep_done) return `<div class="ticket" style="text-align:center;padding:28px 14px;"><div style="font-size:34px;">✅</div><div style="font-weight:800;font-size:18px;margin:8px 0 4px;">Inventaire enregistré</div><div class="pt-muted">${mep_e(mep_secName(mep_done.sec))} · ${mep_e(mep_done.name)} · ${mep_e(mep_done.hm)}</div><div class="actions-row" style="justify-content:center;"><button class="btn t-add" onclick="mep_newEntry()">Nouvelle saisie</button></div></div>`;
-  const list = mep_lists[mep_sec] || [], emps = mep_empList();
-  const rows = list.length ? list.map((i, k)=>`<div class="mep-ing"><div class="mep-num">${k + 1}</div><div class="n">${mep_e(i.n)}</div><input class="ft-in" type="text" inputmode="decimal" placeholder="0" value="${mep_e(mep_form.vals[i.id] || '')}" oninput="mep_setVal('${i.id}', this.value)"><div class="u">${mep_e(i.u || '')}</div></div>`).join('') : `<div class="pt-muted">Aucun ingrédient défini pour cette section.${mep_isAdmin() ? ' Ajoute-les dans « Listes ».' : ''}</div>`;
-  return `<div class="mep-seg">${mep_secs().map(x=>`<button class="${mep_sec === x[0] ? 'on' : ''}" onclick="mep_pickSec('${x[0]}')">${x[1]}</button>`).join('')}</div>
-    <div class="ticket"><div class="field"><label>Cuisinier</label><select class="ft-in" id="mep-emp" onchange="mep_setEmp(this.value)"><option value="">Choisis ton nom</option>${emps.map(x=>`<option value="${mep_e(x.code)}" ${String(mep_form.emp) === String(x.code) ? 'selected' : ''}>${mep_e(x.name)}</option>`).join('')}</select></div></div>
-    <div class="ticket"><div class="section-label">Inventaire de fin de service — ${mep_e(mep_secName(mep_sec))}</div>${rows}</div>
-    ${list.length ? '<div class="actions-row"><button class="btn t-save" style="width:100%;height:48px;" onclick="mep_submit()">Valider mon inventaire</button></div>' : ''}`;
+function mep_correctStart(){ // administrateur : repart du dernier inventaire
+  const st = mep_stockOf(mep_sec); if(!mep_isAdmin() || !st) return;
+  mep_form = { sec:mep_sec, emp:'', vals:{}, mode:'correct', base:{} };
+  (mep_lists[mep_sec] || []).forEach(i=>{ const it = st.items.find(x=>x.id === i.id); const v = it ? mep_fmtIn(it.q) : ''; mep_form.vals[i.id] = v; mep_form.base[i.id] = v; });
+  mep_render();
 }
-function mep_newEntry(){ mep_resetForm(); mep_render(); window.scrollTo && window.scrollTo(0, 0); }
-async function mep_submit(){
-  if(mep_busy || !mep_form) return;
-  const f = mep_form, list = mep_lists[f.sec] || [];
-  if(!f.emp){ alert('Choisis ton nom avant de valider.'); return; }
-  const emp = mep_empList().find(x=>String(x.code) === String(f.emp)); if(!emp){ alert('Choisis ton nom avant de valider.'); return; }
+function mep_correctCancel(){ mep_resetForm(); mep_render(); }
+function mep_lastHead(st){
+  if(!st) return '<div class="pt-muted" style="font-weight:500;">—</div>';
+  const d = new Date(st.at), dm = isNaN(d) ? '' : String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+  return `<div class="mep2-who">${mep_e(st.name)}</div><div class="pt-muted" style="font-weight:500;">${mep_e(dm)}</div><div class="pt-muted" style="font-weight:500;">${mep_e(mep_hm(st.at))}</div>${st.correctedBy ? `<div class="mep2-corr">✎ ${mep_e(st.correctedBy)} · ${mep_e(mep_hm(st.correctedAt))}</div>` : ''}`;
+}
+function mep_entryView(){
+  if(!mep_form) mep_resetForm();
+  const list = mep_lists[mep_sec] || [], emps = mep_empList(), st = mep_stockOf(mep_sec), f = mep_form, correct = f.mode === 'correct' && !!st;
+  const lastQ = (id)=>{ const it = st && st.items.find(x=>x.id === id); return it ? mep_e(mep_fq(it.q)) : '<span class="pt-muted">—</span>'; };
+  const rows = list.map((i, k)=>`<tr><td><span class="mep-num s">${k + 1}</span>${mep_e(i.n)}${i.u ? ` <span class="pt-muted">(${mep_e(i.u)})</span>` : ''}</td><td class="i"><input id="mep-in-${i.id}" class="ft-in ${correct && !mep_same(f.vals[i.id], f.base && f.base[i.id]) ? 'chg' : ''}" type="text" inputmode="decimal" placeholder="0" value="${mep_e(f.vals[i.id] || '')}" oninput="mep_setVal('${i.id}', this.value)"></td><td class="l">${lastQ(i.id)}</td></tr>`).join('');
+  const table = list.length ? `<div style="overflow-x:auto;"><table class="mep-g mep-in"><tr><th>Article</th><th>${correct ? 'Correction' : 'En cours'}</th><th class="l">${mep_lastHead(st)}</th></tr>${rows}</table></div>` : `<div class="pt-muted">Aucun ingrédient défini pour cette section.${mep_isAdmin() ? ' Ajoute-les dans « Listes ».' : ''}</div>`;
+  const nameBox = correct ? `<div class="ticket"><div class="pt-muted">Tu corriges le dernier inventaire de <b>${mep_e(st.name)}</b> (${mep_e(mep_fdt(st.at))}). Change les quantités en erreur, puis enregistre.</div></div>`
+    : `<div class="ticket"><div class="field"><label>Cuisinier</label><select class="ft-in" id="mep-emp" onchange="mep_setEmp(this.value)"><option value="">Choisis ton nom</option>${emps.map(x=>`<option value="${mep_e(x.code)}" ${String(f.emp) === String(x.code) ? 'selected' : ''}>${mep_e(x.name)}</option>`).join('')}</select></div></div>`;
+  const btns = !list.length ? '' : correct
+    ? `<div class="actions-row"><button class="btn t-edit" style="flex:1 1 60%;height:48px;" onclick="mep_submit()">Enregistrer la correction</button><button class="btn ghost t-cancel" style="flex:1 1 30%;height:48px;" onclick="mep_correctCancel()">Annuler</button></div>`
+    : `<div class="actions-row"><button class="btn t-save" style="width:100%;height:48px;" onclick="mep_submit()">Valider l’inventaire</button></div>${mep_isAdmin() && st ? '<div class="actions-row"><button class="btn ghost small t-edit" onclick="mep_correctStart()">Corriger le dernier inventaire</button></div>' : ''}`;
+  return `<div class="mep-seg">${mep_secs().map(x=>`<button class="${mep_sec === x[0] ? 'on' : ''}" onclick="mep_pickSec('${x[0]}')">${x[1]}</button>`).join('')}</div>
+    ${nameBox}<div class="ticket"><div class="section-label">${mep_e(mep_secName(mep_sec))} — ${correct ? 'correction' : 'inventaire'}</div>${table}</div>${btns}`;
+}
+function mep_same(a, b){ const x = ft_parseQ(a), y = ft_parseQ(b); return (x !== null && y !== null) ? x === y : String(a || '').trim() === String(b || '').trim(); }
+function mep_readItems(list, vals){ // toutes les quantités sont obligatoires
   const items = [], missing = [];
   for(const i of list){
-    const raw = String(f.vals[i.id] == null ? '' : f.vals[i.id]).trim();
+    const raw = String(vals[i.id] == null ? '' : vals[i.id]).trim();
     if(!raw){ missing.push(i.n); continue; }
     const q = ft_parseQ(raw);
-    if(q === null || q < 0){ alert('Quantité non valide pour « ' + i.n + ' » : « ' + raw + ' ».'); return; }
+    if(q === null || q < 0){ alert('Quantité non valide pour « ' + i.n + ' » : « ' + raw + ' ».'); return null; }
     items.push({ id:i.id, n:i.n, u:i.u || '', q });
   }
-  if(missing.length){ alert('Il manque ' + missing.length + ' quantité' + (missing.length > 1 ? 's' : '') + ' : ' + missing.slice(0, 5).join(', ') + (missing.length > 5 ? '…' : '') + '\nMets 0 si tu n’en as plus.'); return; }
-  if(!items.length){ alert('Rien à enregistrer.'); return; }
-  const now = new Date();
-  const doc = { section:f.sec, date:mep_ymd(now), at:now.toISOString(), emp:String(emp.code), name:emp.name, items, by:(typeof currentUser !== 'undefined' ? currentUser : '') };
+  if(missing.length){ alert('Il manque ' + missing.length + ' quantité' + (missing.length > 1 ? 's' : '') + ' : ' + missing.slice(0, 5).join(', ') + (missing.length > 5 ? '…' : '') + '\nMets 0 si tu n’en as plus.'); return null; }
+  return items.length ? items : null;
+}
+async function mep_submit(){
+  if(mep_busy || !mep_form) return;
+  const f = mep_form, list = mep_lists[f.sec] || [], st = mep_stockOf(f.sec), correct = f.mode === 'correct' && !!st;
+  let emp = null;
+  if(!correct){
+    if(!f.emp){ alert('Choisis ton nom avant de valider.'); return; }
+    emp = mep_empList().find(x=>String(x.code) === String(f.emp)); if(!emp){ alert('Choisis ton nom avant de valider.'); return; }
+  }
+  const items = mep_readItems(list, f.vals); if(!items) return;
+  const now = new Date(), nowIso = now.toISOString();
+  let doc, snap;
+  if(correct){
+    if(!items.some(i=>{ const o = st.items.find(x=>x.id === i.id); return !o || Number(o.q) !== i.q; })){ alert('Aucune quantité n’a changé.'); return; }
+    doc = { section:f.sec, date:mep_ymd(new Date(st.at)), at:nowIso, origAt:st.at, emp:String(st.emp), name:st.name, items, kind:'correction', correctedBy:mep_who(), correctedAt:nowIso, by:mep_who() };
+    snap = { at:st.at, name:st.name, emp:String(st.emp), items, correctedBy:mep_who(), correctedAt:nowIso };
+  }else{
+    doc = { section:f.sec, date:mep_ymd(now), at:nowIso, emp:String(emp.code), name:emp.name, items, kind:'full', by:mep_who() };
+    snap = { at:nowIso, name:emp.name, emp:String(emp.code), items, correctedBy:'', correctedAt:'' };
+  }
   mep_busy = true;
-  try{ await mep_saisiesCol.add(doc); mep_done = { sec:f.sec, name:emp.name, hm:mep_hm(doc.at) }; mep_form = null; mep_render(); window.scrollTo && window.scrollTo(0, 0); }
-  catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e) + '\nRéessaie.'); }
+  try{
+    const b = db.batch(); b.set(mep_saisiesCol.doc(), doc); b.set(mep_stockRef, { s:{ [f.sec]:snap } }, { merge:true });
+    await b.commit();
+    mep_stock[f.sec] = snap; mep_resetForm(); mep_render(); window.scrollTo && window.scrollTo(0, 0);
+    if(typeof pt_toast === 'function') pt_toast(correct ? 'Correction enregistrée.' : 'Inventaire enregistré.');
+  }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e) + '\nRéessaie.'); }
   mep_busy = false;
 }
 /* ---------- administrateur : historique ---------- */
-function mep_setTab(t){ mep_tab = t; if(t === 'listes' && !mep_draft) mep_draft = JSON.parse(JSON.stringify({ cooks:[], ...mep_lists, sections:mep_secList() })); if(t !== 'listes') mep_draft = null; if(t === 'saisie') mep_resetForm(); mep_render(); }
-function mep_setDate(v){ mep_date = v || mep_ymd(); mep_render(); }
-function mep_histSec(k){ mep_sec = k; mep_render(); }
-function mep_daySaisies(sec, date){ return mep_saisies.filter(x=>x.section === sec && x.date === date).sort((a, b)=>String(a.at).localeCompare(String(b.at))); }
+function mep_setTab(t){ mep_tab = t; mep_edit = null; if(t === 'listes' && !mep_draft) mep_draft = JSON.parse(JSON.stringify({ cooks:[], ...mep_lists, sections:mep_secList() })); if(t !== 'listes') mep_draft = null; if(t === 'saisie') mep_resetForm(); mep_render(); }
+function mep_setDate(v){ mep_date = v || mep_ymd(); mep_viewId = ''; mep_edit = null; mep_render(); }
+function mep_histSec(k){ mep_sec = k; mep_viewId = ''; mep_edit = null; mep_render(); }
+function mep_daySaisies(sec, date){ return mep_saisies.filter(x=>x.section === sec && x.date === date).sort(mep_byAt); }
+/* valeurs successives de chaque article (une entrée par inventaire) */
+function mep_events(sec){
+  const ev = {};
+  mep_saisies.filter(x=>x.section === sec).sort(mep_byAt).forEach(x=>(x.items || []).forEach(it=>{ if(!mep_counts(x, it.id)) return; (ev[it.id] = ev[it.id] || []).push({ q:it.q, by:x.name, at:mep_shownAt(x), corr:x.correctedBy || '' }); }));
+  return ev;
+}
+/* pour chaque saisie : articles dont la valeur diffère de l'inventaire précédent */
+function mep_flags(sec){
+  const run = {}, out = {};
+  mep_saisies.filter(x=>x.section === sec).sort(mep_byAt).forEach(x=>{
+    out[x.id] = {};
+    (x.items || []).forEach(it=>{ if(run[it.id] !== undefined && run[it.id] !== it.q) out[x.id][it.id] = true; if(mep_counts(x, it.id)) run[it.id] = it.q; });
+  });
+  return out;
+}
+function mep_kindLabel(x){ const n = (x.items || []).length; return x.kind === 'correction' ? 'correction par ' + x.correctedBy : (n + ' article' + (n > 1 ? 's' : '')) + (x.correctedBy ? ' · modifié par ' + x.correctedBy + ' ' + mep_hm(x.correctedAt) : ''); }
+function mep_view(id){ mep_viewId = mep_viewId === id ? '' : id; mep_render(); }
+/* modifier une saisie en place */
+function mep_editStart(id){ const x = mep_saisies.find(s=>s.id === id); if(!x || !mep_isAdmin()) return; mep_edit = { id, vals:{} }; (x.items || []).forEach(i=>{ mep_edit.vals[i.id] = mep_fmtIn(i.q); }); mep_viewId = ''; mep_render(); }
+function mep_editVal(itemId, v){ if(mep_edit) mep_edit.vals[itemId] = v; }
+function mep_editCancel(){ mep_edit = null; mep_render(); }
+async function mep_editSave(){
+  if(!mep_edit || !mep_isAdmin() || mep_busy) return;
+  const x = mep_saisies.find(s=>s.id === mep_edit.id); if(!x) return;
+  const items = mep_readItems((x.items || []).map(i=>({ id:i.id, n:i.n, u:i.u })), mep_edit.vals); if(!items) return;
+  if(!items.some(i=>{ const o = (x.items || []).find(y=>y.id === i.id); return !o || Number(o.q) !== i.q; })){ alert('Aucune quantité n’a changé.'); return; }
+  const nowIso = new Date().toISOString();
+  const patch = { items, origItems:x.origItems || x.items, correctedBy:mep_who(), correctedAt:nowIso };
+  mep_busy = true;
+  try{ await mep_saisiesCol.doc(x.id).set(patch, { merge:true }); await mep_rebuildStock('', { [x.id]:patch }); mep_edit = null; mep_render(); if(typeof pt_toast === 'function') pt_toast('Saisie modifiée.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  mep_busy = false;
+}
+function mep_editView(){
+  const x = mep_saisies.find(s=>s.id === mep_edit.id); if(!x){ mep_edit = null; return ''; }
+  const list = mep_lists[x.section] || [];
+  return `<div class="ticket"><div class="section-label">Modifier la saisie de ${mep_e(x.name)} · ${mep_e(mep_fdt(mep_shownAt(x)))}</div><div class="pt-muted" style="margin-bottom:6px;">La saisie est modifiée en place et porte la mention « modifié par ${mep_e(mep_who())} ». Les quantités d’origine sont conservées.</div>
+    ${(x.items || []).map(i=>{ const pos = list.findIndex(l=>l.id === i.id); return `<div class="mep2-row"><div class="mep2-name"><span class="mep-num">${pos >= 0 ? pos + 1 : '–'}</span><span>${mep_e(i.n)} <span class="pt-muted">(${mep_e(i.u || '')})</span></span></div><div class="mep2-cols"><input class="ft-in" type="text" inputmode="decimal" value="${mep_e(mep_edit.vals[i.id] || '')}" oninput="mep_editVal('${i.id}', this.value)"><div class="mep2-last pt-muted">avant : ${mep_e(mep_fq(i.q))}</div></div></div>`; }).join('')}
+    <div class="actions-row"><button class="btn t-save" onclick="mep_editSave()">Enregistrer la modification</button><button class="btn ghost t-cancel" onclick="mep_editCancel()">Annuler</button></div></div>`;
+}
 function mep_histView(){
   if(!mep_date) mep_date = mep_ymd();
-  const sec = mep_sec, all = mep_daySaisies(sec, mep_date);
-  const byCook = {}; all.forEach(x=>{ byCook[x.emp] = x; }); // dernière saisie de chaque cuisinier
-  const cooks = Object.values(byCook).sort((a, b)=>String(a.at).localeCompare(String(b.at)));
-  const rowsIds = [], seen = {}, rowInfo = {};
-  (mep_lists[sec] || []).forEach(i=>{ rowsIds.push(i.id); seen[i.id] = 1; rowInfo[i.id] = i; });
-  cooks.forEach(c=>(c.items || []).forEach(i=>{ if(!seen[i.id]){ seen[i.id] = 1; rowsIds.push(i.id); rowInfo[i.id] = i; } }));
-  const cell = (c, id)=>{ const it = (c.items || []).find(x=>x.id === id); return it ? ft_fmtQ(it.q, '').replace(/\s/g, ' ') : '<span class="pt-muted">—</span>'; };
-  const table = cooks.length ? `<div style="overflow-x:auto;"><table class="mep-g"><tr><th>Ingrédient</th>${cooks.map(c=>`<th>${mep_e(c.name)}<div class="pt-muted" style="font-weight:500;">${mep_e(mep_hm(c.at))}${all.filter(x=>x.emp === c.emp).length > 1 ? ' · ' + all.filter(x=>x.emp === c.emp).length + ' saisies' : ''}</div></th>`).join('')}</tr>${rowsIds.map(id=>{ const pos = (mep_lists[sec] || []).findIndex(i=>i.id === id); return `<tr><td>${pos >= 0 ? '<span class="mep-num s">' + (pos + 1) + '</span>' : '<span class="mep-num s off">–</span>'}${mep_e(rowInfo[id].n)}<span class="pt-muted"> (${mep_e(rowInfo[id].u || '')})</span></td>${cooks.map(c=>`<td>${cell(c, id)}</td>`).join('')}</tr>`; }).join('')}</table></div>`
-    : `<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucun inventaire reçu pour cette date.</div>`;
-  const detail = all.length ? `<div class="ticket"><div class="section-label">Saisies du ${mep_e(mep_frDate(mep_date))} — ${mep_e(mep_secName(sec))}</div>${all.map(x=>`<div class="row-between" style="padding:8px 0;border-top:1px solid var(--line);"><div><b>${mep_e(x.name)}</b> <span class="pt-muted">${mep_e(mep_hm(x.at))} · ${(x.items || []).length} ingrédients</span></div><button class="btn ghost small t-del" onclick="mep_delSaisie('${x.id}')">Supprimer</button></div>`).join('')}</div>` : '';
-  // derniers jours
-  const days = []; for(let k = 0; k < 14; k++){ const d = new Date(); d.setDate(d.getDate() - k); days.push(mep_ymd(d)); }
-  const cnt = (sec2, d)=>mep_daySaisies(sec2, d).length;
-  const recent = `<div class="ticket"><div class="section-label">Derniers jours</div><div style="overflow-x:auto;"><table class="mep-g"><tr><th>Date</th>${mep_secs().map(x=>`<th>${x[1]}</th>`).join('')}</tr>${days.map(d=>`<tr class="mep-day ${d === mep_date ? 'on' : ''}" onclick="mep_setDate('${d}')"><td>${mep_e(mep_frDate(d))}</td>${mep_secs().map(x=>{ const n = cnt(x[0], d); return `<td>${n ? n : '<span class="ft-dot"></span>'}</td>`; }).join('')}</tr>`).join('')}</table></div></div>`;
-  return `<div class="mep-seg">${mep_secs().map(x=>`<button class="${sec === x[0] ? 'on' : ''}" onclick="mep_histSec('${x[0]}')">${x[1]}${cnt(x[0], mep_date) ? ' · ' + cnt(x[0], mep_date) : ''}</button>`).join('')}</div>
-    <div class="ticket"><div class="field"><label>Date</label><input type="date" class="ft-in" value="${mep_e(mep_date)}" onchange="mep_setDate(this.value)"></div></div>
-    <div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — inventaires du ${mep_e(mep_frDate(mep_date))}</div>${table}</div>${detail}${recent}`;
+  const sec = mep_sec, list = mep_lists[sec] || [], all = mep_daySaisies(sec, mep_date), cnt = (sec2, d)=>mep_daySaisies(sec2, d).length;
+  const secBtns = `<div class="mep-seg">${mep_secs().map(x=>`<button class="${sec === x[0] ? 'on' : ''}" onclick="mep_histSec('${x[0]}')">${x[1]}${cnt(x[0], mep_date) ? ' · ' + cnt(x[0], mep_date) : ''}</button>`).join('')}</div>`;
+  // situation actuelle : dernier et avant-dernier inventaire de chaque article
+  const ev = mep_events(sec), has = mep_saisies.some(x=>x.section === sec), anyRp = list.some(i=>i.rp);
+  const cell = (x, u, d)=>x ? `<div class="mep-q">${mep_e(mep_fq(x.q))}<span class="pt-muted"> ${mep_e(u)}</span>${d ? ' <span class="mep-d ' + (d > 0 ? 'up' : 'dn') + '">' + (d > 0 ? '▲ +' : '▼ ') + mep_fq(d) + '</span>' : ''}</div><div class="mep-w">${mep_e(x.by)} · ${mep_e(mep_fdt(x.at))}${x.corr ? ' ✎' : ''}</div>` : '<span class="pt-muted">—</span>';
+  const situ = !list.length ? '<div class="pt-muted">Aucun ingrédient défini pour cette section.</div>' : !has ? '<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucun inventaire pour cette section.</div>'
+    : `<div style="overflow-x:auto;"><table class="mep-g"><tr><th>Article</th><th>Dernier inventaire</th>${anyRp ? '<th>Resto Pro</th>' : '<th>Avant</th>'}</tr>${list.map((i, k)=>{ const e = ev[i.id] || [], last = e[e.length - 1], prev = e[e.length - 2]; return `<tr><td><span class="mep-num s">${k + 1}</span>${mep_e(i.n)}</td><td>${cell(last, i.u || '', last && prev ? Number(last.q) - Number(prev.q) : 0)}</td><td>${anyRp ? mep_rpCell(i, last) : cell(prev, i.u || '', 0)}</td></tr>`; }).join('')}</table></div>${anyRp ? mep_rpBar() : ''}`;
+  // historique de la date : une colonne par saisie
+  const flags = mep_flags(sec), rowsIds = [], seen = {}, info = {};
+  list.forEach(i=>{ rowsIds.push(i.id); seen[i.id] = 1; info[i.id] = i; });
+  all.forEach(x=>(x.items || []).forEach(i=>{ if(!seen[i.id]){ seen[i.id] = 1; rowsIds.push(i.id); info[i.id] = i; } }));
+  const qOf = (x, id)=>{ const it = (x.items || []).find(y=>y.id === id); return it ? it.q : null; };
+  const table = all.length ? `<div style="overflow-x:auto;"><table class="mep-g mep-sticky"><tr><th>Article</th>${all.map(x=>`<th>${mep_e(x.name)}<div class="pt-muted" style="font-weight:500;">${mep_e(mep_hm(mep_shownAt(x)))}${x.correctedBy ? ' ✎' : ''}</div></th>`).join('')}</tr>${rowsIds.map(id=>{ const pos = list.findIndex(i=>i.id === id); return `<tr><td>${pos >= 0 ? '<span class="mep-num s">' + (pos + 1) + '</span>' : '<span class="mep-num s off">–</span>'}${mep_e(info[id].n)}<span class="pt-muted"> (${mep_e(info[id].u || '')})</span></td>${all.map(x=>{ const q = qOf(x, id); return `<td class="${q !== null && flags[x.id] && flags[x.id][id] ? 'mep-chg' : ''}">${q === null ? '<span class="pt-muted">—</span>' : mep_e(mep_fq(q))}</td>`; }).join('')}</tr>`; }).join('')}</table></div><div class="pt-muted" style="margin-top:6px;"><span class="mep-d up">orange</span> = différent de l’inventaire précédent · ✎ = corrigé</div>`
+    : '<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucune saisie à cette date.</div>';
+  const detail = all.length ? `<div class="ticket"><div class="section-label">Saisies du ${mep_e(mep_frDate(mep_date))} — ${mep_e(mep_secName(sec))}</div>${all.map(x=>`<div style="padding:8px 0;border-top:1px solid var(--line);"><div style="margin-bottom:6px;"><b>${mep_e(x.name)}</b> <span class="pt-muted">${mep_e(mep_hm(mep_shownAt(x)))} · ${mep_e(mep_kindLabel(x))}</span></div><div class="pt-row" style="gap:6px;flex-wrap:wrap;"><button class="btn ghost small t-view" onclick="mep_view('${x.id}')">${mep_viewId === x.id ? 'Masquer' : 'Voir'}</button><button class="btn ghost small t-edit" onclick="mep_editStart('${x.id}')">Modifier</button><button class="btn ghost small t-del" onclick="mep_delSaisie('${x.id}')">Supprimer</button></div>${mep_viewId === x.id ? `<div style="margin-top:8px;">${(x.items || []).map(it=>{ const pos = list.findIndex(i=>i.id === it.id); const c = flags[x.id] && flags[x.id][it.id]; return `<div class="row-between" style="padding:5px 0;border-top:1px solid var(--line);"><span><span class="mep-num s">${pos >= 0 ? pos + 1 : '–'}</span>${mep_e(it.n)}</span><span class="${c ? 'mep-d up' : ''}">${mep_e(mep_fq(it.q))} <span class="pt-muted">${mep_e(it.u || '')}</span></span></div>`; }).join('')}</div>` : ''}</div>`).join('')}</div>` : '';
+  if(mep_edit) return secBtns + mep_editView();
+  return `${secBtns}<div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — situation actuelle</div>${situ}</div>
+    <div class="ticket"><div class="field"><label>Historique — date</label><input type="date" class="ft-in" value="${mep_e(mep_date)}" onchange="mep_setDate(this.value)"></div></div>
+    <div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — saisies du ${mep_e(mep_frDate(mep_date))}</div>${table}</div>${detail}`;
 }
 async function mep_delSaisie(id){
   if(!mep_isAdmin()) return; const x = mep_saisies.find(s=>s.id === id); if(!x) return;
-  if(!confirm('Supprimer la saisie de ' + x.name + ' (' + mep_hm(x.at) + ') ?')) return;
-  try{ await mep_saisiesCol.doc(id).delete(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  if(!confirm('Supprimer la saisie de ' + x.name + ' (' + mep_hm(mep_shownAt(x)) + ') ? Le dernier inventaire est recalculé.')) return;
+  try{ await mep_saisiesCol.doc(id).delete(); await mep_rebuildStock(id); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+/* ---------- stock Resto Pro (administrateur) : restopro_meta/stock = { at, items:[{c:code, n:nom, f:famille, s:stock, a:dernier achat AAAA-MM-JJ}] } ---------- */
+const MEP_RP_FRESH_DAYS = 30;
+let mep_rp = { at:'', items:[] }, mep_rpReady = false, mep_rpSearch = {}, mep_rpPending = false, mep_rpNoReply = false, mep_rpPrevAt = '', mep_rpReqId = 0;
+function mep_watchRp(){
+  db.collection('restopro_meta').doc('stock').onSnapshot((doc)=>{ const d = doc.exists ? (doc.data() || {}) : {}; mep_rp = { at:d.at || '', items:Array.isArray(d.items) ? d.items : [] }; mep_rpReady = true; if(mep_rpPending && mep_rp.at && mep_rp.at !== mep_rpPrevAt){ mep_rpPending = false; mep_rpNoReply = false; } if(!mep_typing()) mep_render(); }, (e)=>{ console.error(e); mep_rpReady = true; });
+}
+function mep_refreshRp(){
+  if(mep_rpPending) return;
+  mep_rpPending = true; mep_rpNoReply = false; mep_rpPrevAt = mep_rp.at || ''; const id = ++mep_rpReqId;
+  try{ rp_requestSync(true); }catch(e){ console.warn(e); }
+  mep_render();
+  setTimeout(()=>{ if(mep_rpPending && mep_rpReqId === id){ mep_rpPending = false; mep_rpNoReply = true; mep_render(); } }, 180000); // sans réponse du PC au bout de 3 minutes
+}
+function mep_rpBar(){
+  const up = mep_rp.at ? 'Stock Resto Pro mis à jour le ' + mep_fdt(mep_rp.at) : 'Aucun stock reçu de Resto Pro pour l’instant';
+  const msg = mep_rpPending ? '⏳ Mise à jour demandée au PC du restaurant… (moins d’une minute)' : mep_rpNoReply ? '⚠ Le PC du restaurant n’a pas répondu (éteint, sans internet ou écoute arrêtée ?). ' + up + '.' : up + '.';
+  return `<div class="rp2-bar"><span class="${mep_rpNoReply ? 'rp2-bad' : 'pt-muted'}">${mep_e(msg)}</span><button type="button" class="btn ghost small" onclick="mep_refreshRp()" ${mep_rpPending ? 'disabled' : ''}>↻ Actualiser</button></div>`;
+}
+const mep_rpItem = (code)=>mep_rp.items.find(x=>String(x.c) === String(code)) || null;
+function mep_rpDm(iso){ const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : ''; }
+function mep_rpState(it){ // { ok, label, sub }
+  if(!it) return { ok:false, none:true, label:'Introuvable', sub:'article absent de la dernière synchro' };
+  const s = Number(it.s), hasS = it.s !== null && it.s !== undefined && it.s !== '' && !isNaN(s);
+  const days = it.a ? Math.floor((Date.now() - new Date(it.a + 'T12:00:00').getTime()) / 86400000) : null;
+  const sub = (hasS ? mep_fq(s) : '—') + ' · ' + (it.a ? 'achat ' + mep_rpDm(it.a) : 'aucun achat');
+  const ok = hasS && s >= 0 && days !== null && days <= MEP_RP_FRESH_DAYS;
+  return { ok, label:ok ? '● à jour' : '⚠ peu fiable', sub, s:hasS ? s : null, a:it.a || '' };
+}
+function mep_rpDraftSet(sec, i, code){ const it = mep_rpItem(code); const r = mep_draft[sec][i]; r.rp = String(code); r.rpn = it ? it.n : (r.rpn || ''); mep_rpSearch = {}; mep_render(); }
+function mep_rpDraftClear(sec, i){ const r = mep_draft[sec][i]; r.rp = ''; r.rpn = ''; mep_rpSearch = {}; mep_render(); setTimeout(()=>{ const el = document.getElementById('mep-rpq-' + sec + '-' + i); if(el) el.focus(); }, 0); }
+function mep_rpQuery(sec, i, v){
+  const q = String(v || '').trim().toLowerCase(), box = document.getElementById('mep-rpres-' + sec + '-' + i); if(!box) return;
+  if(q.length < 2){ box.innerHTML = ''; return; }
+  const words = q.split(/\s+/);
+  const res = mep_rp.items.filter(x=>{ const t = (String(x.n) + ' ' + String(x.f || '')).toLowerCase(); return words.every(w=>t.includes(w)); }).slice(0, 8);
+  box.innerHTML = res.length ? res.map(x=>`<button type="button" class="rp2-res" onclick="mep_rpDraftSet('${sec}',${i},'${mep_e(String(x.c).replace(/'/g, ''))}')"><b>${mep_e(x.n)}</b><span class="pt-muted"> · ${mep_e(x.f || '')}</span></button>`).join('') : '<div class="pt-muted" style="padding:6px 2px;">Aucun article trouvé.</div>';
+}
+function mep_rpBlock(sec, i, r){
+  if(r.rp){
+    const it = mep_rpItem(r.rp), st = mep_rpState(it);
+    const stateHtml = !mep_rpReady || !mep_rp.items.length ? '<span class="pt-muted">stock non reçu</span>' : `<span class="${st.ok ? 'rp2-ok' : 'rp2-bad'}">${mep_e(st.label)}</span><br><span class="pt-muted">${mep_e(st.sub)}</span>`;
+    return `<div class="g2 rp2-r2"><div><label>Article Resto Pro</label><div class="rp2-linked"><span>${mep_e(it ? it.n : r.rpn || r.rp)}</span><button type="button" class="btn ghost small" onclick="mep_rpDraftClear('${sec}',${i})">Changer</button></div></div><div><label>État du stock</label><div class="rp2-box"><div>${stateHtml}</div></div></div></div>`;
+  }
+  return `<div class="g2 rp2-r2"><div><label>Article Resto Pro</label><input type="text" id="mep-rpq-${sec}-${i}" class="ft-in" placeholder="🔎 Chercher…" autocomplete="off" oninput="mep_rpQuery('${sec}',${i},this.value)"></div><div><label>État du stock</label><div class="rp2-box pt-muted">Non lié</div></div></div><div id="mep-rpres-${sec}-${i}"></div>`;
+}
+function mep_unitSelect(sec, i, cur){ // zone de saisie libre (ex. : kg, g, pièces, boîte…)
+  return `<input type="text" class="ft-in" maxlength="20" autocomplete="off" placeholder="ex. : kg, g, pièces" value="${mep_e(cur || '')}" oninput="mep_dUnit('${sec}',${i},this.value)">`;
+}
+function mep_ingCard(sec, i, r){
+  return `<div class="rp2-ing"><div class="rp2-top"><span class="mep-num">${i + 1}</span><div class="rp2-act"><button class="btn ghost small" onclick="mep_dMove('${sec}',${i},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_dMove('${sec}',${i},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="mep_dDel('${sec}',${i})" aria-label="Retirer">✕</button></div></div>
+    <div class="g2"><div><label>Ingrédient</label><input type="text" class="ft-in mep-name-${sec}" placeholder="Ingrédient" value="${mep_e(r.n)}" oninput="mep_dName('${sec}',${i},this.value)"></div><div><label>Unité</label>${mep_unitSelect(sec, i, r.u)}</div></div>${mep_rpBlock(sec, i, r)}</div>`;
+}
+/* colonne « Resto Pro » de la situation actuelle : quantité Resto Pro + écart en dessous (article peu fiable : grisé) */
+function mep_rpCell(i, last){
+  if(!i.rp) return '<span class="pt-muted">—</span>';
+  const it = mep_rpItem(i.rp), rs = mep_rpState(it);
+  if(!it || rs.s === null) return '<span class="pt-muted">—</span>';
+  const ec = last ? Math.round((rs.s - Number(last.q)) * 100) / 100 : null;
+  const ecTxt = ec === null ? '' : ec === 0 ? '<span class="rp2-ok">✓ écart 0</span>' : `<span class="mep-d ${ec > 0 ? 'up' : 'dn'}">${ec > 0 ? '▲ +' : '▼ −'}${mep_e(mep_fq(Math.abs(ec)))}</span> d’écart`;
+  return `<div class="${rs.ok ? '' : 'rp2-dim'}"><div class="mep-q">${mep_e(mep_fq(rs.s))}<span class="pt-muted"> ${mep_e(i.u || '')}</span></div><div class="mep-w">${ecTxt}</div></div>`;
 }
 /* ---------- administrateur : listes ---------- */
 function mep_sName(i, v){ if(mep_draft && mep_draft.sections[i]) mep_draft.sections[i].n = v; }
@@ -3793,7 +4192,7 @@ function mep_cAdd(){ mep_draft.cooks.push({ id:mep_newId(), n:'' }); mep_render(
 function mep_cDel(i){ mep_draft.cooks.splice(i, 1); mep_render(); }
 function mep_dName(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].n = v; }
 function mep_dUnit(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].u = v; }
-function mep_dAdd(sec){ mep_draft[sec].push({ id:mep_newId(), n:'', u:'kg' }); mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-' + sec); if(els.length) els[els.length - 1].focus(); }, 0); }
+function mep_dAdd(sec){ mep_draft[sec].push({ id:mep_newId(), n:'', u:'', rp:'', rpn:'' }); mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-' + sec); if(els.length) els[els.length - 1].focus(); }, 0); }
 function mep_dDel(sec, i){ mep_draft[sec].splice(i, 1); mep_render(); }
 function mep_dMove(sec, i, d){ const j = i + d, l = mep_draft[sec]; if(j < 0 || j >= l.length) return; const t = l[i]; l[i] = l[j]; l[j] = t; mep_render(); }
 async function mep_saveLists(){
@@ -3803,20 +4202,18 @@ async function mep_saveLists(){
   if(secs.some(x=>!x.n)){ alert('Donne un nom à chaque section.'); return; }
   if(new Set(secs.map(x=>x.n.toLowerCase())).size !== secs.length){ alert('Deux sections portent le même nom.'); return; }
   const out = { sections:secs };
-  secs.forEach(x=>{ out[x.id] = (mep_draft[x.id] || []).map(i=>({ id:i.id, n:String(i.n || '').trim(), u:String(i.u || '').trim() })).filter(i=>i.n); });
+  secs.forEach(x=>{ out[x.id] = (mep_draft[x.id] || []).map(i=>({ id:i.id, n:String(i.n || '').trim(), u:String(i.u || '').trim(), rp:String(i.rp || ''), rpn:i.rp ? String(i.rpn || '') : '' })).filter(i=>i.n); });
   out.cooks = (mep_draft.cooks || []).map(c=>({ id:c.id, n:String(c.n || '').trim() })).filter(c=>c.n);
   try{ await mep_listsRef.set({ ...out, updatedAt:new Date().toISOString(), updatedBy:(typeof currentUser !== 'undefined' ? currentUser : '') }); mep_draft = null; mep_tab = 'hist'; mep_render(); if(typeof pt_toast === 'function') pt_toast('Listes enregistrées.'); }
   catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
 }
 function mep_listsView(){
   const d = mep_draft || { ...mep_lists, sections:mep_secList() };
-  return `<datalist id="mep-units">${MEP_UNITS.map(u=>`<option value="${mep_e(u)}">`).join('')}</datalist>
-    <div class="pt-muted" style="margin-bottom:8px;">Les ingrédients que les cuisiniers doivent compter à la fin de leur service. Les anciennes saisies gardent le nom et l’unité d’origine.</div>
+  return `<div class="pt-muted" style="margin-bottom:8px;">Les ingrédients que les cuisiniers doivent compter à la fin de leur service. Les anciennes saisies gardent le nom et l’unité d’origine.</div>
     <div class="ticket"><div class="section-label">Cuisiniers</div><div class="pt-muted" style="margin-bottom:8px;">Les noms proposés aux cuisiniers dans « Choisis ton nom ».</div>${(d.cooks || []).map((c, n)=>`<div class="ft-edrow"><input type="text" class="ft-in mep-name-cooks" style="flex:1 1 calc(100% - 56px);min-width:0;" placeholder="Prénom" value="${mep_e(c.n)}" oninput="mep_cName(${n},this.value)"><button class="btn ghost small t-del" onclick="mep_cDel(${n})" aria-label="Retirer">✕</button></div>`).join('') || '<div class="pt-muted">Aucun cuisinier.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_cAdd()">＋ Cuisinier</button></div></div>
     <div class="ticket"><div class="section-label">Sections</div><div class="pt-muted" style="margin-bottom:8px;">Une section qui a déjà des saisies peut être renommée mais pas supprimée (🔒).</div>${(d.sections || []).map((x, n)=>`<div class="ft-edrow"><input type="text" class="ft-in mep-name-secs" style="flex:1 1 calc(100% - 56px);min-width:0;" placeholder="Nom de la section" value="${mep_e(x.n)}" oninput="mep_sName(${n},this.value)">${mep_hasSaisies(x.id) ? '<button class="btn ghost small" disabled title="Historique conservé" aria-label="Verrouillée">🔒</button>' : `<button class="btn ghost small t-del" onclick="mep_sDel(${n})" aria-label="Retirer">✕</button>`}
       <div class="ft-mv" style="flex:1 1 100%;"><button class="btn ghost small" onclick="mep_sMove(${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_sMove(${n},1)" aria-label="Descendre">↓</button></div></div>`).join('')}<div class="actions-row"><button class="btn small t-add" onclick="mep_sAdd()">＋ Section</button></div></div>
-    ${(d.sections || []).map(sc=>{ const k = sc.id; return `<div class="ticket"><div class="section-label">Ingrédients — ${mep_e(sc.n || 'Nouvelle section')}</div>${(d[k] || []).map((i, n)=>`<div class="ft-edrow"><span class="mep-num">${n + 1}</span><input type="text" class="ft-in mep-name-${k}" style="flex:1 1 40%;min-width:0;" placeholder="Ingrédient" value="${mep_e(i.n)}" oninput="mep_dName('${k}',${n},this.value)"><input type="text" class="ft-in" list="mep-units" style="flex:1 1 24%;min-width:0;" placeholder="Unité" value="${mep_e(i.u)}" oninput="mep_dUnit('${k}',${n},this.value)">
-      <div class="ft-mv" style="flex:1 1 100%;"><button class="btn ghost small" onclick="mep_dMove('${k}',${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_dMove('${k}',${n},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="mep_dDel('${k}',${n})" aria-label="Retirer">✕</button></div></div>`).join('') || '<div class="pt-muted">Aucun ingrédient.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_dAdd('${k}')">＋ Ingrédient</button></div></div>`; }).join('')}
+    ${(d.sections || []).map(sc=>{ const k = sc.id; return `<div class="ticket"><div class="section-label">Ingrédients — ${mep_e(sc.n || 'Nouvelle section')}</div>${mep_rpBar()}${(d[k] || []).map((i, n)=>mep_ingCard(k, n, i)).join('') || '<div class="pt-muted">Aucun ingrédient.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_dAdd('${k}')">＋ Ingrédient</button></div></div>`; }).join('')}
     <div class="actions-row"><button class="btn t-save" onclick="mep_saveLists()">Enregistrer les listes</button><button class="btn ghost t-cancel" onclick="mep_setTab('hist')">Annuler</button></div>`;
 }
 function mep_render(){
