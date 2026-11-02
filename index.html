@@ -1638,9 +1638,13 @@ function pt_groupsFromDoc(data){ return ((data && data.groups) || []).map(g=>Arr
 let pt_renderQueued = false;
 // plusieurs écoutes Firestore répondent presque en même temps au chargement : on ne redessine qu'une fois
 function pt_scheduleRender(){ if(pt_renderQueued) return; pt_renderQueued = true; Promise.resolve().then(()=>{ pt_renderQueued = false; pt_render(); if(activeModule === 'paie' && typeof pa_render === 'function') pa_render(); if(activeModule === 'users' && typeof uu_render === 'function'){ uu_render(); uu_fillNewEmp(); } }); }
+let pa_vues = {};
 function pt_start(){
   if(pt_started) return;
   pt_started = true;
+  if(session && session.isAdmin){ // suivi des consultations de fiche de paie (admin uniquement)
+    db.collection('paie_vues').onSnapshot((snap)=>{ const o = {}; snap.forEach(d=>{ o[d.id] = d.data() || {}; }); pa_vues = o; pt_scheduleRender(); }, (err)=>console.error(err));
+  }
   pt_loadStartedAt = Date.now();
   setTimeout(()=>{ if(activeModule === 'pointage') pt_render(); }, 5000); // force un nouvel essai d'affichage même si aucune donnée n'est jamais arrivée
   try{ const raw = localStorage.getItem('pt-period'); if(raw) pt_filter = JSON.parse(raw); }catch(e){}
@@ -2942,7 +2946,8 @@ function pt_tabEmployes(codes, sessions, anoms, overlaps){
   if(pt_selAll){
     const qs = codes.map(x=>pt_displayPayroll(x, sessions)), S = (k)=>qs.reduce((t,q)=>t + (Number(q[k]) || 0), 0);
     const tot = { totalHours:S('totalHours'), workedDays:S('workedDays'), baseWage:S('baseWage'), transportTotal:S('transportTotal'), bonusesTotal:S('bonusesTotal'), advancesTotal:S('advancesTotal'), leavesTotal:S('leavesTotal'), loanTotal:S('loanTotal'), subTotal:S('subTotal'), reportIn:S('reportIn'), reportOut:S('reportOut'), net:S('net') };
-    return html + `<div class="ticket">${pt_empSelect(codes)}${pt_empCards(tot, isAdmin)}<div class="pt-muted">Totaux de tous les employés sur la période affichée. Choisis un employé pour voir ses pointages et sa paie.</div></div>`
+    const vuesBox = isAdmin ? `<div class="ticket"><div class="section-label">Consultation des fiches de paie</div>${codes.map(x=>`<div style="padding:6px 0;border-bottom:1px solid var(--line,#2a2a2a);"><b>${pt_e(pt_label(x))}</b>${pa_vueLine(x)}</div>`).join('')}</div>` : '';
+    return html + vuesBox + `<div class="ticket">${pt_empSelect(codes)}${pt_empCards(tot, isAdmin)}<div class="pt-muted">Totaux de tous les employés sur la période affichée. Choisis un employé pour voir ses pointages et sa paie.</div></div>`
       + (() => { const probs = codes.map(x=>({ x, a:anoms.filter(a=>a.code === x).length, o:overlaps.filter(o=>o.codeA === x || o.codeB === x).length })).filter(r=>r.a || r.o);
           return probs.length ? `<div class="ticket"><div class="section-label">À régler</div>${probs.map(r=>`<div class="pt-an"><div><b>${pt_e(pt_label(r.x))}</b><div class="pt-an-reason">${[r.a ? r.a + ' entrée(s)/sortie(s) manquante(s)' : '', r.o ? r.o + ' chevauchement(s)' : ''].filter(Boolean).join(' · ')}</div></div><button class="btn ghost small b-neutral t-view" onclick="pt_selEmp('${r.x}')">Ouvrir</button></div>`).join('')}</div>` : ''; })()
       + (isAdmin ? pt_accordion('prets', 'Prêts — tous les employés', pt_pretsAllHtml(codes)) + pt_accordion('clotures', 'Clôtures', pt_cloturesSection()) + pt_accordion('conge', 'Congé — tous les employés', pt_congesHtml(codes)) : '');
@@ -2953,6 +2958,7 @@ function pt_tabEmployes(codes, sessions, anoms, overlaps){
   html += `<div class="ticket">
     ${pt_empSelect(codes)}
     ${pt_empCards(p, isAdmin)}
+    ${isAdmin ? `<div class="pt-muted" style="margin-top:8px;">Fiche de paie · ${pa_vueLine(c)}</div>` : ''}
   </div>`;
   html += pt_accordion('pointages', 'Pointages de l’employé', pt_pointagesSection(c, sessions, myAn, myOv));
   if(isAdmin) html += pt_accordion('paie', 'Paie', pt_paieSection(c, sessions, codes));
@@ -3253,6 +3259,22 @@ function pa_data(code){
     } };
   });
 }
+function pa_logVue(code, weekKey){
+  if(!session || session.isAdmin) return;
+  const k = 'pa-vue-' + code + '-' + weekKey, now = Date.now();
+  try{ if(now - Number(localStorage.getItem(k) || 0) < 600000) return; localStorage.setItem(k, String(now)); }catch(e){}
+  const inc = firebase.firestore.FieldValue.increment(1), iso = new Date(now).toISOString();
+  db.collection('paie_vues').doc(String(code)).set({ code, user:currentUser, last:iso, n:inc, v:{ [weekKey]:{ last:iso, n:inc } } }, { merge:true }).catch(e=>console.error(e));
+}
+function pa_vueLine(code){
+  const o = pa_vues[String(code)], wk = pt_filter && pt_filter.from;
+  const f = (iso)=>{ const d = new Date(iso); return d.toLocaleDateString('fr-FR', { weekday:'short', day:'numeric', month:'short' }) + ' ' + pt_hhmm(d); };
+  const st = 'display:block;font-size:11px;font-weight:400;color:var(--muted,#8a8a8a);margin-top:2px;';
+  if(!o || !o.last) return `<span style="${st}">👁 jamais consultée</span>`;
+  const w = o.v && wk && o.v[wk];
+  if(w && w.last) return `<span style="${st}">👁 vue ${w.n}× · dernière : ${f(w.last)}</span>`;
+  return `<span style="${st}">👁 pas vue cette semaine · dernière : ${f(o.last)}</span>`;
+}
 function pa_render(){
   if(activeModule !== 'paie') return;
   const body = document.getElementById('pa-body'); if(!body) return;
@@ -3274,8 +3296,9 @@ function pa_render(){
     <div class="pa-week">Semaine du ${dl(r.wk.from)} au ${dl(r.wk.to)} ${yr}</div>
     <div class="pt-cards">${showTransport ? card('c-transport','Transport',pt_fmtMoney(q.transportTotal),d.transport) : ''}${card('c-bonus','Primes &amp; bonus',pt_fmtMoney(q.bonusesTotal),d.primes)}${card('c-adv','Avances',pt_fmtMoney(q.advancesTotal),d.avances)}${card('c-loan','Prêt',pt_fmtMoney(q.loanTotal),d.prets,resteDu)}${card('c-bonus','Congé versé',pt_fmtMoney(r.cg.taken),d.congeVerse)}${card('c-transport','Reste à verser',pt_money2(r.cg.left),d.reste)}</div>
     <div class="grid grid-2"><div class="result-box prelim"><div class="label">Sous-total<br><span style="font-weight:400;font-size:11px;">base + transport + primes</span><div class="pa-dt">🕒 ${pa_fmt(d.sous)}</div></div><div class="value">${pt_fmtMoney(q.subTotal)}</div></div><div class="result-box final"><div class="label">Net à payer${rep}<div class="pa-dt">🕒 ${pa_fmt(d.net)}</div></div><div class="value">${pt_fmtMoney(q.net)}</div></div></div>
-    <div class="pt-muted" style="margin-top:10px;">La fiche de la nouvelle semaine remplace celle-ci chaque dimanche. 🕒 = date de la dernière modification de la rubrique.</div>
+    <div class="pt-muted" style="margin-top:10px;">La fiche de la nouvelle semaine remplace celle-ci chaque dimanche. Les consultations de ta fiche sont enregistrées. 🕒 = date de la dernière modification de la rubrique.</div>
   </div>`;
+  pa_logVue(code, r.wk.from);
 }
 setInterval(()=>{ if(activeModule === 'paie') pa_render(); }, 300000); // bascule automatique de semaine si l’écran reste ouvert
 
