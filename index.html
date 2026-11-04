@@ -4021,7 +4021,11 @@ function mep_snapshotOf(x){ return { at:mep_shownAt(x), name:x.name, emp:String(
 /* recalcule le « dernier inventaire » de chaque section à partir des saisies (administrateur) */
 function mep_stockFrom(exceptId, override){
   const s = {};
-  mep_saisies.filter(x=>x.id !== exceptId).map(x=>override && override[x.id] ? { ...x, ...override[x.id] } : x).sort(mep_byAt).forEach(x=>{ s[x.section] = mep_snapshotOf(x); });
+  mep_saisies.filter(x=>x.id !== exceptId).map(x=>override && override[x.id] ? { ...x, ...override[x.id] } : x).sort(mep_byAt).forEach(x=>{
+    const sn = mep_snapshotOf(x), prev = s[x.section];
+    if(prev) prev.items.forEach(p=>{ if(!sn.items.some(i=>i.id === p.id)) sn.items.push(p); }); // ligne retirée d'une saisie : on garde la valeur précédente
+    s[x.section] = sn;
+  });
   return s;
 }
 async function mep_rebuildStock(exceptId, override){ await mep_stockRef.set({ s:mep_stockFrom(exceptId, override), rebuiltAt:new Date().toISOString() }); }
@@ -4143,14 +4147,17 @@ function mep_flags(sec){
 function mep_kindLabel(x){ const n = (x.items || []).length; return x.kind === 'correction' ? 'correction par ' + x.correctedBy : (n + ' article' + (n > 1 ? 's' : '')) + (x.correctedBy ? ' · modifié par ' + x.correctedBy + ' ' + mep_hm(x.correctedAt) : ''); }
 function mep_view(id){ mep_viewId = mep_viewId === id ? '' : id; mep_render(); }
 /* modifier une saisie en place */
-function mep_editStart(id){ const x = mep_saisies.find(s=>s.id === id); if(!x || !mep_isAdmin()) return; mep_edit = { id, vals:{} }; (x.items || []).forEach(i=>{ mep_edit.vals[i.id] = mep_fmtIn(i.q); }); mep_viewId = ''; mep_render(); }
+function mep_editStart(id){ const x = mep_saisies.find(s=>s.id === id); if(!x || !mep_isAdmin()) return; mep_edit = { id, vals:{}, removed:{} }; (x.items || []).forEach(i=>{ mep_edit.vals[i.id] = mep_fmtIn(i.q); }); mep_viewId = ''; mep_render(); }
 function mep_editVal(itemId, v){ if(mep_edit) mep_edit.vals[itemId] = v; }
+function mep_editRemove(id){ if(!mep_edit) return; mep_edit.removed[id] = !mep_edit.removed[id]; mep_render(); }
 function mep_editCancel(){ mep_edit = null; mep_render(); }
 async function mep_editSave(){
   if(!mep_edit || !mep_isAdmin() || mep_busy) return;
   const x = mep_saisies.find(s=>s.id === mep_edit.id); if(!x) return;
-  const items = mep_readItems((x.items || []).map(i=>({ id:i.id, n:i.n, u:i.u })), mep_edit.vals); if(!items) return;
-  if(!items.some(i=>{ const o = (x.items || []).find(y=>y.id === i.id); return !o || Number(o.q) !== i.q; })){ alert('Aucune quantité n’a changé.'); return; }
+  const rm = mep_edit.removed || {}, nRm = (x.items || []).filter(i=>rm[i.id]).length;
+  if(nRm >= (x.items || []).length){ alert('Tu retires toutes les lignes : utilise plutôt « Supprimer » pour effacer toute la saisie.'); return; }
+  const items = mep_readItems((x.items || []).filter(i=>!rm[i.id]).map(i=>({ id:i.id, n:i.n, u:i.u })), mep_edit.vals); if(!items) return;
+  if(!nRm && !items.some(i=>{ const o = (x.items || []).find(y=>y.id === i.id); return !o || Number(o.q) !== i.q; })){ alert('Aucune quantité n’a changé.'); return; }
   const nowIso = new Date().toISOString();
   const patch = { items, origItems:x.origItems || x.items, correctedBy:mep_who(), correctedAt:nowIso };
   mep_busy = true;
@@ -4161,8 +4168,8 @@ async function mep_editSave(){
 function mep_editView(){
   const x = mep_saisies.find(s=>s.id === mep_edit.id); if(!x){ mep_edit = null; return ''; }
   const list = mep_lists[x.section] || [];
-  return `<div class="ticket"><div class="section-label">Modifier la saisie de ${mep_e(x.name)} · ${mep_e(mep_fdt(mep_shownAt(x)))}</div><div class="pt-muted" style="margin-bottom:6px;">La saisie est modifiée en place et porte la mention « modifié par ${mep_e(mep_who())} ». Les quantités d’origine sont conservées.</div>
-    ${(x.items || []).map(i=>{ const pos = list.findIndex(l=>l.id === i.id); return `<div class="mep2-row"><div class="mep2-name"><span class="mep-num">${pos >= 0 ? pos + 1 : '–'}</span><span>${mep_e(i.n)} <span class="pt-muted">(${mep_e(i.u || '')})</span></span></div><div class="mep2-cols"><input class="ft-in" type="text" inputmode="decimal" value="${mep_e(mep_edit.vals[i.id] || '')}" oninput="mep_editVal('${i.id}', this.value)"><div class="mep2-last pt-muted">avant : ${mep_e(mep_fq(i.q))}</div></div></div>`; }).join('')}
+  return `<div class="ticket"><div class="section-label">Modifier la saisie de ${mep_e(x.name)} · ${mep_e(mep_fdt(mep_shownAt(x)))}</div><div class="pt-muted" style="margin-bottom:6px;">La saisie est modifiée en place et porte la mention « modifié par ${mep_e(mep_who())} ». Les quantités d’origine sont conservées. « Retirer » enlève seulement cette ligne de la saisie : elle n’est ni comptée ni remplacée par 0, et le contrôle reprend le pesé précédent de cet article.</div>
+    ${(x.items || []).map(i=>{ const pos = list.findIndex(l=>l.id === i.id); return `<div class="mep2-row"><div class="mep2-name"><span class="mep-num">${pos >= 0 ? pos + 1 : '–'}</span><span>${mep_e(i.n)} <span class="pt-muted">(${mep_e(i.u || '')})</span></span></div><div class="mep2-cols"><input class="ft-in" type="text" inputmode="decimal" ${mep_edit.removed && mep_edit.removed[i.id] ? 'disabled style="opacity:.4;"' : ''} value="${mep_e(mep_edit.vals[i.id] || '')}" oninput="mep_editVal('${i.id}', this.value)"><div class="mep2-last pt-muted">${mep_edit.removed && mep_edit.removed[i.id] ? '<b>retirée de la saisie</b>' : 'avant : ' + mep_e(mep_fq(i.q))} <button class="btn ghost small ${mep_edit.removed && mep_edit.removed[i.id] ? 't-edit' : 't-del'}" onclick="mep_editRemove('${i.id}')">${mep_edit.removed && mep_edit.removed[i.id] ? 'Annuler' : 'Retirer'}</button></div></div></div>`; }).join('')}
     <div class="actions-row"><button class="btn t-save" onclick="mep_editSave()">Enregistrer la modification</button><button class="btn ghost t-cancel" onclick="mep_editCancel()">Annuler</button></div></div>`;
 }
 function mep_histView(){
