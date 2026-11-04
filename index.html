@@ -3986,7 +3986,7 @@ function mep_newId(){ return 'i' + Date.now().toString(36) + Math.random().toStr
 function mep_empList(){ return (mep_lists.cooks || []).filter(c=>c && c.n).map(c=>({ code:c.id, name:c.n })).sort((a, b)=>a.name.localeCompare(b.name, 'fr')); }
 function mep_typing(){ try{ const a = document.activeElement, b = document.getElementById('mep-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
 function mep_start(){
-  if(mep_isAdmin() && !mep_adminStarted){ mep_adminStarted = true; mep_watchSaisies(); mep_watchRp(); }
+  if(mep_isAdmin() && !mep_adminStarted){ mep_adminStarted = true; mep_watchSaisies(); mep_watchRp(); ct_start(); }
   if(mep_started) return; mep_started = true;
   mep_listsRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
@@ -4300,9 +4300,167 @@ function mep_render(){
   const admin = mep_isAdmin();
   const head = `<div style="font-weight:700;font-size:18px;margin-bottom:10px;">Mise en place</div>`;
   if(!admin){ body.innerHTML = head + mep_entryView(); return; }
-  const tabs = `<div class="mep-seg">${[['hist', 'Historique'], ['saisie', 'Saisie'], ['listes', 'Listes']].map(t=>`<button class="${mep_tab === t[0] ? 'on' : ''}" onclick="mep_setTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
-  const view = mep_tab === 'listes' ? mep_listsView() : mep_tab === 'saisie' ? mep_entryView() : (mep_saisiesReady ? mep_histView() : '<div class="empty-state">Chargement…</div>');
+  const tabs = `<div class="mep-seg">${[['hist', 'Historique'], ['saisie', 'Saisie'], ['controle', 'Contrôle'], ['listes', 'Listes']].map(t=>`<button class="${mep_tab === t[0] ? 'on' : ''}" onclick="mep_setTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
+  const view = mep_tab === 'listes' ? mep_listsView() : mep_tab === 'controle' ? ct_view() : mep_tab === 'saisie' ? mep_entryView() : (mep_saisiesReady ? mep_histView() : '<div class="empty-state">Chargement…</div>');
   body.innerHTML = head + tabs + view;
+}
+
+/* ==================== CONTRÔLE DES STOCKS (administrateur) — étape 1 ====================
+   Estime la consommation d'ingrédients à partir des ventes par plat (Resto Pro) × grammage net par plat ÷ rendement de l'ingrédient.
+   Les données sont dans mise_en_place/controle : { ing:{ <idIngrédient>:{ on, rend (%), f (g par unité de comptage) } },
+   plats:{ <clé du plat>:{ name, g:{ <idIngrédient>: grammage net en g (0 = n'en contient pas) } } } }.
+   Jamais chargées ni affichées pour les cuisiniers (écran administrateur seulement). */
+const ct_ref = db.collection('mise_en_place').doc('controle');
+let ct_cfg = { ing:{}, plats:{} }, ct_ready = false, ct_started = false;
+let ct_from = '', ct_to = '', ct_days = [], ct_unsub = null, ct_tok = 0, ct_loaded = false, ct_err = '';
+let ct_openFilled = false, ct_openIng = null;
+function ct_typing(){ try{ const a = document.activeElement, b = document.getElementById('mep-body'); return !!(a && b && b.contains(a) && ((a.tagName === 'INPUT' && /^(text|search|number|tel|)$/.test(a.type || '')) || a.tagName === 'TEXTAREA')); }catch(e){ return false; } }
+function ct_start(){
+  if(ct_started) return; ct_started = true;
+  if(!ct_from){ ct_from = ct_to = mep_ymd(); }
+  ct_ref.onSnapshot((doc)=>{
+    const d = doc.exists ? (doc.data() || {}) : {};
+    ct_cfg = { ing:d.ing || {}, plats:d.plats || {} }; ct_ready = true;
+    if(mep_tab === 'controle' && !ct_typing()) mep_render();
+  }, (e)=>{ console.error(e); ct_ready = true; ct_err = (e && e.message) || String(e); if(mep_tab === 'controle') mep_render(); });
+  ct_load();
+}
+function ct_load(){
+  if(ct_unsub){ try{ ct_unsub(); }catch(e){} ct_unsub = null; }
+  if(!ct_from || !ct_to) return;
+  const tok = ++ct_tok; ct_loaded = false;
+  const FP = firebase.firestore.FieldPath.documentId();
+  ct_unsub = db.collection('restopro_jours').where(FP, '>=', ct_from).where(FP, '<=', ct_to).onSnapshot((snap)=>{
+    if(tok !== ct_tok) return;
+    ct_days = snap.docs.map(d=>({ id:d.id, ...d.data() })); ct_loaded = true;
+    if(mep_tab === 'controle' && !ct_typing()) mep_render();
+  }, (e)=>{ if(tok !== ct_tok) return; console.error(e); ct_loaded = true; ct_err = (e && e.message) || String(e); if(mep_tab === 'controle') mep_render(); });
+}
+function ct_setRange(){
+  let f = (document.getElementById('ct-from') || {}).value, t = (document.getElementById('ct-to') || {}).value;
+  if(!f && !t) return; if(!f) f = t; if(!t) t = f; if(f > t){ const x = f; f = t; t = x; }
+  ct_from = f; ct_to = t; ct_load(); mep_render();
+}
+function ct_preset(k){
+  const d = new Date(), iso = (x)=>mep_ymd(x);
+  if(k === 'yesterday'){ d.setDate(d.getDate() - 1); ct_from = ct_to = iso(d); }
+  else if(k === '7d'){ ct_to = iso(d); d.setDate(d.getDate() - 6); ct_from = iso(d); }
+  else { ct_from = ct_to = iso(d); }
+  ct_load(); mep_render();
+}
+/* clé stable d'un plat (nom Resto Pro normalisé) */
+function ct_key(n){ return String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'x'; }
+/* plats vendus sur la période (tickets fermés ET non fermés, comme « Ventes par plat ») */
+function ct_sales(){
+  const map = {};
+  ct_days.forEach(day=>(day.tickets || []).forEach(t=>(Array.isArray(t.l) ? t.l : []).forEach(l=>{
+    if(l.p && String(l.p) !== String(l.i)) return; // commentaire rattaché à un article, pas un plat
+    const nm = String(l.n || '').replace(/\s+/g, ' ').trim(); if(!nm) return;
+    const k = ct_key(nm), o = map[k] || (map[k] = { key:k, name:nm, q:0 });
+    o.q += Number(l.q) || 0;
+  })));
+  return Object.keys(map).map(k=>map[k]).sort((a, b)=>b.q - a.q || a.name.localeCompare(b.name, 'fr'));
+}
+function ct_factor(i){ const f = Number(i.f); if(f > 0) return f; const u = String(i.u || '').trim().toLowerCase(); return u === 'kg' ? 1000 : u === 'g' ? 1 : 0; }
+function ct_tracked(){
+  const out = [];
+  mep_secList().forEach(sc=>(mep_lists[sc.id] || []).forEach(i=>{
+    const c = ct_cfg.ing[i.id];
+    if(c && c.on) out.push({ id:i.id, n:i.n, u:i.u || '', sec:sc.id, secName:sc.n, rend:Number(c.rend) > 0 ? Number(c.rend) : 100, f:Number(c.f) || 0 });
+  }));
+  return out;
+}
+const ct_has = (pl, id)=>!!(pl && pl.g && pl.g[id] !== undefined && pl.g[id] !== null);
+function ct_calc(i, sales){
+  let g = 0, miss = 0, missPl = 0;
+  sales.forEach(s=>{ const pl = ct_cfg.plats[s.key]; if(ct_has(pl, i.id)) g += s.q * Number(pl.g[i.id]); else { miss += s.q; missPl++; } });
+  return { brut:g / (i.rend / 100), miss, missPl };
+}
+/* ---------- réglage des ingrédients suivis ---------- */
+async function ct_ingSet(id, key, v){
+  let val;
+  if(key === 'on') val = !!v;
+  else { val = ft_parseQ(v); if(val === null || !(val > 0) || (key === 'rend' && val > 100)){ alert(key === 'rend' ? 'Rendement : un nombre entre 1 et 100 (%).' : 'Équivalence : un nombre de grammes supérieur à 0.'); mep_render(); return; } }
+  ct_cfg.ing[id] = Object.assign({}, ct_cfg.ing[id], { [key]:val });
+  try{ await ct_ref.set({ ing:{ [id]:{ [key]:val } } }, { merge:true }); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+  if(key === 'on') mep_render(); else ct_softRender();
+}
+function ct_toggleIng(){ ct_openIng = !(ct_openIng === null ? !ct_tracked().length : ct_openIng); mep_render(); }
+function ct_ingHtml(){
+  const rows = mep_secList().map(sc=>{
+    const list = mep_lists[sc.id] || [];
+    if(!list.length) return '';
+    return `<div class="pt-muted" style="margin:10px 0 4px;font-weight:600;">${mep_e(sc.n)}</div>` + list.map(i=>{
+      const c = ct_cfg.ing[i.id] || {}, on = !!c.on, f = ct_factor({ f:c.f, u:i.u });
+      return `<div class="rp2-ing"><label class="pt-chk" style="margin:0;"><input type="checkbox" ${on ? 'checked' : ''} onchange="ct_ingSet('${i.id}','on',this.checked)"> <b>${mep_e(i.n)}</b> <span class="pt-muted">(${mep_e(i.u || 'sans unité')})</span></label>
+        ${on ? `<div class="g2" style="margin-top:8px;"><div><label>Rendement (%)</label><input type="text" inputmode="decimal" class="ft-in" placeholder="100" value="${mep_e(c.rend || '')}" onchange="ct_ingSet('${i.id}','rend',this.value)"></div>
+        <div><label>1 ${mep_e(i.u || 'unité')} = … g brut</label><input type="text" inputmode="decimal" class="ft-in" placeholder="${mep_e(f || 'ex. 1000')}" value="${mep_e(c.f || '')}" onchange="ct_ingSet('${i.id}','f',this.value)"></div></div>${f ? '' : '<div class="rp2-bad" style="margin-top:6px;">Indique combien de grammes vaut 1 ' + mep_e(i.u || 'unité') + '.</div>'}` : ''}</div>`;
+    }).join('');
+  }).join('');
+  const nTr = ct_tracked().length, open = ct_openIng === null ? !nTr : ct_openIng;
+  return `<div class="ticket"><div class="row-between" style="cursor:pointer;" onclick="ct_toggleIng()"><div style="font-weight:700;">Ingrédients suivis <span class="pt-muted">(${nTr})</span></div><span class="pt-chevron">${open ? '▾' : '▸'}</span></div>
+    ${open ? `<div class="pt-muted" style="margin-top:8px;">Coche les ingrédients à suivre. <b>Rendement</b> = part utilisable du poids brut acheté/pesé (avocat : 64 %). Les grammages des plats sont en <b>net</b> ; l’app les ramène au brut en divisant par le rendement.</div>${rows || '<div class="pt-muted">Aucun ingrédient défini dans « Listes ».</div>'}` : ''}</div>`;
+}
+/* ---------- grammages par plat ---------- */
+async function ct_savePlat(key){
+  const sale = ct_sales().find(s=>s.key === key), cur = ct_cfg.plats[key];
+  const name = (sale && sale.name) || (cur && cur.name) || key, g = {}; let n = 0, bad = false;
+  ct_tracked().forEach(i=>{
+    const el = document.getElementById('ct-g-' + key + '-' + i.id); if(!el) return;
+    const raw = el.value.trim(); if(raw === '') return;
+    const v = ft_parseQ(raw);
+    if(v === null || v < 0){ alert('Grammage non valide pour « ' + i.n + ' » : « ' + raw + ' ». Écris un nombre de grammes (0 si le plat n’en contient pas).'); bad = true; return; }
+    g[i.id] = v; n++;
+  });
+  if(bad) return;
+  if(!n){ alert('Saisis au moins un grammage (0 si le plat n’en contient pas).'); return; }
+  try{ await ct_ref.set({ plats:{ [key]:{ name, g } } }, { merge:true }); if(typeof pt_toast === 'function') pt_toast('Grammages enregistrés : ' + name); }
+  catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+function ct_zero(key, id){ const el = document.getElementById('ct-g-' + key + '-' + id); if(el) el.value = '0'; }
+function ct_toggleFilled(){ ct_openFilled = !ct_openFilled; mep_render(); }
+function ct_inputRow(key, i, val){
+  return `<div class="g2" style="margin-top:8px;align-items:end;"><div><label>${mep_e(i.n)} — g net par plat</label><input type="text" inputmode="decimal" class="ft-in" id="ct-g-${key}-${i.id}" placeholder="g" value="${mep_e(val === undefined ? '' : val)}"></div>
+    <div><button type="button" class="btn ghost small t-cancel" onclick="ct_zero('${key}','${i.id}')">∅ n’en contient pas</button></div></div>`;
+}
+function ct_platsHtml(tr, sales){
+  const todo = sales.map(s=>({ s, miss:tr.filter(i=>!ct_has(ct_cfg.plats[s.key], i.id)) })).filter(x=>x.miss.length);
+  const soldQ = {}; sales.forEach(s=>{ soldQ[s.key] = s.q; });
+  const filled = Object.keys(ct_cfg.plats).map(k=>({ k, pl:ct_cfg.plats[k], have:tr.filter(i=>ct_has(ct_cfg.plats[k], i.id)) })).filter(x=>x.have.length).sort((a, b)=>String(a.pl.name).localeCompare(String(b.pl.name), 'fr'));
+  const todoHtml = !ct_loaded ? '<div class="pt-muted">Chargement des ventes…</div>'
+    : !sales.length ? '<div class="pt-muted">Aucun plat vendu sur cette période (ou détail des tickets indisponible).</div>'
+    : !todo.length ? '<div class="rp2-ok">✓ Tous les plats vendus ont un grammage pour les ingrédients suivis.</div>'
+    : todo.map(x=>`<div class="rp2-ing"><div class="row-between"><b>${mep_e(x.s.name)}</b><span class="pt-muted">vendu × ${mep_e(mep_fq(x.s.q))}</span></div>${x.miss.map(i=>ct_inputRow(x.s.key, i)).join('')}<div class="actions-row"><button class="btn small t-save" onclick="ct_savePlat('${x.s.key}')">Valider</button></div></div>`).join('');
+  const fHtml = ct_openFilled ? (filled.length ? filled.map(x=>`<div class="rp2-ing"><div class="row-between"><b>${mep_e(x.pl.name)}</b><span class="pt-muted">${soldQ[x.k] ? 'vendu × ' + mep_e(mep_fq(soldQ[x.k])) : 'non vendu sur la période'}</span></div>${x.have.map(i=>ct_inputRow(x.k, i, x.pl.g[i.id])).join('')}<div class="actions-row"><button class="btn small t-save" onclick="ct_savePlat('${x.k}')">Enregistrer</button></div></div>`).join('') : '<div class="pt-muted">Aucun grammage enregistré.</div>') : '';
+  return `<div class="ticket"><div class="section-label">À renseigner (${todo.length} plat${todo.length > 1 ? 's' : ''})</div><div class="pt-muted" style="margin-bottom:8px;">Grammage <b>net</b> de l’ingrédient dans une portion du plat. Mets 0 (ou « ∅ ») si le plat n’en contient pas : il ne te sera plus redemandé.</div>${todoHtml}</div>
+    <div class="ticket"><div class="row-between" style="cursor:pointer;" onclick="ct_toggleFilled()"><div style="font-weight:700;">Déjà renseignés <span class="pt-muted">(${filled.length} plat${filled.length > 1 ? 's' : ''})</span></div><span class="pt-chevron">${ct_openFilled ? '▾' : '▸'}</span></div>${ct_openFilled ? '<div style="margin-top:10px;">' + fHtml + '</div>' : ''}</div>`;
+}
+/* ---------- consommation estimée ---------- */
+function ct_resultsHtml(){
+  const tr = ct_tracked(); if(!tr.length) return '';
+  const sales = ct_sales();
+  const noDetail = ct_days.filter(d=>(d.tickets || []).length && !d.lignes).length;
+  const rows = tr.map(i=>{
+    const c = ct_calc(i, sales), f = ct_factor(i), st = mep_stockOf(i.sec), it = st && st.items.find(x=>x.id === i.id);
+    const last = it ? `<div class="mep-q">${mep_e(mep_fq(it.q))} <span class="pt-muted">${mep_e(i.u)}</span></div><div class="mep-w">${mep_e(mep_fdt(st.at))}</div>` : '<span class="pt-muted">—</span>';
+    const g = Math.round(c.brut).toLocaleString('fr-FR') + ' g brut';
+    const conso = f ? `<div class="mep-q">${mep_e(mep_fq(c.brut / f))} <span class="pt-muted">${mep_e(i.u)}</span></div><div class="mep-w">${mep_e(g)} · rendement ${mep_e(i.rend)} %</div>` : `<div class="mep-w">${mep_e(g)}</div><div class="rp2-bad">Équivalence en g manquante</div>`;
+    const warn = !ct_loaded ? '' : c.miss ? `<div class="rp2-bad">⚠ incomplet : ${c.missPl} plat${c.missPl > 1 ? 's' : ''} (${mep_e(mep_fq(c.miss))} vente${c.miss > 1 ? 's' : ''}) sans grammage</div>` : (sales.length ? '<div class="rp2-ok">✓ tous les plats vendus renseignés</div>' : '');
+    return `<tr><td>${mep_e(i.n)}<div class="pt-muted">${mep_e(i.secName)}</div></td><td>${last}</td><td>${conso}${warn}</td></tr>`;
+  }).join('');
+  return `<div style="overflow-x:auto;"><table class="mep-g"><tr><th>Ingrédient</th><th>Dernier pesé</th><th>Consommation estimée</th></tr>${rows}</table></div>
+    ${noDetail ? `<div class="rp2-bad" style="margin-top:8px;">⚠ ${noDetail} jour${noDetail > 1 ? 's' : ''} de la période sans détail des tickets (disponible depuis le ${mep_e(rp_fmtDate(RP_LIGNES_DEPUIS))}) : estimation sous-évaluée.</div>` : ''}`;
+}
+function ct_softRender(){ const el = document.getElementById('ct-results'); if(el) el.innerHTML = ct_resultsHtml(); }
+function ct_view(){
+  if(!ct_ready) return '<div class="empty-state">Chargement…</div>';
+  if(ct_err) return `<div class="alert-banner"><b>Erreur de lecture</b>${mep_e(ct_err)}</div>`;
+  const tr = ct_tracked(), sales = ct_sales();
+  const period = `<div class="ticket"><div class="section-label">Période des ventes</div><div class="grid grid-2"><div class="field"><label>Du</label><input type="date" id="ct-from" value="${mep_e(ct_from)}" onchange="ct_setRange()"></div><div class="field"><label>Au</label><input type="date" id="ct-to" value="${mep_e(ct_to)}" onchange="ct_setRange()"></div></div>
+    <div class="filter-row" style="margin-top:10px;margin-bottom:0;"><button class="filter-chip" onclick="ct_preset('today')">Aujourd’hui</button><button class="filter-chip" onclick="ct_preset('yesterday')">Hier</button><button class="filter-chip" onclick="ct_preset('7d')">7 derniers jours</button></div></div>`;
+  if(!tr.length) return period + ct_ingHtml() + '<div class="ticket"><div class="empty-state">Coche au moins un ingrédient à suivre pour commencer.</div></div>';
+  return period + `<div class="ticket"><div class="section-label">Consommation estimée</div><div id="ct-results">${ct_resultsHtml()}</div><div class="pt-muted" style="margin-top:8px;">Estimation = plats vendus × grammage net ÷ rendement. Les achats et le stock théorique viendront à l’étape suivante.</div></div>`
+    + ct_platsHtml(tr, sales) + ct_ingHtml();
 }
 
 const dt_dettesCol = db.collection('dettes_perso');
