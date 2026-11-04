@@ -4988,13 +4988,15 @@ function dp_renderMouvementsTab(){
   else if(dp_dateFilterStart) dateFilterSummary = `à partir du ${fmtDateShort(dp_dateFilterStart)}`;
   else if(dp_dateFilterEnd) dateFilterSummary = `jusqu'au ${fmtDateShort(dp_dateFilterEnd)}`;
 
-  const filterChips = `<h2 class="section">Mouvements déjà enregistrés</h2>
+  const filterChips = `${dp_importBox()}<h2 class="section">Mouvements déjà enregistrés</h2>
     <div class="ticket" style="padding:10px 14px;margin-bottom:10px;">
       <div class="search-wrap" style="${isAdmin?'margin-bottom:10px;':''}"><span class="icon">🔎</span><input type="text" id="dp-search" placeholder="Rechercher (motif, fournisseur, article, employé, saisi par…)" value="${esc(dp_searchTerm)}" oninput="dp_searchTerm=this.value;dp_render()" /></div>
       ${isAdmin ? `<div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;">
         <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Du</label><input type="date" id="dp-date-filter-start" value="${dp_dateFilterStart}" onchange="dp_dateFilterStart=this.value;dp_render()" /></div>
         <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Au</label><input type="date" id="dp-date-filter-end" value="${dp_dateFilterEnd}" onchange="dp_dateFilterEnd=this.value;dp_render()" /></div>
         <button class="btn small" style="white-space:nowrap;" onclick="dp_exportMouvementsExcel()">📊 Télécharger Excel</button>
+        <button class="btn ghost small" style="white-space:nowrap;" onclick="document.getElementById('dp-imp-file').click()">📥 Importer Excel</button>
+        <input type="file" id="dp-imp-file" accept=".xlsx,.xls" style="display:none;" onchange="dp_importFile(this.files[0]); this.value='';" />
         ${(hasDateFilter||dp_searchTerm) ? `<button class="btn ghost small" onclick="dp_dateFilterStart='';dp_dateFilterEnd='';dp_searchTerm='';dp_render()">✕ Effacer</button>` : ''}
       </div>` : ''}
     </div>
@@ -5444,6 +5446,75 @@ async function dp_recloturer(id){
   const solde = dp_computeSolde(dp_mouvements.filter(m=>m.date>=c.dateDebut && m.date<=c.dateFin));
   if(!confirm(`Reclôturer la période du ${fmtDateShort(c.dateDebut)} au ${fmtDateShort(c.dateFin)} avec un solde théorique de ${dp_fmtMoney(solde)} ?`)) return;
   await dp_cloturesCol.doc(id).set({ statut:'clos', soldeTheorique: solde, clotureParEn: currentUser, clotureLe: new Date().toISOString() }, { merge:true });
+}
+
+/* ---------- import d'un fichier Excel de l'ancienne application (administrateur, une seule fois) ----------
+   Lit le fichier « mouvements_depenses_….xlsx » (onglet Mouvements), l'ID du mouvement sert d'identifiant du document :
+   relancer l'import ne crée pas de doublon. Rien n'est écrit avant la confirmation. */
+let dp_imp = null; // { name, rows:[mouvement], bad:[{ligne, motif}], fresh:[…], known:n }
+function dp_impDate(v){
+  if(v instanceof Date && !isNaN(v)) return toLocalISO(v);
+  if(typeof v === 'number' && typeof XLSX !== 'undefined'){ const p = XLSX.SSF.parse_date_code(v); if(p) return p.y + '-' + String(p.m).padStart(2,'0') + '-' + String(p.d).padStart(2,'0'); }
+  const t = String(v == null ? '' : v).trim(); const m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1] + '-' + m[2] + '-' + m[3];
+  const f = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); return f ? f[3] + '-' + f[2].padStart(2,'0') + '-' + f[1].padStart(2,'0') : '';
+}
+function dp_impNum(v){ if(v === '' || v == null) return null; const n = Number(String(v).replace(/\s/g,'').replace(',','.')); return isNaN(n) ? null : n; }
+async function dp_importFile(file){
+  if(!file) return;
+  if(!(session && session.isAdmin)){ alert('Réservé à l’administratrice.'); return; }
+  if(typeof XLSX === 'undefined'){ alert('Le module Excel n’est pas disponible. Vérifie ta connexion puis réessaie.'); return; }
+  try{
+    const wb = XLSX.read(await file.arrayBuffer(), { type:'array' });
+    const ws = wb.Sheets['Mouvements'] || wb.Sheets[wb.SheetNames[0]];
+    const raw = XLSX.utils.sheet_to_json(ws, { defval:'' });
+    const types = DP_TYPES.map(t=>t.id), rows = [], bad = [];
+    if(!raw.length || !('ID mouvement' in raw[0]) || !('Type' in raw[0]) || !('Montant (DA)' in raw[0])){ alert('Ce fichier n’a pas le format attendu (colonnes « ID mouvement », « Type », « Montant (DA) »). Utilise le fichier téléchargé avec « 📊 Télécharger Excel » dans l’ancienne application.'); return; }
+    raw.forEach((r, i)=>{
+      const ligne = i + 2, id = String(r['ID mouvement'] || '').trim(), type = String(r['Type'] || '').trim(), date = dp_impDate(r['Date']), montant = dp_impNum(r['Montant (DA)']);
+      if(!id) return bad.push({ ligne, motif:'pas d’identifiant' });
+      if(!types.includes(type)) return bad.push({ ligne, motif:'type inconnu « ' + type + ' »' });
+      if(!date) return bad.push({ ligne, motif:'date illisible' });
+      if(montant === null) return bad.push({ ligne, motif:'montant illisible' });
+      const des = String(r['Désignation / Motif'] || '').trim(), qte = dp_impNum(r['Quantité']);
+      const creeLe = String(r['Date/heure saisie'] || '').trim() || (date + 'T' + (String(r['Heure'] || '12:00').trim() || '12:00') + ':00');
+      const m = { id, type, date, montant };
+      if(type === 'Achat'){ m.articleNom = des; m.quantite = qte === null ? 0 : qte; m.unite = String(r['Unité'] || '').trim(); m.fournisseur = String(r['Fournisseur'] || '').trim(); }
+      else { m.libelle = des; m.estAvanceSalaire = String(r['Avance salaire']).trim() === 'Oui'; m.employeNom = String(r['Employé'] || '').trim(); }
+      m.pointe = String(r['Pointé']).trim() === 'Oui';
+      m.creePar = String(r['Saisi par'] || '').trim(); m.creeLe = creeLe;
+      const mp = String(r['Modifié par'] || '').trim(); if(mp){ m.modifiePar = mp; m.modifieLe = String(r['Date/heure modification'] || '').trim(); }
+      m.importeLe = new Date().toISOString();
+      rows.push(m);
+    });
+    const known = new Set(dp_mouvements.map(x=>x.id));
+    dp_imp = { name:file.name, rows, bad, fresh:rows.filter(m=>!known.has(m.id)), known:rows.filter(m=>known.has(m.id)).length, busy:false };
+  }catch(e){ console.error(e); alert('Lecture impossible : ' + (e.message || e)); dp_imp = null; }
+  dp_render();
+}
+function dp_importCancel(){ dp_imp = null; dp_render(); }
+async function dp_importConfirm(){
+  if(!dp_imp || dp_imp.busy || !(session && session.isAdmin)) return;
+  const list = dp_imp.fresh; if(!list.length){ dp_imp = null; dp_render(); return; }
+  if(!confirm('Importer ' + list.length + ' mouvement(s) dans la base ?')) return;
+  dp_imp.busy = true; dp_render();
+  try{
+    for(let i = 0; i < list.length; i += 400){
+      const b = db.batch(); list.slice(i, i + 400).forEach(m=>b.set(dp_mouvCol.doc(m.id), m)); await b.commit();
+    }
+    const n = list.length; dp_imp = null; dp_render(); alert(n + ' mouvement(s) importé(s).');
+  }catch(e){ console.error(e); if(dp_imp) dp_imp.busy = false; dp_render(); alert('Erreur pendant l’import : ' + (e.message || e) + '\nRelance l’import : les mouvements déjà écrits seront ignorés.'); }
+}
+function dp_importBox(){
+  if(!(session && session.isAdmin)) return '';
+  if(!dp_imp) return '';
+  const r = dp_imp.rows, ds = r.map(m=>m.date).sort(), cnt = {};
+  dp_imp.fresh.forEach(m=>{ cnt[m.type] = (cnt[m.type] || 0) + 1; });
+  const types = Object.keys(cnt).map(t=>dp_typeMeta(t).shortLabel + ' : ' + cnt[t]).join(' · ');
+  return `<div class="ticket" style="border-color:var(--forest);"><div class="section-label">Import du fichier ${esc(dp_imp.name)}</div>
+    <div style="font-size:13px;line-height:1.6;"><b>${r.length}</b> ligne(s) lue(s)${ds.length ? ', du ' + esc(fmtDateShort(ds[0])) + ' au ' + esc(fmtDateShort(ds[ds.length - 1])) : ''}<br>
+    <b style="color:var(--moss);">${dp_imp.fresh.length}</b> nouveau(x) à importer${types ? ' <span style="color:var(--ink-muted);">(' + esc(types) + ')</span>' : ''}<br>
+    <b>${dp_imp.known}</b> déjà présent(s) — ignoré(s)${dp_imp.bad.length ? `<br><b style="color:var(--rust);">${dp_imp.bad.length}</b> ligne(s) rejetée(s) : ${esc(dp_imp.bad.slice(0, 5).map(x=>'ligne ' + x.ligne + ' (' + x.motif + ')').join(', '))}${dp_imp.bad.length > 5 ? '…' : ''}` : ''}</div>
+    <div style="display:flex;gap:8px;margin-top:10px;"><button class="btn moss" ${dp_imp.fresh.length && !dp_imp.busy ? '' : 'disabled'} onclick="dp_importConfirm()">${dp_imp.busy ? 'Import en cours…' : '✓ Importer ' + dp_imp.fresh.length + ' mouvement(s)'}</button><button class="btn ghost" ${dp_imp.busy ? 'disabled' : ''} onclick="dp_importCancel()">Annuler</button></div></div>`;
 }
 
 let dp_started = false;
