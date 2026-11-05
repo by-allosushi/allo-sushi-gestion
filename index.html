@@ -5353,8 +5353,37 @@ function dp_cfgAdd(kind){
   dp_grabForm(); dp_cfg[kind].push(it); dp_cfgSave(); dp_render();
   const el = document.getElementById('dp-cfg-new'); if(el) el.focus();
 }
-function dp_cfgRename(kind, id, v){ const it = dp_cfg[kind].find(x=>x.id === id); v = String(v).trim(); if(!it || !v) { dp_render(); return; } it.n = v; dp_cfgSave(); dp_render(); }
+async function dp_cfgRename(kind, id, v){
+  const it = dp_cfg[kind].find(x=>x.id === id); v = String(v).trim();
+  if(!it || !v || v === it.n){ dp_render(); return; }
+  const old = it.n, all = dp_mouvements.concat(dp_pending), changes = [];
+  all.forEach(m=>{
+    const u = {};
+    if(kind === 'ingredients' && m.type === 'Achat' && m.articleNom === old) u.articleNom = v;
+    else if(kind === 'concepts' && m.concept === old){ u.concept = v; if(m.libelle === old) u.libelle = v; }
+    else if(kind === 'livreurs' && m.livreur === old){ u.livreur = v; u.libelle = String(m.libelle || '').replace('Livraison — ' + old, 'Livraison — ' + v); }
+    else if(kind === 'boutons' && m.bouton === old){ u.bouton = v; if(m.libelle === old) u.libelle = v; else if(String(m.libelle || '').startsWith(old + ' : ')) u.libelle = v + String(m.libelle).slice(old.length); }
+    if(Object.keys(u).length) changes.push({ m, u });
+  });
+  if(changes.length && !confirm('Renommer « ' + old + ' » en « ' + v + ' » ?\n' + changes.length + ' ancien(s) mouvement(s) seront mis à jour avec le nouveau nom.')){ dp_render(); return; }
+  it.n = v;
+  try{
+    for(let k = 0; k < changes.length; k += 400){
+      const batch = db.batch();
+      changes.slice(k, k + 400).forEach(c=>{ batch.set(dp_mouvCol.doc(c.m.id), Object.assign({}, c.m, c.u)); });
+      await batch.commit();
+    }
+  }catch(e){ console.error(e); alert('Mise à jour des anciens mouvements incomplète : ' + e.message); }
+  await dp_cfgSave(); dp_render();
+}
 function dp_cfgToggle(kind, id){ const it = dp_cfg[kind].find(x=>x.id === id); if(!it) return; it.off = !it.off; dp_grabForm(); dp_cfgSave(); dp_render(); }
+function dp_cfgDelete(kind, id){
+  const it = dp_cfg[kind].find(x=>x.id === id); if(!it) return;
+  if(!confirm('Supprimer « ' + it.n + ' » de la liste ?\nLes anciens mouvements gardent leur nom.')) return;
+  dp_cfg[kind] = dp_cfg[kind].filter(x=>x.id !== id);
+  if(kind === 'ingredients' && dp_fv['dp-ing'] === it.n) delete dp_fv['dp-ing'];
+  dp_grabForm(); dp_cfgSave(); dp_render();
+}
 function dp_cfgMove(kind, id, dir){
   const a = dp_cfg[kind], i = a.findIndex(x=>x.id === id), j = i + dir; if(i < 0 || j < 0 || j >= a.length) return;
   const t = a[i]; a[i] = a[j]; a[j] = t; dp_grabForm(); dp_cfgSave(); dp_render();
@@ -5370,10 +5399,11 @@ function dp_cfgPanelHtml(kind){
       <button type="button" class="btn ghost small" ${i === 0 ? 'disabled' : ''} onclick="dp_cfgMove('${kind}','${it.id}',-1)">▲</button>
       <button type="button" class="btn ghost small" ${i === dp_cfg[kind].length - 1 ? 'disabled' : ''} onclick="dp_cfgMove('${kind}','${it.id}',1)">▼</button>
       <button type="button" class="btn ghost small" onclick="dp_cfgToggle('${kind}','${it.id}')">${it.off ? 'Afficher' : 'Masquer'}</button>
+      ${(kind === 'boutons' && DP_BOUTONS_BASE.some(b=>b.id === it.id)) ? '' : `<button type="button" class="btn ghost small" style="color:var(--rust);" title="Supprimer" onclick="dp_cfgDelete('${kind}','${it.id}')">🗑️</button>`}
     </div>`).join('');
   return `<div class="ticket" style="padding:12px;border-color:var(--forest);margin:8px 0;">
     <div class="row-between"><b style="font-size:13px;">⚙️ ${TITRES[kind]}</b><button type="button" class="btn ghost small" onclick="dp_cfgOpen('${kind}')">Fermer</button></div>
-    <div style="font-size:11.5px;color:var(--ink-muted);margin:4px 0;">Un élément masqué disparaît de la liste, mais les anciens mouvements gardent leur nom.</div>
+    <div style="font-size:11.5px;color:var(--ink-muted);margin:4px 0;">Modifier le nom met à jour les anciens mouvements. « Masquer » (réaffichable) et 🗑️ (définitif) les laissent inchangés, avec leur ancien nom.</div>
     ${rows}
     <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
       <input type="text" id="dp-cfg-new" class="ft-in" style="flex:1;min-width:0;padding:6px 8px;" placeholder="Ajouter…" onkeydown="if(event.key==='Enter'){ event.preventDefault(); dp_cfgAdd('${kind}'); }" />
