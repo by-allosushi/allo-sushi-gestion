@@ -1312,6 +1312,10 @@ function ca_lineLocked(key, id){
   return false;
 }
 // Appelé à chaque enregistrement de la journée : crée / met à jour / retire les entrées EN ATTENTE.
+function ca_syncNow(){
+  if(!ca_retraitReady){ ca_setSyncLabel('⚠ Retrait non transmis à Dépenses (accès à « depenses_mouvements » impossible)'); return; }
+  ca_syncRetraits(ca_session).catch(e=>{ console.warn('Sync retraits', e); ca_setSyncLabel('⚠ Retrait non transmis à Dépenses'); });
+}
 async function ca_syncRetraits(sess){
   if(!ca_retraitReady) return;                 // base des retraits pas encore lue : on ne touche à rien
   const date = sess.date, col = db.collection('depenses_mouvements');
@@ -1431,6 +1435,7 @@ function ca_addEntry(k){
   if(!Array.isArray(ca_session[k])) ca_session[k] = [];
   ca_session[k].push(line);
   d.montant = ''; d.note = '';
+  if(k === 'sorties' && line.motif === 'retrait') ca_syncNow();
   ca_render();
   const el = document.getElementById('cg-' + k + '-m'); if(el) el.focus();
 }
@@ -1446,6 +1451,7 @@ function ca_removeLine(key, id){
   if(ca_lineLocked(key, id)) return;
   if(!Array.isArray(ca_session[key])) ca_session[key] = [];
   ca_session[key] = ca_session[key].filter(l=>l.id!==id);
+  if(key === 'sorties') ca_syncNow();
   ca_render();
 }
 function ca_updateLine(key, id, field, value){
@@ -1453,6 +1459,7 @@ function ca_updateLine(key, id, field, value){
   if(!Array.isArray(ca_session[key])) ca_session[key] = [];
   const line = ca_session[key].find(l=>l.id===id);
   if(line) line[field] = value;
+  if(key === 'sorties') ca_syncNow();
   ca_render();
 }
 function ca_renderHistModal(){
@@ -4458,6 +4465,7 @@ function dp_periodLabel(){
 }
 
 let dp_mouvements = [];
+let dp_listMax = 50;
 let dp_pending = [];          // retraits de caisse en attente de confirmation (hors solde)
 let dp_pendVals = {};
 let dp_purge = null, dp_purgeFile = null, dp_purgeBusy = false;
@@ -5240,8 +5248,9 @@ function dp_renderMouvementsTab(){
     <button class="filter-chip ${dp_typeFilter==='out'?'active':''}" style="${dp_typeFilter==='out'?'background:var(--rust);border-color:var(--rust);color:#fff;':''}" onclick="dp_typeFilter='out';dp_render()">↑ Sortie</button>
   </div>`;
 
+  const shown = sorted.slice(0, dp_listMax);
   const list = sorted.length===0 ? `<p style="font-size:13px;color:var(--ink-muted);">Aucun mouvement.</p>` :
-    sorted.map(m=>{
+    shown.map(m=>{
       const meta = dp_typeMeta(m.type);
       const detail = m.type==='Achat' ? `${esc(m.articleNom||'')} · ${dp_fmtNum(m.quantite)} ${esc(m.unite||'')}` : (esc(m.libelle||'') + (m.estAvanceSalaire?` · 👤 Avance : ${esc(m.employeNom)}`:'') + (m.source==='caisse'&&m.ecart?` · <span style="color:var(--rust);">écart Caisse ${m.ecart>0?'+':'−'}${dp_fmtMoney(Math.abs(m.ecart))}</span>`:'') + (m.type==='Report'&&m.purges?` · jusqu’au ${fmtDateShort(m.date)}`:''));
       return `<div class="movement-row">
@@ -5257,7 +5266,8 @@ function dp_renderMouvementsTab(){
       </div>`;
     }).join('');
 
-  return dp_pendingBox() + soldeBox + addBar + form + draftBox + dp_purgeBox() + filterChips + list;
+  const more = sorted.length > dp_listMax ? `<button class="btn ghost" style="width:100%;margin-top:10px;" onclick="dp_listMax+=100;dp_render()">Afficher plus (${sorted.length - dp_listMax} restants)</button>` : '';
+  return dp_pendingBox() + soldeBox + addBar + form + draftBox + dp_purgeBox() + filterChips + list + more;
 }
 
 /* ---------------- Boutons Entrée / Sortie / Avance et formulaires ----------------
@@ -5297,7 +5307,7 @@ function dp_cfgFix(){
   DP_BOUTONS_BASE.forEach(b=>{ if(!dp_cfg.boutons.some(x=>x.id === b.id)) dp_cfg.boutons.push(Object.assign({}, b)); });
 }
 const dp_watchCfg = ()=>dp_cfgRef.onSnapshot((doc)=>{
-  if(doc.exists){ const d = doc.data() || {}; ['concepts','boutons','ingredients','livreurs'].forEach(k=>{ if(Array.isArray(d[k])) dp_cfg[k] = d[k]; }); }
+  if(doc.exists){ const d = doc.data() || {}; ['concepts','boutons','ingredients','livreurs'].forEach(k=>{ if(Array.isArray(d[k])) dp_cfg[k] = d[k]; }); if(Array.isArray(d.ordre)) dp_cfg.ordre = d.ordre; }
   dp_cfgFix(); dp_cfgErr = ''; dp_render();
 }, (err)=>{ console.warn(err); dp_cfgErr = (err && err.message) || 'Lecture impossible'; });
 const dp_watchPtEmp = ()=>pt_configRef.onSnapshot((doc)=>{ dp_ptEmp = doc.exists ? ((doc.data() || {}).emp || {}) : {}; }, (err)=>console.warn(err));
@@ -5360,13 +5370,28 @@ function dp_cfgPanelHtml(kind){
 }
 
 /* --- barre des trois boutons --- */
+let dp_orderMode = false;
+function dp_kindOrder(){ const base = ['entree','sortie','avance']; const o = (dp_cfg.ordre || []).filter(x=>base.includes(x)); base.forEach(x=>{ if(!o.includes(x)) o.push(x); }); return o; }
+function dp_toggleOrder(){ dp_orderMode = !dp_orderMode; dp_render(); }
+async function dp_moveKind(k, dir){
+  const o = dp_kindOrder(), i = o.indexOf(k), j = i + dir;
+  if(j < 0 || j >= o.length) return;
+  [o[i], o[j]] = [o[j], o[i]]; dp_cfg.ordre = o; dp_render(); await dp_cfgSave();
+}
 function dp_renderAddBar(){
-  const K = [['entree','↓ Entrée','Appoint, recette','var(--moss)','var(--moss-bg)'], ['sortie','↑ Sortie','Ingrédients, livraison…','var(--rust)','var(--rust-bg)'], ['avance','👤 Avance','Sur salaire','var(--amber)','var(--amber-bg)']];
-  return `<div class="grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">${K.map(k=>{
+  const isAdm = session && session.isAdmin;
+  const ALL = { entree:['entree','↓ Entrée','Appoint, recette','var(--moss)','var(--moss-bg)'], sortie:['sortie','↑ Sortie','Ingrédients, livraison…','var(--rust)','var(--rust-bg)'], avance:['avance','👤 Avance','Sur salaire','var(--amber)','var(--amber-bg)'] };
+  const K = dp_kindOrder().map(x=>ALL[x]);
+  const tiles = K.map((k,idx)=>{
     const on = dp_formKind === k[0];
-    return `<button type="button" ${dp_editingMouvId ? 'disabled' : ''} onclick="dp_openKind('${k[0]}')" style="padding:12px 6px;border-radius:8px;border:2px solid ${on ? k[3] : 'var(--line)'};background:${on ? k[4] : 'var(--surface)'};text-align:center;cursor:pointer;${dp_editingMouvId && !on ? 'opacity:.4;' : ''}">
+    if(dp_orderMode) return `<div style="padding:10px 6px;border-radius:8px;border:2px dashed var(--line);text-align:center;background:var(--surface);">
+      <div style="font-weight:700;font-size:14px;color:${k[3]};">${k[1]}</div>
+      <div style="display:flex;justify-content:center;gap:8px;margin-top:6px;"><button type="button" class="btn ghost small" ${idx===0?'disabled':''} onclick="dp_moveKind('${k[0]}',-1)">◀</button><button type="button" class="btn ghost small" ${idx===K.length-1?'disabled':''} onclick="dp_moveKind('${k[0]}',1)">▶</button></div></div>`;
+    return `<button type="button" ${dp_editingMouvId ? 'disabled' : ''} onclick="dp_openKind('${k[0]}')" style="padding:12px 6px;border-radius:8px;border:2px solid ${on ? k[3] : 'var(--line)'};background:${on ? k[4] : 'var(--surface)'};text-align:center;cursor:pointer;">
       <div style="font-weight:700;font-size:14px;color:${on ? k[3] : 'var(--ink)'};">${k[1]}</div><div style="font-size:10.5px;color:var(--ink-muted);margin-top:2px;">${k[2]}</div></button>`;
-  }).join('')}</div>`;
+  }).join('');
+  return `<div class="grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:${isAdm ? '4px' : '12px'};">${tiles}</div>`
+    + (isAdm ? `<div style="text-align:right;margin-bottom:10px;"><button type="button" class="btn ghost small" style="font-size:11px;padding:2px 8px;" onclick="dp_toggleOrder()">${dp_orderMode ? '✓ Terminé' : '↔ Ordre des boutons'}</button></div>` : '');
 }
 function dp_openKind(k){
   if(dp_editingMouvId) return;
