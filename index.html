@@ -5259,9 +5259,9 @@ function dp_renderMouvementsTab(){
     ${((isAdmin&&hasDateFilter)||dp_searchTerm) ? `<div style="font-size:12px;color:var(--forest);margin-bottom:8px;">${isAdmin?dateFilterSummary:''}${isAdmin&&dateFilterSummary&&dp_searchTerm?' · ':''}${dp_searchTerm?`recherche « ${esc(dp_searchTerm)} »`:''} — ${sorted.length} mouvement(s)</div>` : ''}
     <div class="filter-row" style="margin-bottom:6px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">${(manualRange || dp_searchTerm.trim()) ? '' : [['jour','Aujourd’hui'],['hier','Hier'],['semaine','Semaine'],['tous','Tous']].map(([id,l])=>`<button class="filter-chip ${dp_period===id?'active':''}" style="${dp_period===id?'background:var(--forest);border-color:var(--forest);color:#fff;':''}" onclick="dp_setPeriod('${id}')">${l}</button>`).join('')}</div>
     <div class="filter-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
-    <button class="filter-chip ${dp_typeFilter==='Tous'?'active':''}" style="${dp_typeFilter==='Tous'?'background:var(--forest);border-color:var(--forest);color:#fff;':''}" onclick="dp_typeFilter='Tous';dp_render()">Tous</button>
-    <button class="filter-chip ${dp_typeFilter==='in'?'active':''}" style="${dp_typeFilter==='in'?'background:var(--moss);border-color:var(--moss);color:#fff;':''}" onclick="dp_typeFilter='in';dp_render()">↓ Entrée</button>
     <button class="filter-chip ${dp_typeFilter==='out'?'active':''}" style="${dp_typeFilter==='out'?'background:var(--rust);border-color:var(--rust);color:#fff;':''}" onclick="dp_typeFilter='out';dp_render()">↑ Sortie</button>
+    <button class="filter-chip ${dp_typeFilter==='in'?'active':''}" style="${dp_typeFilter==='in'?'background:var(--moss);border-color:var(--moss);color:#fff;':''}" onclick="dp_typeFilter='in';dp_render()">↓ Entrée</button>
+    <button class="filter-chip ${dp_typeFilter==='Tous'?'active':''}" style="${dp_typeFilter==='Tous'?'background:var(--forest);border-color:var(--forest);color:#fff;':''}" onclick="dp_typeFilter='Tous';dp_render()">Tous</button>
   </div>`;
 
   const shown = sorted.slice(0, dp_listMax);
@@ -5276,7 +5276,7 @@ function dp_renderMouvementsTab(){
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <div class="mono" style="font-weight:600;color:${meta.color};">${dp_signedAmt(m)}</div>
-          ${session && session.isAdmin && m.type!=='Report' ? `<button class="x-btn" style="color:var(--forest);font-size:13px;" onclick="dp_openEditMouv('${m.id}')">✏️</button>` : ''}
+          ${m.type!=='Report' && !(m.source==='caisse' && !(session && session.isAdmin)) ? `<button class="x-btn" style="color:var(--forest);font-size:13px;" onclick="dp_openEditMouv('${m.id}')">✏️</button>` : ''}
           ${m.type!=='Report' ? `<button class="x-btn" onclick="dp_deleteMouvement('${m.id}')">✕</button>` : ''}
         </div>
       </div>`;
@@ -5420,9 +5420,9 @@ function dp_pickBtn(id){ dp_grabForm(); dp_sortieBtn = id; dp_fvReset(); dp_cfgP
 function dp_closeForm(){ dp_formKind = null; dp_cfgPanel = null; dp_editingMouvId = null; dp_editPrefill = null; dp_fvReset(); dp_render(); }
 
 function dp_openEditMouv(id){
-  if(!(session && session.isAdmin)){ alert("Seule l'administratrice peut modifier un mouvement déjà enregistré."); return; }
   const m = dp_mouvements.find(x=>x.id === id);
   if(!m) return;
+  if(m.source==='caisse' && !(session && session.isAdmin)){ alert('Cette entrée vient de la Caisse (retrait confirmé) : seule l’administratrice peut la modifier.'); return; }
   if(m.type==='Report'){ alert('Le « Report de solde » n’est pas modifiable.'); return; }
   const closure = dp_closureFor(m.date);
   if(closure){ alert(`Cette période (${fmtDateShort(closure.dateDebut)} → ${fmtDateShort(closure.dateFin)}) est clôturée. Réouvrez-la dans l'onglet Clôtures pour modifier.`); return; }
@@ -5530,7 +5530,6 @@ function dp_renderMouvForm(){
 
 async function dp_submitMouv(){
   if(!currentUser){ askUserName(false); if(!currentUser) return; }
-  if(dp_editingMouvId && !(session && session.isAdmin)){ alert("Seule l'administratrice peut modifier un mouvement déjà enregistré."); return; }
   const date = dp_workingDate, closure = dp_closureFor(date);
   if(closure){ alert(`La date sélectionnée (${fmtDateShort(date)}) fait partie d'une période clôturée (${fmtDateShort(closure.dateDebut)} → ${fmtDateShort(closure.dateFin)}). Réouvrez-la dans l'onglet Clôtures pour modifier.`); return; }
   const E = dp_editPrefill || {}, V = dp_achVal, montantOf = ()=>dp_parseNum(V('dp-montant'));
