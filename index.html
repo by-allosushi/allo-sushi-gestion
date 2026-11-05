@@ -4465,7 +4465,7 @@ function dp_periodLabel(){
 }
 
 let dp_mouvements = [];
-let dp_listMax = 50, dp_period = 'jour';
+let dp_listMax = 50, dp_period = 'jour', dp_jPeriod = 'jour';
 function dp_setPeriod(x){ dp_period = x; dp_listMax = 50; dp_render(); }
 let dp_pending = [];          // retraits de caisse en attente de confirmation (hors solde)
 let dp_pendVals = {};
@@ -4670,7 +4670,7 @@ function dp_renderVerificationBox(){
   const soldeTheorique = dp_computeSolde(dp_mouvements);
   const helper = isAdmin
     ? 'Vous pouvez consulter le solde théorique, saisir le solde réellement compté, puis lancer la vérification.'
-    : 'Saisissez le montant réellement compté, puis cliquez sur Vérification. Le solde théorique reste masqué.';
+    : 'Saisir le solde réellement compté, puis lancer la vérification.';
   const theoreticalBox = isAdmin ? `<div class="result-box final" style="margin-top:10px;">
       <div class="label">Solde théorique</div><div class="value">${dp_fmtMoney(soldeTheorique)}</div>
     </div>` : '';
@@ -4686,7 +4686,7 @@ function dp_renderVerificationBox(){
       <button class="btn" type="button" onclick="dp_verifierSolde()">✓ Vérification</button>
       ${displayedEcart}
     </div>
-    ${v && session && session.isAdmin ? `<div style="font-size:10.5px;color:var(--ink-muted);margin-top:8px;">Dernière vérification : ${dp_fmtDateTime(v.dateHeure)}${v.verifiePar?' · par '+esc(v.verifiePar):''}</div>` : ''}
+    ${v ? `<div style="font-size:10.5px;color:var(--ink-muted);margin-top:8px;">Dernière vérification : ${dp_fmtDateTime(v.dateHeure)}${v.verifiePar?' · par '+esc(v.verifiePar):''}</div>` : ''}
   </div>`;
 }
 function dp_renderVerificationHistory(){
@@ -4720,6 +4720,10 @@ function dp_renderHistoriqueTab(){
   const sub = `<div class="filter-row" style="margin-bottom:12px;">${chip('verifications','🔎 Vérifications')}${chip('mouvements','🧾 Mouvements')}</div>`;
   return sub + (dp_histSub==='mouvements' ? dp_renderJournalMouvements() : dp_renderVerificationHistory());
 }
+const DP_EDIT_DAYS = 3;
+function dp_editLimit(){ const d = new Date(); d.setDate(d.getDate() - DP_EDIT_DAYS); return dp_isoLocal(d); }
+function dp_tooOld(m){ return !(session && session.isAdmin) && (m.date || '') < dp_editLimit(); }
+const DP_TOOOLD_MSG = 'Ce mouvement date de plus de ' + DP_EDIT_DAYS + ' jours : il ne peut plus être modifié ni supprimé. Contacte l’administratrice.';
 function dp_dayOf(iso){
   const d = new Date(iso);
   return isNaN(d.getTime()) ? '' : toLocalISO(d);
@@ -4749,22 +4753,23 @@ function dp_renderJournalMouvements(){
     modification: all.filter(i=>i.kind==='modification').length,
     suppression: all.filter(i=>i.kind==='suppression').length
   };
-  let items = dp_journalFilter==='tous' ? all : all.filter(i=>i.kind===dp_journalFilter);
-  if(dp_journalStart) items = items.filter(i=>dp_dayOf(i.at) >= dp_journalStart);
-  if(dp_journalEnd) items = items.filter(i=>dp_dayOf(i.at) <= dp_journalEnd);
+  let items = all;
+  { const t = todayISO(); let a = t, b = t;
+    const manual = dp_journalStart || dp_journalEnd;
+    if(manual){ a = dp_journalStart || '0000-00-00'; b = dp_journalEnd || '9999-12-31'; }
+    else if(dp_jPeriod === 'hier'){ const d = new Date(); d.setDate(d.getDate()-1); a = b = dp_isoLocal(d); }
+    else if(dp_jPeriod === 'semaine'){ a = dp_startOfWeek(t); }
+    items = items.filter(i=>{ const d = dp_dayOf(i.at); return d >= a && d <= b; }); }
 
   const fchip = (id,label,color)=>`<button class="filter-chip ${dp_journalFilter===id?'active':''}" style="${dp_journalFilter===id?`background:${color};border-color:${color};color:#fff;`:''}" onclick="dp_journalFilter='${id}';dp_render()">${label} (${counts[id]})</button>`;
   const header = `<div class="ticket" style="border-color:var(--forest);background:var(--surface);">
     <div style="font-size:13px;font-weight:700;color:var(--forest);">🧾 Historique des mouvements</div>
-    <div style="font-size:11.5px;color:var(--ink-muted);margin-top:4px;">Saisies faites après la date du mouvement, modifications et suppressions de mouvements déjà enregistrés. Les modifications et suppressions sont tracées à partir de la mise en service de cette fonction.</div>
     <div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin-top:10px;">
-      <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Du (date de l'action)</label><input type="date" value="${dp_journalStart}" onchange="dp_journalStart=this.value;dp_render()" /></div>
+      <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Du</label><input type="date" value="${dp_journalStart}" onchange="dp_journalStart=this.value;dp_render()" /></div>
       <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Au</label><input type="date" value="${dp_journalEnd}" onchange="dp_journalEnd=this.value;dp_render()" /></div>
       ${(dp_journalStart||dp_journalEnd)?`<button class="btn ghost small" onclick="dp_journalStart='';dp_journalEnd='';dp_render()">✕ Effacer</button>`:''}
     </div>
-  </div>
-  <div class="filter-row">
-    ${fchip('tous','Tous','var(--forest)')}${fchip('retard','⏰ En retard','var(--amber)')}${fchip('modification','✏️ Modifications','var(--bar)')}${fchip('suppression','🗑️ Suppressions','var(--rust)')}
+    ${(dp_journalStart||dp_journalEnd) ? '' : `<div class="filter-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0 0;">${[['jour','Aujourd’hui'],['hier','Hier'],['semaine','Semaine']].map(([id,l])=>`<button class="filter-chip ${dp_jPeriod===id?'active':''}" style="${dp_jPeriod===id?'background:var(--forest);border-color:var(--forest);color:#fff;':''}" onclick="dp_jPeriod='${id}';dp_render()">${l}</button>`).join('')}</div>`}
   </div>`;
 
   const rows = items.map(i=>{
@@ -4798,13 +4803,14 @@ function dp_renderJournalMouvements(){
     </div>`;
   }).join('');
 
-  return header + (rows || `<p style="font-size:12.5px;color:var(--ink-muted);">Aucun élément.</p>`);
+  return header + (rows || `<p style="font-size:12.5px;color:var(--ink-muted);">Aucune activité${(dp_journalStart||dp_journalEnd) ? ' sur cette période' : ' ' + ({jour:'aujourd’hui',hier:'hier',semaine:'cette semaine'})[dp_jPeriod]}.</p>`);
 }
 
 async function dp_deleteMouvement(id){
   const m = dp_mouvements.find(x=>x.id===id);
   if(m && m.type==='Report'){ alert('Le « Report de solde » ne peut pas être supprimé : il remplace les périodes déjà supprimées.'); return; }
   if(m && m.source==='caisse' && !(session && session.isAdmin)){ alert('Cette entrée vient de la Caisse (retrait confirmé) : seule l’administratrice peut la supprimer.'); return; }
+  if(m && dp_tooOld(m)){ alert(DP_TOOOLD_MSG); return; }
   if(m){
     const closure = dp_closureFor(m.date);
     if(closure){ alert(`Cette période (${fmtDateShort(closure.dateDebut)} → ${fmtDateShort(closure.dateFin)}) est clôturée. Réouvrez-la dans l'onglet Clôtures pour modifier.`); return; }
@@ -4835,13 +4841,13 @@ function dp_render(){
   const isAdmin = session && session.isAdmin;
   if(dp_currentTab==='tableau' || dp_currentTab==='pointage' || dp_currentTab==='clotures') dp_currentTab = 'mouvements';
   if(dp_currentTab==='verification' && !dp_canVerify()) dp_currentTab = 'mouvements';
-  if(dp_currentTab==='historique' && !dp_canSeeVerificationHistory()) dp_currentTab = 'mouvements';
+  if(dp_currentTab==='historique') dp_currentTab = dp_canSeeVerificationHistory() ? 'verification' : 'mouvements';
   if(!isAdmin && (dp_currentTab==='clotures' || dp_currentTab==='avances')) dp_currentTab = 'mouvements';
 
   dp_renderTabs();
   const main = document.getElementById('depenses-main');
   if(dp_currentTab==='mouvements') main.innerHTML = dp_renderMouvementsTab();
-  else if(dp_currentTab==='verification') main.innerHTML = dp_renderVerificationBox();
+  else if(dp_currentTab==='verification') main.innerHTML = dp_renderVerificationBox() + (dp_canSeeVerificationHistory() ? '<h2 class="section">Historique</h2>' + dp_renderHistoriqueTab() : '');
   else if(dp_currentTab==='historique') main.innerHTML = dp_renderHistoriqueTab();
   else if(dp_currentTab==='avances') main.innerHTML = dp_renderAvancesTab();
   else if(dp_currentTab==='clotures') main.innerHTML = dp_renderCloturesTab();
@@ -4856,7 +4862,7 @@ function dp_setTab(t){ dp_currentTab = t; dp_render(); }
 function dp_renderTabs(){
   const isAdmin = session && session.isAdmin;
   const tabs = isAdmin
-    ? [ {id:'mouvements', label:'Mouvements'}, {id:'verification', label:'🔎 Vérification'}, {id:'historique', label:'📋 Historique'}, {id:'avances', label:'Avances salaire'} ]
+    ? [ {id:'mouvements', label:'Mouvements'}, {id:'verification', label:'🔎 Vérification'}, {id:'avances', label:'Avances salaire'} ]
     : [ {id:'mouvements', label:'Mouvements'}, {id:'verification', label:'🔎 Vérification'} ];
   document.getElementById('depenses-tabs').innerHTML = tabs.map(t=>`
     <button class="${dp_currentTab===t.id?'active':''}" onclick="dp_setTab('${t.id}')">${esc(t.label)}</button>
@@ -5277,8 +5283,8 @@ function dp_renderMouvementsTab(){
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <div class="mono" style="font-weight:600;color:${meta.color};">${dp_signedAmt(m)}</div>
-          ${m.type!=='Report' && !(m.source==='caisse' && !(session && session.isAdmin)) ? `<button class="x-btn" style="color:var(--forest);font-size:13px;" onclick="dp_openEditMouv('${m.id}')">✏️</button>` : ''}
-          ${m.type!=='Report' ? `<button class="x-btn" onclick="dp_deleteMouvement('${m.id}')">✕</button>` : ''}
+          ${m.type!=='Report' && !dp_tooOld(m) && !(m.source==='caisse' && !(session && session.isAdmin)) ? `<button class="x-btn" style="color:var(--forest);font-size:13px;" onclick="dp_openEditMouv('${m.id}')">✏️</button>` : ''}
+          ${m.type!=='Report' && !dp_tooOld(m) ? `<button class="x-btn" onclick="dp_deleteMouvement('${m.id}')">✕</button>` : (dp_tooOld(m) ? '<span title="Modification impossible après 3 jours" style="font-size:13px;opacity:.6;">🔒</span>' : '')}
         </div>
       </div>`;
     }).join('');
@@ -5476,6 +5482,7 @@ function dp_openEditMouv(id){
   if(!m) return;
   if(m.source==='caisse' && !(session && session.isAdmin)){ alert('Cette entrée vient de la Caisse (retrait confirmé) : seule l’administratrice peut la modifier.'); return; }
   if(m.type==='Report'){ alert('Le « Report de solde » n’est pas modifiable.'); return; }
+  if(dp_tooOld(m)){ alert(DP_TOOOLD_MSG); return; }
   const closure = dp_closureFor(m.date);
   if(closure){ alert(`Cette période (${fmtDateShort(closure.dateDebut)} → ${fmtDateShort(closure.dateFin)}) est clôturée. Réouvrez-la dans l'onglet Clôtures pour modifier.`); return; }
   dp_editingMouvId = id; dp_editPrefill = m; dp_workingDate = m.date; dp_cfgPanel = null;
@@ -5643,6 +5650,7 @@ async function dp_submitMouv(){
   }
   if(dp_editingMouvId){
     const original = dp_mouvements.find(m=>m.id === dp_editingMouvId);
+    if(original && (dp_tooOld(original) || (!(session && session.isAdmin) && date < dp_editLimit()))){ alert('Modification refusée : une modification ne peut porter que sur les ' + DP_EDIT_DAYS + ' derniers jours.'); return; }
     const mouv = Object.assign({}, original, base, { date, modifiePar:currentUser, modifieLe:new Date().toISOString() });
     await dp_mouvCol.doc(dp_editingMouvId).set(mouv);
     await dp_logJournal('modification', dp_editingMouvId, original, mouv);
@@ -5920,6 +5928,7 @@ let dp_started = false;
 function dp_start(){
   if(dp_started) return; dp_started = true;
   dp_watchMouv(); dp_watchPointages(); dp_watchClotures(); dp_watchCfg(); dp_watchPtEmp();
+  dp_startVerificationListener(); dp_startJournalListener();   // historique (administratrice) : vérifications + journal des mouvements
 }
 
 /* ==================== CONTRÔLE DES STOCKS (administrateur) — étape 1 ====================
