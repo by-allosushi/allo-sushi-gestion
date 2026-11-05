@@ -4476,6 +4476,11 @@ const DP_PURGE_PROTECT_DAYS = 30;
 let dp_pointages = [];
 let dp_currentTab = 'mouvements';
 let dp_typeFilter = 'Tous';
+function dp_typeMatch(m){
+  if(dp_typeFilter === 'Tous') return true;
+  if(dp_typeFilter === 'avance') return !!m.estAvanceSalaire;
+  return (dp_typeMeta(m.type).sign > 0 ? 'in' : 'out') === dp_typeFilter;
+}
 let dp_dateFilterStart = '';
 let dp_dateFilterEnd = '';
 let dp_searchTerm = '';
@@ -4950,7 +4955,7 @@ function dp_exportMouvementsExcel(){
   let rows = dp_mouvements.slice();
   if(dp_dateFilterStart) rows = rows.filter(m=>m.date>=dp_dateFilterStart);
   if(dp_dateFilterEnd) rows = rows.filter(m=>m.date<=dp_dateFilterEnd);
-  if(dp_typeFilter!=='Tous') rows = rows.filter(m => (dp_typeMeta(m.type).sign>0 ? 'in' : 'out') === dp_typeFilter);
+  rows = rows.filter(dp_typeMatch);
   if(dp_searchTerm.trim()){
     const q=dp_searchTerm.trim().toLowerCase();
     rows=rows.filter(m=>[m.libelle,m.articleNom,m.fournisseur,m.employeNom,m.creePar,m.modifiePar,m.type,m.unite].filter(Boolean).join(' ').toLowerCase().includes(q));
@@ -5172,7 +5177,7 @@ async function dp_purgeApply(){
 
 function dp_renderMouvementsTab(){
   const isAdmin = session && session.isAdmin;
-  let filtered = dp_typeFilter==='Tous' ? dp_mouvements : dp_mouvements.filter(m=> (dp_typeMeta(m.type).sign>0 ? 'in' : 'out') === dp_typeFilter);
+  let filtered = dp_mouvements.filter(dp_typeMatch);
   if(isAdmin && dp_dateFilterStart) filtered = filtered.filter(m=>m.date>=dp_dateFilterStart);
   if(isAdmin && dp_dateFilterEnd) filtered = filtered.filter(m=>m.date<=dp_dateFilterEnd);
   if(dp_searchTerm.trim()){
@@ -5265,9 +5270,10 @@ function dp_renderMouvementsTab(){
     </div>
     ${((isAdmin&&hasDateFilter)||dp_searchTerm) ? `<div style="font-size:12px;color:var(--forest);margin-bottom:8px;">${isAdmin?dateFilterSummary:''}${isAdmin&&dateFilterSummary&&dp_searchTerm?' · ':''}${dp_searchTerm?`recherche « ${esc(dp_searchTerm)} »`:''} — ${sorted.length} mouvement(s)</div>` : ''}
     <div class="filter-row" style="margin-bottom:6px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">${(manualRange || dp_searchTerm.trim()) ? '' : [['jour','Aujourd’hui'],['hier','Hier'],['semaine','Semaine'],['tous','Tous']].map(([id,l])=>`<button class="filter-chip ${dp_period===id?'active':''}" style="${dp_period===id?'background:var(--forest);border-color:var(--forest);color:#fff;':''}" onclick="dp_setPeriod('${id}')">${l}</button>`).join('')}</div>
-    <div class="filter-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+    <div class="filter-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
     <button class="filter-chip ${dp_typeFilter==='out'?'active':''}" style="${dp_typeFilter==='out'?'background:var(--rust);border-color:var(--rust);color:#fff;':''}" onclick="dp_typeFilter='out';dp_render()">↑ Sortie</button>
     <button class="filter-chip ${dp_typeFilter==='in'?'active':''}" style="${dp_typeFilter==='in'?'background:var(--moss);border-color:var(--moss);color:#fff;':''}" onclick="dp_typeFilter='in';dp_render()">↓ Entrée</button>
+    <button class="filter-chip ${dp_typeFilter==='avance'?'active':''}" style="${dp_typeFilter==='avance'?'background:var(--amber);border-color:var(--amber);color:#000;':''}" onclick="dp_typeFilter='avance';dp_render()">👤 Avance</button>
     <button class="filter-chip ${dp_typeFilter==='Tous'?'active':''}" style="${dp_typeFilter==='Tous'?'background:var(--forest);border-color:var(--forest);color:#fff;':''}" onclick="dp_typeFilter='Tous';dp_render()">Tous</button>
   </div>`;
 
@@ -5471,7 +5477,7 @@ function dp_openKind(k){
   if(dp_editingMouvId) return;
   dp_grabForm();
   if(dp_formKind === k){ dp_formKind = null; dp_cfgPanel = null; }
-  else { dp_formKind = k; dp_cfgPanel = null; if(k === 'sortie' && !dp_sortieBtn) dp_sortieBtn = dp_curBtn().id; }
+  else { dp_typeFilter = ({ entree:'in', sortie:'out', avance:'avance' })[k] || 'Tous'; dp_listMax = 50; dp_formKind = k; dp_cfgPanel = null; if(k === 'sortie' && !dp_sortieBtn) dp_sortieBtn = dp_curBtn().id; }
   dp_fvReset(); dp_render();
 }
 function dp_pickBtn(id){ dp_grabForm(); dp_sortieBtn = id; dp_fvReset(); dp_cfgPanel = null; dp_render(); }
