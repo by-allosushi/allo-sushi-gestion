@@ -4601,9 +4601,10 @@ function dp_fmtSnapVal(k,v){
   if(k==='quantite') return dp_fmtNum(v);
   return (v===undefined||v===null||v==='') ? '—' : String(v);
 }
+function dp_achatDetail(m){ return esc(m.articleNom||'') + (Number(m.quantite) > 0 ? ' · ' + dp_fmtNum(m.quantite) + (m.unite ? ' ' + esc(m.unite) : '') : '') + (m.note ? ' · ' + esc(m.note) : ''); }
 function dp_snapDetail(o){
   if(!o) return '';
-  return o.type==='Achat' ? `${esc(o.articleNom||'')} · ${dp_fmtNum(o.quantite)} ${esc(o.unite||'')}` : (esc(o.libelle||'') + (o.estAvanceSalaire?` · 👤 Avance : ${esc(o.employeNom)}`:''));
+  return o.type==='Achat' ? dp_achatDetail(o) : (esc(o.libelle||'') + (o.estAvanceSalaire?` · 👤 Avance : ${esc(o.employeNom)}`:''));
 }
 function dp_snapLine(o){
   if(!o) return '';
@@ -5220,7 +5221,7 @@ function dp_renderMouvementsTab(){
       </div>
       ${dp_draft.map(m=>{
         const meta = dp_typeMeta(m.type);
-        const detail = m.type==='Achat' ? `${esc(m.articleNom||'')} · ${dp_fmtNum(m.quantite)} ${esc(m.unite||'')}` : (esc(m.libelle||'') + (m.estAvanceSalaire?` · 👤 Avance : ${esc(m.employeNom)}`:''));
+        const detail = m.type==='Achat' ? dp_achatDetail(m) : (esc(m.libelle||'') + (m.estAvanceSalaire?` · 👤 Avance : ${esc(m.employeNom)}`:''));
         return `<div class="movement-row">
           <div>
             <div style="font-weight:500;"><span class="chip" style="color:${meta.color};background:${meta.bg};margin-right:5px;">${esc(m.type)}</span>${detail}</div>
@@ -5268,7 +5269,7 @@ function dp_renderMouvementsTab(){
   const list = sorted.length===0 ? `<p style="font-size:13px;color:var(--ink-muted);">Aucun mouvement${(!manualRange && !dp_searchTerm.trim() && dp_period!=='tous') ? ' ' + ({jour:'aujourd’hui',hier:'hier',semaine:'cette semaine'})[dp_period] : ''}.</p>` :
     shown.map(m=>{
       const meta = dp_typeMeta(m.type);
-      const detail = m.type==='Achat' ? `${esc(m.articleNom||'')} · ${dp_fmtNum(m.quantite)} ${esc(m.unite||'')}` : (esc(m.libelle||'') + (m.estAvanceSalaire?` · 👤 Avance : ${esc(m.employeNom)}`:'') + (m.source==='caisse'&&m.ecart?` · <span style="color:var(--rust);">écart Caisse ${m.ecart>0?'+':'−'}${dp_fmtMoney(Math.abs(m.ecart))}</span>`:'') + (m.type==='Report'&&m.purges?` · jusqu’au ${fmtDateShort(m.date)}`:''));
+      const detail = m.type==='Achat' ? dp_achatDetail(m) : (esc(m.libelle||'') + (m.estAvanceSalaire?` · 👤 Avance : ${esc(m.employeNom)}`:'') + (m.source==='caisse'&&m.ecart?` · <span style="color:var(--rust);">écart Caisse ${m.ecart>0?'+':'−'}${dp_fmtMoney(Math.abs(m.ecart))}</span>`:'') + (m.type==='Report'&&m.purges?` · jusqu’au ${fmtDateShort(m.date)}`:''));
       return `<div class="movement-row">
         <div>
           <div style="font-weight:500;"><span class="chip" style="color:${meta.color};background:${meta.bg};margin-right:5px;">${esc(m.type)}</span>${detail}</div>
@@ -5295,6 +5296,7 @@ const DP_MODELES = [
   { id:'achat', label:'Ingrédient (quantité et prix)' },
   { id:'livraison', label:'Livraison (liste de noms)' },
   { id:'autre', label:'Note + montant' },
+  { id:'liste', label:'Liste déroulante + champs au choix' },
   { id:'simple', label:'Montant seul' },
 ];
 const DP_BOUTONS_BASE = [
@@ -5331,7 +5333,14 @@ async function dp_cfgSave(){
   try{ await dp_cfgRef.set(dp_cfg); dp_cfgErr = ''; }
   catch(e){ console.error(e); dp_cfgErr = e.message || 'Écriture impossible'; alert('Réglage non enregistré : ' + dp_cfgErr + '\nVérifie que les règles Firestore autorisent la collection « depenses_config ».'); }
 }
-function dp_vis(kind){ return (dp_cfg[kind] || []).filter(x=>!x.off); }
+function dp_L(kind){
+  if(String(kind).startsWith('items:')){ const b = (dp_cfg.boutons || []).find(x=>x.id === kind.slice(6)); if(!b) return []; if(!Array.isArray(b.items)) b.items = []; return b.items; }
+  return dp_cfg[kind] || (dp_cfg[kind] = []);
+}
+function dp_vis(kind){ return dp_L(kind).filter(x=>!x.off); }
+const DP_CHAMPS_DEF = { unite:true, qte:true, pu:true, note:false };
+function dp_champs(btn){ return Object.assign({}, DP_CHAMPS_DEF, (btn && btn.champs) || {}); }
+function dp_unitOf(btn, name){ const it = (btn && btn.m === 'liste' ? dp_L('items:' + btn.id) : dp_cfg.ingredients).find(x=>x.n === name); return it && it.u; }
 function dp_employeesList(extra){
   const set = new Set();
   Object.keys(dp_ptEmp).forEach(c=>{ const n = String((dp_ptEmp[c] || {}).name || '').trim(); if(n) set.add(n); });
@@ -5346,20 +5355,23 @@ function dp_cfgOpen(kind){ dp_grabForm(); dp_cfgPanel = (dp_cfgPanel === kind) ?
 function dp_cfgAdd(kind){
   const nEl = document.getElementById('dp-cfg-new'), n = nEl ? nEl.value.trim() : '';
   if(!n){ if(nEl) nEl.focus(); return; }
-  if(dp_cfg[kind].some(x=>String(x.n).toLowerCase() === n.toLowerCase())){ alert('« ' + n + ' » existe déjà dans la liste.'); return; }
+  if(dp_L(kind).some(x=>String(x.n).toLowerCase() === n.toLowerCase())){ alert('« ' + n + ' » existe déjà dans la liste.'); return; }
   const it = { id: uid(), n };
-  if(kind === 'ingredients'){ const u = document.getElementById('dp-cfg-new-u'); it.u = u ? u.value : 'kg'; }
-  if(kind === 'boutons'){ const m = document.getElementById('dp-cfg-new-m'); it.m = m ? m.value : 'simple'; }
-  dp_grabForm(); dp_cfg[kind].push(it); dp_cfgSave(); dp_render();
+  if(kind === 'ingredients' || String(kind).startsWith('items:')){ const u = document.getElementById('dp-cfg-new-u'); if(u) it.u = u.value; else if(kind === 'ingredients') it.u = 'kg'; }
+  if(kind === 'boutons'){ const m = document.getElementById('dp-cfg-new-m'); it.m = m ? m.value : 'simple'; if(it.m === 'liste'){ it.items = []; it.champs = Object.assign({}, DP_CHAMPS_DEF); } }
+  dp_grabForm(); dp_L(kind).push(it);
+  if(kind === 'boutons' && it.m === 'liste'){ dp_sortieBtn = it.id; dp_cfgPanel = 'items:' + it.id; dp_fvReset(); }
+  dp_cfgSave(); dp_render();
   const el = document.getElementById('dp-cfg-new'); if(el) el.focus();
 }
 async function dp_cfgRename(kind, id, v){
-  const it = dp_cfg[kind].find(x=>x.id === id); v = String(v).trim();
+  const it = dp_L(kind).find(x=>x.id === id); v = String(v).trim();
   if(!it || !v || v === it.n){ dp_render(); return; }
   const old = it.n, all = dp_mouvements.concat(dp_pending), changes = [];
   all.forEach(m=>{
     const u = {};
     if(kind === 'ingredients' && m.type === 'Achat' && m.articleNom === old) u.articleNom = v;
+    else if(String(kind).startsWith('items:') && m.type === 'Achat' && m.articleNom === old && m.bouton === ((dp_cfg.boutons.find(x=>x.id === kind.slice(6)) || {}).n)) u.articleNom = v;
     else if(kind === 'concepts' && m.concept === old){ u.concept = v; if(m.libelle === old) u.libelle = v; }
     else if(kind === 'livreurs' && m.livreur === old){ u.livreur = v; u.libelle = String(m.libelle || '').replace('Livraison — ' + old, 'Livraison — ' + v); }
     else if(kind === 'boutons' && m.bouton === old){ u.bouton = v; if(m.libelle === old) u.libelle = v; else if(String(m.libelle || '').startsWith(old + ' : ')) u.libelle = v + String(m.libelle).slice(old.length); }
@@ -5376,38 +5388,48 @@ async function dp_cfgRename(kind, id, v){
   }catch(e){ console.error(e); alert('Mise à jour des anciens mouvements incomplète : ' + e.message); }
   await dp_cfgSave(); dp_render();
 }
-function dp_cfgToggle(kind, id){ const it = dp_cfg[kind].find(x=>x.id === id); if(!it) return; it.off = !it.off; dp_grabForm(); dp_cfgSave(); dp_render(); }
+function dp_cfgToggle(kind, id){ const it = dp_L(kind).find(x=>x.id === id); if(!it) return; it.off = !it.off; dp_grabForm(); dp_cfgSave(); dp_render(); }
 function dp_cfgDelete(kind, id){
-  const it = dp_cfg[kind].find(x=>x.id === id); if(!it) return;
+  const it = dp_L(kind).find(x=>x.id === id); if(!it) return;
   if(!confirm('Supprimer « ' + it.n + ' » de la liste ?\nLes anciens mouvements gardent leur nom.')) return;
-  dp_cfg[kind] = dp_cfg[kind].filter(x=>x.id !== id);
+  { const arr = dp_L(kind), ix = arr.findIndex(x=>x.id === id); if(ix >= 0) arr.splice(ix, 1); }
   if(kind === 'ingredients' && dp_fv['dp-ing'] === it.n) delete dp_fv['dp-ing'];
   dp_grabForm(); dp_cfgSave(); dp_render();
 }
 function dp_cfgMove(kind, id, dir){
-  const a = dp_cfg[kind], i = a.findIndex(x=>x.id === id), j = i + dir; if(i < 0 || j < 0 || j >= a.length) return;
+  const a = dp_L(kind), i = a.findIndex(x=>x.id === id), j = i + dir; if(i < 0 || j < 0 || j >= a.length) return;
   const t = a[i]; a[i] = a[j]; a[j] = t; dp_grabForm(); dp_cfgSave(); dp_render();
 }
-function dp_cfgUnit(id, v){ const it = dp_cfg.ingredients.find(x=>x.id === id); if(it){ it.u = v; dp_cfgSave(); } }
+function dp_cfgUnit(id, v){
+  let it = dp_cfg.ingredients.find(x=>x.id === id);
+  if(!it) dp_cfg.boutons.some(b=>(it = (b.items || []).find(x=>x.id === id)));
+  if(it){ it.u = v; dp_cfgSave(); }
+}
+function dp_cfgChamp(btnId, key, on){ const b = dp_cfg.boutons.find(x=>x.id === btnId); if(!b) return; b.champs = Object.assign({}, DP_CHAMPS_DEF, b.champs || {}); b.champs[key] = !!on; dp_grabForm(); dp_cfgSave(); dp_render(); }
+function dp_cfgGoList(id){ dp_grabForm(); dp_sortieBtn = id; dp_cfgPanel = 'items:' + id; dp_fvReset(); dp_render(); }
 function dp_cfgPanelHtml(kind){
+  const isItems = String(kind).startsWith('items:'), ownerBtn = isItems ? dp_cfg.boutons.find(x=>x.id === kind.slice(6)) : null;
   const TITRES = { concepts:'Concepts d’entrée', ingredients:'Ingrédients', livreurs:'Livraison / Taxi : noms', boutons:'Boutons de sortie' };
+  const titre = isItems ? 'Liste « ' + (ownerBtn ? ownerBtn.n : '') + ' »' : TITRES[kind];
+  const champsHtml = (isItems && ownerBtn) ? (()=>{ const ch = dp_champs(ownerBtn); return `<div style="margin:6px 0 4px;padding:8px;border:1px solid var(--line);border-radius:8px;"><div style="font-size:12px;font-weight:600;margin-bottom:6px;">Informations à saisir pour ce bouton</div><div style="display:flex;flex-wrap:wrap;gap:10px 16px;font-size:12.5px;">${[['unite','Unité de mesure'],['qte','Quantité'],['pu','Prix unitaire'],['note','Note (optionnel)']].map(([k,l])=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" ${ch[k] ? 'checked' : ''} onchange="dp_cfgChamp('${ownerBtn.id}','${k}',this.checked)" /> ${l}</label>`).join('')}</div><div style="font-size:11px;color:var(--ink-muted);margin-top:6px;">Le prix total est toujours demandé. Le prix unitaire n’est proposé qu’avec la quantité.</div></div>`; })() : '';
   const unitSel = (id, cur, attrs)=>`<select class="ft-in" style="width:auto;padding:6px;" ${attrs}>${DP_UNITES.concat(DP_UNITES.includes(cur) || !cur ? [] : [cur]).map(u=>`<option value="${esc(u)}" ${u === cur ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select>`;
-  const rows = dp_cfg[kind].map((it, i)=>`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-top:1px solid var(--line);${it.off ? 'opacity:.5;' : ''}">
-      <input type="text" class="ft-in" style="flex:1;min-width:0;padding:6px 8px;" value="${esc(it.n)}" onchange="dp_cfgRename('${kind}','${it.id}',this.value)" />
-      ${kind === 'ingredients' ? unitSel(it.id, it.u || 'kg', `onchange="dp_cfgUnit('${it.id}',this.value)"`) : ''}
-      ${kind === 'boutons' ? `<span style="font-size:11px;color:var(--ink-muted);white-space:nowrap;">${esc((DP_MODELES.find(m=>m.id === it.m) || {}).label || '')}</span>` : ''}
+  const rows = dp_L(kind).map((it, i)=>`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-top:1px solid var(--line);flex-wrap:wrap;${it.off ? 'opacity:.5;' : ''}">
+      <input type="text" class="ft-in" style="flex:1 1 100%;min-width:0;padding:6px 8px;" value="${esc(it.n)}" onchange="dp_cfgRename('${kind}','${it.id}',this.value)" />
+      ${(kind === 'ingredients' || (isItems && ownerBtn && dp_champs(ownerBtn).unite)) ? unitSel(it.id, it.u || (isItems ? 'unité' : 'kg'), `onchange="dp_cfgUnit('${it.id}',this.value)"`) : ''}
+      ${kind === 'boutons' ? (it.m === 'liste' ? `<button type="button" class="btn ghost small" onclick="dp_cfgGoList('${it.id}')">Liste &amp; champs</button>` : `<span style="font-size:11px;color:var(--ink-muted);white-space:nowrap;">${esc((DP_MODELES.find(m=>m.id === it.m) || {}).label || '')}</span>`) : ''}
       <button type="button" class="btn ghost small" ${i === 0 ? 'disabled' : ''} onclick="dp_cfgMove('${kind}','${it.id}',-1)">▲</button>
-      <button type="button" class="btn ghost small" ${i === dp_cfg[kind].length - 1 ? 'disabled' : ''} onclick="dp_cfgMove('${kind}','${it.id}',1)">▼</button>
+      <button type="button" class="btn ghost small" ${i === dp_L(kind).length - 1 ? 'disabled' : ''} onclick="dp_cfgMove('${kind}','${it.id}',1)">▼</button>
       <button type="button" class="btn ghost small" onclick="dp_cfgToggle('${kind}','${it.id}')">${it.off ? 'Afficher' : 'Masquer'}</button>
       ${(kind === 'boutons' && DP_BOUTONS_BASE.some(b=>b.id === it.id)) ? '' : `<button type="button" class="btn ghost small" style="color:var(--rust);" title="Supprimer" onclick="dp_cfgDelete('${kind}','${it.id}')">🗑️</button>`}
     </div>`).join('');
   return `<div class="ticket" style="padding:12px;border-color:var(--forest);margin:8px 0;">
-    <div class="row-between"><b style="font-size:13px;">⚙️ ${TITRES[kind]}</b><button type="button" class="btn ghost small" onclick="dp_cfgOpen('${kind}')">Fermer</button></div>
+    <div class="row-between"><b style="font-size:13px;">⚙️ ${titre}</b><button type="button" class="btn ghost small" onclick="dp_cfgOpen('${kind}')">Fermer</button></div>
     <div style="font-size:11.5px;color:var(--ink-muted);margin:4px 0;">Modifier le nom met à jour les anciens mouvements. « Masquer » (réaffichable) et 🗑️ (définitif) les laissent inchangés, avec leur ancien nom.</div>
+    ${champsHtml}
     ${rows}
     <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
       <input type="text" id="dp-cfg-new" class="ft-in" style="flex:1;min-width:0;padding:6px 8px;" placeholder="Ajouter…" onkeydown="if(event.key==='Enter'){ event.preventDefault(); dp_cfgAdd('${kind}'); }" />
-      ${kind === 'ingredients' ? unitSel('', 'kg', 'id="dp-cfg-new-u"') : ''}
+      ${(kind === 'ingredients' || (isItems && ownerBtn && dp_champs(ownerBtn).unite)) ? unitSel('', isItems ? 'unité' : 'kg', 'id="dp-cfg-new-u"') : ''}
       ${kind === 'boutons' ? `<select id="dp-cfg-new-m" class="ft-in" style="width:auto;padding:6px;">${DP_MODELES.map(m=>`<option value="${m.id}">${esc(m.label)}</option>`).join('')}</select>` : ''}
       <button type="button" class="btn small" onclick="dp_cfgAdd('${kind}')">Ajouter</button>
     </div>
@@ -5459,9 +5481,9 @@ function dp_openEditMouv(id){
   dp_editingMouvId = id; dp_editPrefill = m; dp_workingDate = m.date; dp_cfgPanel = null;
   const sign = dp_typeMeta(m.type).sign, fv = {};
   if(m.type === 'Achat'){
-    dp_formKind = 'sortie'; dp_sortieBtn = (dp_cfg.boutons.find(b=>b.m === 'achat') || {}).id;
+    dp_formKind = 'sortie'; dp_sortieBtn = (dp_cfg.boutons.find(b=>b.m === 'liste' && b.n === m.bouton) || dp_cfg.boutons.find(b=>b.m === 'achat') || {}).id;
     const q = Number(m.quantite) || 0, tot = Number(m.montant) || 0;
-    Object.assign(fv, { 'dp-ing':m.articleNom || '', 'dp-unite':m.unite || '', 'dp-qty':q ? String(q) : '', 'dp-tot':String(tot), 'dp-pu':q ? String(Math.round(tot / q * 100) / 100) : '' });
+    Object.assign(fv, { 'dp-ing':m.articleNom || '', 'dp-unite':m.unite || '', 'dp-qty':q ? String(q) : '', 'dp-tot':String(tot), 'dp-pu':q ? String(Math.round(tot / q * 100) / 100) : '', 'dp-note':m.note || '' });
   } else if(m.estAvanceSalaire){
     dp_formKind = 'avance'; Object.assign(fv, { 'dp-employe':m.employeNom || '', 'dp-montant':String(m.montant) });
   } else if(sign > 0){
@@ -5490,7 +5512,7 @@ function dp_achQty(){
 }
 function dp_achPu(){ const q = dp_parseNum(dp_achVal('dp-qty')), pu = dp_achVal('dp-pu'); dp_achSet('dp-tot', (q > 0 && pu) ? dp_r2(q * dp_parseNum(pu)) : ''); }
 function dp_achTot(){ const q = dp_parseNum(dp_achVal('dp-qty')), tot = dp_achVal('dp-tot'); dp_achSet('dp-pu', (q > 0 && tot) ? dp_r2(dp_parseNum(tot) / q) : ''); }
-function dp_ingPick(name){ const it = dp_cfg.ingredients.find(x=>x.n === name); const u = document.getElementById('dp-unite'); if(it && it.u && u && Array.from(u.options).some(o=>o.value === it.u)) u.value = it.u; }
+function dp_ingPick(name){ const un = dp_unitOf(dp_curBtn(), name); const u = document.getElementById('dp-unite'); if(un && u && Array.from(u.options).some(o=>o.value === un)) u.value = un; }
 
 /* --- formulaire --- */
 function dp_selHtml(id, opts, cur, attrs){
@@ -5526,6 +5548,19 @@ function dp_renderMouvForm(){
           ${fld('Prix unitaire (DA)', `<input type="text" inputmode="decimal" id="dp-pu" placeholder="0" value="${V('dp-pu')}" oninput="dp_achPu()" />`)}
           ${fld('Total (DA)', `<input type="text" inputmode="decimal" id="dp-tot" placeholder="0" value="${V('dp-tot')}" oninput="dp_achTot()" />`)}
         </div><div id="dp-ach-hint" style="font-size:12px;color:var(--amber);margin-top:6px;"></div>`;
+    } else if(cur.m === 'liste'){
+      const ch = dp_champs(cur), kid = 'items:' + cur.id, unites = DP_UNITES.slice(); if(fv['dp-unite'] && !unites.includes(fv['dp-unite'])) unites.push(fv['dp-unite']);
+      const unit0 = fv['dp-unite'] || dp_unitOf(cur, fv['dp-ing']) || 'unité', withPu = ch.qte && ch.pu;
+      inner = `<div style="display:flex;align-items:flex-end;gap:8px;">${fld(esc(cur.n), dp_selHtml('dp-ing', dp_vis(kid).map(i=>i.n), fv['dp-ing'], 'onchange="dp_ingPick(this.value)"'), 'flex:1;margin:0;')}${dp_gear(kid)}</div>
+        ${dp_cfgPanel === kid ? dp_cfgPanelHtml(kid) : ''}
+        <div class="grid grid-2" style="margin-top:10px;">
+          ${ch.unite ? fld('Unité', `<select id="dp-unite" class="ft-in">${unites.map(u=>`<option value="${esc(u)}" ${u === unit0 ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select>`) : ''}
+          ${ch.qte ? fld('Quantité', `<input type="text" inputmode="decimal" id="dp-qty" placeholder="0" value="${V('dp-qty')}" oninput="dp_achQty()" />`) : ''}
+          ${withPu ? fld('Prix unitaire (DA)', `<input type="text" inputmode="decimal" id="dp-pu" placeholder="0" value="${V('dp-pu')}" oninput="dp_achPu()" />`) : ''}
+          ${fld(withPu ? 'Total (DA)' : 'Prix total (DA)', `<input type="text" inputmode="decimal" id="dp-tot" placeholder="0" value="${V('dp-tot')}" ${withPu ? 'oninput="dp_achTot()"' : ''} />`)}
+        </div>
+        ${ch.note ? fld('Note (optionnel)', `<input type="text" id="dp-note" value="${V('dp-note')}" />`, 'margin-top:10px;') : ''}
+        <div id="dp-ach-hint" style="font-size:12px;color:var(--amber);margin-top:6px;"></div>`;
     } else if(cur.m === 'livraison'){
       inner = `<div style="display:flex;align-items:flex-end;gap:8px;">${fld('Livreur / Taxi', dp_selHtml('dp-livreur', dp_vis('livreurs').map(l=>l.n), fv['dp-livreur']), 'flex:1;margin:0;')}${dp_gear('livreurs')}</div>
         ${dp_cfgPanel === 'livreurs' ? dp_cfgPanelHtml('livreurs') : ''}
@@ -5583,6 +5618,13 @@ async function dp_submitMouv(){
       if(!(qty > 0)){ alert('Merci de renseigner une quantité.'); return; }
       if(!(tot > 0)){ alert('Merci de renseigner le prix unitaire ou le total.'); return; }
       base = { type:'Achat', articleNom:ing, quantite:qty, unite, fournisseur:E.fournisseur || '', montant:Math.round(tot * 100) / 100, bouton:btn.n };
+    } else if(btn.m === 'liste'){
+      const ch = dp_champs(btn), ing = V('dp-ing'), unite = ch.unite ? V('dp-unite') : '', qty = ch.qte ? dp_parseNum(V('dp-qty')) : 0;
+      const tot = dp_parseNum(V('dp-tot')) || (ch.qte && ch.pu ? qty * dp_parseNum(V('dp-pu')) : 0), note = ch.note ? V('dp-note') : '';
+      if(!ing){ alert('Choisis un élément dans la liste « ' + btn.n + ' ».'); return; }
+      if(ch.qte && !(qty > 0)){ alert('Merci de renseigner une quantité.'); return; }
+      if(!(tot > 0)){ alert('Merci de renseigner le prix' + (ch.qte && ch.pu ? ' unitaire ou le total.' : ' total.')); return; }
+      base = { type:'Achat', articleNom:ing, quantite:qty, unite, fournisseur:E.fournisseur || '', montant:Math.round(tot * 100) / 100, bouton:btn.n, note };
     } else if(btn.m === 'livraison'){
       const nom = V('dp-livreur'), montant = montantOf(), note = V('dp-note');
       if(!nom){ alert('Choisis le livreur ou le taxi dans la liste.'); return; }
