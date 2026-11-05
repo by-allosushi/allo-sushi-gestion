@@ -1293,6 +1293,49 @@ ca_caisseCol.onSnapshot((snap)=>{
   ca_setSyncLabel('⚠ Hors ligne / erreur de connexion');
 });
 
+/* ---------- Retraits de caisse → entrées « Caisse » à confirmer (Dépenses) ---------- */
+let ca_retraitDocs = {}, ca_retraitReady = false;
+try{
+  db.collection('depenses_mouvements').where('source','==','caisse').onSnapshot((snap)=>{
+    const o = {}; snap.forEach(d=>{ o[d.id] = { id:d.id, ...d.data() }; });
+    ca_retraitDocs = o; ca_retraitReady = true;
+  }, (err)=>console.warn('Retraits caisse', err));
+}catch(e){ console.warn(e); }
+function ca_retraitId(date, lineId){ return 'caisse_' + date + '_' + lineId; }
+function ca_lineLocked(key, id){
+  if(key !== 'sorties') return false;
+  const d = ca_retraitDocs[ca_retraitId(ca_session.date, id)];
+  if(d && d.statut === 'confirme'){
+    alert('Ce retrait a déjà été confirmé comme reçu par le gérant (rubrique Dépenses). Il ne peut plus être modifié ni supprimé ici.');
+    return true;
+  }
+  return false;
+}
+// Appelé à chaque enregistrement de la journée : crée / met à jour / retire les entrées EN ATTENTE.
+async function ca_syncRetraits(sess){
+  if(!ca_retraitReady) return;                 // base des retraits pas encore lue : on ne touche à rien
+  const date = sess.date, col = db.collection('depenses_mouvements');
+  const wanted = (sess.sorties || []).filter(l=>l.motif === 'retrait' && ca_parseNum(l.montant) > 0);
+  const keep = new Set(), batch = db.batch();
+  let ops = 0, report = null, reportLoaded = false;
+  for(const l of wanted){
+    const id = ca_retraitId(date, l.id); keep.add(id);
+    const ex = ca_retraitDocs[id], m = ca_parseNum(l.montant);
+    if(ex && ex.statut === 'confirme') continue;
+    if(ex && Number(ex.montantCaisse) === m) continue;
+    if(!ex){
+      if(!reportLoaded){ const r = await col.doc('report_solde').get(); report = r.exists ? r.data() : null; reportLoaded = true; }
+      if(report && report.date >= date){ console.warn('Période déjà supprimée dans Dépenses : retrait non recréé', date); continue; }
+    }
+    const base = ex ? { ...ex } : { id, type:'AppointCaisse', libelle:'Caisse', concept:'Caisse', bouton:'Retrait caisse', source:'caisse', caisseDate:date, caisseLineId:l.id, date, creePar:currentUser, creeLe:new Date().toISOString() };
+    batch.set(col.doc(id), { ...base, statut:'attente', montantCaisse:m, montant:m }); ops++;
+  }
+  Object.values(ca_retraitDocs).forEach(d=>{
+    if(d.caisseDate === date && d.statut === 'attente' && !keep.has(d.id)){ batch.delete(col.doc(d.id)); ops++; }
+  });
+  if(ops) await batch.commit();
+}
+
 async function ca_saveSession(){
   if(!currentUser){ askUserName(false); if(!currentUser) return; }
   try{
@@ -1300,6 +1343,7 @@ async function ca_saveSession(){
     const { debutCaisseAuto, debutCaisseManuel, ...cleanSession } = ca_session;
     const saved = { ...cleanSession, enregistreParEn: currentUser, enregistreLe: new Date().toISOString() };
     await ca_caisseCol.doc(ca_session.date).set(saved);
+    try{ await ca_syncRetraits(saved); }catch(e){ console.warn('Sync retraits', e); }
     ca_allSessions = { ...ca_allSessions, [ca_session.date]: saved };
     ca_setSyncLabel('✓ Synchronisé');
     ca_render();
@@ -1310,6 +1354,7 @@ async function ca_saveSession(){
   }
 }
 async function ca_deleteSession(date){
+  if(Object.values(ca_retraitDocs).some(d=>d.caisseDate===date && d.statut==='confirme')){ alert('Cette journée contient un retrait déjà confirmé comme reçu par le gérant (Dépenses) : elle ne peut pas être supprimée.'); return; }
   if(!confirm('Supprimer définitivement la clôture du '+fmtDateShort(date)+' ?')) return;
   try{ await ca_caisseCol.doc(date).delete(); }catch(e){ console.warn(e); }
 }
@@ -1393,15 +1438,18 @@ function ca_openHist(k){ ca_hist = k; ca_histEdit = null; ca_render(); }
 function ca_closeHist(){ ca_hist = null; ca_histEdit = null; ca_render(); }
 function ca_editHist(id){ ca_histEdit = (ca_histEdit === id) ? null : id; ca_render(); }
 function ca_delHist(id){
+  if(ca_lineLocked(ca_hist, id)) return;
   if(!confirm('Supprimer cette ligne ?')) return;
   ca_removeLine(ca_hist, id);
 }
 function ca_removeLine(key, id){
+  if(ca_lineLocked(key, id)) return;
   if(!Array.isArray(ca_session[key])) ca_session[key] = [];
   ca_session[key] = ca_session[key].filter(l=>l.id!==id);
   ca_render();
 }
 function ca_updateLine(key, id, field, value){
+  if(ca_lineLocked(key, id)){ ca_render(); return; }
   if(!Array.isArray(ca_session[key])) ca_session[key] = [];
   const line = ca_session[key].find(l=>l.id===id);
   if(line) line[field] = value;
@@ -4358,6 +4406,7 @@ const DP_TYPES = [
   { id:'Recette', label:'Recette encaissée', shortLabel:'Recette', color:'var(--forest)', bg:'var(--moss-bg)', sign:+1 },
   { id:'Charge', label:'Charge / Divers', shortLabel:'Charge', color:'var(--rust)', bg:'var(--rust-bg)', sign:-1 },
   { id:'Achat', label:'Achat', shortLabel:'Achat', color:'var(--amber)', bg:'var(--amber-bg)', sign:-1 },
+  { id:'Report', label:'Report de solde', shortLabel:'Report', color:'var(--ink-muted)', bg:'var(--moss-bg)', sign:+1 },
   { id:'Retrait', label:'Retrait gérant → moi', shortLabel:'Retrait', color:'var(--wrap)', bg:'var(--wrap-bg)', sign:-1 },
 ];
 // Types autorisés à la SAISIE d'un nouveau mouvement pour les utilisateurs non-admin.
@@ -4366,7 +4415,7 @@ const DP_TYPES_NON_ADMIN = ['AppointCaisse', 'AppointDivers', 'Charge', 'Achat']
 // désormais comme une Charge avec un commentaire. On garde sa définition dans DP_TYPES
 // uniquement pour continuer à afficher correctement les mouvements "Retrait" déjà enregistrés.
 function dp_allowedTypes(){
-  const creatable = DP_TYPES.filter(t=>t.id!=='Retrait');
+  const creatable = DP_TYPES.filter(t=>t.id!=='Retrait' && t.id!=='Report');
   if(session && session.isAdmin) return creatable;
   return creatable.filter(t=>DP_TYPES_NON_ADMIN.includes(t.id));
 }
@@ -4409,6 +4458,12 @@ function dp_periodLabel(){
 }
 
 let dp_mouvements = [];
+let dp_pending = [];          // retraits de caisse en attente de confirmation (hors solde)
+let dp_pendVals = {};
+let dp_purge = null, dp_purgeFile = null, dp_purgeBusy = false;
+const DP_REPORT_ID = 'report_solde';
+const DP_PURGE_MAIL = 'allo.sushi.27@gmail.com';
+const DP_PURGE_PROTECT_DAYS = 30;
 let dp_pointages = [];
 let dp_currentTab = 'mouvements';
 let dp_typeFilter = 'Tous';
@@ -4444,8 +4499,8 @@ let dp_verificationResult = null;
 let dp_verificationBusy = false;
 
 const dp_watchMouv = ()=>dp_mouvCol.onSnapshot((snap)=>{
-  dp_mouvements = [];
-  snap.forEach(doc=>dp_mouvements.push({ id: doc.id, ...doc.data() }));
+  dp_mouvements = []; dp_pending = [];
+  snap.forEach(doc=>{ const o = { id: doc.id, ...doc.data() }; (o.statut === 'attente' ? dp_pending : dp_mouvements).push(o); });
   dp_verificationResult = null;
   dp_render();
 }, (err)=>console.error(err));
@@ -4738,6 +4793,8 @@ function dp_renderJournalMouvements(){
 
 async function dp_deleteMouvement(id){
   const m = dp_mouvements.find(x=>x.id===id);
+  if(m && m.type==='Report'){ alert('Le « Report de solde » ne peut pas être supprimé : il remplace les périodes déjà supprimées.'); return; }
+  if(m && m.source==='caisse' && !(session && session.isAdmin)){ alert('Cette entrée vient de la Caisse (retrait confirmé) : seule l’administratrice peut la supprimer.'); return; }
   if(m){
     const closure = dp_closureFor(m.date);
     if(closure){ alert(`Cette période (${fmtDateShort(closure.dateDebut)} → ${fmtDateShort(closure.dateFin)}) est clôturée. Réouvrez-la dans l'onglet Clôtures pour modifier.`); return; }
@@ -4759,6 +4816,7 @@ async function dp_savePointage(p){
 }
 
 function dp_render(){
+  if(dp_skipGrab) dp_skipGrab = false; else dp_grabForm();
   const active = document.activeElement;
   const activeId = (active && active.id) ? active.id : null;
   let selStart=null, selEnd=null;
@@ -4800,8 +4858,8 @@ function dp_renderTableauTab(){
   const [start, end] = dp_getPeriodRange();
   const periodMouv = dp_mouvements.filter(m=>m.date>=start && m.date<=end);
 
-  const totalEntrees = periodMouv.filter(m=>dp_typeMeta(m.type).sign>0).reduce((s,m)=>s+(Number(m.montant)||0),0);
-  const totalSorties = periodMouv.filter(m=>dp_typeMeta(m.type).sign<0).reduce((s,m)=>s+(Number(m.montant)||0),0);
+  const totalEntrees = periodMouv.filter(m=>m.type!=='Report' && dp_typeMeta(m.type).sign>0).reduce((s,m)=>s+(Number(m.montant)||0),0);
+  const totalSorties = periodMouv.filter(m=>m.type!=='Report' && dp_typeMeta(m.type).sign<0).reduce((s,m)=>s+(Number(m.montant)||0),0);
   const net = totalEntrees - totalSorties;
 
   const periodChips = `<div class="filter-row">
@@ -4850,7 +4908,7 @@ function dp_renderTableauTab(){
   const byDate = {};
   periodMouv.forEach(m=>{
     if(!byDate[m.date]) byDate[m.date] = {entrees:0, sorties:0};
-    if(dp_typeMeta(m.type).sign>0) byDate[m.date].entrees += (Number(m.montant)||0);
+    if(m.type!=='Report' && dp_typeMeta(m.type).sign>0) byDate[m.date].entrees += (Number(m.montant)||0);
     else byDate[m.date].sorties += (Number(m.montant)||0);
   });
   const dates = Object.keys(byDate).sort();
@@ -4922,6 +4980,180 @@ function dp_exportMouvementsExcel(){
   XLSX.writeFile(wb, `mouvements_depenses${suffix}.xlsx`);
 }
 
+function dp_signedAmt(m){
+  const v = dp_typeMeta(m.type).sign * (Number(m.montant)||0);
+  return (v >= 0 ? '+' : '−') + dp_fmtMoney(Math.abs(Number(m.montant)||0));
+}
+
+/* ---------------- Retraits de caisse à confirmer ---------------- */
+function dp_pendingBox(){
+  if(!dp_pending.length) return '';
+  const rows = dp_pending.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0).map(p=>{
+    const val = dp_pendVals[p.id] !== undefined ? dp_pendVals[p.id] : String(p.montantCaisse != null ? p.montantCaisse : p.montant);
+    return `<div class="movement-row" style="align-items:flex-end;gap:10px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:160px;">
+        <div style="font-weight:500;"><span class="chip" style="color:var(--moss);background:var(--moss-bg);margin-right:5px;">Caisse</span>Retrait du ${fmtDateShort(p.date)}</div>
+        <div class="sub">Sorti de la caisse : <b>${dp_fmtMoney(p.montantCaisse != null ? p.montantCaisse : p.montant)}</b>${p.creePar ? ' · par ' + esc(p.creePar) : ''}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <div class="field" style="margin:0;width:120px;"><label>Montant reçu</label><input type="text" inputmode="decimal" value="${esc(val)}" oninput="dp_pendVals['${p.id}']=this.value" /></div>
+        <button class="btn small" onclick="dp_confirmRetrait('${p.id}')">✓ Reçu</button>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="ticket" style="padding:14px 16px;border-color:var(--moss);">
+    <div style="font-size:13px;font-weight:700;color:var(--moss);margin-bottom:4px;">💵 Retraits à confirmer (${dp_pending.length})</div>
+    <div style="font-size:12px;color:var(--ink-muted);margin-bottom:8px;">Ces montants ne comptent dans le solde théorique qu’une fois confirmés. Si le montant reçu est différent, modifie-le avant de valider.</div>
+    ${rows}
+  </div>`;
+}
+async function dp_confirmRetrait(id){
+  const p = dp_pending.find(x=>x.id === id); if(!p) return;
+  if(!currentUser){ askUserName(false); if(!currentUser) return; }
+  const raw = dp_pendVals[id] !== undefined ? dp_pendVals[id] : String(p.montantCaisse != null ? p.montantCaisse : p.montant);
+  const v = dp_parseNum(raw);
+  if(!(v > 0)){ alert('Saisis le montant réellement reçu.'); return; }
+  const caisse = Number(p.montantCaisse != null ? p.montantCaisse : p.montant);
+  const ecart = Math.round((v - caisse) * 100) / 100;
+  if(ecart !== 0 && !confirm(`Le montant reçu (${dp_fmtMoney(v)}) est différent du retrait en caisse (${dp_fmtMoney(caisse)}).\nÉcart : ${ecart > 0 ? '+' : '−'}${dp_fmtMoney(Math.abs(ecart))}.\nConfirmer quand même ?`)) return;
+  const upd = { statut:'confirme', montant:v, montantRecu:v, ecart, confirmePar:currentUser, confirmeLe:new Date().toISOString() };
+  try{
+    await dp_mouvCol.doc(id).set(upd, { merge:true });
+    delete dp_pendVals[id];
+  }catch(e){ console.error(e); alert('Erreur lors de la confirmation : ' + e.message); }
+}
+
+/* ---------------- Supprimer une période (avec Report de solde) ---------------- */
+function dp_isoLocal(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function dp_purgeLimit(){ const d = new Date(); d.setDate(d.getDate() - DP_PURGE_PROTECT_DAYS); return dp_isoLocal(d); }
+function dp_purgeOpen(){
+  if(!(session && session.isAdmin)){ alert('Réservé à l’administratrice.'); return; }
+  dp_purge = { step:'pick', au:'' }; dp_purgeFile = null; dp_render();
+}
+function dp_purgeClose(){ dp_purge = null; dp_purgeFile = null; dp_render(); }
+function dp_purgeCheck(){
+  const p = dp_purge || {}, all = dp_mouvements;
+  const dates = all.map(m=>m.date).filter(Boolean).sort();
+  if(!dates.length) return { err:'Aucun mouvement à supprimer.' };
+  const du = dates[0], au = p.au, lim = dp_purgeLimit();
+  if(!au) return { err:'Choisis la date « Au ».' };
+  if(au < du) return { err:'La date « Au » doit être après la date « Du ».' };
+  if(au > lim) return { err:`Protection : les ${DP_PURGE_PROTECT_DAYS} derniers jours ne peuvent pas être supprimés (date maximale : ${fmtDateShort(lim)}).` };
+  const rows = all.filter(m=>(m.date||'') <= au);
+  const dels = rows.filter(m=>m.id !== DP_REPORT_ID);
+  if(!dels.length) return { err:'Aucun mouvement à supprimer sur cette période.' };
+  if(dp_pending.some(x=>(x.date||'') <= au)) return { err:'Des retraits de caisse sont encore à confirmer sur cette période. Confirme-les d’abord.' };
+  return { du, au, rows, dels, nb:dels.length, net:Math.round(dp_computeSolde(rows) * 100) / 100 };
+}
+function dp_purgeBox(){
+  if(!dp_purge || !(session && session.isAdmin)) return '';
+  const p = dp_purge, chk = dp_purgeCheck();
+  const dates = dp_mouvements.map(m=>m.date).filter(Boolean).sort();
+  const du = dates[0] || '';
+  if(p.step === 'confirm'){
+    const how = p.how === 'share' ? 'La feuille de partage a été ouverte.' : p.how === 'download' ? 'Le fichier a été téléchargé (le partage direct n’est pas disponible sur cet appareil).' : 'Le partage a été annulé.';
+    return `<div class="ticket" style="padding:14px 16px;border-color:var(--rust);">
+      <div style="font-size:13px;font-weight:700;color:var(--rust);margin-bottom:6px;">🗑️ Supprimer du ${fmtDateShort(p.du)} au ${fmtDateShort(p.au)}</div>
+      <div style="font-size:13px;line-height:1.5;">${how}<br>
+      ${p.copied ? '✓ L’adresse <b>' + DP_PURGE_MAIL + '</b> est copiée : choisis Gmail, colle-la et envoie.' : 'Envoie le fichier à <b>' + DP_PURGE_MAIL + '</b>.'}<br>
+      <span style="color:var(--ink-muted);">Rien n’est supprimé tant que tu ne confirmes pas ci-dessous. ${p.nb} mouvement(s) seront remplacés par un « Report de solde » de <b>${dp_fmtMoney(p.net)}</b> (solde théorique inchangé).</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <button class="btn ghost small" onclick="dp_purgeShare()">📤 Partager à nouveau</button>
+        <button class="btn ghost small" onclick="dp_purgeDownload()">⬇️ Télécharger le fichier</button>
+        <button class="btn small" style="background:var(--rust);border-color:var(--rust);" onclick="dp_purgeApply()" ${dp_purgeBusy ? 'disabled' : ''}>✓ Mail envoyé — supprimer la période</button>
+        <button class="btn ghost small" onclick="dp_purgeClose()">Annuler</button>
+      </div>
+    </div>`;
+  }
+  const lim = dp_purgeLimit();
+  return `<div class="ticket" style="padding:14px 16px;border-color:var(--rust);">
+    <div style="font-size:13px;font-weight:700;color:var(--rust);margin-bottom:8px;">🗑️ Supprimer une période (le solde théorique ne change pas)</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+      <div class="field" style="margin:0;flex:1;min-width:130px;"><label>Du (plus ancienne date)</label><input type="text" value="${du ? fmtDateShort(du) : '—'}" disabled /></div>
+      <div class="field" style="margin:0;flex:1;min-width:130px;"><label>Au</label><input type="date" max="${lim}" value="${p.au || ''}" onchange="dp_purge.au=this.value;dp_render()" /></div>
+    </div>
+    <div style="font-size:12.5px;margin:10px 0;color:${chk.err ? 'var(--ink-muted)' : 'var(--forest)'};">${chk.err ? esc(chk.err) : `${chk.nb} mouvement(s) seront remplacés par un seul « Report de solde » de <b>${dp_fmtMoney(chk.net)}</b>.`}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn small" style="background:var(--rust);border-color:var(--rust);" onclick="dp_purgeGo()">🗑️ Supprimer</button>
+      <button class="btn ghost small" onclick="dp_purgeClose()">Annuler</button>
+    </div>
+  </div>`;
+}
+function dp_purgeBuildFile(chk){
+  if(typeof XLSX === 'undefined') throw new Error('Le module Excel n’est pas disponible. Vérifie ta connexion puis réessaie.');
+  const rows = chk.rows.slice().sort((a,b)=> (a.date||'').localeCompare(b.date||'') || (a.creeLe||'').localeCompare(b.creeLe||''));
+  const out = rows.map(m=>{
+    const sign = dp_typeMeta(m.type).sign, montant = Number(m.montant)||0;
+    return {
+      'Date': m.date || '', 'Heure': dp_fmtTime(m.creeLe), 'Type': m.type || '', 'Sens': sign>0 ? 'Entrée' : 'Sortie',
+      'Désignation / Motif': m.articleNom || m.libelle || '', 'Quantité': m.quantite ?? '', 'Unité': m.unite || '',
+      'Prix unitaire (DA)': (m.type==='Achat' && m.quantite) ? montant/Number(m.quantite) : '', 'Montant (DA)': montant,
+      'Fournisseur': m.fournisseur || '', 'Employé': m.employeNom || '', 'Avance salaire': m.estAvanceSalaire ? 'Oui' : 'Non',
+      'Saisi par': m.creePar || '', 'Date/heure saisie': m.creeLe || '', 'Modifié par': m.modifiePar || '', 'Date/heure modification': m.modifieLe || '',
+      'Pointé': m.pointe ? 'Oui' : 'Non', 'ID mouvement': m.id || ''
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(out);
+  ws['!cols'] = [{wch:12},{wch:8},{wch:14},{wch:10},{wch:30},{wch:12},{wch:10},{wch:18},{wch:16},{wch:24},{wch:22},{wch:16},{wch:18},{wch:24},{wch:18},{wch:26},{wch:10},{wch:30}];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Mouvements');
+  const buf = XLSX.write(wb, { type:'array', bookType:'xlsx' });
+  const name = `mouvements_depenses_du_${chk.du}_au_${chk.au}.xlsx`;
+  return new File([buf], name, { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+function dp_purgeDownload(){
+  if(!dp_purgeFile) return;
+  const url = URL.createObjectURL(dp_purgeFile), a = document.createElement('a');
+  a.href = url; a.download = dp_purgeFile.name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 5000);
+}
+async function dp_purgeShare(){
+  if(!dp_purgeFile) return;
+  try{ if(navigator.clipboard) await navigator.clipboard.writeText(DP_PURGE_MAIL); dp_purge.copied = true; }catch(e){ dp_purge.copied = false; }
+  if(navigator.canShare && navigator.canShare({ files:[dp_purgeFile] })){
+    try{ await navigator.share({ files:[dp_purgeFile], title:'Allo Sushi — dépenses du ' + dp_purge.du + ' au ' + dp_purge.au, text:'Historique des dépenses (sauvegarde avant suppression).' }); dp_purge.how = 'share'; }
+    catch(e){ if(!e || e.name !== 'AbortError') console.warn(e); dp_purge.how = 'cancel'; }
+  }else{ dp_purgeDownload(); dp_purge.how = 'download'; }
+  dp_render();
+}
+async function dp_purgeGo(){
+  if(!(session && session.isAdmin)) return;
+  const chk = dp_purgeCheck();
+  if(chk.err){ alert(chk.err); return; }
+  try{ dp_purgeFile = dp_purgeBuildFile(chk); }catch(e){ alert(e.message); return; }
+  dp_purge.step = 'confirm'; dp_purge.du = chk.du; dp_purge.au = chk.au; dp_purge.nb = chk.nb; dp_purge.net = chk.net;
+  await dp_purgeShare();
+}
+async function dp_purgeApply(){
+  if(dp_purgeBusy || !dp_purge) return;
+  if(!currentUser){ askUserName(false); if(!currentUser) return; }
+  const chk = dp_purgeCheck();
+  if(chk.err){ alert(chk.err); return; }
+  if(chk.nb !== dp_purge.nb || Math.abs(chk.net - dp_purge.net) > 0.005 || chk.au !== dp_purge.au){
+    alert('Les mouvements ont changé depuis l’export. Recommence la suppression pour générer un fichier à jour.'); dp_purgeClose(); return;
+  }
+  if(!confirm(`Tu confirmes que le mail avec le fichier est bien envoyé ?\n\n${chk.nb} mouvement(s) du ${fmtDateShort(chk.du)} au ${fmtDateShort(chk.au)} seront supprimés et remplacés par un Report de solde de ${dp_fmtMoney(chk.net)}.`)) return;
+  dp_purgeBusy = true; dp_render();
+  try{
+    const old = dp_mouvements.find(m=>m.id === DP_REPORT_ID), now = new Date().toISOString();
+    let run = old ? (Number(old.montant)||0) : 0;
+    const purges = ((old && old.purges) || []).concat([{ le:now, par:currentUser, du:chk.du, au:chk.au, nb:chk.nb, net:chk.net }]);
+    for(let i = 0; i < chk.dels.length; i += 400){
+      const batch = db.batch();
+      chk.dels.slice(i, i + 400).forEach(m=>{ batch.delete(dp_mouvCol.doc(m.id)); run += dp_typeMeta(m.type).sign * (Number(m.montant)||0); });
+      run = Math.round(run * 100) / 100;
+      // Chaque lot supprime ET met le report à jour : le solde théorique reste juste à tout moment.
+      batch.set(dp_mouvCol.doc(DP_REPORT_ID), {
+        id:DP_REPORT_ID, type:'Report', date:chk.au, montant:run, libelle:'Report de solde',
+        creePar:(old && old.creePar) || currentUser, creeLe:(old && old.creeLe) || now, modifiePar:currentUser, modifieLe:now, purges
+      });
+      await batch.commit();
+    }
+    dp_purge = null; dp_purgeFile = null;
+    alert('Période supprimée. Le solde théorique est inchangé.');
+  }catch(e){ console.error(e); alert('Erreur pendant la suppression : ' + e.message + '\nLe solde reste correct ; vérifie puis recommence si besoin.'); }
+  finally{ dp_purgeBusy = false; dp_render(); }
+}
+
 function dp_renderMouvementsTab(){
   const isAdmin = session && session.isAdmin;
   let filtered = dp_typeFilter==='Tous' ? dp_mouvements : dp_mouvements.filter(m=> (dp_typeMeta(m.type).sign>0 ? 'in' : 'out') === dp_typeFilter);
@@ -4954,9 +5186,9 @@ function dp_renderMouvementsTab(){
     </div>`;
   }
 
-  const addBar = !dp_showMouvForm ? `<button class="btn" style="width:100%;justify-content:center;padding:14px;font-size:15px;" onclick="dp_editingMouvId=null;dp_editPrefill=null;dp_showMouvForm=true;dp_render()">Ajouter</button>` : '';
+  const addBar = dp_renderAddBar();
 
-  const form = dp_showMouvForm ? dp_renderMouvForm() : '';
+  const form = dp_formKind ? dp_renderMouvForm() : '';
 
   const draftBox = dp_draft.length>0 ? `
     <div class="ticket" style="padding:14px 16px;border-color:var(--amber);">
@@ -4996,6 +5228,7 @@ function dp_renderMouvementsTab(){
         <div class="field" style="flex:1;min-width:130px;margin:0;"><label>Au</label><input type="date" id="dp-date-filter-end" value="${dp_dateFilterEnd}" onchange="dp_dateFilterEnd=this.value;dp_render()" /></div>
         <button class="btn small" style="white-space:nowrap;" onclick="dp_exportMouvementsExcel()">📊 Télécharger Excel</button>
         <button class="btn ghost small" style="white-space:nowrap;" onclick="document.getElementById('dp-imp-file').click()">📥 Importer Excel</button>
+        <button class="btn ghost small" style="white-space:nowrap;color:var(--rust);" onclick="dp_purgeOpen()">🗑️ Supprimer une période</button>
         <input type="file" id="dp-imp-file" accept=".xlsx,.xls" style="display:none;" onchange="dp_importFile(this.files[0]); this.value='';" />
         ${(hasDateFilter||dp_searchTerm) ? `<button class="btn ghost small" onclick="dp_dateFilterStart='';dp_dateFilterEnd='';dp_searchTerm='';dp_render()">✕ Effacer</button>` : ''}
       </div>` : ''}
@@ -5010,251 +5243,306 @@ function dp_renderMouvementsTab(){
   const list = sorted.length===0 ? `<p style="font-size:13px;color:var(--ink-muted);">Aucun mouvement.</p>` :
     sorted.map(m=>{
       const meta = dp_typeMeta(m.type);
-      const detail = m.type==='Achat' ? `${esc(m.articleNom||'')} · ${dp_fmtNum(m.quantite)} ${esc(m.unite||'')}` : (esc(m.libelle||'') + (m.estAvanceSalaire?` · 👤 Avance : ${esc(m.employeNom)}`:''));
+      const detail = m.type==='Achat' ? `${esc(m.articleNom||'')} · ${dp_fmtNum(m.quantite)} ${esc(m.unite||'')}` : (esc(m.libelle||'') + (m.estAvanceSalaire?` · 👤 Avance : ${esc(m.employeNom)}`:'') + (m.source==='caisse'&&m.ecart?` · <span style="color:var(--rust);">écart Caisse ${m.ecart>0?'+':'−'}${dp_fmtMoney(Math.abs(m.ecart))}</span>`:'') + (m.type==='Report'&&m.purges?` · jusqu’au ${fmtDateShort(m.date)}`:''));
       return `<div class="movement-row">
         <div>
           <div style="font-weight:500;"><span class="chip" style="color:${meta.color};background:${meta.bg};margin-right:5px;">${esc(m.type)}</span>${detail}</div>
           <div class="sub">${fmtDateShort(m.date)}<br>${m.creeLe && dp_fmtTime(m.creeLe)?'🕐 '+dp_fmtTime(m.creeLe):''}${m.creePar?(m.creeLe && dp_fmtTime(m.creeLe)?' · ':'')+'par '+esc(m.creePar):''}${m.modifiePar?' · modifié par '+esc(m.modifiePar):''}${m.pointe?' · ✓ pointé':''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
-          <div class="mono" style="font-weight:600;color:${meta.color};">${meta.sign>0?'+':'−'}${dp_fmtMoney(m.montant)}</div>
-          ${session && session.isAdmin ? `<button class="x-btn" style="color:var(--forest);font-size:13px;" onclick="dp_openEditMouv('${m.id}')">✏️</button>` : ''}
-          <button class="x-btn" onclick="dp_deleteMouvement('${m.id}')">✕</button>
+          <div class="mono" style="font-weight:600;color:${meta.color};">${dp_signedAmt(m)}</div>
+          ${session && session.isAdmin && m.type!=='Report' ? `<button class="x-btn" style="color:var(--forest);font-size:13px;" onclick="dp_openEditMouv('${m.id}')">✏️</button>` : ''}
+          ${m.type!=='Report' ? `<button class="x-btn" onclick="dp_deleteMouvement('${m.id}')">✕</button>` : ''}
         </div>
       </div>`;
     }).join('');
 
-  const verificationBox = dp_renderVerificationBox();
-  return soldeBox + verificationBox + addBar + form + draftBox + filterChips + list;
+  return dp_pendingBox() + soldeBox + addBar + form + draftBox + dp_purgeBox() + filterChips + list;
 }
+
+/* ---------------- Boutons Entrée / Sortie / Avance et formulaires ----------------
+   Configuration (administrateur, ⚙️) dans depenses_config/boutons : concepts d'entrée, boutons de sortie, ingrédients, livreurs.
+   Chaque mouvement garde la structure existante (type, libelle, montant, articleNom…) : les anciens mouvements restent valables. */
+const dp_cfgRef = db.collection('depenses_config').doc('boutons');
+const DP_UNITES = ['kg','g','L','cl','unité','pièce','boîte','carton','sachet','bouteille','botte','paquet'];
+const DP_MODELES = [
+  { id:'achat', label:'Ingrédient (quantité et prix)' },
+  { id:'livraison', label:'Livraison (liste de noms)' },
+  { id:'autre', label:'Note + montant' },
+  { id:'simple', label:'Montant seul' },
+];
+const DP_BOUTONS_BASE = [
+  { id:'ingredients', n:'Ingrédients', m:'achat' },
+  { id:'livraison', n:'Livraison / Taxi', m:'livraison' },
+  { id:'autres', n:'Autres sorties', m:'autre' },
+];
+function dp_cfgDefaults(){
+  return {
+    concepts: [{ id:'caisse', n:'Caisse' }, { id:'huile', n:'Huile usée' }],
+    boutons: DP_BOUTONS_BASE.map(b=>Object.assign({}, b)),
+    ingredients: [['Viande','kg'],['Légumes','kg'],['Huile','L'],['Crevette','kg'],['Fromage','kg'],['Salade','kg'],['Saumon','kg'],['Citron','kg'],['Farine','kg'],['Gingembre','kg']].map(a=>({ id:'i_' + a[0].toLowerCase().replace(/[^a-z]/g,''), n:a[0], u:a[1] })),
+    livreurs: [{ id:'taxi', n:'Taxi' }, { id:'livreur', n:'Livreur' }],
+  };
+}
+let dp_cfg = dp_cfgDefaults(), dp_cfgErr = '';
+let dp_formKind = null;      // 'entree' | 'sortie' | 'avance' : formulaire ouvert
+let dp_sortieBtn = null;     // id du bouton de sortie choisi
+let dp_cfgPanel = null;      // liste en cours de réglage : 'concepts' | 'ingredients' | 'livreurs' | 'boutons'
+let dp_fv = {}, dp_skipGrab = false;   // valeurs saisies, conservées quand l'écran est redessiné
+let dp_ptEmp = {};           // employés de la rubrique Pointage (documents pointage_config/employes)
+const DP_FIELDS = ['dp-concept','dp-montant','dp-ing','dp-unite','dp-qty','dp-pu','dp-tot','dp-livreur','dp-note','dp-employe'];
+function dp_grabForm(){ DP_FIELDS.forEach(id=>{ const el = document.getElementById(id); if(el) dp_fv[id] = el.value; }); }
+function dp_fvReset(){ dp_fv = {}; dp_skipGrab = true; }
+function dp_cfgFix(){
+  DP_BOUTONS_BASE.forEach(b=>{ if(!dp_cfg.boutons.some(x=>x.id === b.id)) dp_cfg.boutons.push(Object.assign({}, b)); });
+}
+const dp_watchCfg = ()=>dp_cfgRef.onSnapshot((doc)=>{
+  if(doc.exists){ const d = doc.data() || {}; ['concepts','boutons','ingredients','livreurs'].forEach(k=>{ if(Array.isArray(d[k])) dp_cfg[k] = d[k]; }); }
+  dp_cfgFix(); dp_cfgErr = ''; dp_render();
+}, (err)=>{ console.warn(err); dp_cfgErr = (err && err.message) || 'Lecture impossible'; });
+const dp_watchPtEmp = ()=>pt_configRef.onSnapshot((doc)=>{ dp_ptEmp = doc.exists ? ((doc.data() || {}).emp || {}) : {}; }, (err)=>console.warn(err));
+async function dp_cfgSave(){
+  try{ await dp_cfgRef.set(dp_cfg); dp_cfgErr = ''; }
+  catch(e){ console.error(e); dp_cfgErr = e.message || 'Écriture impossible'; alert('Réglage non enregistré : ' + dp_cfgErr + '\nVérifie que les règles Firestore autorisent la collection « depenses_config ».'); }
+}
+function dp_vis(kind){ return (dp_cfg[kind] || []).filter(x=>!x.off); }
+function dp_employeesList(extra){
+  const set = new Set();
+  Object.keys(dp_ptEmp).forEach(c=>{ const n = String((dp_ptEmp[c] || {}).name || '').trim(); if(n) set.add(n); });
+  Object.keys(PT_DEFAULT_NAMES).forEach(c=>{ if(!dp_ptEmp[c] || !(dp_ptEmp[c] || {}).name) set.add(PT_DEFAULT_NAMES[c]); });
+  if(extra) set.add(extra);
+  return Array.from(set).sort((a, b)=>a.localeCompare(b, 'fr'));
+}
+function dp_curBtn(){ const v = dp_vis('boutons'); return v.find(b=>b.id === dp_sortieBtn) || v[0] || DP_BOUTONS_BASE[2]; }
+
+/* --- gestion des listes (⚙️, administrateur) --- */
+function dp_cfgOpen(kind){ dp_grabForm(); dp_cfgPanel = (dp_cfgPanel === kind) ? null : kind; dp_render(); }
+function dp_cfgAdd(kind){
+  const nEl = document.getElementById('dp-cfg-new'), n = nEl ? nEl.value.trim() : '';
+  if(!n){ if(nEl) nEl.focus(); return; }
+  if(dp_cfg[kind].some(x=>String(x.n).toLowerCase() === n.toLowerCase())){ alert('« ' + n + ' » existe déjà dans la liste.'); return; }
+  const it = { id: uid(), n };
+  if(kind === 'ingredients'){ const u = document.getElementById('dp-cfg-new-u'); it.u = u ? u.value : 'kg'; }
+  if(kind === 'boutons'){ const m = document.getElementById('dp-cfg-new-m'); it.m = m ? m.value : 'simple'; }
+  dp_grabForm(); dp_cfg[kind].push(it); dp_cfgSave(); dp_render();
+  const el = document.getElementById('dp-cfg-new'); if(el) el.focus();
+}
+function dp_cfgRename(kind, id, v){ const it = dp_cfg[kind].find(x=>x.id === id); v = String(v).trim(); if(!it || !v) { dp_render(); return; } it.n = v; dp_cfgSave(); dp_render(); }
+function dp_cfgToggle(kind, id){ const it = dp_cfg[kind].find(x=>x.id === id); if(!it) return; it.off = !it.off; dp_grabForm(); dp_cfgSave(); dp_render(); }
+function dp_cfgMove(kind, id, dir){
+  const a = dp_cfg[kind], i = a.findIndex(x=>x.id === id), j = i + dir; if(i < 0 || j < 0 || j >= a.length) return;
+  const t = a[i]; a[i] = a[j]; a[j] = t; dp_grabForm(); dp_cfgSave(); dp_render();
+}
+function dp_cfgUnit(id, v){ const it = dp_cfg.ingredients.find(x=>x.id === id); if(it){ it.u = v; dp_cfgSave(); } }
+function dp_cfgPanelHtml(kind){
+  const TITRES = { concepts:'Concepts d’entrée', ingredients:'Ingrédients', livreurs:'Livraison / Taxi : noms', boutons:'Boutons de sortie' };
+  const unitSel = (id, cur, attrs)=>`<select class="ft-in" style="width:auto;padding:6px;" ${attrs}>${DP_UNITES.concat(DP_UNITES.includes(cur) || !cur ? [] : [cur]).map(u=>`<option value="${esc(u)}" ${u === cur ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select>`;
+  const rows = dp_cfg[kind].map((it, i)=>`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-top:1px solid var(--line);${it.off ? 'opacity:.5;' : ''}">
+      <input type="text" class="ft-in" style="flex:1;min-width:0;padding:6px 8px;" value="${esc(it.n)}" onchange="dp_cfgRename('${kind}','${it.id}',this.value)" />
+      ${kind === 'ingredients' ? unitSel(it.id, it.u || 'kg', `onchange="dp_cfgUnit('${it.id}',this.value)"`) : ''}
+      ${kind === 'boutons' ? `<span style="font-size:11px;color:var(--ink-muted);white-space:nowrap;">${esc((DP_MODELES.find(m=>m.id === it.m) || {}).label || '')}</span>` : ''}
+      <button type="button" class="btn ghost small" ${i === 0 ? 'disabled' : ''} onclick="dp_cfgMove('${kind}','${it.id}',-1)">▲</button>
+      <button type="button" class="btn ghost small" ${i === dp_cfg[kind].length - 1 ? 'disabled' : ''} onclick="dp_cfgMove('${kind}','${it.id}',1)">▼</button>
+      <button type="button" class="btn ghost small" onclick="dp_cfgToggle('${kind}','${it.id}')">${it.off ? 'Afficher' : 'Masquer'}</button>
+    </div>`).join('');
+  return `<div class="ticket" style="padding:12px;border-color:var(--forest);margin:8px 0;">
+    <div class="row-between"><b style="font-size:13px;">⚙️ ${TITRES[kind]}</b><button type="button" class="btn ghost small" onclick="dp_cfgOpen('${kind}')">Fermer</button></div>
+    <div style="font-size:11.5px;color:var(--ink-muted);margin:4px 0;">Un élément masqué disparaît de la liste, mais les anciens mouvements gardent leur nom.</div>
+    ${rows}
+    <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+      <input type="text" id="dp-cfg-new" class="ft-in" style="flex:1;min-width:0;padding:6px 8px;" placeholder="Ajouter…" onkeydown="if(event.key==='Enter'){ event.preventDefault(); dp_cfgAdd('${kind}'); }" />
+      ${kind === 'ingredients' ? unitSel('', 'kg', 'id="dp-cfg-new-u"') : ''}
+      ${kind === 'boutons' ? `<select id="dp-cfg-new-m" class="ft-in" style="width:auto;padding:6px;">${DP_MODELES.map(m=>`<option value="${m.id}">${esc(m.label)}</option>`).join('')}</select>` : ''}
+      <button type="button" class="btn small" onclick="dp_cfgAdd('${kind}')">Ajouter</button>
+    </div>
+    ${dp_cfgErr ? `<div style="color:var(--rust);font-size:12px;margin-top:6px;">⚠ ${esc(dp_cfgErr)}</div>` : ''}
+  </div>`;
+}
+
+/* --- barre des trois boutons --- */
+function dp_renderAddBar(){
+  const K = [['entree','↓ Entrée','Appoint, recette','var(--moss)','var(--moss-bg)'], ['sortie','↑ Sortie','Ingrédients, livraison…','var(--rust)','var(--rust-bg)'], ['avance','👤 Avance','Sur salaire','var(--amber)','var(--amber-bg)']];
+  return `<div class="grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">${K.map(k=>{
+    const on = dp_formKind === k[0];
+    return `<button type="button" ${dp_editingMouvId ? 'disabled' : ''} onclick="dp_openKind('${k[0]}')" style="padding:12px 6px;border-radius:8px;border:2px solid ${on ? k[3] : 'var(--line)'};background:${on ? k[4] : 'var(--surface)'};text-align:center;cursor:pointer;${dp_editingMouvId && !on ? 'opacity:.4;' : ''}">
+      <div style="font-weight:700;font-size:14px;color:${on ? k[3] : 'var(--ink)'};">${k[1]}</div><div style="font-size:10.5px;color:var(--ink-muted);margin-top:2px;">${k[2]}</div></button>`;
+  }).join('')}</div>`;
+}
+function dp_openKind(k){
+  if(dp_editingMouvId) return;
+  dp_grabForm();
+  if(dp_formKind === k){ dp_formKind = null; dp_cfgPanel = null; }
+  else { dp_formKind = k; dp_cfgPanel = null; if(k === 'sortie' && !dp_sortieBtn) dp_sortieBtn = dp_curBtn().id; }
+  dp_fvReset(); dp_render();
+}
+function dp_pickBtn(id){ dp_grabForm(); dp_sortieBtn = id; dp_fvReset(); dp_cfgPanel = null; dp_render(); }
+function dp_closeForm(){ dp_formKind = null; dp_cfgPanel = null; dp_editingMouvId = null; dp_editPrefill = null; dp_fvReset(); dp_render(); }
 
 function dp_openEditMouv(id){
   if(!(session && session.isAdmin)){ alert("Seule l'administratrice peut modifier un mouvement déjà enregistré."); return; }
-  const m = dp_mouvements.find(x=>x.id===id);
+  const m = dp_mouvements.find(x=>x.id === id);
   if(!m) return;
+  if(m.type==='Report'){ alert('Le « Report de solde » n’est pas modifiable.'); return; }
   const closure = dp_closureFor(m.date);
   if(closure){ alert(`Cette période (${fmtDateShort(closure.dateDebut)} → ${fmtDateShort(closure.dateFin)}) est clôturée. Réouvrez-la dans l'onglet Clôtures pour modifier.`); return; }
-  dp_editingMouvId = id;
-  dp_editPrefill = m;
-  dp_formType = m.type;
-  dp_workingDate = m.date;
-  if(m.type==='Achat') dp_achatCalcMode = 'montant';
-  dp_showMouvForm = true;
-  dp_render();
-  const el = document.getElementById('dp-form');
-  if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
-}
-function dp_cancelEditMouv(){
-  dp_editingMouvId = null;
-  dp_editPrefill = null;
-  dp_showMouvForm = false;
-  dp_render();
-}
-
-function dp_renderMouvForm(){
-  if(!(session && session.isAdmin) && !DP_TYPES_NON_ADMIN.includes(dp_formType)) dp_formType = 'Achat';
-  const E = dp_editPrefill || {};
-  const isEditing = !!dp_editingMouvId;
-  const employeeSuggestions = EMPLOYES_TOUS.map(n=>`<option value="${esc(n)}">`).join('');
-  const direction = dp_typeMeta(dp_formType).sign > 0 ? 'in' : 'out';
-  const allowedTypes = dp_allowedTypes();
-  const typesIn = allowedTypes.filter(t=>t.sign>0);
-  const typesOut = allowedTypes.filter(t=>t.sign<0);
-  const isAdminForm = session && session.isAdmin;
-  const workingDateClosure = dp_closureFor(dp_workingDate);
-  return `
-    <div class="ticket" id="dp-form" style="padding:18px;${isEditing?'border-color:var(--forest);':''}">
-      ${isEditing ? `<div style="font-size:12.5px;font-weight:700;color:var(--forest);margin-bottom:10px;">✏️ Modification du mouvement du ${fmtDateShort(E.date)}</div>` : ''}
-      <div class="form-section">
-        <div class="section-label"><span class="num">1</span>Date</div>
-        <div class="field"><input type="date" id="dp-working-date" value="${dp_workingDate}" onchange="dp_workingDate=this.value;dp_render()" /></div>
-        ${workingDateClosure ? `<div style="margin-top:8px;font-size:12px;color:var(--rust);">🔒 Cette date fait partie d'une période clôturée (${fmtDateShort(workingDateClosure.dateDebut)} → ${fmtDateShort(workingDateClosure.dateFin)}). Réouvrez-la dans l'onglet Clôtures pour ajouter ou modifier un mouvement.</div>` : ''}
-      </div>
-      <div class="form-section">
-        <div class="section-label"><span class="num">2</span>Type de mouvement</div>
-        <div class="grid grid-2" style="gap:8px;margin-bottom:12px;">
-          <button type="button" onclick="dp_setDirection('in')" style="padding:14px;border-radius:8px;border:2px solid ${direction==='in'?'var(--moss)':'var(--line)'};background:${direction==='in'?'var(--moss-bg)':'var(--surface)'};text-align:left;cursor:pointer;">
-            <div style="font-weight:700;font-size:14px;color:${direction==='in'?'var(--moss)':'var(--ink)'};">↓ Entrée d'argent</div>
-            <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">${isAdminForm?'Appoint, recette':'Prélèvement caisse'}</div>
-          </button>
-          <button type="button" onclick="dp_setDirection('out')" style="padding:14px;border-radius:8px;border:2px solid ${direction==='out'?'var(--rust)':'var(--line)'};background:${direction==='out'?'var(--rust-bg)':'var(--surface)'};text-align:left;cursor:pointer;">
-            <div style="font-weight:700;font-size:14px;color:${direction==='out'?'var(--rust)':'var(--ink)'};">↑ Sortie d'argent</div>
-            <div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">Achat, charge</div>
-          </button>
-        </div>
-        ${(direction==='in'?typesIn:typesOut).length>1 ? `<div class="grid grid-2" style="gap:8px;">
-          ${(direction==='in'?typesIn:typesOut).map(t=>`<button type="button" onclick="dp_formType='${t.id}';dp_render()" style="padding:14px;border-radius:8px;border:2px solid ${dp_formType===t.id?t.color:'var(--line)'};background:${dp_formType===t.id?t.bg:'var(--surface)'};text-align:left;cursor:pointer;">
-            <div style="font-weight:700;font-size:14px;color:${dp_formType===t.id?t.color:'var(--ink)'};">${esc(t.label)}</div>
-          </button>`).join('')}
-        </div>` : ''}
-      </div>
-
-      ${dp_formType==='Achat' ? `
-        <div class="form-section">
-          <div class="section-label"><span class="num">3</span>Article et quantité</div>
-          <div class="grid grid-2">
-             <div class="field" style="grid-column:1/-1;"><label>Article / désignation</label>
-               <input type="text" id="dp-article" placeholder="Ex. Saumon, riz, emballages…" value="${esc(E.type==='Achat'?(E.articleNom||''):'')}" />
-             </div>
-            <div class="field"><label>Quantité</label><input type="text" inputmode="decimal" id="dp-qty" placeholder="0" value="${E.type==='Achat'&&E.quantite!=null?esc(String(E.quantite)):''}" oninput="dp_updateAchatCalc()" /></div>
-            <div class="field"><label>Mode de saisie</label>
-              <div class="filter-row" style="margin:0;">
-                <button type="button" class="filter-chip ${dp_achatCalcMode==='prix'?'active':''}" style="${dp_achatCalcMode==='prix'?'background:var(--amber);border-color:var(--amber);color:#fff;':''}" onclick="dp_achatCalcMode='prix';dp_render()">Prix unitaire</button>
-                <button type="button" class="filter-chip ${dp_achatCalcMode==='montant'?'active':''}" style="${dp_achatCalcMode==='montant'?'background:var(--amber);border-color:var(--amber);color:#fff;':''}" onclick="dp_achatCalcMode='montant';dp_render()">Montant total</button>
-              </div>
-            </div>
-            ${dp_achatCalcMode==='prix' ? `
-              <div class="field" style="grid-column:1/-1;"><label>Prix unitaire (DA)</label><input type="text" inputmode="decimal" id="dp-prix" placeholder="0" value="${(E.type==='Achat'&&E.quantite)?esc(String(E.montant/E.quantite)):''}" oninput="dp_updateAchatCalc()" /></div>
-            ` : `
-              <div class="field" style="grid-column:1/-1;"><label>Montant total (DA)</label><input type="text" inputmode="decimal" id="dp-montant-total" placeholder="0" value="${(E.type==='Achat'&&E.montant!=null)?esc(String(E.montant)):''}" oninput="dp_updateAchatCalc()" /></div>
-            `}
-            <div style="grid-column:1/-1;font-size:12.5px;color:var(--ink-muted);" id="dp-achat-calc-preview"></div>
-          </div>
-        </div>
-        <div class="form-section">
-          <div class="section-label"><span class="num">4</span>Compléments (optionnel)</div>
-          <div class="grid grid-2">
-            <div class="field"><label>Fournisseur</label><input type="text" id="dp-fourn" value="${esc(E.type==='Achat'?(E.fournisseur||''):'')}" /></div>
-             <div class="field"><label>Unité</label><input type="text" id="dp-unite" value="${esc(E.type==='Achat'?(E.unite||''):'')}" placeholder="kg, L, unité…" /></div>
-          </div>
-        </div>
-      ` : `
-        <div class="form-section">
-          <div class="section-label"><span class="num">3</span>Montant et détail</div>
-          <div class="grid grid-2">
-            <div class="field"><label>Montant (DA)</label><input type="text" inputmode="decimal" id="dp-montant" placeholder="0" value="${(E.type&&E.type!=='Achat'&&E.montant!=null)?esc(String(E.montant)):''}" /></div>
-            <div class="field"><label>${dp_formType==='Charge'?'Motif / catégorie':'Note (optionnel)'}</label>
-              <input type="text" id="dp-libelle" placeholder="${dp_formType==='Charge'?'Ex. Loyer, Carburant…':'Ex. Appoint du matin'}" value="${esc(E.type&&E.type!=='Achat'?(E.libelle||''):'')}" />
-            </div>
-          </div>
-        </div>
-        ${dp_formType==='Charge' ? `
-          <div class="form-section">
-            <div class="section-label"><span class="num">4</span>Options complémentaires</div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <input type="checkbox" id="dp-isavance" style="width:auto;" ${E.estAvanceSalaire?'checked':''} onchange="document.getElementById('dp-avance-wrap').style.display=this.checked?'flex':'none'" />
-              <label style="text-transform:none;font-size:12.5px;font-weight:500;color:var(--ink);">Ceci est une avance / un acompte sur salaire</label>
-            </div>
-            <div id="dp-avance-wrap" class="field" style="display:${E.estAvanceSalaire?'flex':'none'};margin-top:10px;">
-              <label>Nom de l'employé</label>
-              <input type="text" id="dp-employe" list="dp-employe-list" placeholder="Prénom de l'employé" value="${esc(E.employeNom||'')}" />
-              <datalist id="dp-employe-list">${employeeSuggestions}</datalist>
-            </div>
-          </div>
-        ` : ''}
-      `}
-      <div style="display:flex;align-items:center;gap:12px;margin-top:14px;">
-        ${isEditing ? `
-          <button class="btn" onclick="dp_submitMouv()">✓ Enregistrer les modifications</button>
-          <button class="btn ghost" onclick="dp_cancelEditMouv()">Annuler la modification</button>
-        ` : `
-          <button onclick="dp_submitMouv()" title="Ajouter cette saisie et passer à la suivante" style="width:52px;height:52px;flex-shrink:0;border-radius:50%;border:none;background:var(--forest);color:#fff;font-size:26px;font-weight:700;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;">+</button>
-          <div style="font-size:11.5px;color:var(--ink-muted);flex:1;">Ajoutez cette saisie, puis enchaînez la suivante.</div>
-          <button class="btn ghost small" onclick="dp_showMouvForm=false;dp_render()">Fermer</button>
-        `}
-      </div>
-    </div>
-  `;
-}
-function dp_setDirection(dir){
-  const allowed = dp_allowedTypes();
-  const first = allowed.find(t => dir==='in' ? t.sign>0 : t.sign<0);
-  if(!first) return;
-  dp_formType = first.id;
-  dp_render();
-}
-function dp_updateAchatCalc(){
-  const qtyEl = document.getElementById('dp-qty');
-  const previewEl = document.getElementById('dp-achat-calc-preview');
-  if(!qtyEl || !previewEl) return;
-  const qty = dp_parseNum(qtyEl.value);
-  if(dp_achatCalcMode==='prix'){
-    const prixEl = document.getElementById('dp-prix');
-    const prix = prixEl ? dp_parseNum(prixEl.value) : 0;
-    previewEl.textContent = (qty && prix) ? `= ${dp_fmtMoney(qty*prix)} au total` : '';
+  dp_editingMouvId = id; dp_editPrefill = m; dp_workingDate = m.date; dp_cfgPanel = null;
+  const sign = dp_typeMeta(m.type).sign, fv = {};
+  if(m.type === 'Achat'){
+    dp_formKind = 'sortie'; dp_sortieBtn = (dp_cfg.boutons.find(b=>b.m === 'achat') || {}).id;
+    const q = Number(m.quantite) || 0, tot = Number(m.montant) || 0;
+    Object.assign(fv, { 'dp-ing':m.articleNom || '', 'dp-unite':m.unite || '', 'dp-qty':q ? String(q) : '', 'dp-tot':String(tot), 'dp-pu':q ? String(Math.round(tot / q * 100) / 100) : '' });
+  } else if(m.estAvanceSalaire){
+    dp_formKind = 'avance'; Object.assign(fv, { 'dp-employe':m.employeNom || '', 'dp-montant':String(m.montant) });
+  } else if(sign > 0){
+    dp_formKind = 'entree'; Object.assign(fv, { 'dp-concept':m.concept || m.libelle || '', 'dp-montant':String(m.montant) });
   } else {
-    const montantEl = document.getElementById('dp-montant-total');
-    const montant = montantEl ? dp_parseNum(montantEl.value) : 0;
-    previewEl.textContent = (qty && montant) ? `= ${dp_fmtMoney(montant/qty)} / unité` : '';
+    dp_formKind = 'sortie';
+    if(m.livreur){ dp_sortieBtn = (dp_cfg.boutons.find(b=>b.m === 'livraison') || {}).id; Object.assign(fv, { 'dp-livreur':m.livreur, 'dp-montant':String(m.montant), 'dp-note':m.note || '' }); }
+    else { dp_sortieBtn = (dp_cfg.boutons.find(b=>b.m === 'autre') || {}).id; Object.assign(fv, { 'dp-note':m.libelle || '', 'dp-montant':String(m.montant) }); }
   }
+  dp_fv = fv; dp_skipGrab = true;
+  dp_render();
+  const el = document.getElementById('dp-form'); if(el) el.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+function dp_cancelEditMouv(){ dp_closeForm(); }
+
+/* --- calcul prix unitaire / total (ingrédients) --- */
+function dp_r2(x){ return String(Math.round(x * 100) / 100); }
+function dp_achSet(id, v){ const el = document.getElementById(id); if(el) el.value = v; }
+function dp_achVal(id){ const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+function dp_achQty(){
+  const q = dp_parseNum(dp_achVal('dp-qty')), pu = dp_achVal('dp-pu'), tot = dp_achVal('dp-tot'), hint = document.getElementById('dp-ach-hint');
+  if(pu && tot){ dp_achSet('dp-pu', ''); dp_achSet('dp-tot', ''); if(hint) hint.textContent = 'Quantité modifiée : saisis à nouveau le prix unitaire ou le total.'; return; }
+  if(hint) hint.textContent = '';
+  if(q > 0 && pu) dp_achSet('dp-tot', dp_r2(q * dp_parseNum(pu)));
+  else if(q > 0 && tot) dp_achSet('dp-pu', dp_r2(dp_parseNum(tot) / q));
+}
+function dp_achPu(){ const q = dp_parseNum(dp_achVal('dp-qty')), pu = dp_achVal('dp-pu'); dp_achSet('dp-tot', (q > 0 && pu) ? dp_r2(q * dp_parseNum(pu)) : ''); }
+function dp_achTot(){ const q = dp_parseNum(dp_achVal('dp-qty')), tot = dp_achVal('dp-tot'); dp_achSet('dp-pu', (q > 0 && tot) ? dp_r2(dp_parseNum(tot) / q) : ''); }
+function dp_ingPick(name){ const it = dp_cfg.ingredients.find(x=>x.n === name); const u = document.getElementById('dp-unite'); if(it && it.u && u && Array.from(u.options).some(o=>o.value === it.u)) u.value = it.u; }
+
+/* --- formulaire --- */
+function dp_selHtml(id, opts, cur, attrs){
+  const list = opts.slice(); if(cur && !list.includes(cur)) list.push(cur);
+  return `<select id="${id}" class="ft-in" ${attrs || ''}><option value="">— Choisir —</option>${list.map(o=>`<option value="${esc(o)}" ${o === cur ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+}
+function dp_gear(kind){ return (session && session.isAdmin) ? `<button type="button" class="btn ghost small" style="flex-shrink:0;" title="Régler la liste" onclick="dp_cfgOpen('${kind}')">⚙️</button>` : ''; }
+function dp_renderMouvForm(){
+  const E = dp_editPrefill || {}, isEditing = !!dp_editingMouvId, isAdmin = session && session.isAdmin, fv = dp_fv, V = id=>esc(fv[id] || '');
+  const fld = (label, inner, style)=>`<div class="field" style="${style || ''}"><label>${label}</label>${inner}</div>`;
+  const workingDateClosure = dp_closureFor(dp_workingDate);
+  let body = '';
+  if(dp_formKind === 'entree'){
+    body = `<div style="display:flex;align-items:flex-end;gap:8px;">${fld('Concept', dp_selHtml('dp-concept', dp_vis('concepts').map(c=>c.n), fv['dp-concept']), 'flex:1;margin:0;')}${dp_gear('concepts')}</div>
+      ${dp_cfgPanel === 'concepts' ? dp_cfgPanelHtml('concepts') : ''}
+      ${fld('Montant (DA)', `<input type="text" inputmode="decimal" id="dp-montant" placeholder="0" value="${V('dp-montant')}" />`, 'margin-top:10px;')}`;
+  } else if(dp_formKind === 'avance'){
+    body = `${fld('Employé', dp_selHtml('dp-employe', dp_employeesList(fv['dp-employe']), fv['dp-employe']))}
+      ${fld('Montant (DA)', `<input type="text" inputmode="decimal" id="dp-montant" placeholder="0" value="${V('dp-montant')}" />`, 'margin-top:10px;')}
+      <div style="font-size:11.5px;color:var(--ink-muted);margin-top:6px;">La liste des employés vient de la rubrique Pointage.</div>`;
+  } else {
+    const btns = dp_vis('boutons'), cur = dp_curBtn();
+    const bar = `<div class="filter-row" style="margin:0 0 12px;align-items:center;">${btns.map(b=>`<button type="button" class="filter-chip ${cur.id === b.id ? 'active' : ''}" style="${cur.id === b.id ? 'background:var(--rust);border-color:var(--rust);color:#fff;' : ''}" ${isEditing ? 'disabled' : ''} onclick="dp_pickBtn('${b.id}')">${esc(b.n)}</button>`).join('')}${isAdmin && !isEditing ? `<button type="button" class="btn ghost small" title="Régler les boutons" onclick="dp_cfgOpen('boutons')">⚙️</button>` : ''}</div>${dp_cfgPanel === 'boutons' ? dp_cfgPanelHtml('boutons') : ''}`;
+    let inner = '';
+    if(cur.m === 'achat'){
+      const ingOpts = dp_vis('ingredients').map(i=>i.n), unites = DP_UNITES.slice(); if(fv['dp-unite'] && !unites.includes(fv['dp-unite'])) unites.push(fv['dp-unite']);
+      const unit0 = fv['dp-unite'] || ((dp_cfg.ingredients.find(i=>i.n === fv['dp-ing']) || {}).u) || 'kg';
+      inner = `<div style="display:flex;align-items:flex-end;gap:8px;">${fld('Ingrédient', dp_selHtml('dp-ing', ingOpts, fv['dp-ing'], 'onchange="dp_ingPick(this.value)"'), 'flex:1;margin:0;')}${dp_gear('ingredients')}</div>
+        ${dp_cfgPanel === 'ingredients' ? dp_cfgPanelHtml('ingredients') : ''}
+        <div class="grid grid-2" style="margin-top:10px;">
+          ${fld('Unité', `<select id="dp-unite" class="ft-in">${unites.map(u=>`<option value="${esc(u)}" ${u === unit0 ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select>`)}
+          ${fld('Quantité', `<input type="text" inputmode="decimal" id="dp-qty" placeholder="0" value="${V('dp-qty')}" oninput="dp_achQty()" />`)}
+          ${fld('Prix unitaire (DA)', `<input type="text" inputmode="decimal" id="dp-pu" placeholder="0" value="${V('dp-pu')}" oninput="dp_achPu()" />`)}
+          ${fld('Total (DA)', `<input type="text" inputmode="decimal" id="dp-tot" placeholder="0" value="${V('dp-tot')}" oninput="dp_achTot()" />`)}
+        </div><div id="dp-ach-hint" style="font-size:12px;color:var(--amber);margin-top:6px;"></div>`;
+    } else if(cur.m === 'livraison'){
+      inner = `<div style="display:flex;align-items:flex-end;gap:8px;">${fld('Livreur / Taxi', dp_selHtml('dp-livreur', dp_vis('livreurs').map(l=>l.n), fv['dp-livreur']), 'flex:1;margin:0;')}${dp_gear('livreurs')}</div>
+        ${dp_cfgPanel === 'livreurs' ? dp_cfgPanelHtml('livreurs') : ''}
+        ${fld('Montant (DA)', `<input type="text" inputmode="decimal" id="dp-montant" placeholder="0" value="${V('dp-montant')}" />`, 'margin-top:10px;')}
+        ${fld('Note (optionnel)', `<input type="text" id="dp-note" value="${V('dp-note')}" />`, 'margin-top:10px;')}`;
+    } else if(cur.m === 'autre'){
+      inner = `${fld('Nature de la sortie (obligatoire)', `<input type="text" id="dp-note" placeholder="Ex. Loyer, carburant, réparation…" value="${V('dp-note')}" />`)}
+        ${fld('Prix total (DA)', `<input type="text" inputmode="decimal" id="dp-montant" placeholder="0" value="${V('dp-montant')}" />`, 'margin-top:10px;')}`;
+    } else {
+      inner = fld('Montant (DA)', `<input type="text" inputmode="decimal" id="dp-montant" placeholder="0" value="${V('dp-montant')}" />`);
+    }
+    body = bar + inner;
+  }
+  const accent = dp_formKind === 'entree' ? 'var(--moss)' : dp_formKind === 'avance' ? 'var(--amber)' : 'var(--rust)';
+  return `<div class="ticket" id="dp-form" style="padding:18px;border-color:${accent};">
+    ${isEditing ? `<div style="font-size:12.5px;font-weight:700;color:var(--forest);margin-bottom:10px;">✏️ Modification du mouvement du ${fmtDateShort(E.date)}</div>` : ''}
+    <div class="field"><label>Date</label><input type="date" id="dp-working-date" value="${dp_workingDate}" onchange="dp_workingDate=this.value;dp_render()" /></div>
+    ${workingDateClosure ? `<div style="margin:8px 0;font-size:12px;color:var(--rust);">🔒 Cette date fait partie d'une période clôturée (${fmtDateShort(workingDateClosure.dateDebut)} → ${fmtDateShort(workingDateClosure.dateFin)}). Réouvrez-la dans l'onglet Clôtures pour ajouter ou modifier un mouvement.</div>` : ''}
+    <div style="margin-top:12px;">${body}</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:14px;">
+      ${isEditing ? `
+        <button class="btn" onclick="dp_submitMouv()">✓ Enregistrer les modifications</button>
+        <button class="btn ghost" onclick="dp_cancelEditMouv()">Annuler la modification</button>
+      ` : `
+        <button onclick="dp_submitMouv()" title="Ajouter cette saisie et passer à la suivante" style="width:52px;height:52px;flex-shrink:0;border-radius:50%;border:none;background:var(--forest);color:#fff;font-size:26px;font-weight:700;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;">+</button>
+        <div style="font-size:11.5px;color:var(--ink-muted);flex:1;">Ajoutez cette saisie, puis enchaînez la suivante.</div>
+        <button class="btn ghost small" onclick="dp_closeForm()">Fermer</button>
+      `}
+    </div>
+  </div>`;
 }
 
 async function dp_submitMouv(){
   if(!currentUser){ askUserName(false); if(!currentUser) return; }
   if(dp_editingMouvId && !(session && session.isAdmin)){ alert("Seule l'administratrice peut modifier un mouvement déjà enregistré."); return; }
-  const date = dp_workingDate;
-  const closure = dp_closureFor(date);
+  const date = dp_workingDate, closure = dp_closureFor(date);
   if(closure){ alert(`La date sélectionnée (${fmtDateShort(date)}) fait partie d'une période clôturée (${fmtDateShort(closure.dateDebut)} → ${fmtDateShort(closure.dateFin)}). Réouvrez-la dans l'onglet Clôtures pour modifier.`); return; }
-  let mouv;
-  if(dp_formType==='Achat'){
-    const typed = document.getElementById('dp-article') ? document.getElementById('dp-article').value.trim() : '';
-    if(!typed){ alert('Merci de renseigner la désignation de l’achat.'); return; }
-    const qty = dp_parseNum(document.getElementById('dp-qty').value);
-    if(!qty){ alert('Merci de renseigner une quantité.'); return; }
-    let prix, montantTotal;
-    if(dp_achatCalcMode==='prix'){
-      prix = dp_parseNum(document.getElementById('dp-prix').value);
-      montantTotal = qty*prix;
-    } else {
-      montantTotal = dp_parseNum(document.getElementById('dp-montant-total').value);
-      prix = qty ? montantTotal/qty : 0;
-    }
-    if(!montantTotal){ alert('Merci de renseigner le montant de l’achat.'); return; }
-    const fournisseur = document.getElementById('dp-fourn').value;
-    const unite = document.getElementById('dp-unite').value.trim();
-
-    if(dp_editingMouvId){
-      const original = dp_mouvements.find(m=>m.id===dp_editingMouvId);
-      mouv = {
-        ...original, type:'Achat', date, montant: montantTotal,
-        articleNom: typed, quantite: qty, unite, fournisseur,
-        modifiePar: currentUser, modifieLe: new Date().toISOString(),
-      };
-      await dp_mouvCol.doc(dp_editingMouvId).set(mouv);
-      await dp_logJournal('modification', dp_editingMouvId, original, mouv);
-    } else {
-      mouv = {
-        id: uid(), type:'Achat', date, montant: montantTotal,
-        articleNom: typed, quantite: qty, unite, fournisseur,
-        pointe:false, creePar: currentUser, creeLe: new Date().toISOString(),
-      };
-      dp_draft.push(mouv);
-    }
+  const E = dp_editPrefill || {}, V = dp_achVal, montantOf = ()=>dp_parseNum(V('dp-montant'));
+  let base;
+  if(dp_formKind === 'entree'){
+    const concept = V('dp-concept'), montant = montantOf();
+    if(!concept){ alert('Choisis un concept dans la liste.'); return; }
+    if(!(montant > 0)){ alert('Merci de renseigner un montant.'); return; }
+    const type = (E.type && dp_typeMeta(E.type).sign > 0 && (E.libelle || '') === concept) ? E.type : (concept.toLowerCase() === 'caisse' ? 'AppointCaisse' : 'AppointDivers');
+    base = { type, libelle:concept, concept, montant, estAvanceSalaire:false, employeNom:'' };
+  } else if(dp_formKind === 'avance'){
+    const nom = V('dp-employe'), montant = montantOf();
+    if(!nom){ alert("Choisis l'employé dans la liste."); return; }
+    if(!(montant > 0)){ alert('Merci de renseigner un montant.'); return; }
+    base = { type:'Charge', libelle:'Avance sur salaire', montant, estAvanceSalaire:true, employeNom:nom, bouton:'Avance' };
   } else {
-    const montant = dp_parseNum(document.getElementById('dp-montant').value);
-    if(!montant){ alert('Merci de renseigner un montant.'); return; }
-    const isAvanceEl = document.getElementById('dp-isavance');
-    const estAvanceSalaire = dp_formType==='Charge' && isAvanceEl && isAvanceEl.checked;
-    const employeEl = document.getElementById('dp-employe');
-    const employeNom = estAvanceSalaire && employeEl ? employeEl.value.trim() : '';
-    if(estAvanceSalaire && !employeNom){ alert("Merci de renseigner le nom de l'employé pour cette avance."); return; }
-    const libelle = document.getElementById('dp-libelle').value;
-
-    if(dp_editingMouvId){
-      const original = dp_mouvements.find(m=>m.id===dp_editingMouvId);
-      mouv = {
-        ...original, type: dp_formType, date, montant, libelle,
-        estAvanceSalaire: !!estAvanceSalaire, employeNom,
-        modifiePar: currentUser, modifieLe: new Date().toISOString(),
-      };
-      await dp_mouvCol.doc(dp_editingMouvId).set(mouv);
-      await dp_logJournal('modification', dp_editingMouvId, original, mouv);
+    const btn = dp_curBtn();
+    if(btn.m === 'achat'){
+      const ing = V('dp-ing'), unite = V('dp-unite'), qty = dp_parseNum(V('dp-qty')), tot = dp_parseNum(V('dp-tot')) || (qty * dp_parseNum(V('dp-pu')));
+      if(!ing){ alert('Choisis un ingrédient dans la liste.'); return; }
+      if(!(qty > 0)){ alert('Merci de renseigner une quantité.'); return; }
+      if(!(tot > 0)){ alert('Merci de renseigner le prix unitaire ou le total.'); return; }
+      base = { type:'Achat', articleNom:ing, quantite:qty, unite, fournisseur:E.fournisseur || '', montant:Math.round(tot * 100) / 100, bouton:btn.n };
+    } else if(btn.m === 'livraison'){
+      const nom = V('dp-livreur'), montant = montantOf(), note = V('dp-note');
+      if(!nom){ alert('Choisis le livreur ou le taxi dans la liste.'); return; }
+      if(!(montant > 0)){ alert('Merci de renseigner un montant.'); return; }
+      base = { type:'Charge', libelle:'Livraison — ' + nom + (note ? ' · ' + note : ''), livreur:nom, note, montant, estAvanceSalaire:false, employeNom:'', bouton:btn.n };
+    } else if(btn.m === 'autre'){
+      const note = V('dp-note'), montant = montantOf();
+      if(!note){ alert('La nature de la sortie est obligatoire.'); return; }
+      if(!(montant > 0)){ alert('Merci de renseigner un montant.'); return; }
+      base = { type:'Charge', libelle:(btn.id === 'autres' ? '' : btn.n + ' : ') + note, montant, estAvanceSalaire:false, employeNom:'', bouton:btn.n };
     } else {
-      mouv = {
-        id: uid(), type: dp_formType, date, montant, libelle,
-        estAvanceSalaire: !!estAvanceSalaire, employeNom,
-        pointe:false, creePar: currentUser, creeLe: new Date().toISOString(),
-      };
-      dp_draft.push(mouv);
+      const montant = montantOf();
+      if(!(montant > 0)){ alert('Merci de renseigner un montant.'); return; }
+      base = { type:'Charge', libelle:btn.n, montant, estAvanceSalaire:false, employeNom:'', bouton:btn.n };
     }
   }
   if(dp_editingMouvId){
-    dp_editingMouvId = null;
-    dp_editPrefill = null;
-    dp_showMouvForm = false;
+    const original = dp_mouvements.find(m=>m.id === dp_editingMouvId);
+    const mouv = Object.assign({}, original, base, { date, modifiePar:currentUser, modifieLe:new Date().toISOString() });
+    await dp_mouvCol.doc(dp_editingMouvId).set(mouv);
+    await dp_logJournal('modification', dp_editingMouvId, original, mouv);
+    dp_closeForm();
+    return;
   }
-  dp_render();
+  dp_draft.push(Object.assign({ id:uid(), date, pointe:false, creePar:currentUser, creeLe:new Date().toISOString() }, base));
+  dp_fvReset(); dp_render();
+  const first = document.getElementById('dp-concept') || document.getElementById('dp-employe') || document.getElementById('dp-ing') || document.getElementById('dp-livreur') || document.getElementById('dp-note') || document.getElementById('dp-montant');
+  if(first) first.focus();
 }
+
 function dp_removeFromDraft(id){
   dp_draft = dp_draft.filter(m=>m.id!==id);
   dp_render();
@@ -5294,8 +5582,7 @@ function dp_quickFollowup(type){
   const compte = compteRaw==='' ? null : dp_parseNum(compteRaw);
   const suggested = compte!=null ? Math.abs(compte - soldeTheorique) : null;
   dp_showPointageForm = false; // on quitte le pointage en cours pour saisir le mouvement (à refaire ensuite si besoin)
-  dp_formType = type;
-  dp_showMouvForm = true;
+  dp_formKind = dp_typeMeta(type).sign > 0 ? 'entree' : 'sortie'; dp_fvReset();
   dp_currentTab = 'mouvements';
   dp_render();
   if(suggested!=null){
@@ -5520,7 +5807,7 @@ function dp_importBox(){
 let dp_started = false;
 function dp_start(){
   if(dp_started) return; dp_started = true;
-  dp_watchMouv(); dp_watchPointages(); dp_watchClotures();
+  dp_watchMouv(); dp_watchPointages(); dp_watchClotures(); dp_watchCfg(); dp_watchPtEmp();
 }
 
 /* ==================== CONTRÔLE DES STOCKS (administrateur) — étape 1 ====================
