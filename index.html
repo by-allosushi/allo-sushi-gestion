@@ -4465,7 +4465,8 @@ function dp_periodLabel(){
 }
 
 let dp_mouvements = [];
-let dp_listMax = 50;
+let dp_listMax = 50, dp_period = 'jour';
+function dp_setPeriod(x){ dp_period = x; dp_listMax = 50; dp_render(); }
 let dp_pending = [];          // retraits de caisse en attente de confirmation (hors solde)
 let dp_pendVals = {};
 let dp_purge = null, dp_purgeFile = null, dp_purgeBusy = false;
@@ -5174,6 +5175,13 @@ function dp_renderMouvementsTab(){
       return hay.includes(q);
     });
   }
+  const manualRange = isAdmin && (dp_dateFilterStart || dp_dateFilterEnd);
+  if(!manualRange && !dp_searchTerm.trim() && dp_period !== 'tous'){
+    const t = todayISO(); let a = t, b = t;
+    if(dp_period === 'hier'){ const d = new Date(); d.setDate(d.getDate()-1); a = b = dp_isoLocal(d); }
+    else if(dp_period === 'semaine'){ a = dp_startOfWeek(t); }
+    filtered = filtered.filter(m=>(m.date||'') >= a && (m.date||'') <= b);
+  }
   const sorted = filtered.slice().sort((a,b)=> a.date<b.date?1: a.date>b.date?-1: (a.creeLe<b.creeLe?1:-1));
 
   // Le solde théorique tient compte UNIQUEMENT du filtre par date (indépendamment du type/recherche),
@@ -5187,10 +5195,17 @@ function dp_renderMouvementsTab(){
     if(dp_dateFilterEnd) mouvementsPourSolde = mouvementsPourSolde.filter(m=>m.date<=dp_dateFilterEnd);
     const solde = dp_computeSolde(mouvementsPourSolde);
     const closureForRange = (dp_dateFilterStart && dp_dateFilterEnd) ? dp_closureFor(dp_dateFilterStart, dp_dateFilterEnd) : null;
-    soldeBox = `<div class="result-box ${solde>=0?'final':'prelim'}" style="margin-bottom:14px;">
-      <div class="label">${hasDateFilterForSolde ? `Solde théorique — ${dp_dateFilterStart?fmtDateShort(dp_dateFilterStart):'…'} → ${dp_dateFilterEnd?fmtDateShort(dp_dateFilterEnd):'…'}` : 'Solde théorique enregistré'}</div>
-      <div class="value">${dp_fmtMoney(solde)}</div>
+    const ecarts = mouvementsPourSolde.filter(m=>m.source==='caisse' && Number(m.ecart)).sort((a,b)=>(b.confirmeLe||b.creeLe||'').localeCompare(a.confirmeLe||a.creeLe||'')).slice(0,5);
+    const ecartsHtml = ecarts.map(m=>{
+      const t = m.confirmeLe ? new Date(m.confirmeLe) : null, hm = t && !isNaN(t) ? t.toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).replace(',','') : fmtDateShort(m.date);
+      return `<div style="flex:0 0 100%;display:flex;justify-content:space-between;align-items:center;margin-top:6px;color:var(--rust);font-size:10px;"><span>Écart Caisse (${hm})</span><span class="mono" style="font-weight:600;">${m.ecart>0?'+':'−'}${dp_fmtMoney(Math.abs(m.ecart))}</span></div>`;
+    }).join('');
+    const sc = solde>=0 ? 'var(--forest-light)' : 'var(--rust)', sb = solde>=0 ? 'rgba(59,130,246,.12)' : 'var(--rust-bg)', sl = solde>=0 ? 'var(--forest)' : 'var(--rust)';
+    soldeBox = `<div class="result-box" style="margin-bottom:14px;flex-wrap:wrap;background:${sb};border:1.5px solid ${sl};">
+      <div class="label" style="font-size:14px;color:${sc};">${hasDateFilterForSolde ? `Solde théorique — ${dp_dateFilterStart?fmtDateShort(dp_dateFilterStart):'…'} → ${dp_dateFilterEnd?fmtDateShort(dp_dateFilterEnd):'…'}` : 'Solde théorique enregistré'}</div>
+      <div class="value" style="color:${sc};">${dp_fmtMoney(solde)}</div>
       ${closureForRange ? `<div style="font-size:11px;color:var(--forest);margin-top:4px;">🔒 Période clôturée le ${fmtDateShort(closureForRange.clotureLe.slice(0,10))} par ${esc(closureForRange.clotureParEn)}</div>` : ''}
+      ${ecartsHtml}
     </div>`;
   }
 
@@ -5242,14 +5257,15 @@ function dp_renderMouvementsTab(){
       </div>` : ''}
     </div>
     ${((isAdmin&&hasDateFilter)||dp_searchTerm) ? `<div style="font-size:12px;color:var(--forest);margin-bottom:8px;">${isAdmin?dateFilterSummary:''}${isAdmin&&dateFilterSummary&&dp_searchTerm?' · ':''}${dp_searchTerm?`recherche « ${esc(dp_searchTerm)} »`:''} — ${sorted.length} mouvement(s)</div>` : ''}
-    <div class="filter-row">
+    <div class="filter-row" style="margin-bottom:6px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">${(manualRange || dp_searchTerm.trim()) ? '' : [['jour','Aujourd’hui'],['hier','Hier'],['semaine','Semaine'],['tous','Tous']].map(([id,l])=>`<button class="filter-chip ${dp_period===id?'active':''}" style="${dp_period===id?'background:var(--forest);border-color:var(--forest);color:#fff;':''}" onclick="dp_setPeriod('${id}')">${l}</button>`).join('')}</div>
+    <div class="filter-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
     <button class="filter-chip ${dp_typeFilter==='Tous'?'active':''}" style="${dp_typeFilter==='Tous'?'background:var(--forest);border-color:var(--forest);color:#fff;':''}" onclick="dp_typeFilter='Tous';dp_render()">Tous</button>
     <button class="filter-chip ${dp_typeFilter==='in'?'active':''}" style="${dp_typeFilter==='in'?'background:var(--moss);border-color:var(--moss);color:#fff;':''}" onclick="dp_typeFilter='in';dp_render()">↓ Entrée</button>
     <button class="filter-chip ${dp_typeFilter==='out'?'active':''}" style="${dp_typeFilter==='out'?'background:var(--rust);border-color:var(--rust);color:#fff;':''}" onclick="dp_typeFilter='out';dp_render()">↑ Sortie</button>
   </div>`;
 
   const shown = sorted.slice(0, dp_listMax);
-  const list = sorted.length===0 ? `<p style="font-size:13px;color:var(--ink-muted);">Aucun mouvement.</p>` :
+  const list = sorted.length===0 ? `<p style="font-size:13px;color:var(--ink-muted);">Aucun mouvement${(!manualRange && !dp_searchTerm.trim() && dp_period!=='tous') ? ' ' + ({jour:'aujourd’hui',hier:'hier',semaine:'cette semaine'})[dp_period] : ''}.</p>` :
     shown.map(m=>{
       const meta = dp_typeMeta(m.type);
       const detail = m.type==='Achat' ? `${esc(m.articleNom||'')} · ${dp_fmtNum(m.quantite)} ${esc(m.unite||'')}` : (esc(m.libelle||'') + (m.estAvanceSalaire?` · 👤 Avance : ${esc(m.employeNom)}`:'') + (m.source==='caisse'&&m.ecart?` · <span style="color:var(--rust);">écart Caisse ${m.ecart>0?'+':'−'}${dp_fmtMoney(Math.abs(m.ecart))}</span>`:'') + (m.type==='Report'&&m.purges?` · jusqu’au ${fmtDateShort(m.date)}`:''));
@@ -5384,14 +5400,14 @@ function dp_renderAddBar(){
   const K = dp_kindOrder().map(x=>ALL[x]);
   const tiles = K.map((k,idx)=>{
     const on = dp_formKind === k[0];
-    if(dp_orderMode) return `<div style="padding:10px 6px;border-radius:8px;border:2px dashed var(--line);text-align:center;background:var(--surface);">
+    if(dp_orderMode) return `<div style="height:58px;box-sizing:border-box;padding:6px;border-radius:10px;border:2px dashed var(--line);text-align:center;background:var(--surface);display:flex;flex-direction:column;justify-content:center;">
       <div style="font-weight:700;font-size:14px;color:${k[3]};">${k[1]}</div>
       <div style="display:flex;justify-content:center;gap:8px;margin-top:6px;"><button type="button" class="btn ghost small" ${idx===0?'disabled':''} onclick="dp_moveKind('${k[0]}',-1)">◀</button><button type="button" class="btn ghost small" ${idx===K.length-1?'disabled':''} onclick="dp_moveKind('${k[0]}',1)">▶</button></div></div>`;
-    return `<button type="button" ${dp_editingMouvId ? 'disabled' : ''} onclick="dp_openKind('${k[0]}')" style="padding:12px 6px;border-radius:8px;border:2px solid ${on ? k[3] : 'var(--line)'};background:${on ? k[4] : 'var(--surface)'};text-align:center;cursor:pointer;">
-      <div style="font-weight:700;font-size:14px;color:${on ? k[3] : 'var(--ink)'};">${k[1]}</div><div style="font-size:10.5px;color:var(--ink-muted);margin-top:2px;">${k[2]}</div></button>`;
+    return `<button type="button" ${dp_editingMouvId ? 'disabled' : ''} onclick="dp_openKind('${k[0]}')" style="height:58px;padding:6px;border-radius:10px;border:1.5px solid ${k[3]};background:${k[4]};color:${k[3]};text-align:center;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;${on ? 'box-shadow:0 0 0 2px ' + k[3] + ';' : ''}">
+      <div style="font-weight:700;font-size:14px;">${k[1]}</div><div style="font-size:10.5px;opacity:.8;margin-top:2px;">${k[2]}</div></button>`;
   }).join('');
   return `<div class="grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:${isAdm ? '4px' : '12px'};">${tiles}</div>`
-    + (isAdm ? `<div style="text-align:right;margin-bottom:10px;"><button type="button" class="btn ghost small" style="font-size:11px;padding:2px 8px;" onclick="dp_toggleOrder()">${dp_orderMode ? '✓ Terminé' : '↔ Ordre des boutons'}</button></div>` : '');
+    + (isAdm ? `<div style="text-align:center;margin-bottom:10px;"><button type="button" class="btn ghost small" style="font-size:11px;padding:2px 10px;" onclick="dp_toggleOrder()">${dp_orderMode ? '✓ Terminé' : '↔ Ordre des boutons'}</button></div>` : '');
 }
 function dp_openKind(k){
   if(dp_editingMouvId) return;
