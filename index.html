@@ -1265,6 +1265,21 @@ function ca_blankSession(date){
   }
   return { ...base, debutCaisse: '', debutCaisseAuto: false };
 }
+function ca_prevSessionFor(date){
+  const exact = ca_allSessions[prevDateStr(date)];
+  if(exact) return { date: prevDateStr(date), s: exact };
+  const ds = Object.keys(ca_allSessions).filter(d=>d < date).sort();
+  return ds.length ? { date: ds[ds.length-1], s: ca_allSessions[ds[ds.length-1]] } : null;
+}
+function ca_refreshDebut(){
+  const prev = ca_prevSessionFor(ca_workingDate);
+  if(!prev){ alert('Aucune clôture antérieure trouvée : saisis le début de caisse à la main.'); return; }
+  const v = ca_montantPourLendemain(prev.s);
+  ca_session.debutCaisse = String(v); ca_session.debutCaisseAuto = true; ca_session.debutCaisseManuel = false;
+  ca_render();
+  const msg = 'Début de caisse mis à jour : ' + ca_fmtMoney(v) + ' (fermeture du ' + fmtDateShort(prev.date) + ')' + (prev.date !== prevDateStr(ca_workingDate) ? '\nAttention : aucune clôture la veille, c’est la dernière clôture connue.' : '') + '\nPense à enregistrer la journée.';
+  alert(msg);
+}
 function ca_loadSessionForDate(date){
   ca_workingDate = date;
   const existing = ca_allSessions[date];
@@ -1547,8 +1562,8 @@ function ca_renderCaisseTab(){
   const hasPrev = !!ca_allSessions[prevDateStr(ca_workingDate)];
   const dS = ca_draft.sorties, dE = ca_draft.entrees;
   const debutCard = hasPrev
-    ? `<div class="cg-val">${ca_fmtMoney(ca_parseNum(ca_session.debutCaisse))}</div><div class="cg-sub">↺ repris de la veille</div>`
-    : `<input id="debut-input" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_session.debutCaisse)}" placeholder="0" oninput="ca_session.debutCaisse=this.value;ca_session.debutCaisseAuto=false;ca_session.debutCaisseManuel=true;ca_render()"><div class="cg-sub" style="color:var(--amber);">Aucune clôture la veille : à saisir</div>`;
+    ? `<div class="cg-val">${ca_fmtMoney(ca_parseNum(ca_session.debutCaisse))}</div><div class="cg-sub">↺ repris de la veille · <a href="#" style="color:var(--forest-light);" onclick="ca_refreshDebut();return false;">↻ Actualiser</a></div>`
+    : `<input id="debut-input" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_session.debutCaisse)}" placeholder="0" oninput="ca_session.debutCaisse=this.value;ca_session.debutCaisseAuto=false;ca_session.debutCaisseManuel=true;ca_render()"><div class="cg-sub" style="color:var(--amber);">Aucune clôture la veille : à saisir · <a href="#" style="color:var(--forest-light);" onclick="ca_refreshDebut();return false;">↻ Actualiser</a></div>`;
   return `
     <div class="ticket">
       <div class="field">
