@@ -694,6 +694,12 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
   </main>
 </div>
 
+<div id="module-controle" class="module">
+  <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
+    <div id="cx-body"></div>
+  </main>
+</div>
+
 <div id="module-restopro" class="module">
   <style>
     #module-restopro .rp-hero{text-align:center;padding:18px 14px;margin-bottom:10px;}
@@ -802,6 +808,7 @@ const MODULE_DEFS = [
   { key:'pointage', label:'Pointage',  ic:'⏱️', desc:'Heures, anomalies & paie' },
   { key:'fiches',   label:'Fiches techniques', ic:'📋', desc:'Recettes & dressage' },
   { key:'mep',      label:'Mise en place', ic:'🧑‍🍳', desc:'Inventaire de fin de service' },
+  { key:'controle', label:'Contrôle', ic:'🎯', desc:'Achats, ventes & écarts de stock' },
   { key:'restopro', label:'CA Resto Pro', ic:'📈', desc:'Chiffre d’affaires & remises' },
   { key:'paie',     label:'Ma fiche de paie', ic:'💵', desc:'Ma paie de la semaine' },
 ];
@@ -815,6 +822,7 @@ function hasAccess(moduleKey){
     if(session.isAdmin) return session.empCode !== null && session.empCode !== undefined && session.empCode !== '';
     return !!(session.permissions && session.permissions.paie);
   }
+  if(moduleKey === 'controle') return !!session.isAdmin;   // réservé à l'administrateur
   if(session.isAdmin) return true;
   return !!(session.permissions && session.permissions[moduleKey]);
 }
@@ -880,7 +888,7 @@ function applySession(userDoc){
   renderUserChip();
   buildModuleTabs();
   showModule(PAIE_LINK && hasAccess('paie') ? 'paie' : 'home'); // lien « ?paie » : arrivée directe sur la fiche
-  if(session.isAdmin){ uu_subscribeUsers(); }
+  if(session.isAdmin){ uu_subscribeUsers(); setTimeout(()=>{ try{ cx_boot(); }catch(e){ console.warn('Contrôle :', e); } }, 1500); }
   try{ if(hasAccess('restopro')){ rp_watchMeta(); rp_requestSync(); } }catch(e){ console.warn('CA Resto Pro :', e); }
 }
 
@@ -1165,6 +1173,7 @@ function showModule(name){
   if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
   if(name==='fiches'){ if(typeof ft_start==='function') ft_start(); if(typeof ft_render==='function') ft_render(); }
   if(name==='restopro'){ if(typeof rp_start==='function') rp_start(); }
+  if(name==='controle'){ if(typeof cx_start==='function'){ cx_start(); cx_render(); cx_reload(); } }
   if(name==='mep'){ if(typeof mep_start==='function') mep_start(); if(typeof mep_render==='function') mep_render(); }
   if(name==='dettes'){ if(typeof dt_start==='function') dt_start(); if(typeof dt_render==='function') dt_render(); }
   if(name==='paie'){ if(typeof pt_start==='function') pt_start(); if(typeof pa_render==='function') pa_render(); }
@@ -4077,12 +4086,13 @@ function mep_newId(){ return 'i' + Date.now().toString(36) + Math.random().toStr
 function mep_empList(){ return (mep_lists.cooks || []).filter(c=>c && c.n).map(c=>({ code:c.id, name:c.n })).sort((a, b)=>a.name.localeCompare(b.name, 'fr')); }
 function mep_typing(){ try{ const a = document.activeElement, b = document.getElementById('mep-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
 function mep_start(){
-  if(mep_isAdmin() && !mep_adminStarted){ mep_adminStarted = true; mep_watchSaisies(); mep_watchRp(); ct_start(); }
+  if(mep_isAdmin() && !mep_adminStarted){ mep_adminStarted = true; mep_watchSaisies(); mep_watchRp(); }
   if(mep_started) return; mep_started = true;
   mep_listsRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
     mep_lists = Object.assign({ sushi:[], chaud:[], bar:[], cooks:[] }, d); mep_listsReady = true;
     if((mep_tab !== 'listes' || !mep_draft) && !mep_typing()) mep_render();
+    if(typeof cx_refresh === 'function') cx_refresh();
   }, (e)=>{ console.error(e); mep_listsReady = true; mep_render(); });
   mep_stockRef.onSnapshot((doc)=>{ const d = doc.exists ? (doc.data() || {}) : {}; mep_stock = d.s || {}; mep_stockReady = true; if(!mep_typing()) mep_render(); mep_maybeBoot(); }, (e)=>{ console.error(e); mep_stockReady = true; });
 }
@@ -4091,7 +4101,7 @@ function mep_watchSaisies(){
   {
     const since = new Date(); since.setDate(since.getDate() - 400);
     mep_saisiesCol.where('date', '>=', mep_ymd(since)).onSnapshot((snap)=>{
-      const l = []; snap.forEach(d=>l.push({ id:d.id, ...d.data() })); mep_saisies = l; mep_saisiesReady = true; mep_render(); mep_maybeBoot();
+      const l = []; snap.forEach(d=>l.push({ id:d.id, ...d.data() })); mep_saisies = l; mep_saisiesReady = true; mep_render(); mep_maybeBoot(); if(typeof cx_refresh === 'function') cx_refresh();
     }, (e)=>{ console.error(e); mep_saisiesReady = true; mep_render(); });
   }
 }
@@ -4398,8 +4408,8 @@ function mep_render(){
   const admin = mep_isAdmin();
   const head = `<div style="font-weight:700;font-size:18px;margin-bottom:10px;">Mise en place</div>`;
   if(!admin){ body.innerHTML = head + mep_entryView(); return; }
-  const tabs = `<div class="mep-seg">${[['hist', 'Historique'], ['saisie', 'Saisie'], ['controle', 'Contrôle'], ['listes', 'Listes']].map(t=>`<button class="${mep_tab === t[0] ? 'on' : ''}" onclick="mep_setTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
-  const view = mep_tab === 'listes' ? mep_listsView() : mep_tab === 'controle' ? ct_view() : mep_tab === 'saisie' ? mep_entryView() : (mep_saisiesReady ? mep_histView() : '<div class="empty-state">Chargement…</div>');
+  const tabs = `<div class="mep-seg">${[['hist', 'Historique'], ['saisie', 'Saisie'], ['listes', 'Listes']].map(t=>`<button class="${mep_tab === t[0] ? 'on' : ''}" onclick="mep_setTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
+  const view = mep_tab === 'listes' ? mep_listsView() : mep_tab === 'saisie' ? mep_entryView() : (mep_saisiesReady ? mep_histView() : '<div class="empty-state">Chargement…</div>');
   body.innerHTML = head + tabs + view;
 }
 
@@ -5353,7 +5363,7 @@ let dp_sortieBtn = null;     // id du bouton de sortie choisi
 let dp_cfgPanel = null;      // liste en cours de réglage : 'concepts' | 'ingredients' | 'livreurs' | 'boutons'
 let dp_fv = {}, dp_skipGrab = false;   // valeurs saisies, conservées quand l'écran est redessiné
 let dp_ptEmp = {};           // employés de la rubrique Pointage (documents pointage_config/employes)
-const DP_FIELDS = ['dp-concept','dp-montant','dp-ing','dp-unite','dp-qty','dp-pu','dp-tot','dp-livreur','dp-note','dp-employe'];
+const DP_FIELDS = ['dp-concept','dp-montant','dp-ing','dp-unite','dp-qty','dp-pu','dp-tot','dp-livreur','dp-note','dp-employe','dp-heure'];
 function dp_grabForm(){ DP_FIELDS.forEach(id=>{ const el = document.getElementById(id); if(el) dp_fv[id] = el.value; }); }
 function dp_fvReset(){ dp_fv = {}; dp_skipGrab = true; }
 function dp_cfgFix(){
@@ -5435,6 +5445,7 @@ function dp_cfgMove(kind, id, dir){
   const a = dp_L(kind), i = a.findIndex(x=>x.id === id), j = i + dir; if(i < 0 || j < 0 || j >= a.length) return;
   const t = a[i]; a[i] = a[j]; a[j] = t; dp_grabForm(); dp_cfgSave(); dp_render();
 }
+function dp_cfgTrack(id, on){ const it = dp_cfg.ingredients.find(x=>x.id === id); if(!it) return; it.track = !!on; dp_cfgSave(); }
 function dp_cfgUnit(id, v){
   let it = dp_cfg.ingredients.find(x=>x.id === id);
   if(!it) dp_cfg.boutons.some(b=>(it = (b.items || []).find(x=>x.id === id)));
@@ -5451,6 +5462,7 @@ function dp_cfgPanelHtml(kind){
   const rows = dp_L(kind).map((it, i)=>`<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-top:1px solid var(--line);flex-wrap:wrap;${it.off ? 'opacity:.5;' : ''}">
       <input type="text" class="ft-in" style="flex:1 1 100%;min-width:0;padding:6px 8px;" value="${esc(it.n)}" onchange="dp_cfgRename('${kind}','${it.id}',this.value)" />
       ${(kind === 'ingredients' || (isItems && ownerBtn && dp_champs(ownerBtn).unite)) ? unitSel(it.id, it.u || (isItems ? 'unité' : 'kg'), `onchange="dp_cfgUnit('${it.id}',this.value)"`) : ''}
+      ${kind === 'ingredients' ? `<label style="font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:4px;"><input type="checkbox" ${it.track ? 'checked' : ''} onchange="dp_cfgTrack('${it.id}',this.checked)"> 🎯 Suivre dans le contrôle</label>` : ''}
       ${kind === 'boutons' ? (it.m === 'liste' ? `<button type="button" class="btn ghost small" onclick="dp_cfgGoList('${it.id}')">Liste &amp; champs</button>` : `<span style="font-size:11px;color:var(--ink-muted);white-space:nowrap;">${esc((DP_MODELES.find(m=>m.id === it.m) || {}).label || '')}</span>`) : ''}
       <button type="button" class="btn ghost small" ${i === 0 ? 'disabled' : ''} onclick="dp_cfgMove('${kind}','${it.id}',-1)">▲</button>
       <button type="button" class="btn ghost small" ${i === dp_L(kind).length - 1 ? 'disabled' : ''} onclick="dp_cfgMove('${kind}','${it.id}',1)">▼</button>
@@ -5519,7 +5531,7 @@ function dp_openEditMouv(id){
   if(m.type === 'Achat'){
     dp_formKind = 'sortie'; dp_sortieBtn = (dp_cfg.boutons.find(b=>b.m === 'liste' && b.n === m.bouton) || dp_cfg.boutons.find(b=>b.m === 'achat') || {}).id;
     const q = Number(m.quantite) || 0, tot = Number(m.montant) || 0;
-    Object.assign(fv, { 'dp-ing':m.articleNom || '', 'dp-unite':m.unite || '', 'dp-qty':q ? String(q) : '', 'dp-tot':String(tot), 'dp-pu':q ? String(Math.round(tot / q * 100) / 100) : '', 'dp-note':m.note || '' });
+    Object.assign(fv, { 'dp-ing':m.articleNom || '', 'dp-unite':m.unite || '', 'dp-qty':q ? String(q) : '', 'dp-tot':String(tot), 'dp-pu':q ? String(Math.round(tot / q * 100) / 100) : '', 'dp-note':m.note || '', 'dp-heure':m.heure || (m.creeLe ? (()=>{ const d = new Date(m.creeLe); return isNaN(d) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); })() : '') });
   } else if(m.estAvanceSalaire){
     dp_formKind = 'avance'; Object.assign(fv, { 'dp-employe':m.employeNom || '', 'dp-montant':String(m.montant) });
   } else if(sign > 0){
@@ -5538,6 +5550,7 @@ function dp_cancelEditMouv(){ dp_closeForm(); }
 /* --- calcul prix unitaire / total (ingrédients) --- */
 function dp_r2(x){ return String(Math.round(x * 100) / 100); }
 function dp_achSet(id, v){ const el = document.getElementById(id); if(el) el.value = v; }
+function dp_nowHM(){ const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
 function dp_achVal(id){ const el = document.getElementById(id); return el ? el.value.trim() : ''; }
 function dp_achQty(){
   const q = dp_parseNum(dp_achVal('dp-qty')), pu = dp_achVal('dp-pu'), tot = dp_achVal('dp-tot'), hint = document.getElementById('dp-ach-hint');
@@ -5583,6 +5596,7 @@ function dp_renderMouvForm(){
           ${fld('Quantité', `<input type="text" inputmode="decimal" id="dp-qty" placeholder="0" value="${V('dp-qty')}" oninput="dp_achQty()" />`)}
           ${fld('Prix unitaire (DA)', `<input type="text" inputmode="decimal" id="dp-pu" placeholder="0" value="${V('dp-pu')}" oninput="dp_achPu()" />`)}
           ${fld('Total (DA)', `<input type="text" inputmode="decimal" id="dp-tot" placeholder="0" value="${V('dp-tot')}" oninput="dp_achTot()" />`)}
+          ${fld('Heure d’achat', `<input type="time" id="dp-heure" value="${esc(fv['dp-heure'] || dp_nowHM())}" />`)}
         </div><div id="dp-ach-hint" style="font-size:12px;color:var(--amber);margin-top:6px;"></div>`;
     } else if(cur.m === 'liste'){
       const ch = dp_champs(cur), kid = 'items:' + cur.id, unites = DP_UNITES.slice(); if(fv['dp-unite'] && !unites.includes(fv['dp-unite'])) unites.push(fv['dp-unite']);
@@ -5653,7 +5667,7 @@ async function dp_submitMouv(){
       if(!ing){ alert('Choisis un ingrédient dans la liste.'); return; }
       if(!(qty > 0)){ alert('Merci de renseigner une quantité.'); return; }
       if(!(tot > 0)){ alert('Merci de renseigner le prix unitaire ou le total.'); return; }
-      base = { type:'Achat', articleNom:ing, quantite:qty, unite, fournisseur:E.fournisseur || '', montant:Math.round(tot * 100) / 100, bouton:btn.n };
+      base = { type:'Achat', articleNom:ing, quantite:qty, unite, fournisseur:E.fournisseur || '', montant:Math.round(tot * 100) / 100, bouton:btn.n, heure:V('dp-heure') || dp_nowHM() };
     } else if(btn.m === 'liste'){
       const ch = dp_champs(btn), ing = V('dp-ing'), unite = ch.unite ? V('dp-unite') : '', qty = ch.qte ? dp_parseNum(V('dp-qty')) : 0;
       const tot = dp_parseNum(V('dp-tot')) || (ch.qte && ch.pu ? qty * dp_parseNum(V('dp-pu')) : 0), note = ch.note ? V('dp-note') : '';
@@ -5963,278 +5977,503 @@ function dp_start(){
   dp_startVerificationListener(); dp_startJournalListener();   // historique (administratrice) : vérifications + journal des mouvements
 }
 
-/* ==================== CONTRÔLE DES STOCKS (administrateur) — étape 1 ====================
-   Estime la consommation d'ingrédients à partir des ventes par plat (Resto Pro) × grammage net par plat ÷ rendement de l'ingrédient.
-   Un ingrédient suivi regroupe toutes les lignes de même nom (ou de même « nom du groupe ») des différentes sections :
-   le grammage par plat et le rendement sont saisis une seule fois, les derniers pesés de chaque section sont additionnés.
-   Données dans mise_en_place/controle :
-     ing:{ <clé du groupe>:{ on, rend (%) } }
-     lines:{ <id de la ligne d'ingrédient>:{ f (g par unité de comptage), grp (nom du groupe, facultatif) } }
-     achats:{ <id>:{ k:<clé du groupe>, q, u, g (grammes), at (ISO date+heure de l'achat), src } }   (saisie manuelle pour l'instant ; l'app du gérant écrira ici)
-     plats:{ <clé du plat>:{ name, g:{ <clé du groupe>: grammage net en g (0 = n'en contient pas) } } }
-   Jamais affichées aux cuisiniers (écran administrateur seulement). */
-const ct_ref = db.collection('mise_en_place').doc('controle');
-let ct_cfg = { ing:{}, lines:{}, plats:{}, achats:{} }, ct_ready = false, ct_started = false;
-let ct_from = '', ct_to = '', ct_days = [], ct_unsub = null, ct_tok = 0, ct_loaded = false, ct_err = '';
-let ct_openFilled = false, ct_openSet = {}, ct_openRes = {}, ct_ad = {};
-function ct_typing(){ try{ const a = document.activeElement, b = document.getElementById('mep-body'); return !!(a && b && b.contains(a) && ((a.tagName === 'INPUT' && /^(text|search|number|tel|)$/.test(a.type || '')) || a.tagName === 'TEXTAREA')); }catch(e){ return false; } }
-function ct_start(){
-  if(ct_started) return; ct_started = true;
-  if(!ct_from){ ct_from = ct_to = mep_ymd(); }
-  ct_ref.onSnapshot((doc)=>{
+/* ==================== MODULE CONTRÔLE (administrateur) ====================
+   Suivi des ingrédients chers : Stock de départ ± Ajustements + Achats − Utilisé = Théorique, comparé au Réel (pesée de fin de service).
+   - Ingrédients suivis : ceux de Dépenses > Sortie > Ingrédients cochés « 🎯 Suivre dans le contrôle » (dp_cfg.ingredients[].track).
+   - Achats : mouvements « Achat » du gérant (date + heure d'achat) ; ventes : tickets Resto Pro (heure du ticket) × grammage net par plat ÷ rendement ;
+     pesées : saisies de la Mise en place (lignes liées à l'ingrédient, converties dans l'unité de base : g, ml ou l'unité elle-même).
+   Données :
+     mise_en_place/controle2        : { ing:{ <id ingrédient>:{ rend (%), map:{ <id ligne>: base par unité (0 = auto) } } }, plats:{ <clé>:{ name, g:{ <id ingrédient>: qté nette } } }, snapFrom }
+     controle_events/<id>           : { type:'ajust'|'restart', ing, ingN, at (ISO), q (base, signé) | mode/qty, note, by, cr, modBy, modAt }
+     controle_jours/<AAAA-MM-JJ>    : sauvegarde automatique du jour de contrôle (2 h → 2 h) : { day, from, to, gen, by, items:{ <id>:{…} } } */
+const cx_cfgRef = db.collection('mise_en_place').doc('controle2');
+const cx_evCol = db.collection('controle_events');
+const cx_jourCol = db.collection('controle_jours');
+let cx_cfg = { ing:{}, plats:{}, snapFrom:'' }, cx_ready = false, cx_started = false, cx_dpReady = false, cx_err = '';
+let cx_tab = 'ctrl', cx_from = '', cx_to = '', cx_mode = {}, cx_data = null, cx_loading = false, cx_tok = 0, cx_open = {}, cx_adj = null, cx_snapRun = false;
+let cx_j = { from:'', to:'', ing:'', type:'', who:'', q:'', max:60, data:null, busy:false };
+let cx_h = { ing:'', rows:null, busy:false, day:'' };
+const cx_pad = (n)=>String(n).padStart(2, '0');
+const cx_dt = (d)=>d.getFullYear() + '-' + cx_pad(d.getMonth() + 1) + '-' + cx_pad(d.getDate()) + 'T' + cx_pad(d.getHours()) + ':' + cx_pad(d.getMinutes());
+const cx_ms = (s)=>{ const t = new Date(s).getTime(); return isNaN(t) ? NaN : t; };
+const cx_e = (v)=>esc(v == null ? '' : String(v));
+const cx_n = (v)=>(Math.round(Number(v) * 100) / 100).toLocaleString('fr-FR', { maximumFractionDigits:2 });
+const cx_key = (n)=>String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'x';
+const cx_who = ()=>(typeof currentUser !== 'undefined' && currentUser) ? currentUser : 'administrateur';
+const cx_isAdmin = ()=>!!(session && session.isAdmin);
+function cx_typing(){ try{ const a = document.activeElement, b = document.getElementById('cx-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
+/* jour de contrôle : de 2 h à 2 h */
+function cx_dayStart(ms){ const d = new Date(ms); d.setHours(2, 0, 0, 0); if(ms < d.getTime()) d.setDate(d.getDate() - 1); return d; }
+function cx_dayWindow(dayKey){ const a = new Date(dayKey + 'T02:00'), b = new Date(a); b.setDate(b.getDate() + 1); return [a.getTime(), b.getTime()]; }
+/* unités : kg/g → g ; L/cl/ml → ml ; autre → l'unité elle-même */
+function cx_fam(u){ const x = String(u || '').trim().toLowerCase(); if(x === 'kg') return { b:'g', f:1000 }; if(x === 'g') return { b:'g', f:1 }; if(x === 'l') return { b:'ml', f:1000 }; if(x === 'cl') return { b:'ml', f:10 }; if(x === 'ml') return { b:'ml', f:1 }; return { b:x || 'unité', f:1 }; }
+function cx_toBase(q, u, ing){ const a = cx_fam(u), b = cx_fam(ing.u); return a.b === b.b ? Number(q) * a.f : null; }
+function cx_fmt(v, ing, signed){
+  if(v === null || v === undefined || isNaN(v)) return '—';
+  const b = cx_fam(ing.u).b, a = Math.abs(v), s = v < 0 ? '−' : (signed && v > 0 ? '+' : '');
+  if(b === 'g') return s + (a >= 1000 ? cx_n(a / 1000) + ' kg' : cx_n(Math.round(a)) + ' g');
+  if(b === 'ml') return s + (a >= 1000 ? cx_n(a / 1000) + ' L' : cx_n(Math.round(a)) + ' ml');
+  return s + cx_n(a) + ' ' + b;
+}
+const cx_baseLbl = (ing)=>cx_fam(ing.u).b;
+const cx_ingList = ()=>(dp_cfg.ingredients || []).filter(i=>i.track);
+const cx_ingById = (id)=>(dp_cfg.ingredients || []).find(i=>i.id === id);
+const cx_fmtD = (ms)=>{ const d = new Date(ms); return isNaN(d) ? '' : cx_pad(d.getDate()) + '/' + cx_pad(d.getMonth() + 1) + ' ' + cx_pad(d.getHours()) + ':' + cx_pad(d.getMinutes()); };
+
+/* ---------- démarrage ---------- */
+function cx_start(){
+  if(cx_started || !cx_isAdmin()) return; cx_started = true;
+  if(typeof mep_start === 'function') mep_start();
+  dp_cfgRef.onSnapshot((doc)=>{
+    if(!dp_started){ if(doc.exists){ const d = doc.data() || {}; ['concepts', 'boutons', 'ingredients', 'livreurs'].forEach(k=>{ if(Array.isArray(d[k])) dp_cfg[k] = d[k]; }); if(Array.isArray(d.ordre)) dp_cfg.ordre = d.ordre; } dp_cfgFix(); }
+    cx_dpReady = true; if(activeModule === 'controle' && !cx_typing()) cx_render();
+  }, (e)=>{ console.warn(e); cx_dpReady = true; });
+  cx_cfgRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
-    ct_cfg = { ing:d.ing || {}, lines:d.lines || {}, plats:d.plats || {}, achats:d.achats || {} }; ct_ready = true;
-    if(mep_tab === 'controle' && !ct_typing()) mep_render();
-  }, (e)=>{ console.error(e); ct_ready = true; ct_err = (e && e.message) || String(e); if(mep_tab === 'controle') mep_render(); });
-  ct_load();
+    cx_cfg = { ing:d.ing || {}, plats:d.plats || {}, snapFrom:d.snapFrom || '' }; cx_ready = true;
+    if(activeModule === 'controle' && !cx_typing()) cx_render();
+  }, (e)=>{ console.error(e); cx_ready = true; cx_err = (e && e.message) || String(e); if(activeModule === 'controle') cx_render(); });
+  cx_preset('today', true);
 }
-function ct_load(){
-  if(ct_unsub){ try{ ct_unsub(); }catch(e){} ct_unsub = null; }
-  if(!ct_from || !ct_to) return;
-  const tok = ++ct_tok; ct_loaded = false;
+function cx_refresh(){ if(activeModule === 'controle' && cx_started && !cx_typing()) cx_render(); }
+/* à l'ouverture de l'application : sauvegarde automatique des jours de contrôle manquants */
+function cx_boot(){
+  if(!cx_isAdmin()) return; cx_start();
+  let n = 0; const iv = setInterval(()=>{ n++; if(n > 90){ clearInterval(iv); return; }
+    if(cx_ready && cx_dpReady && mep_listsReady && mep_saisiesReady){ clearInterval(iv); cx_autoSnap().catch(e=>console.warn('Contrôle (sauvegarde auto) :', e)); } }, 1000);
+}
+
+/* ---------- lecture des données d'une fenêtre [f, t] (ms) ---------- */
+async function cx_fetch(f, t, lookDays, priceDays){
+  const lb = lookDays === undefined ? 3 : lookDays, pd = priceDays === undefined ? 30 : priceDays;
   const FP = firebase.firestore.FieldPath.documentId();
-  ct_unsub = db.collection('restopro_jours').where(FP, '>=', ct_from).where(FP, '<=', ct_to).onSnapshot((snap)=>{
-    if(tok !== ct_tok) return;
-    ct_days = snap.docs.map(d=>({ id:d.id, ...d.data() })); ct_loaded = true;
-    if(mep_tab === 'controle' && !ct_typing()) mep_render();
-  }, (e)=>{ if(tok !== ct_tok) return; console.error(e); ct_loaded = true; ct_err = (e && e.message) || String(e); if(mep_tab === 'controle') mep_render(); });
+  const dAch0 = mep_ymd(new Date(f - Math.max(pd, lb) * 864e5)), dAch1 = mep_ymd(new Date(t)), dTk0 = mep_ymd(new Date(f - (lb + 1) * 864e5));
+  const [a, b, c] = await Promise.all([
+    dp_mouvCol.where('date', '>=', dAch0).where('date', '<=', dAch1).get(),
+    db.collection('restopro_jours').where(FP, '>=', dTk0).where(FP, '<=', dAch1).get(),
+    cx_evCol.where('at', '>=', new Date(f - lb * 864e5).toISOString()).where('at', '<=', new Date(t + 864e5).toISOString()).get(),
+  ]);
+  const btnAch = (dp_cfg.boutons || []).find(x=>x.m === 'achat'), btnName = btnAch ? btnAch.n : 'Ingrédients';
+  const ach = [], sales = [], ev = [], lo = f - lb * 864e5;
+  a.forEach((d)=>{ const m = d.data(); if(!m || m.type !== 'Achat' || m.statut === 'annule' || (m.bouton && m.bouton !== btnName)) return;
+    const hm = m.heure || (m.creeLe ? cx_pad(new Date(m.creeLe).getHours()) + ':' + cx_pad(new Date(m.creeLe).getMinutes()) : '12:00'), ms = cx_ms(m.date + 'T' + hm);
+    if(isNaN(ms)) return; ach.push({ id:d.id, ms, name:String(m.articleNom || '').trim(), q:Number(m.quantite) || 0, u:m.unite || '', montant:Number(m.montant) || 0, who:m.creePar || '', heure:hm, noHeure:!m.heure }); });
+  b.forEach((d)=>{ const day = d.data() || {}; (day.tickets || []).forEach((tk)=>{
+    const h = String(tk.h || '').slice(0, 5); if(!/^\d\d:\d\d$/.test(h)) return;
+    let dt = tk.date || d.id; if(!tk.date && h < '06:00'){ const x = new Date(d.id + 'T00:00'); x.setDate(x.getDate() + 1); dt = mep_ymd(x); }
+    const ms = cx_ms(dt + 'T' + h); if(isNaN(ms) || ms < lo || ms > t) return;
+    (Array.isArray(tk.l) ? tk.l : []).forEach((l)=>{ if(l.p && String(l.p) !== String(l.i)) return; const nm = String(l.n || '').replace(/\s+/g, ' ').trim(); if(!nm) return;
+      sales.push({ ms, key:cx_key(nm), name:nm, q:Number(l.q) || 0 }); }); }); });
+  c.forEach((d)=>{ ev.push(Object.assign({ id:d.id }, d.data())); });
+  const noDetail = []; b.forEach((d)=>{ const day = d.data() || {}; if((day.tickets || []).length && !day.lignes) noDetail.push(d.id); });
+  return { f, t, ach, sales, ev, noDetail };
 }
-function ct_setRange(){
-  let f = (document.getElementById('ct-from') || {}).value, t = (document.getElementById('ct-to') || {}).value;
-  if(!f && !t) return; if(!f) f = t; if(!t) t = f; if(f > t){ const x = f; f = t; t = x; }
-  ct_from = f; ct_to = t; ct_load(); mep_render();
+function cx_setWindow(){ return [cx_ms(cx_from), cx_to ? cx_ms(cx_to) : Date.now()]; }
+async function cx_reload(){
+  if(!cx_started || !cx_from) return; const tok = ++cx_tok; cx_loading = true;
+  try{ const [f, t] = cx_setWindow(); const d = await cx_fetch(f, t); if(tok !== cx_tok) return; cx_data = d; cx_err = ''; }
+  catch(e){ if(tok !== cx_tok) return; console.error(e); cx_err = (e && e.message) || String(e); }
+  cx_loading = false; if(activeModule === 'controle' && !cx_typing()) cx_render();
 }
-function ct_preset(k){
-  const d = new Date(), iso = (x)=>mep_ymd(x);
-  if(k === 'yesterday'){ d.setDate(d.getDate() - 1); ct_from = ct_to = iso(d); }
-  else if(k === '7d'){ ct_to = iso(d); d.setDate(d.getDate() - 6); ct_from = iso(d); }
-  else { ct_from = ct_to = iso(d); }
-  ct_load(); mep_render();
+function cx_preset(k, silent){
+  const now = new Date(), ds = cx_dayStart(now.getTime());
+  if(k === 'today'){ cx_from = cx_dt(ds); cx_to = ''; }
+  else if(k === 'yesterday'){ const a = new Date(ds); a.setDate(a.getDate() - 1); cx_from = cx_dt(a); cx_to = cx_dt(ds); }
+  else if(k === '3h'){ const a = new Date(now.getTime() - 3 * 36e5); cx_from = cx_dt(a); cx_to = ''; }
+  else if(k === '7d'){ const a = new Date(ds); a.setDate(a.getDate() - 6); cx_from = cx_dt(a); cx_to = ''; }
+  if(!silent){ cx_reload(); cx_render(); }
 }
-/* clé stable (nom normalisé) d'un plat ou d'un groupe d'ingrédients */
-function ct_key(n){ return String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'x'; }
-function ct_fmtG(g){ g = Number(g) || 0; return g >= 1000 ? (Math.round(g / 10) / 100).toLocaleString('fr-FR') + ' kg' : Math.round(g).toLocaleString('fr-FR') + ' g'; }
-/* plats vendus sur la période (tickets fermés ET non fermés, comme « Ventes par plat ») */
-function ct_sales(){
-  const map = {};
-  ct_days.forEach(day=>(day.tickets || []).forEach(t=>(Array.isArray(t.l) ? t.l : []).forEach(l=>{
-    if(l.p && String(l.p) !== String(l.i)) return; // commentaire rattaché à un article, pas un plat
-    const nm = String(l.n || '').replace(/\s+/g, ' ').trim(); if(!nm) return;
-    const k = ct_key(nm), o = map[k] || (map[k] = { key:k, name:nm, q:0 });
-    o.q += Number(l.q) || 0;
-  })));
-  return Object.keys(map).map(k=>map[k]).sort((a, b)=>b.q - a.q || a.name.localeCompare(b.name, 'fr'));
+function cx_setRange(){
+  const f = (document.getElementById('cx-from') || {}).value, t = (document.getElementById('cx-to') || {}).value;
+  if(f) cx_from = f; cx_to = t || ''; if(cx_to && cx_ms(cx_to) <= cx_ms(cx_from)){ alert('La fin doit être après le début.'); cx_to = ''; }
+  cx_reload(); cx_render();
 }
-/* ---------- ingrédients suivis : regroupement des lignes de toutes les sections ---------- */
-function ct_gkey(l){ const c = ct_cfg.lines[l.id]; return ct_key((c && c.grp) || l.n); }
-function ct_lineFactor(l){ const f = Number(l.f); if(f > 0) return f; const u = String(l.u || '').trim().toLowerCase(); return u === 'kg' ? 1000 : u === 'g' ? 1 : 0; }
-function ct_line(id){ let r = null; mep_secList().forEach(sc=>(mep_lists[sc.id] || []).forEach(l=>{ if(l.id === id) r = l; })); return r; }
-function ct_groups(){
-  const map = {}, out = [];
-  mep_secList().forEach(sc=>(mep_lists[sc.id] || []).forEach(l=>{
-    const k = ct_gkey(l), lc = ct_cfg.lines[l.id] || {};
-    let g = map[k];
-    if(!g){ const c = ct_cfg.ing[k] || {}; g = map[k] = { k, n:lc.grp || l.n, on:!!c.on, rend:Number(c.rend) > 0 ? Number(c.rend) : 100, rendRaw:c.rend, lines:[] }; out.push(g); }
-    g.lines.push({ id:l.id, n:l.n, u:l.u || '', sec:sc.id, secName:sc.n, f:Number(lc.f) || 0, grp:lc.grp || '' });
+function cx_nowTo(){ cx_to = ''; cx_reload(); cx_render(); }
+function cx_setTab(t){ cx_tab = t; cx_adj = null; if(t === 'jour' && !cx_j.from){ cx_jPreset('today', true); } if(t === 'jour' && !cx_j.data) cx_jLoad(); if(t === 'hist') cx_hLoad(); cx_render(); }
+
+/* ---------- lignes de Mise en place liées à un ingrédient, pesées ---------- */
+function cx_lines(ing){
+  const m = (cx_cfg.ing[ing.id] || {}).map || {}, out = [], fb = cx_fam(ing.u).b;
+  mep_secList().forEach((sc)=>(mep_lists[sc.id] || []).forEach((l)=>{
+    if(m[l.id] === undefined || m[l.id] === null) return;
+    const v = Number(m[l.id]), a = cx_fam(l.u), f = v > 0 ? v : (a.b === fb ? a.f : 0);
+    out.push({ id:l.id, sec:sc.id, secName:sc.n, n:l.n, u:l.u || '', f, auto:!(v > 0) });
   }));
   return out;
 }
-const ct_tracked = ()=>ct_groups().filter(g=>g.on);
-const ct_has = (pl, k)=>!!(pl && pl.g && pl.g[k] !== undefined && pl.g[k] !== null);
-function ct_calc(g, sales){
-  let n = 0, miss = 0, missPl = 0;
-  sales.forEach(s=>{ const pl = ct_cfg.plats[s.key]; if(ct_has(pl, g.k)) n += s.q * Number(pl.g[g.k]); else { miss += s.q; missPl++; } });
-  return { brut:n / (g.rend / 100), miss, missPl };
+function cx_weighs(l){
+  const out = [];
+  mep_saisies.forEach((x)=>{ if(x.section !== l.sec) return; const it = (x.items || []).find(i=>i.id === l.id); if(!it || !mep_counts(x, l.id)) return;
+    const ms = new Date(mep_shownAt(x)).getTime(); if(isNaN(ms)) return; out.push({ ms, q:Number(it.q) || 0, who:x.name || '', corr:x.correctedBy || '', rec:String(x.at || '') }); });
+  return out.sort((a, b)=>a.ms - b.ms || a.rec.localeCompare(b.rec));
 }
-async function ct_grpSet(k, key, v){
-  let val;
-  if(key === 'on') val = !!v;
-  else { val = ft_parseQ(v); if(val === null || !(val > 0) || val > 100){ alert('Rendement : un nombre entre 1 et 100 (%).'); mep_render(); return; } }
-  ct_cfg.ing[k] = Object.assign({}, ct_cfg.ing[k], { [key]:val });
-  try{ await ct_ref.set({ ing:{ [k]:{ [key]:val } } }, { merge:true }); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
-  if(key === 'on') mep_render(); else ct_softRender();
+const cx_lastW = (ws, lo, hi)=>{ let b = null; ws.forEach((w)=>{ if(w.ms > lo && w.ms <= hi) b = w; }); return b; };
+/* ajustements, achats et consommation sur ]lo, hi] */
+function cx_seg(ing, D, lo, hi, rend){
+  const adjL = [], achL = []; let adj = 0, ach = 0, bad = 0, used = 0, miss = 0; const missPl = {}, nm = ing.n.trim().toLowerCase();
+  D.ev.forEach((e)=>{ if(e.type !== 'ajust' || e.ing !== ing.id) return; const m = cx_ms(e.at); if(m > lo && m <= hi){ adj += Number(e.q) || 0; adjL.push(e); } });
+  D.ach.forEach((a)=>{ if(a.name.toLowerCase() !== nm || !(a.ms > lo && a.ms <= hi)) return; const v = cx_toBase(a.q, a.u, ing); if(v === null) bad++; else { ach += v; achL.push(Object.assign({ base:v }, a)); } });
+  D.sales.forEach((s)=>{ if(!(s.ms > lo && s.ms <= hi)) return; const pl = cx_cfg.plats[s.key]; if(pl && pl.g && pl.g[ing.id] !== undefined && pl.g[ing.id] !== null) used += s.q * Number(pl.g[ing.id]); else { miss += s.q; missPl[s.key] = s.name; } });
+  adjL.sort((a, b)=>cx_ms(a.at) - cx_ms(b.at)); achL.sort((a, b)=>a.ms - b.ms);
+  return { adj, ach, used:used / (rend / 100), bad, miss, missPl, adjL, achL };
 }
-async function ct_lineSet(id, key, v){
-  const l = ct_line(id); if(!l) return;
-  let val;
-  if(key === 'f'){ val = ft_parseQ(v); if(val === null || !(val > 0)){ alert('Équivalence : un nombre de grammes supérieur à 0.'); mep_render(); return; } }
-  else val = String(v || '').trim();
-  const oldK = ct_gkey(l);
-  ct_cfg.lines[id] = Object.assign({}, ct_cfg.lines[id], { [key]:val });
-  const patch = { lines:{ [id]:{ [key]:val } } };
-  if(key === 'grp'){ const newK = ct_gkey(l); if(newK !== oldK && !ct_cfg.ing[newK] && ct_cfg.ing[oldK]){ ct_cfg.ing[newK] = Object.assign({}, ct_cfg.ing[oldK]); patch.ing = { [newK]:ct_cfg.ing[newK] }; } }
-  try{ await ct_ref.set(patch, { merge:true }); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
-  if(key === 'grp') mep_render(); else ct_softRender();
+function cx_price(ing, D, t){
+  const nm = ing.n.trim().toLowerCase(); let list = D.ach.filter(a=>a.name.toLowerCase() === nm && a.ms <= t && a.montant > 0).map(a=>({ ms:a.ms, p:a.montant / (cx_toBase(a.q, a.u, ing) || NaN) })).filter(x=>isFinite(x.p) && x.p > 0).sort((a, b)=>b.ms - a.ms);
+  if(!list.length) return 0; list = list.filter(x=>x.ms >= list[0].ms - 7 * 864e5); return list.reduce((s, x)=>s + x.p, 0) / list.length;
 }
-function ct_toggleSet(k){ ct_openSet[k] = !ct_openSet[k]; mep_render(); }
-function ct_ingHtml(){
-  const groups = ct_groups(), tr = groups.filter(g=>g.on), rest = groups.filter(g=>!g.on);
-  const secsOf = (g)=>Array.from(new Set(g.lines.map(l=>l.secName))).join(' + ');
-  const rows = tr.map(g=>{
-    const open = !!ct_openSet[g.k], noF = g.lines.some(l=>!ct_lineFactor(l));
-    const settings = open ? `<div style="margin-top:8px;"><label>Rendement (%)</label><input type="text" inputmode="decimal" class="ft-in" placeholder="100" value="${mep_e(g.rendRaw || '')}" onchange="ct_grpSet('${g.k}','rend',this.value)"></div>`
-      + g.lines.map(l=>{ const f = ct_lineFactor(l); return `<div class="g2" style="margin-top:8px;"><div><label>${mep_e(l.secName)} · 1 ${mep_e(l.u || 'unité')} = … g brut</label><input type="text" inputmode="decimal" class="ft-in" placeholder="${mep_e(f || 'ex. 1000')}" value="${mep_e((ct_cfg.lines[l.id] || {}).f || '')}" onchange="ct_lineSet('${l.id}','f',this.value)"></div>
-        <div><label>Nom du groupe (facultatif)</label><input type="text" class="ft-in" placeholder="${mep_e(l.n)}" value="${mep_e(l.grp)}" onchange="ct_lineSet('${l.id}','grp',this.value)"></div></div>`; }).join('')
-      + '<div class="pt-muted" style="margin-top:8px;">Les lignes de même nom dans plusieurs sections sont regroupées automatiquement ; pour regrouper des noms différents, écris le même « nom du groupe ».</div>' : '';
-    return `<div class="rp2-ing"><div class="row-between"><div><b>${mep_e(g.n)}</b><div class="mep-w">${mep_e(secsOf(g))} · rendement ${mep_e(g.rend)} %${noF ? ' · <span class="rp2-bad">équivalence en g manquante</span>' : ''}</div></div>
-      <div class="rp2-act"><button class="btn ghost small t-edit" onclick="ct_toggleSet('${g.k}')">${open ? 'Fermer' : 'Régler'}</button><button class="btn ghost small t-del" onclick="ct_grpSet('${g.k}','on',false)" aria-label="Ne plus suivre">✕</button></div></div>${settings}</div>`;
+/* calcul complet d'un ingrédient sur [f, t] ; mode : {k:'reel'|'theo'|'qty', q} */
+function cx_calc(ing, f, t, mode, D){
+  const c = cx_cfg.ing[ing.id] || {}, rend = Number(c.rend) > 0 ? Number(c.rend) : 100, lines = cx_lines(ing), flags = [], k = (mode && mode.k) || 'reel';
+  const W = lines.map((l)=>({ l, ws:cx_weighs(l) }));
+  if(!lines.length) flags.push('aucune ligne de Mise en place liée (onglet Réglages)');
+  if(lines.some(l=>!l.f)) flags.push('équivalence manquante pour : ' + lines.filter(l=>!l.f).map(l=>l.secName + ' · ' + l.n).join(', '));
+  const S = W.map((p)=>({ l:p.l, w:cx_lastW(p.ws, f - 3 * 864e5, f) }));
+  const sumW = (a)=>a.reduce((s, p)=>s + (p.w ? p.w.q * p.l.f : 0), 0);
+  const startW = sumW(S), TwMax = S.reduce((m, p)=>p.w && p.w.ms > m ? p.w.ms : m, 0);
+  let start = startW, startNote = '', segPrev = null;
+  if(k === 'qty'){ start = (ft_parseQ((mode && mode.q) || '') || 0) * cx_fam(ing.u).f; startNote = 'quantité saisie'; }
+  else {
+    const miss = S.filter(p=>!p.w);
+    if(lines.length && miss.length === lines.length) flags.push('aucune pesée récente avant le début (compté 0)');
+    else if(miss.length) flags.push('pas de pesée de départ : ' + miss.map(p=>p.l.secName).join(', ') + ' (compté 0)');
+    if(TwMax && f - TwMax > 36e5 * 14) flags.push('la dernière pesée de départ date du ' + cx_fmtD(TwMax));
+    if(k === 'theo' && TwMax){ segPrev = cx_seg(ing, D, TwMax, f, rend); start = startW + segPrev.adj + segPrev.ach - segPrev.used; startNote = 'théorique reporté depuis la pesée du ' + cx_fmtD(TwMax) + ' (écart passé conservé)'; }
+    else startNote = TwMax ? 'pesée du ' + cx_fmtD(TwMax) : '';
+  }
+  const seg = cx_seg(ing, D, f, t, rend);
+  const theo = start + seg.adj + seg.ach - seg.used;
+  const R = W.map((p)=>({ l:p.l, w:cx_lastW(p.ws, f, t) })), have = R.filter(p=>p.w), real = have.length ? sumW(R) : null;
+  const missR = R.filter(p=>!p.w);
+  if(missR.length && have.length) flags.push('pesée de fin manquante : ' + missR.map(p=>p.l.secName + ' · ' + p.l.n).join(', '));
+  const ecart = (real !== null && !missR.length) ? real - theo : null, den = seg.used > 0 ? seg.used : (Math.abs(theo) || 1);
+  const pct = ecart === null ? null : ecart / den * 100, price = cx_price(ing, D, t), da = ecart === null ? null : ecart * price;
+  if(seg.miss) flags.push(Object.keys(seg.missPl).length + ' plat(s) vendu(s) sans grammage (' + cx_n(seg.miss) + ' portions non comptées)');
+  if(seg.bad) flags.push(seg.bad + ' achat(s) dans une unité incompatible avec ' + ing.u);
+  if(D.noDetail && D.noDetail.length) flags.push('jour(s) sans détail des tickets : ' + D.noDetail.join(', '));
+  return { ing, rend, lines, start, startW, startNote, seg, theo, real, R, S, ecart, pct, price, da, flags, k };
+}
+function cx_pack(r){
+  const rd = (v)=>v === null || v === undefined || isNaN(v) ? null : Math.round(v * 100) / 100;
+  return { n:r.ing.n, u:r.ing.u, start:rd(r.start), adj:rd(r.seg.adj), ach:rd(r.seg.ach), used:rd(r.seg.used), theo:rd(r.theo), reel:rd(r.real), ecart:rd(r.ecart), pct:rd(r.pct), da:rd(r.da), flags:r.flags };
+}
+
+/* ---------- sauvegarde automatique du jour de contrôle ---------- */
+async function cx_snapDay(dayKey, by){
+  const [f, t] = cx_dayWindow(dayKey), D = await cx_fetch(f, t), items = {};
+  cx_ingList().forEach((ing)=>{ items[ing.id] = cx_pack(cx_calc(ing, f, t, { k:'reel' }, D)); });
+  const rec = { day:dayKey, from:new Date(f).toISOString(), to:new Date(t).toISOString(), gen:new Date().toISOString(), by:by || 'auto', items };
+  await cx_jourCol.doc(dayKey).set(rec); return rec;
+}
+async function cx_autoSnap(){
+  if(cx_snapRun || !cx_isAdmin() || !cx_ingList().length) return; cx_snapRun = true;
+  try{
+    const cur = cx_dayStart(Date.now()), curKey = mep_ymd(cur);
+    if(!cx_cfg.snapFrom){ cx_cfg.snapFrom = curKey; await cx_cfgRef.set({ snapFrom:curKey }, { merge:true }); return; }
+    const days = []; for(let i = 1; i <= 14; i++){ const d = new Date(cur); d.setDate(d.getDate() - i); const k = mep_ymd(d); if(k >= cx_cfg.snapFrom) days.push(k); }
+    if(!days.length) return;
+    const FP = firebase.firestore.FieldPath.documentId(), snap = await cx_jourCol.where(FP, '>=', days[days.length - 1]).get(), have = new Set();
+    snap.forEach((d)=>have.add(d.id));
+    const todo = days.filter(k=>!have.has(k)).reverse();
+    for(const k of todo){ await cx_snapDay(k, 'auto'); }
+    if(todo.length && typeof pt_toast === 'function') pt_toast('Contrôle : ' + todo.length + ' jour(s) sauvegardé(s) automatiquement.');
+  } finally { cx_snapRun = false; }
+}
+/* un ajustement sur un jour déjà sauvegardé remplace la sauvegarde par le nouveau calcul */
+async function cx_resnapFor(ms){
+  const dayKey = mep_ymd(cx_dayStart(ms)); if(dayKey >= mep_ymd(cx_dayStart(Date.now()))) return;
+  const ex = await cx_jourCol.doc(dayKey).get(); if(ex.exists) await cx_snapDay(dayKey, cx_who() + ' (recalcul après ajustement)');
+}
+async function cx_snapManual(){
+  const el = document.getElementById('cx-snapday'), k = el && el.value; if(!k){ alert('Choisis un jour.'); return; }
+  if(k >= mep_ymd(cx_dayStart(Date.now()))){ alert('Ce jour de contrôle n’est pas terminé (il se termine à 2 h).'); return; }
+  cx_h.busy = true; cx_render();
+  try{ await cx_snapDay(k, cx_who() + ' (manuel)'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  cx_h.busy = false; await cx_hLoad();
+}
+
+/* ---------- réglages : suivi, rendement, lignes liées, grammages ---------- */
+async function cx_ingPatch(id, patch){
+  cx_cfg.ing[id] = Object.assign({}, cx_cfg.ing[id], patch);
+  try{ await cx_cfgRef.set({ ing:{ [id]:patch } }, { merge:true }); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+function cx_track(id, on){
+  if(!cx_dpReady){ alert('Liste des ingrédients pas encore chargée.'); return; }
+  dp_cfgTrack(id, on); cx_render();
+}
+async function cx_rend(id, v){
+  const n = ft_parseQ(v); if(n === null || !(n > 0) || n > 100){ alert('Rendement : un nombre entre 1 et 100 (%).'); cx_render(); return; }
+  await cx_ingPatch(id, { rend:n }); cx_reload(); cx_render();
+}
+async function cx_link(id, lineId){
+  if(!lineId) return; const c = cx_cfg.ing[id] || {}; const map = Object.assign({}, c.map, { [lineId]:0 });
+  cx_cfg.ing[id] = Object.assign({}, c, { map });
+  try{ await cx_cfgRef.set({ ing:{ [id]:{ map:{ [lineId]:0 } } } }, { merge:true }); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+  cx_render();
+}
+async function cx_unlink(id, lineId){
+  const c = cx_cfg.ing[id] || {}, map = Object.assign({}, c.map); delete map[lineId]; cx_cfg.ing[id] = Object.assign({}, c, { map });
+  try{ await cx_cfgRef.set({ ing:{ [id]:{ map:{ [lineId]:PT_DEL() } } } }, { merge:true }); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+  cx_render();
+}
+async function cx_lineF(id, lineId, v){
+  const raw = String(v || '').trim(); let n = 0;
+  if(raw){ n = ft_parseQ(raw); if(n === null || !(n > 0)){ alert('Équivalence : un nombre supérieur à 0.'); cx_render(); return; } }
+  const c = cx_cfg.ing[id] || {}, map = Object.assign({}, c.map, { [lineId]:n }); cx_cfg.ing[id] = Object.assign({}, c, { map });
+  try{ await cx_cfgRef.set({ ing:{ [id]:{ map:{ [lineId]:n } } } }, { merge:true }); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+  cx_render();
+}
+async function cx_autoLink(id){
+  const ing = cx_ingById(id); if(!ing) return; const key = cx_key(ing.n), map = Object.assign({}, (cx_cfg.ing[id] || {}).map), add = {};
+  mep_secList().forEach((sc)=>(mep_lists[sc.id] || []).forEach((l)=>{ if(map[l.id] === undefined && cx_key(l.n) === key){ map[l.id] = 0; add[l.id] = 0; } }));
+  if(!Object.keys(add).length){ alert('Aucune ligne de Mise en place portant le même nom que « ' + ing.n + ' ».'); return; }
+  cx_cfg.ing[id] = Object.assign({}, cx_cfg.ing[id], { map });
+  try{ await cx_cfgRef.set({ ing:{ [id]:{ map:add } } }, { merge:true }); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+  cx_render();
+}
+function cx_toggleSet(id){ cx_open['set:' + id] = !cx_open['set:' + id]; cx_render(); }
+async function cx_savePlat(key){
+  const sale = cx_salesTotals().find(s=>s.key === key), cur = cx_cfg.plats[key], name = (sale && sale.name) || (cur && cur.name) || key, g = {}; let n = 0, bad = false;
+  cx_ingList().forEach((i)=>{ const el = document.getElementById('cx-g-' + key + '-' + i.id); if(!el) return; const raw = el.value.trim(); if(raw === '') return; const v = ft_parseQ(raw);
+    if(v === null || v < 0){ alert('Grammage non valide pour « ' + i.n + ' » : « ' + raw + ' ».'); bad = true; return; } g[i.id] = v; n++; });
+  if(bad) return; if(!n){ alert('Saisis au moins une quantité (0 si le plat n’en contient pas).'); return; }
+  cx_cfg.plats[key] = { name, g:Object.assign({}, cur && cur.g, g) };
+  try{ await cx_cfgRef.set({ plats:{ [key]:{ name, g } } }, { merge:true }); if(typeof pt_toast === 'function') pt_toast('Enregistré : ' + name); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  cx_reload(); cx_render();
+}
+function cx_zero(key, id){ const el = document.getElementById('cx-g-' + key + '-' + id); if(el) el.value = '0'; }
+function cx_salesTotals(){
+  const map = {}; if(!cx_data) return [];
+  const [f, t] = cx_setWindow(); cx_data.sales.forEach((s)=>{ if(s.ms > f && s.ms <= t){ const o = map[s.key] || (map[s.key] = { key:s.key, name:s.name, q:0 }); o.q += s.q; } });
+  return Object.keys(map).map(k=>map[k]).sort((a, b)=>b.q - a.q || a.name.localeCompare(b.name, 'fr'));
+}
+function cx_inputRow(key, i, val){
+  return `<div class="g2" style="margin-top:8px;align-items:end;"><div><label>${cx_e(i.n)} — ${cx_e(cx_baseLbl(i))} net par plat</label><input type="text" inputmode="decimal" class="ft-in" id="cx-g-${key}-${i.id}" placeholder="${cx_e(cx_baseLbl(i))}" value="${cx_e(val === undefined ? '' : val)}"></div>
+    <div><button type="button" class="btn ghost small t-cancel" onclick="cx_zero('${key}','${i.id}')">∅ n’en contient pas</button></div></div>`;
+}
+function cx_platsHtml(){
+  const tr = cx_ingList(); if(!tr.length) return '';
+  const sales = cx_salesTotals(), has = (pl, i)=>!!(pl && pl.g && pl.g[i.id] !== undefined && pl.g[i.id] !== null);
+  const todo = sales.map(s=>({ s, miss:tr.filter(i=>!has(cx_cfg.plats[s.key], i)) })).filter(x=>x.miss.length);
+  const soldQ = {}; sales.forEach((s)=>{ soldQ[s.key] = s.q; });
+  const filled = Object.keys(cx_cfg.plats).map(k=>({ k, pl:cx_cfg.plats[k], have:tr.filter(i=>has(cx_cfg.plats[k], i)) })).filter(x=>x.have.length).sort((a, b)=>String(a.pl.name).localeCompare(String(b.pl.name), 'fr'));
+  const todoHtml = !cx_data ? '<div class="pt-muted">Chargement des ventes…</div> ' : !sales.length ? '<div class="pt-muted">Aucun plat vendu dans la fenêtre choisie (onglet Contrôle).</div>'
+    : !todo.length ? '<div class="rp2-ok">✓ Tous les plats vendus ont une quantité pour les ingrédients suivis.</div>'
+    : todo.map(x=>`<div class="rp2-ing"><div class="row-between"><b>${cx_e(x.s.name)}</b><span class="pt-muted">vendu × ${cx_e(cx_n(x.s.q))}</span></div>${x.miss.map(i=>cx_inputRow(x.s.key, i)).join('')}<div class="actions-row"><button class="btn small t-save" onclick="cx_savePlat('${x.s.key}')">Valider</button></div></div>`).join('');
+  const open = !!cx_open.filled;
+  const fHtml = open ? (filled.length ? filled.map(x=>`<div class="rp2-ing"><div class="row-between"><b>${cx_e(x.pl.name)}</b><span class="pt-muted">${soldQ[x.k] ? 'vendu × ' + cx_e(cx_n(soldQ[x.k])) : 'non vendu dans la fenêtre'}</span></div>${x.have.map(i=>cx_inputRow(x.k, i, x.pl.g[i.id])).join('')}<div class="actions-row"><button class="btn small t-save" onclick="cx_savePlat('${x.k}')">Modifier</button></div></div>`).join('') : '<div class="pt-muted">Aucun.</div>') : '';
+  return `<div class="ticket"><div class="section-label">Grammage par plat — à renseigner (${todo.length})</div><div class="pt-muted" style="margin-bottom:8px;">Quantité <b>nette</b> de l’ingrédient dans une portion (g, ml ou unité selon l’ingrédient). Mets 0 si le plat n’en contient pas. Seuls les plats vendus dans la fenêtre du Contrôle sont proposés.</div>${todoHtml}</div>
+    <div class="ticket"><div class="row-between" style="cursor:pointer;" onclick="cx_open.filled=!cx_open.filled;cx_render()"><div style="font-weight:700;">Déjà renseignés <span class="pt-muted">(${filled.length})</span></div><span class="pt-chevron">${open ? '▾' : '▸'}</span></div>${fHtml}</div>`;
+}
+function cx_settingsHtml(){
+  const all = (dp_cfg.ingredients || []).filter(i=>!i.off);
+  if(!cx_dpReady) return '<div class="empty-state">Chargement…</div>';
+  const rows = all.map((ing)=>{
+    const on = !!ing.track, c = cx_cfg.ing[ing.id] || {}, open = !!cx_open['set:' + ing.id], lines = on ? cx_lines(ing) : [];
+    let det = '';
+    if(on && open){
+      const linkedIds = new Set(lines.map(l=>l.id)), free = [];
+      mep_secList().forEach((sc)=>(mep_lists[sc.id] || []).forEach((l)=>{ if(!linkedIds.has(l.id)) free.push({ l, sc }); }));
+      det = `<div style="margin-top:8px;"><label>Rendement (%) — part utilisable après parage / cuisson</label><input type="text" inputmode="decimal" class="ft-in" placeholder="100" value="${cx_e(c.rend || '')}" onchange="cx_rend('${ing.id}',this.value)"></div>
+        <div class="pt-muted" style="margin-top:10px;">Lignes de Mise en place pesées (stock de départ et réel = somme de ces lignes, convertie en ${cx_e(cx_baseLbl(ing))}) :</div>
+        ${lines.map(l=>`<div class="g2" style="margin-top:6px;align-items:end;"><div><label>${cx_e(l.secName)} · ${cx_e(l.n)} (${cx_e(l.u || 'unité')})</label><input type="text" inputmode="decimal" class="ft-in" placeholder="${l.f ? '1 ' + cx_e(l.u || 'unité') + ' = ' + cx_e(cx_n(l.f)) + ' ' + cx_e(cx_baseLbl(ing)) + ' (auto)' : '1 ' + cx_e(l.u || 'unité') + ' = … ' + cx_e(cx_baseLbl(ing)) + ' cru'}" value="${l.auto ? '' : cx_e(l.f)}" onchange="cx_lineF('${ing.id}','${l.id}',this.value)"></div><div><button class="btn ghost small t-del" onclick="cx_unlink('${ing.id}','${l.id}')">Délier</button></div></div>`).join('') || '<div class="pt-muted">Aucune ligne liée.</div>'}
+        <div class="pt-muted" style="margin-top:6px;">Si le cuisinier pèse du mariné ou du cuit, indique l’équivalent en cru : « 1 kg de cuit = 1 330 g cru ».</div>
+        <select class="ft-in" style="margin-top:8px;" onchange="cx_link('${ing.id}',this.value)"><option value="">＋ Lier une ligne de Mise en place…</option>${free.map(x=>`<option value="${x.l.id}">${cx_e(x.sc.n)} · ${cx_e(x.l.n)} (${cx_e(x.l.u || 'unité')})</option>`).join('')}</select>
+        <div class="actions-row"><button class="btn ghost small" onclick="cx_autoLink('${ing.id}')">Lier les lignes du même nom</button></div>`;
+    }
+    return `<div class="rp2-ing"><div class="row-between"><label style="display:flex;align-items:center;gap:8px;font-weight:700;"><input type="checkbox" ${on ? 'checked' : ''} onchange="cx_track('${ing.id}',this.checked)"> ${cx_e(ing.n)} <span class="pt-muted" style="font-weight:500;">(${cx_e(ing.u || '')})</span></label>
+      ${on ? `<button class="btn ghost small t-edit" onclick="cx_toggleSet('${ing.id}')">${open ? 'Fermer' : 'Régler'}</button>` : ''}</div>
+      ${on ? `<div class="mep-w">rendement ${cx_e(c.rend || 100)} % · ${lines.length} ligne(s) liée(s)</div>` : ''}${det}</div>`;
   }).join('');
-  const add = rest.length ? `<select class="ft-in" style="margin-top:10px;" onchange="if(this.value){ ct_grpSet(this.value,'on',true); }"><option value="">＋ Suivre un ingrédient…</option>${rest.map(g=>`<option value="${g.k}">${mep_e(g.n)} (${mep_e(secsOf(g))})</option>`).join('')}</select>`
-    : (groups.length ? '<div class="pt-muted" style="margin-top:8px;">Tous les ingrédients sont suivis.</div>' : '<div class="pt-muted">Aucun ingrédient défini dans « Listes ».</div>');
-  return `<div class="ticket"><div class="section-label">Ingrédients suivis (${tr.length})</div>${rows || '<div class="pt-muted">Aucun ingrédient suivi pour l’instant.</div>'}${add}</div>`;
+  return `<div class="ticket"><div class="section-label">Ingrédients suivis</div><div class="pt-muted" style="margin-bottom:8px;">La liste vient de Dépenses › Sortie › Ingrédients. Coche ceux à suivre ; l’unité de chaque ingrédient est définie là-bas (une seule unité partout).</div>${rows || '<div class="pt-muted">Aucun ingrédient.</div>'}</div>` + cx_platsHtml();
 }
-/* ---------- grammages par plat ---------- */
-async function ct_savePlat(key){
-  const sale = ct_sales().find(s=>s.key === key), cur = ct_cfg.plats[key];
-  const name = (sale && sale.name) || (cur && cur.name) || key, g = {}; let n = 0, bad = false;
-  ct_tracked().forEach(i=>{
-    const el = document.getElementById('ct-g-' + key + '-' + i.k); if(!el) return;
-    const raw = el.value.trim(); if(raw === '') return;
-    const v = ft_parseQ(raw);
-    if(v === null || v < 0){ alert('Grammage non valide pour « ' + i.n + ' » : « ' + raw + ' ». Écris un nombre de grammes (0 si le plat n’en contient pas).'); bad = true; return; }
-    g[i.k] = v; n++;
-  });
-  if(bad) return;
-  if(!n){ alert('Saisis au moins un grammage (0 si le plat n’en contient pas).'); return; }
-  try{ await ct_ref.set({ plats:{ [key]:{ name, g } } }, { merge:true }); if(typeof pt_toast === 'function') pt_toast('Grammages enregistrés : ' + name); }
+
+/* ---------- ajustements, redémarrage ---------- */
+function cx_adjOpen(ingId, evId){
+  const ing = cx_ingById(ingId); if(!ing) return; const e = evId && cx_data ? cx_data.ev.find(x=>x.id === evId) : null;
+  if(e){ const f = cx_fam(ing.u).f; cx_adj = { ing:ingId, id:evId, sign:e.q < 0 ? '-' : '+', q:cx_n(Math.abs(e.q) / f).replace(/\s/g, '').replace(',', '.'), at:cx_dt(new Date(cx_ms(e.at))), note:e.note || '' }; }
+  else cx_adj = { ing:ingId, id:'', sign:'+', q:'', at:cx_dt(new Date()), note:'' };
+  cx_open['ing:' + ingId] = true; cx_render();
+}
+function cx_adjSet(f, v){ if(cx_adj) cx_adj[f] = v; }
+async function cx_adjSave(){
+  const a = cx_adj; if(!a) return; const ing = cx_ingById(a.ing); if(!ing) return;
+  const q = ft_parseQ(a.q), note = String(a.note || '').trim(), ms = cx_ms(a.at);
+  if(q === null || !(q > 0)){ alert('Indique une quantité supérieure à 0 (le signe + ou − se choisit à côté).'); return; }
+  if(!note){ alert('La note explicative est obligatoire.'); return; }
+  if(isNaN(ms)){ alert('Indique la date et l’heure de l’ajustement.'); return; }
+  const prev = a.id && cx_data ? cx_data.ev.find(x=>x.id === a.id) : null, oldMs = prev ? cx_ms(prev.at) : null;
+  const rec = Object.assign({}, prev || {}, { type:'ajust', ing:ing.id, ingN:ing.n, q:(a.sign === '-' ? -1 : 1) * q * cx_fam(ing.u).f, note, at:new Date(ms).toISOString() });
+  if(prev){ rec.modBy = cx_who(); rec.modAt = new Date().toISOString(); } else { rec.by = cx_who(); rec.cr = new Date().toISOString(); }
+  const id = a.id || mep_newId(); delete rec.id;
+  try{ await cx_evCol.doc(id).set(rec); cx_adj = null; await cx_resnapFor(ms); if(oldMs !== null && oldMs !== ms) await cx_resnapFor(oldMs); if(typeof pt_toast === 'function') pt_toast('Ajustement enregistré.'); }
   catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+  await cx_reload(); cx_render();
 }
-function ct_zero(key, k){ const el = document.getElementById('ct-g-' + key + '-' + k); if(el) el.value = '0'; }
-function ct_toggleFilled(){ ct_openFilled = !ct_openFilled; mep_render(); }
-function ct_inputRow(key, i, val){
-  return `<div class="g2" style="margin-top:8px;align-items:end;"><div><label>${mep_e(i.n)} — g net par plat</label><input type="text" inputmode="decimal" class="ft-in" id="ct-g-${key}-${i.k}" placeholder="g" value="${mep_e(val === undefined ? '' : val)}"></div>
-    <div><button type="button" class="btn ghost small t-cancel" onclick="ct_zero('${key}','${i.k}')">∅ n’en contient pas</button></div></div>`;
+async function cx_adjDel(id){
+  const e = cx_data && cx_data.ev.find(x=>x.id === id); if(!e) return; if(!confirm('Supprimer cet ajustement ?')) return;
+  try{ await cx_evCol.doc(id).delete(); await cx_resnapFor(cx_ms(e.at)); }catch(er){ console.error(er); alert('Erreur : ' + (er.message || er)); }
+  await cx_reload(); cx_render();
 }
-function ct_platsHtml(tr, sales){
-  const todo = sales.map(s=>({ s, miss:tr.filter(i=>!ct_has(ct_cfg.plats[s.key], i.k)) })).filter(x=>x.miss.length);
-  const soldQ = {}; sales.forEach(s=>{ soldQ[s.key] = s.q; });
-  const filled = Object.keys(ct_cfg.plats).map(k=>({ k, pl:ct_cfg.plats[k], have:tr.filter(i=>ct_has(ct_cfg.plats[k], i.k)) })).filter(x=>x.have.length).sort((a, b)=>String(a.pl.name).localeCompare(String(b.pl.name), 'fr'));
-  const todoHtml = !ct_loaded ? '<div class="pt-muted">Chargement des ventes…</div>'
-    : !sales.length ? '<div class="pt-muted">Aucun plat vendu sur cette période (ou détail des tickets indisponible).</div>'
-    : !todo.length ? '<div class="rp2-ok">✓ Tous les plats vendus ont un grammage pour les ingrédients suivis.</div>'
-    : todo.map(x=>`<div class="rp2-ing"><div class="row-between"><b>${mep_e(x.s.name)}</b><span class="pt-muted">vendu × ${mep_e(mep_fq(x.s.q))}</span></div>${x.miss.map(i=>ct_inputRow(x.s.key, i)).join('')}<div class="actions-row"><button class="btn small t-save" onclick="ct_savePlat('${x.s.key}')">Valider</button></div></div>`).join('');
-  const fHtml = ct_openFilled ? (filled.length ? filled.map(x=>`<div class="rp2-ing"><div class="row-between"><b>${mep_e(x.pl.name)}</b><span class="pt-muted">${soldQ[x.k] ? 'vendu × ' + mep_e(mep_fq(soldQ[x.k])) : 'non vendu sur la période'}</span></div>${x.have.map(i=>ct_inputRow(x.k, i, x.pl.g[i.k])).join('')}<div class="actions-row"><button class="btn small t-save" onclick="ct_savePlat('${x.k}')">Enregistrer</button></div></div>`).join('') : '<div class="pt-muted">Aucun grammage enregistré.</div>') : '';
-  return `<div class="ticket"><div class="section-label">À renseigner (${todo.length} plat${todo.length > 1 ? 's' : ''})</div><div class="pt-muted" style="margin-bottom:8px;">Grammage <b>net</b> de l’ingrédient dans une portion du plat. Mets 0 (ou « ∅ ») si le plat n’en contient pas : il ne te sera plus redemandé.</div>${todoHtml}</div>
-    <div class="ticket"><div class="row-between" style="cursor:pointer;" onclick="ct_toggleFilled()"><div style="font-weight:700;">Déjà renseignés <span class="pt-muted">(${filled.length} plat${filled.length > 1 ? 's' : ''})</span></div><span class="pt-chevron">${ct_openFilled ? '▾' : '▸'}</span></div>${ct_openFilled ? '<div style="margin-top:10px;">' + fHtml + '</div>' : ''}</div>`;
+async function cx_restartSave(ingId){
+  const ing = cx_ingById(ingId); if(!ing) return; const m = cx_mode[ingId] || { k:'reel' };
+  if(m.k === 'qty' && ft_parseQ(m.q || '') === null){ alert('Indique la quantité de départ.'); return; }
+  const rec = { type:'restart', ing:ing.id, ingN:ing.n, at:new Date(cx_ms(cx_from)).toISOString(), mode:m.k, qty:m.k === 'qty' ? ft_parseQ(m.q) : null, by:cx_who(), cr:new Date().toISOString() };
+  try{ await cx_evCol.doc(mep_newId()).set(rec); if(typeof pt_toast === 'function') pt_toast('Redémarrage noté dans le journal.'); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+  cx_reload();
 }
-/* ---------- contrôle : ouverture + achats − consommation = stock théorique, comparé au pesé de fin de service ---------- */
-/* dernier pesé d'une ligne dont la date de service vérifie pred (les corrections gardent l'heure d'origine) */
-function ct_weigh(l, pred){
-  let best = null;
-  mep_saisies.forEach(x=>{
-    if(x.section !== l.sec || !pred(x.date)) return;
-    const it = (x.items || []).find(i=>i.id === l.id); if(!it || !mep_counts(x, l.id)) return;
-    const at = mep_shownAt(x), rec = String(x.at || '');
-    if(!best || at > best.at || (at === best.at && rec > best.rec)) best = { q:Number(it.q), at, rec, date:x.date, who:x.name, corr:x.correctedBy || '' };
-  });
-  return best;
-}
-function ct_control(g, sales){
-  const mk = (pred)=>g.lines.map(l=>({ l, f:ct_lineFactor(l), w:ct_weigh(l, pred) }));
-  const O = mk(d=>d < ct_from), C = mk(d=>d >= ct_from && d <= ct_to);
-  const gr = (a)=>a.reduce((t, p)=>t + (p.w && p.f ? p.w.q * p.f : 0), 0);
-  const maxAt = (a)=>a.reduce((m, p)=>p.w && p.w.at > m ? p.w.at : m, '');
-  const S = maxAt(O), E = maxAt(C);
-  const achats = Object.keys(ct_cfg.achats).map(id=>Object.assign({ id }, ct_cfg.achats[id])).filter(a=>a.k === g.k).sort((a, b)=>String(a.at).localeCompare(String(b.at)));
-  const inWin = achats.filter(a=>(!S || a.at > S) && (!E || a.at <= E));
-  const c = ct_calc(g, sales);
-  const openG = gr(O), closeG = gr(C), achG = inWin.reduce((t, a)=>t + (Number(a.g) || 0), 0);
-  const theo = openG + achG - c.brut;
-  const missO = O.filter(p=>!p.w), missC = C.filter(p=>!p.w), noF = O.concat(C).filter(p=>p.w && !p.f);
-  const openDate = O.reduce((m, p)=>p.w && p.w.date > m ? p.w.date : m, '');
-  const gap = !!(openDate && ct_from && openDate < prevDateStr(ct_from));
-  const hasOpen = O.some(p=>p.w), ecart = (hasOpen && !missC.length && C.length) ? closeG - theo : null;
-  const flags = [];
-  if(!hasOpen) flags.push('aucun pesé d’ouverture avant le ' + rp_fmtDate(ct_from));
-  else if(missO.length) flags.push('pas de pesé d’ouverture : ' + missO.map(p=>p.l.secName).join(', ') + ' (compté 0)');
-  if(gap) flags.push('le dernier pesé d’ouverture date du ' + rp_fmtDate(openDate) + ' : commence la période le ' + rp_fmtDate(pt_addDays(openDate, 1)));
-  if(missC.length) flags.push('pesé de fin de service manquant : ' + missC.map(p=>p.l.secName).join(', '));
-  if(noF.length) flags.push('équivalence en g manquante : ' + Array.from(new Set(noF.map(p=>p.l.secName))).join(', '));
-  if(c.miss) flags.push(c.missPl + ' plat' + (c.missPl > 1 ? 's' : '') + ' vendu' + (c.missPl > 1 ? 's' : '') + ' sans grammage');
-  return { O, C, S, E, achats, inWin, c, openG, closeG, achG, theo, ecart, flags, openDate, gap };
-}
-function ct_ad_get(k){
-  const d = ct_ad[k] || {}, today = mep_ymd(), now = new Date();
-  return { d:d.d || ct_to || today, t:d.t || ((ct_to || today) === today ? String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') : '12:00'), q:d.q || '', u:d.u || '0' };
-}
-function ct_adSet(k, f, v){ ct_ad[k] = Object.assign({}, ct_ad[k], { [f]:v }); }
-function ct_achatUnits(g){
-  const out = [{ u:'kg', f:1000 }, { u:'g', f:1 }];
-  g.lines.forEach(l=>{ const f = ct_lineFactor(l), u = String(l.u || '').trim(); if(u && f > 0 && !out.some(x=>x.u.toLowerCase() === u.toLowerCase())) out.push({ u, f }); });
-  return out;
-}
-async function ct_achatAdd(k){
-  const g = ct_groups().find(x=>x.k === k); if(!g) return;
-  const a = ct_ad_get(k), units = ct_achatUnits(g), un = units[Number(a.u)] || units[0], q = ft_parseQ(a.q);
-  if(q === null || !(q > 0)){ alert('Indique la quantité achetée (un nombre supérieur à 0).'); return; }
-  if(!a.d || !a.t){ alert('Indique la date et l’heure de l’achat.'); return; }
-  const id = mep_newId(), rec = { k, q, u:un.u, g:q * un.f, at:new Date(a.d + 'T' + a.t + ':00').toISOString(), src:'manuel', by:(typeof currentUser !== 'undefined' ? currentUser : '') };
-  ct_cfg.achats[id] = rec; ct_ad[k] = { d:a.d, t:a.t, q:'', u:a.u };
-  try{ await ct_ref.set({ achats:{ [id]:rec } }, { merge:true }); if(typeof pt_toast === 'function') pt_toast('Achat enregistré.'); }
-  catch(e){ console.error(e); delete ct_cfg.achats[id]; alert('Erreur d’enregistrement : ' + (e.message || e)); }
-  mep_render();
-}
-async function ct_achatDel(id){
-  const a = ct_cfg.achats[id]; if(!a) return;
-  if(!confirm('Supprimer cet achat de ' + mep_fq(a.q) + ' ' + a.u + ' ?')) return;
-  const keep = a; delete ct_cfg.achats[id];
-  try{ await ct_ref.set({ achats:{ [id]:PT_DEL() } }, { merge:true }); }catch(e){ console.error(e); ct_cfg.achats[id] = keep; alert('Erreur : ' + (e.message || e)); }
-  mep_render();
-}
-function ct_adjustFrom(d){ ct_from = d; if(ct_to < d) ct_to = d; ct_load(); mep_render(); }
-function ct_toggleRes(k, def){ ct_openRes[k] = !(ct_openRes[k] !== undefined ? ct_openRes[k] : def); mep_render(); }
-function ct_ecartBadge(r){
-  if(r.ecart === null) return '<span class="pt-muted">en attente</span>';
-  const conso = Math.max(r.c.brut, 1), pct = Math.abs(r.ecart) / conso * 100;
-  const col = r.flags.length ? 'var(--amber)' : pct <= 5 ? 'var(--moss)' : pct <= 15 ? 'var(--amber)' : 'var(--rust)';
-  return `<span style="color:${col};font-weight:700;font-family:'IBM Plex Mono',monospace;">${r.ecart < 0 ? '−' : '+'}${mep_e(ct_fmtG(Math.abs(r.ecart)))}</span>`;
-}
-function ct_resRow(label, val, sub, strong){
+function cx_setMode(id, k){ cx_mode[id] = Object.assign({}, cx_mode[id], { k }); cx_render(); }
+function cx_setModeQ(id, v){ cx_mode[id] = Object.assign({}, cx_mode[id], { k:'qty', q:v }); }
+function cx_toggleIng(id){ cx_open['ing:' + id] = !cx_open['ing:' + id]; cx_render(); }
+
+/* ---------- affichage du contrôle ---------- */
+function cx_row(label, val, sub, strong){
   return `<div style="padding:8px 0;border-top:1px solid var(--line);"><div class="row-between"><span${strong ? ' style="font-weight:700;"' : ''}>${label}</span><b style="font-family:'IBM Plex Mono',monospace;">${val}</b></div>${sub ? `<div class="mep-w">${sub}</div>` : ''}</div>`;
 }
-function ct_partsText(a){
-  return a.map(p=>`${mep_e(p.l.secName)} : ${p.w ? mep_e(mep_fq(p.w.q)) + ' ' + mep_e(p.l.u) + ' (' + mep_e(rp_fmtDate(p.w.date)) + ' ' + mep_e(mep_hm(p.w.at)) + (p.w.corr ? ' ✎' : '') + ')' : '—'}`).join('<br>');
+function cx_badge(r){
+  if(r.ecart === null) return '<span class="pt-muted">en attente</span>';
+  const ap = Math.abs(r.pct), col = r.flags.length ? 'var(--amber)' : ap <= 5 ? 'var(--moss)' : ap <= 15 ? 'var(--amber)' : 'var(--rust)';
+  return `<span style="color:${col};font-weight:700;font-family:'IBM Plex Mono',monospace;">${cx_e(cx_fmt(r.ecart, r.ing, true))}</span>`;
 }
-function ct_detailHtml(g, r){
-  const u = ct_achatUnits(g), a = ct_ad_get(g.k);
-  const achatsList = r.inWin.map(x=>`<div class="row-between" style="padding:2px 0;"><span>${mep_e(rp_fmtDate(String(x.at).slice(0, 10)))} ${mep_e(mep_hm(x.at))} · ${mep_e(mep_fq(x.q))} ${mep_e(x.u)}${x.src && x.src !== 'manuel' ? ' · ' + mep_e(x.src) : ''}</span><button class="btn ghost small t-del" onclick="ct_achatDel('${x.id}')" aria-label="Supprimer l’achat">✕</button></div>`).join('');
-  const outside = r.achats.length - r.inWin.length;
-  const form = `<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;"><div class="pt-muted" style="margin-bottom:6px;">Ajouter un achat (date et heure de réception) :</div>
-    <div class="g2"><div><label>Date</label><input type="date" class="ft-in" value="${mep_e(a.d)}" onchange="ct_adSet('${g.k}','d',this.value)"></div><div><label>Heure</label><input type="time" class="ft-in" value="${mep_e(a.t)}" onchange="ct_adSet('${g.k}','t',this.value)"></div></div>
-    <div class="g2" style="margin-top:8px;"><div><label>Quantité</label><input type="text" inputmode="decimal" class="ft-in" placeholder="ex. 10" value="${mep_e(a.q)}" oninput="ct_adSet('${g.k}','q',this.value)"></div><div><label>Unité</label><select class="ft-in" onchange="ct_adSet('${g.k}','u',this.value)">${u.map((x, i)=>`<option value="${i}" ${String(i) === String(a.u) ? 'selected' : ''}>${mep_e(x.u)}</option>`).join('')}</select></div></div>
-    <div class="actions-row"><button class="btn small t-add" onclick="ct_achatAdd('${g.k}')">Ajouter l’achat</button></div></div>`;
-  const pct = r.ecart !== null && r.c.brut > 0 ? ' (' + (Math.round(Math.abs(r.ecart) / r.c.brut * 1000) / 10).toLocaleString('fr-FR') + ' % de la conso)' : '';
-  return `${ct_resRow('Stock d’ouverture', mep_e(ct_fmtG(r.openG)), ct_partsText(r.O) + (r.openDate ? '' : ''))}
-    ${ct_resRow('+ Achats', mep_e(ct_fmtG(r.achG)), achatsList || 'Aucun achat sur la période' + (outside > 0 ? ' · ' + outside + ' hors période' : ''))}
-    ${ct_resRow('− Consommation (plats vendus)', mep_e(ct_fmtG(r.c.brut)), 'grammage net ÷ rendement ' + mep_e(g.rend) + ' %')}
-    ${ct_resRow('= Stock théorique', mep_e((r.theo < 0 ? '−' : '') + ct_fmtG(Math.abs(r.theo))), '', true)}
-    ${ct_resRow('Stock réel (pesé fin de service, total)', r.C.some(p=>p.w) ? mep_e(ct_fmtG(r.closeG)) : '—', ct_partsText(r.C), true)}
-    ${ct_resRow('Écart (réel − théorique)', ct_ecartBadge(r), r.ecart !== null ? 'négatif = il manque du stock, positif = plus de stock que prévu' + pct : 'écart indisponible tant que le pesé de chaque section n’est pas saisi')}
-    ${r.flags.length ? `<div class="rp2-bad" style="margin-top:8px;">${r.flags.map(f=>'⚠ ' + mep_e(f)).join('<br>')}${r.gap ? `<div class="actions-row"><button class="btn small t-edit" onclick="ct_adjustFrom('${pt_addDays(r.openDate, 1)}')">Commencer la période le ${mep_e(rp_fmtDate(pt_addDays(r.openDate, 1)))}</button></div>` : ''}</div>` : '<div class="rp2-ok" style="margin-top:8px;">✓ données complètes : l’écart est exploitable</div>'}
-    ${form}`;
+function cx_detailHtml(r){
+  const ing = r.ing, id = ing.id, m = cx_mode[id] || { k:'reel', q:'' }, a = cx_adj && cx_adj.ing === id ? cx_adj : null;
+  const wtxt = (arr)=>arr.map(p=>`${cx_e(p.l.secName)} · ${cx_e(p.l.n)} : ${p.w ? cx_e(mep_fq(p.w.q)) + ' ' + cx_e(p.l.u) + ' (' + cx_e(cx_fmtD(p.w.ms)) + (p.w.corr ? ' ✎' : '') + ')' : '—'}`).join('<br>');
+  const adjList = r.seg.adjL.map(e=>`<div class="row-between" style="padding:3px 0;"><span>${cx_e(cx_fmtD(cx_ms(e.at)))} · <b>${cx_e(cx_fmt(e.q, ing, true))}</b> · ${cx_e(e.note)}<span class="pt-muted"> — ${cx_e(e.by || '')}${e.modBy ? ' · modifié par ' + cx_e(e.modBy) : ''}</span></span><span style="white-space:nowrap;"><button class="btn ghost small t-edit" onclick="cx_adjOpen('${id}','${e.id}')">✎</button><button class="btn ghost small t-del" onclick="cx_adjDel('${e.id}')">✕</button></span></div>`).join('');
+  const achList = r.seg.achL.map(x=>`${cx_e(cx_fmtD(x.ms))} · ${cx_e(mep_fq(x.q))} ${cx_e(x.u)}${x.montant ? ' · ' + cx_e(cx_n(x.montant)) + ' DA' : ''}${x.noHeure ? ' <i>(heure non saisie)</i>' : ''}<span class="pt-muted"> — ${cx_e(x.who)}</span>`).join('<br>');
+  const modeBar = `<div class="mep-w" style="margin:8px 0 0;">Départ du contrôle :</div><div class="filter-row" style="margin:4px 0 0;flex-wrap:wrap;">
+      <button class="filter-chip ${m.k === 'reel' ? 'active' : ''}" onclick="cx_setMode('${id}','reel')">Pesée réelle</button>
+      <button class="filter-chip ${m.k === 'theo' ? 'active' : ''}" onclick="cx_setMode('${id}','theo')">Théorique (avec l’écart passé)</button>
+      <button class="filter-chip ${m.k === 'qty' ? 'active' : ''}" onclick="cx_setMode('${id}','qty')">Quantité…</button></div>
+    ${m.k === 'qty' ? `<div style="margin-top:6px;"><input type="text" inputmode="decimal" class="ft-in" placeholder="Quantité de départ en ${cx_e(ing.u)}" value="${cx_e(m.q || '')}" oninput="cx_setModeQ('${id}',this.value)" onchange="cx_render()"></div>` : ''}`;
+  const form = a ? `<div class="rp2-ing" style="margin-top:10px;"><div class="section-label">${a.id ? 'Modifier l’ajustement' : 'Nouvel ajustement'} — ${cx_e(ing.n)}</div>
+      <div class="g2"><div><label>Sens</label><select class="ft-in" onchange="cx_adjSet('sign',this.value)"><option value="+" ${a.sign === '+' ? 'selected' : ''}>＋ Ajouter</option><option value="-" ${a.sign === '-' ? 'selected' : ''}>− Déduire</option></select></div>
+      <div><label>Quantité (${cx_e(ing.u)})</label><input type="text" inputmode="decimal" class="ft-in" value="${cx_e(a.q)}" oninput="cx_adjSet('q',this.value)"></div></div>
+      <div style="margin-top:8px;"><label>Date et heure</label><input type="datetime-local" class="ft-in" value="${cx_e(a.at)}" onchange="cx_adjSet('at',this.value)"></div>
+      <div style="margin-top:8px;"><label>Note explicative (obligatoire)</label><input type="text" class="ft-in" placeholder="Ex. perte, don, erreur de pesée…" value="${cx_e(a.note)}" oninput="cx_adjSet('note',this.value)"></div>
+      <div class="actions-row"><button class="btn small t-save" onclick="cx_adjSave()">Enregistrer</button><button class="btn ghost small" onclick="cx_adj=null;cx_render()">Annuler</button></div></div>` : '';
+  const pct = r.ecart !== null && r.pct !== null ? ' (' + (r.pct < 0 ? '−' : '+') + cx_n(Math.abs(r.pct)) + ' %)' : '';
+  const da = r.da !== null && r.price > 0 ? ' · ' + (r.da < 0 ? '−' : '+') + cx_n(Math.abs(r.da)) + ' DA' : '';
+  return `${cx_row('Stock de départ', cx_e(cx_fmt(r.start, ing)), cx_e(r.startNote) + (r.k === 'reel' ? '<br>' + wtxt(r.S) : ''))}
+    ${cx_row('± Ajustements', cx_e(cx_fmt(r.seg.adj, ing, true)), adjList || 'Aucun ajustement dans la fenêtre')}
+    ${cx_row('＋ Achats', cx_e(cx_fmt(r.seg.ach, ing)), achList || 'Aucun achat dans la fenêtre')}
+    ${cx_row('− Utilisé (ventes)', cx_e(cx_fmt(r.seg.used, ing)), 'quantité nette par plat ÷ rendement ' + cx_e(cx_n(r.rend)) + ' %')}
+    ${cx_row('= Théorique', cx_e(cx_fmt(r.theo, ing)), '', true)}
+    ${cx_row('Réel (pesée de fin)', cx_e(cx_fmt(r.real, ing)), wtxt(r.R), true)}
+    ${cx_row('Écart (réel − théorique)', cx_badge(r), r.ecart !== null ? 'négatif = il manque du stock' + cx_e(pct + da) : 'indisponible tant que la pesée de chaque ligne liée n’est pas faite')}
+    ${r.flags.length ? `<div class="rp2-bad" style="margin-top:8px;">${r.flags.map(f=>'⚠ ' + cx_e(f)).join('<br>')}</div>` : ''}
+    ${modeBar}
+    <div class="actions-row"><button class="btn small t-add" onclick="cx_adjOpen('${id}')">± Ajustement</button><button class="btn ghost small" onclick="cx_restartSave('${id}')" title="Garde une trace dans le journal">📌 Noter ce redémarrage</button></div>${form}`;
 }
-function ct_resultsHtml(){
-  const tr = ct_tracked(); if(!tr.length) return '';
-  const sales = ct_sales();
-  const noDetail = ct_days.filter(d=>(d.tickets || []).length && !d.lignes).length;
-  const rows = tr.map(g=>{
-    const r = ct_control(g, sales), def = tr.length === 1, open = ct_openRes[g.k] !== undefined ? ct_openRes[g.k] : def;
-    return `<div class="rp2-ing"><div class="row-between" style="cursor:pointer;" onclick="ct_toggleRes('${g.k}', ${def})"><div><b>${mep_e(g.n)}</b><div class="mep-w">conso estimée ${mep_e(ct_fmtG(r.c.brut))}${r.flags.length ? ' · <span class="rp2-bad">⚠ ' + r.flags.length + '</span>' : ''}</div></div><div style="display:flex;align-items:center;gap:10px;">${ct_ecartBadge(r)}<span class="pt-chevron">${open ? '▾' : '▸'}</span></div></div>${open ? '<div style="margin-top:8px;">' + ct_detailHtml(g, r) + '</div>' : ''}</div>`;
+function cx_ctrlHtml(){
+  const tr = cx_ingList();
+  const win = `<div class="ticket"><div class="section-label">Fenêtre de contrôle</div><div class="grid grid-2"><div class="field"><label>De</label><input type="datetime-local" id="cx-from" value="${cx_e(cx_from)}" onchange="cx_setRange()"></div><div class="field"><label>À ${cx_to ? '' : '(maintenant)'}</label><input type="datetime-local" id="cx-to" value="${cx_e(cx_to)}" onchange="cx_setRange()"></div></div>
+    <div class="filter-row" style="margin-top:10px;margin-bottom:0;flex-wrap:wrap;"><button class="filter-chip" onclick="cx_preset('today')">Jour en cours</button><button class="filter-chip" onclick="cx_preset('yesterday')">Hier</button><button class="filter-chip" onclick="cx_preset('3h')">3 dernières h</button><button class="filter-chip" onclick="cx_preset('7d')">7 jours</button>${cx_to ? '<button class="filter-chip" onclick="cx_nowTo()">Jusqu’à maintenant</button>' : ''}</div>
+    <div class="pt-muted" style="margin-top:8px;">Le jour de contrôle va de 2 h à 2 h. Pour recommencer à 16 h : mets « De » à 16:00 et choisis le départ (pesée réelle, théorique avec l’écart passé, ou quantité).</div></div>`;
+  if(!tr.length) return win + '<div class="ticket"><div class="empty-state">Aucun ingrédient suivi. Va dans l’onglet Réglages pour cocher les ingrédients à contrôler.</div></div>';
+  if(!cx_data) return win + `<div class="ticket"><div class="empty-state">${cx_err ? cx_e(cx_err) : 'Chargement…'}</div></div>`;
+  const [f, t] = cx_setWindow(), res = tr.map(ing=>cx_calc(ing, f, t, cx_mode[ing.id] || { k:'reel', q:'' }, cx_data));
+  const noGram = res.reduce((n, r)=>n + Object.keys(r.seg.missPl).length, 0);
+  const cards = res.map((r)=>{
+    const open = cx_open['ing:' + r.ing.id] !== undefined ? cx_open['ing:' + r.ing.id] : tr.length === 1;
+    return `<div class="rp2-ing"><div class="row-between" style="cursor:pointer;" onclick="cx_toggleIng('${r.ing.id}')"><div><b>${cx_e(r.ing.n)}</b><div class="mep-w">théorique ${cx_e(cx_fmt(r.theo, r.ing))} · réel ${cx_e(cx_fmt(r.real, r.ing))}${r.flags.length ? ' · <span class="rp2-bad">⚠ ' + r.flags.length + '</span>' : ''}</div></div>
+      <div style="display:flex;align-items:center;gap:8px;">${cx_badge(r)}<span class="pt-chevron">${open ? '▾' : '▸'}</span></div></div>${open ? cx_detailHtml(r) : ''}</div>`;
   }).join('');
-  return rows + (noDetail ? `<div class="rp2-bad" style="margin-top:8px;">⚠ ${noDetail} jour${noDetail > 1 ? 's' : ''} de la période sans détail des tickets (disponible depuis le ${mep_e(rp_fmtDate(RP_LIGNES_DEPUIS))}) : consommation sous-évaluée.</div>` : '');
+  return win + `<div class="ticket"><div class="section-label">Contrôle des ingrédients${cx_loading ? ' · mise à jour…' : ''}</div>${cards}${noGram ? `<div class="rp2-bad" style="margin-top:8px;">⚠ ${noGram} plat(s) vendu(s) sans quantité pour un ingrédient suivi : <a href="#" onclick="cx_setTab('reg');return false;">les renseigner</a>.</div>` : ''}</div>`;
 }
-function ct_softRender(){ const el = document.getElementById('ct-results'); if(el) el.innerHTML = ct_resultsHtml(); }
-function ct_view(){
-  if(!ct_ready) return '<div class="empty-state">Chargement…</div>';
-  if(ct_err) return `<div class="alert-banner"><b>Erreur de lecture</b>${mep_e(ct_err)}</div>`;
-  const tr = ct_tracked(), sales = ct_sales();
-  const period = `<div class="ticket"><div class="section-label">Période</div><div class="grid grid-2"><div class="field"><label>Du</label><input type="date" id="ct-from" value="${mep_e(ct_from)}" onchange="ct_setRange()"></div><div class="field"><label>Au</label><input type="date" id="ct-to" value="${mep_e(ct_to)}" onchange="ct_setRange()"></div></div>
-    <div class="filter-row" style="margin-top:10px;margin-bottom:0;"><button class="filter-chip" onclick="ct_preset('today')">Aujourd’hui</button><button class="filter-chip" onclick="ct_preset('yesterday')">Hier</button><button class="filter-chip" onclick="ct_preset('7d')">7 derniers jours</button></div>
-    <div class="pt-muted" style="margin-top:8px;">Ouverture = dernier pesé avant le début de la période ; stock réel = dernier pesé de chaque section dans la période.</div></div>`;
-  if(!tr.length) return period + ct_ingHtml() + '<div class="ticket"><div class="empty-state">Ajoute au moins un ingrédient à suivre pour commencer.</div></div>';
-  return period + ct_ingHtml()
-    + `<div class="ticket"><div class="section-label">Contrôle des stocks</div><div id="ct-results">${ct_resultsHtml()}</div></div>`
-    + ct_platsHtml(tr, sales);
+
+/* ---------- journal ---------- */
+const CX_TYPES = { achat:'Achat', pesee:'Pesée', ajust:'Ajustement', vente:'Ventes', restart:'Redémarrage', snap:'Sauvegarde' };
+function cx_jPreset(k, silent){
+  const now = Date.now(), ds = cx_dayStart(now);
+  if(k === 'today'){ cx_j.from = cx_dt(ds); cx_j.to = ''; }
+  else if(k === 'yesterday'){ const a = new Date(ds); a.setDate(a.getDate() - 1); cx_j.from = cx_dt(a); cx_j.to = cx_dt(ds); }
+  else { const a = new Date(ds); a.setDate(a.getDate() - (k === '30d' ? 29 : 6)); cx_j.from = cx_dt(a); cx_j.to = ''; }
+  cx_j.max = 60; if(!silent){ cx_jLoad(); cx_render(); }
+}
+async function cx_jLoad(){
+  if(!cx_j.from) cx_jPreset('today', true); const f = cx_ms(cx_j.from), t = cx_j.to ? cx_ms(cx_j.to) : Date.now(); cx_j.busy = true; if(activeModule === 'controle') cx_render();
+  try{ const D = await cx_fetch(f, t, 0, 0), s = await cx_jourCol.where('gen', '>=', new Date(f).toISOString()).where('gen', '<=', new Date(t).toISOString()).get(), snaps = []; s.forEach(d=>snaps.push(d.data()));
+    cx_j.data = { D, snaps, f, t }; }catch(e){ console.error(e); cx_j.data = null; alert('Lecture impossible : ' + (e.message || e)); }
+  cx_j.busy = false; if(activeModule === 'controle' && !cx_typing()) cx_render();
+}
+function cx_jSet(){
+  ['from', 'to'].forEach((k)=>{ const el = document.getElementById('cx-j' + k); if(el) cx_j[k] = el.value; });
+  cx_j.max = 60; cx_jLoad();
+}
+function cx_jFilt(k, v){ cx_j[k] = v; cx_j.max = 60; cx_render(); }
+function cx_jRows(){
+  const J = cx_j.data; if(!J) return []; const D = J.D, f = J.f, t = J.t, rows = [], tr = cx_ingList(), nameSet = {}; tr.forEach((i)=>{ nameSet[i.n.trim().toLowerCase()] = i; });
+  D.ach.forEach((a)=>{ const ing = nameSet[a.name.toLowerCase()]; if(!ing || a.ms < f || a.ms > t) return; rows.push({ ms:a.ms, type:'achat', ing:ing.id, ingN:ing.n, txt:`Achat ${mep_fq(a.q)} ${a.u}${a.montant ? ' · ' + cx_n(a.montant) + ' DA' : ''}${a.noHeure ? ' (heure non saisie)' : ''}`, who:a.who }); });
+  tr.forEach((ing)=>cx_lines(ing).forEach((l)=>cx_weighs(l).forEach((w)=>{ if(w.ms < f || w.ms > t) return;
+    rows.push({ ms:w.ms, type:'pesee', ing:ing.id, ingN:ing.n, txt:`Pesée ${l.secName} · ${l.n} : ${mep_fq(w.q)} ${l.u}${l.f ? ' (= ' + cx_fmt(w.q * l.f, ing) + ')' : ''}${w.corr ? ' · corrigée par ' + w.corr : ''}`, who:w.who }); })));
+  D.ev.forEach((e)=>{ const ms = cx_ms(e.at), ing = cx_ingById(e.ing); if(isNaN(ms) || ms < f || ms > t) return;
+    if(e.type === 'ajust') rows.push({ ms, type:'ajust', ing:e.ing, ingN:e.ingN || (ing && ing.n) || '', txt:`Ajustement ${ing ? cx_fmt(e.q, ing, true) : cx_n(e.q)} — ${e.note || ''}${e.modBy ? ' (modifié par ' + e.modBy + ')' : ''}`, who:e.by || '' });
+    else if(e.type === 'restart') rows.push({ ms, type:'restart', ing:e.ing, ingN:e.ingN || '', txt:`Contrôle redémarré à ${cx_fmtD(ms)} — départ : ${e.mode === 'theo' ? 'théorique (avec l’écart passé)' : e.mode === 'qty' ? 'quantité ' + e.qty : 'pesée réelle'}`, who:e.by || '' }); });
+  const per = {}; D.sales.forEach((s)=>{ if(s.ms < f || s.ms > t) return; const o = per[s.key] || (per[s.key] = { name:s.name, key:s.key, q:0, ms:0 }); o.q += s.q; if(s.ms > o.ms) o.ms = s.ms; });
+  Object.keys(per).forEach((k)=>{ const p = per[k], pl = cx_cfg.plats[k], ings = tr.filter(i=>pl && pl.g && pl.g[i.id] !== undefined && pl.g[i.id] !== null);
+    const use = ings.map(i=>cx_fmt(p.q * Number(pl.g[i.id]) / ((Number((cx_cfg.ing[i.id] || {}).rend) || 100) / 100), i)).map((x, n)=>ings[n].n + ' ' + x).join(', ');
+    rows.push({ ms:p.ms, type:'vente', ing:'', ingIds:ings.map(i=>i.id), ingN:ings.map(i=>i.n).join(', '), txt:`${p.name} × ${cx_n(p.q)} (total de la période)${use ? ' — utilisé : ' + use : ' — sans grammage'}`, who:'Resto Pro' }); });
+  J.snaps.forEach((s)=>{ const ms = cx_ms(s.gen); rows.push({ ms, type:'snap', ing:'', ingN:'', txt:`Contrôle du jour ${s.day} enregistré (${s.by || 'auto'})`, who:s.by || 'auto' }); });
+  return rows.sort((a, b)=>b.ms - a.ms);
+}
+function cx_jFiltered(){
+  const q = cx_j.q.trim().toLowerCase(), who = cx_j.who.trim().toLowerCase();
+  return cx_jRows().filter((r)=>(!cx_j.ing || r.ing === cx_j.ing || (r.ingIds && r.ingIds.includes(cx_j.ing))) && (!cx_j.type || r.type === cx_j.type) && (!who || String(r.who).toLowerCase().includes(who)) && (!q || (r.txt + ' ' + r.ingN + ' ' + r.who + ' ' + CX_TYPES[r.type]).toLowerCase().includes(q)));
+}
+function cx_jExport(){
+  const rows = cx_jFiltered(); if(!rows.length){ alert('Rien à exporter.'); return; }
+  const data = rows.map((r)=>{ const d = new Date(r.ms); return { Date:cx_pad(d.getDate()) + '/' + cx_pad(d.getMonth() + 1) + '/' + d.getFullYear(), Heure:cx_pad(d.getHours()) + ':' + cx_pad(d.getMinutes()), Type:CX_TYPES[r.type], 'Ingrédient':r.ingN, 'Détail':r.txt, Personne:r.who }; });
+  const ws = XLSX.utils.json_to_sheet(data), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Journal'); XLSX.writeFile(wb, 'journal_controle_' + todayISO() + '.xlsx');
+}
+function cx_jListHtml(){
+  const rows = cx_jFiltered(), shown = rows.slice(0, cx_j.max);
+  return cx_j.busy ? '<div class="empty-state">Chargement…</div>' : !cx_j.data ? '<div class="empty-state">Aucune donnée.</div>' : !rows.length ? '<div class="empty-state">Aucun événement.</div>'
+    : shown.map(r=>`<div style="padding:8px 0;border-top:1px solid var(--line);"><div class="row-between"><span><b>${cx_e(CX_TYPES[r.type])}</b>${r.ingN ? ' · ' + cx_e(r.ingN) : ''}</span><span class="pt-muted">${cx_e(cx_fmtD(r.ms))}</span></div><div class="mep-w">${cx_e(r.txt)}${r.who ? '<span class="pt-muted"> — ' + cx_e(r.who) + '</span>' : ''}</div></div>`).join('')
+      + (rows.length > shown.length ? `<div class="actions-row"><button class="btn ghost small" onclick="cx_j.max+=60;cx_render()">Afficher plus (${rows.length - shown.length})</button></div>` : '');
+}
+function cx_jQ(v){ cx_j.q = v; cx_j.max = 60; clearTimeout(cx_jT); cx_jT = setTimeout(()=>{ const el = document.getElementById('cx-jlist'); if(el) el.innerHTML = cx_jListHtml(); }, 200); }
+function cx_jourHtml(){
+  const tr = cx_ingList(), rows = cx_jFiltered();
+  const sel = (k, opts, ph)=>`<select class="ft-in" onchange="cx_jFilt('${k}',this.value)"><option value="">${ph}</option>${opts.map(o=>`<option value="${cx_e(o[0])}" ${cx_j[k] === o[0] ? 'selected' : ''}>${cx_e(o[1])}</option>`).join('')}</select>`;
+  const head = `<div class="ticket"><div class="section-label">Journal du contrôle</div>
+    <div class="grid grid-2"><div class="field"><label>De</label><input type="datetime-local" id="cx-jfrom" value="${cx_e(cx_j.from)}" onchange="cx_jSet()"></div><div class="field"><label>À ${cx_j.to ? '' : '(maintenant)'}</label><input type="datetime-local" id="cx-jto" value="${cx_e(cx_j.to)}" onchange="cx_jSet()"></div></div>
+    <div class="filter-row" style="margin:10px 0;"><button class="filter-chip" onclick="cx_jPreset('today')">Jour en cours</button><button class="filter-chip" onclick="cx_jPreset('yesterday')">Hier</button><button class="filter-chip" onclick="cx_jPreset('7d')">7 jours</button><button class="filter-chip" onclick="cx_jPreset('30d')">30 jours</button></div>
+    <input type="search" class="ft-in" id="cx-jq" placeholder="🔍 Rechercher (ingrédient, plat, note, personne…)" value="${cx_e(cx_j.q)}" oninput="cx_jQ(this.value)">
+    <div class="g2" style="margin-top:8px;">${sel('ing', tr.map(i=>[i.id, i.n]), 'Tous les ingrédients')}${sel('type', Object.keys(CX_TYPES).map(k=>[k, CX_TYPES[k]]), 'Tous les types')}</div>
+    <input type="text" class="ft-in" style="margin-top:8px;" placeholder="Personne…" value="${cx_e(cx_j.who)}" onchange="cx_jFilt('who',this.value)">
+    <div class="actions-row"><button class="btn small t-save" onclick="cx_jExport()">⬇ Exporter en Excel (${rows.length})</button></div></div>`;
+  return head + `<div class="ticket" id="cx-jlist">${cx_jListHtml()}</div>`;
+}
+let cx_jT = null;
+
+/* ---------- historique des écarts (sauvegardes quotidiennes) ---------- */
+async function cx_hLoad(){
+  cx_h.busy = true; if(activeModule === 'controle') cx_render();
+  try{ const FP = firebase.firestore.FieldPath.documentId(), d0 = mep_ymd(new Date(Date.now() - 90 * 864e5)), s = await cx_jourCol.where(FP, '>=', d0).get(), rows = []; s.forEach(d=>rows.push(d.data())); cx_h.rows = rows.sort((a, b)=>String(b.day).localeCompare(String(a.day))); }
+  catch(e){ console.error(e); cx_h.rows = []; alert('Lecture impossible : ' + (e.message || e)); }
+  cx_h.busy = false; if(activeModule === 'controle' && !cx_typing()) cx_render();
+}
+function cx_histHtml(){
+  const tr = cx_ingList(), id = cx_h.ing || (tr[0] && tr[0].id) || '', ing = cx_ingById(id), rows = cx_h.rows || [];
+  const yest = new Date(cx_dayStart(Date.now())); yest.setDate(yest.getDate() - 1);
+  const head = `<div class="ticket"><div class="section-label">Historique des écarts</div>
+    <select class="ft-in" onchange="cx_h.ing=this.value;cx_render()">${tr.map(i=>`<option value="${i.id}" ${i.id === id ? 'selected' : ''}>${cx_e(i.n)}</option>`).join('')}</select>
+    <div class="pt-muted" style="margin-top:8px;">Chaque jour de contrôle (2 h → 2 h) est sauvegardé automatiquement à la première ouverture de l’application après 2 h. Un ajustement sur un jour passé remplace la sauvegarde par le nouveau calcul.</div>
+    <div class="g2" style="margin-top:10px;align-items:end;"><div><label>Calculer / recalculer un jour</label><input type="date" id="cx-snapday" class="ft-in" value="${mep_ymd(yest)}"></div><div><button class="btn small t-save" ${cx_h.busy ? 'disabled' : ''} onclick="cx_snapManual()">Calculer et enregistrer</button></div></div></div>`;
+  if(!ing) return head + '<div class="ticket"><div class="empty-state">Aucun ingrédient suivi.</div></div>';
+  const lines = rows.filter(r=>r.items && r.items[id]).map((r)=>{ const x = r.items[id], col = x.ecart === null || x.ecart === undefined ? 'var(--ink-muted)' : Math.abs(x.pct || 0) <= 5 ? 'var(--moss)' : Math.abs(x.pct || 0) <= 15 ? 'var(--amber)' : 'var(--rust)';
+    return `<tr><td>${cx_e(rp_fmtDate(r.day))}</td><td>${cx_e(cx_fmt(x.theo, ing))}</td><td>${cx_e(cx_fmt(x.reel, ing))}</td><td style="color:${col};font-weight:700;">${cx_e(cx_fmt(x.ecart, ing, true))}${x.pct === null || x.pct === undefined ? '' : ' <span style="font-weight:500;">(' + cx_e((x.pct < 0 ? '−' : '+') + cx_n(Math.abs(x.pct))) + ' %)</span>'}</td><td>${x.da === null || x.da === undefined ? '—' : cx_e((x.da < 0 ? '−' : '+') + cx_n(Math.abs(x.da)))}</td><td title="${cx_e((x.flags || []).join(' · '))}">${(x.flags || []).length ? '⚠' : ''}</td></tr>`; }).join('');
+  const body = cx_h.busy || cx_h.rows === null ? '<div class="empty-state">Chargement…</div>' : !lines ? '<div class="empty-state">Aucune sauvegarde pour cet ingrédient.</div>'
+    : `<div class="pt-scroll"><table class="pt-table"><thead><tr><th>Jour</th><th>Théorique</th><th>Réel</th><th>Écart</th><th>DA</th><th></th></tr></thead><tbody>${lines}</tbody></table></div>`;
+  return head + `<div class="ticket">${body}</div>`;
+}
+
+function cx_render(){
+  const el = document.getElementById('cx-body'); if(!el) return;
+  if(!cx_isAdmin()){ el.innerHTML = '<div class="empty-state">Réservé à l’administrateur.</div>'; return; }
+  if(!cx_ready || !cx_dpReady){ el.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
+  const tabs = `<div class="mep-seg">${[['ctrl', 'Contrôle'], ['jour', 'Journal'], ['hist', 'Historique'], ['reg', 'Réglages']].map(t=>`<button class="${cx_tab === t[0] ? 'on' : ''}" onclick="cx_setTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
+  const view = cx_tab === 'reg' ? cx_settingsHtml() : cx_tab === 'jour' ? cx_jourHtml() : cx_tab === 'hist' ? cx_histHtml() : cx_ctrlHtml();
+  el.innerHTML = `<div style="font-weight:700;font-size:18px;margin-bottom:10px;">🎯 Contrôle</div>${tabs}${view}`;
 }
 
 const dt_dettesCol = db.collection('dettes_perso');
