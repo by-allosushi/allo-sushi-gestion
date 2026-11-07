@@ -695,6 +695,25 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
 </div>
 
 <div id="module-controle" class="module">
+  <style>
+    #module-controle .cxz{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0;}
+    #module-controle .cxz h4{margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted);font-weight:700;}
+    #module-controle .cxh,#module-controle .cxr{display:grid;grid-template-columns:1fr 62px 92px 34px;gap:6px;align-items:center;}
+    #module-controle .cxh{font-size:10.5px;color:var(--ink-muted);text-transform:uppercase;padding-bottom:4px;border-bottom:1px solid var(--line);}
+    #module-controle .cxh span:nth-child(n+2){text-align:right;} #module-controle .cxh span:nth-child(2):not(:last-child){text-align:right;}
+    #module-controle .cxr{padding:8px 0;border-top:1px solid var(--line);} #module-controle .cxh + .cxr{border-top:none;}
+    #module-controle .cxr .l{font-weight:600;font-size:14px;} #module-controle .cxr .l small{display:block;font-weight:400;font-size:11.5px;color:var(--ink-muted);}
+    #module-controle .cxr .p{text-align:center;font-size:12px;color:var(--ink-muted);background:rgba(255,255,255,.05);border-radius:6px;padding:3px 0;}
+    #module-controle .cxr .q{text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:13px;}
+    #module-controle .cxr .q.est{font-weight:500;font-style:italic;color:var(--ink-muted);}
+    #module-controle .cxe{width:30px;height:30px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--ink);font-size:13px;cursor:pointer;}
+    #module-controle .cxr .l .cxe{width:24px;height:24px;font-size:11px;margin-left:4px;vertical-align:middle;}
+    #module-controle .cxr.tot{background:rgba(255,255,255,.04);border-radius:8px;padding:8px 6px;border-top:none;margin-top:4px;}
+    #module-controle .sw{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;}
+    #module-controle .sw i{width:34px;height:20px;border-radius:12px;background:var(--moss);position:relative;display:inline-block;}
+    #module-controle .sw i:after{content:'';position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;}
+    #module-controle .sw.off i{background:#555;} #module-controle .sw.off i:after{right:auto;left:2px;}
+  </style>
   <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
     <div id="cx-body"></div>
   </main>
@@ -5363,7 +5382,7 @@ let dp_sortieBtn = null;     // id du bouton de sortie choisi
 let dp_cfgPanel = null;      // liste en cours de réglage : 'concepts' | 'ingredients' | 'livreurs' | 'boutons'
 let dp_fv = {}, dp_skipGrab = false;   // valeurs saisies, conservées quand l'écran est redessiné
 let dp_ptEmp = {};           // employés de la rubrique Pointage (documents pointage_config/employes)
-const DP_FIELDS = ['dp-concept','dp-montant','dp-ing','dp-unite','dp-qty','dp-pu','dp-tot','dp-livreur','dp-note','dp-employe','dp-heure'];
+const DP_FIELDS = ['dp-concept','dp-montant','dp-ing','dp-unite','dp-qty','dp-pu','dp-tot','dp-livreur','dp-note','dp-employe','dp-heure','dp-rep-0','dp-rep-1','dp-rep-2'];
 function dp_grabForm(){ DP_FIELDS.forEach(id=>{ const el = document.getElementById(id); if(el) dp_fv[id] = el.value; }); }
 function dp_fvReset(){ dp_fv = {}; dp_skipGrab = true; }
 function dp_cfgFix(){
@@ -5531,7 +5550,7 @@ function dp_openEditMouv(id){
   if(m.type === 'Achat'){
     dp_formKind = 'sortie'; dp_sortieBtn = (dp_cfg.boutons.find(b=>b.m === 'liste' && b.n === m.bouton) || dp_cfg.boutons.find(b=>b.m === 'achat') || {}).id;
     const q = Number(m.quantite) || 0, tot = Number(m.montant) || 0;
-    Object.assign(fv, { 'dp-ing':m.articleNom || '', 'dp-unite':m.unite || '', 'dp-qty':q ? String(q) : '', 'dp-tot':String(tot), 'dp-pu':q ? String(Math.round(tot / q * 100) / 100) : '', 'dp-note':m.note || '', 'dp-heure':m.heure || (m.creeLe ? (()=>{ const d = new Date(m.creeLe); return isNaN(d) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); })() : '') });
+    Object.assign(fv, { 'dp-ing':m.articleNom || '', 'dp-unite':m.unite || '', 'dp-qty':q ? String(q) : '', 'dp-tot':String(tot), 'dp-pu':q ? String(Math.round(tot / q * 100) / 100) : '', 'dp-note':m.note || '', 'dp-rep-0':'', 'dp-heure':m.heure || (m.creeLe ? (()=>{ const d = new Date(m.creeLe); return isNaN(d) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); })() : '') });
   } else if(m.estAvanceSalaire){
     dp_formKind = 'avance'; Object.assign(fv, { 'dp-employe':m.employeNom || '', 'dp-montant':String(m.montant) });
   } else if(sign > 0){
@@ -5561,7 +5580,11 @@ function dp_achQty(){
 }
 function dp_achPu(){ const q = dp_parseNum(dp_achVal('dp-qty')), pu = dp_achVal('dp-pu'); dp_achSet('dp-tot', (q > 0 && pu) ? dp_r2(q * dp_parseNum(pu)) : ''); }
 function dp_achTot(){ const q = dp_parseNum(dp_achVal('dp-qty')), tot = dp_achVal('dp-tot'); dp_achSet('dp-pu', (q > 0 && tot) ? dp_r2(dp_parseNum(tot) / q) : ''); }
-function dp_ingPick(name){ const un = dp_unitOf(dp_curBtn(), name); const u = document.getElementById('dp-unite'); if(un && u && Array.from(u.options).some(o=>o.value === un)) u.value = un; }
+function dp_repHtml(name){
+  const it = (dp_cfg.ingredients || []).find(i=>i.n === name); if(!it || !it.track || !Array.isArray(it.kit) || it.kit.length < 2) return '';
+  return `<div style="font-size:12px;color:var(--ink-muted);margin-top:10px;">Répartition entre cuisines <i>(facultatif)</i></div><div class="grid grid-2" style="margin-top:4px;">${it.kit.slice(0, 3).map((k, i)=>`<div class="field"><label>dont ${esc(k.n)}</label><input type="text" inputmode="decimal" id="dp-rep-${i}" placeholder="—" value="${esc(dp_fv['dp-rep-' + i] || '')}" /></div>`).join('')}</div>`;
+}
+function dp_ingPick(name){ const un = dp_unitOf(dp_curBtn(), name); const u = document.getElementById('dp-unite'); if(un && u && Array.from(u.options).some(o=>o.value === un)) u.value = un; if(dp_curBtn().m === 'achat'){ dp_grabForm(); const box = document.getElementById('dp-rep-box'); if(box) box.innerHTML = dp_repHtml(name); } }
 
 /* --- formulaire --- */
 function dp_selHtml(id, opts, cur, attrs){
@@ -5597,7 +5620,7 @@ function dp_renderMouvForm(){
           ${fld('Prix unitaire (DA)', `<input type="text" inputmode="decimal" id="dp-pu" placeholder="0" value="${V('dp-pu')}" oninput="dp_achPu()" />`)}
           ${fld('Total (DA)', `<input type="text" inputmode="decimal" id="dp-tot" placeholder="0" value="${V('dp-tot')}" oninput="dp_achTot()" />`)}
           ${fld('Heure d’achat', `<input type="time" id="dp-heure" value="${esc(fv['dp-heure'] || dp_nowHM())}" />`)}
-        </div><div id="dp-ach-hint" style="font-size:12px;color:var(--amber);margin-top:6px;"></div>`;
+        </div><div id="dp-rep-box">${dp_repHtml(fv['dp-ing'] || ingOpts[0])}</div><div id="dp-ach-hint" style="font-size:12px;color:var(--amber);margin-top:6px;"></div>`;
     } else if(cur.m === 'liste'){
       const ch = dp_champs(cur), kid = 'items:' + cur.id, unites = DP_UNITES.slice(); if(fv['dp-unite'] && !unites.includes(fv['dp-unite'])) unites.push(fv['dp-unite']);
       const unit0 = fv['dp-unite'] || dp_unitOf(cur, fv['dp-ing']) || 'unité', withPu = ch.qte && ch.pu;
@@ -5667,7 +5690,10 @@ async function dp_submitMouv(){
       if(!ing){ alert('Choisis un ingrédient dans la liste.'); return; }
       if(!(qty > 0)){ alert('Merci de renseigner une quantité.'); return; }
       if(!(tot > 0)){ alert('Merci de renseigner le prix unitaire ou le total.'); return; }
-      base = { type:'Achat', articleNom:ing, quantite:qty, unite, fournisseur:E.fournisseur || '', montant:Math.round(tot * 100) / 100, bouton:btn.n, heure:V('dp-heure') || dp_nowHM() };
+      const itI = (dp_cfg.ingredients || []).find(i=>i.n === ing), kit = itI && itI.track && Array.isArray(itI.kit) && itI.kit.length >= 2 ? itI.kit.slice(0, 3) : [], repo = {}; let sumR = 0;
+      kit.forEach((k, i)=>{ const v = dp_parseNum(V('dp-rep-' + i)); if(v > 0){ repo[k.id] = v; sumR += v; } });
+      if(sumR > qty + 1e-6){ alert('La répartition entre cuisines dépasse la quantité achetée.'); return; }
+      base = { type:'Achat', articleNom:ing, quantite:qty, unite, fournisseur:E.fournisseur || '', montant:Math.round(tot * 100) / 100, bouton:btn.n, heure:V('dp-heure') || dp_nowHM(), rep:Object.keys(repo).length ? repo : null };
     } else if(btn.m === 'liste'){
       const ch = dp_champs(btn), ing = V('dp-ing'), unite = ch.unite ? V('dp-unite') : '', qty = ch.qte ? dp_parseNum(V('dp-qty')) : 0;
       const tot = dp_parseNum(V('dp-tot')) || (ch.qte && ch.pu ? qty * dp_parseNum(V('dp-pu')) : 0), note = ch.note ? V('dp-note') : '';
@@ -5990,6 +6016,7 @@ const cx_cfgRef = db.collection('mise_en_place').doc('controle2');
 const cx_evCol = db.collection('controle_events');
 const cx_jourCol = db.collection('controle_jours');
 let cx_cfg = { ing:{}, plats:{}, snapFrom:'' }, cx_ready = false, cx_started = false, cx_dpReady = false, cx_err = '';
+let cx_form = null, cx_byK = {}, cx_pk = {}, cx_kitBusy = false;
 let cx_menu = false, cx_perOpen = false, cx_rst = { open:false, at:'', ing:'', k:'reel', q:'' }, cx_res = {}, cx_pq = '';
 let cx_tab = 'ctrl', cx_from = '', cx_to = '', cx_mode = {}, cx_data = null, cx_loading = false, cx_tok = 0, cx_open = {}, cx_adj = null, cx_snapRun = false;
 let cx_j = { from:'', to:'', ing:'', type:'', who:'', q:'', max:60, data:null, busy:false };
@@ -6058,7 +6085,7 @@ async function cx_fetch(f, t, lookDays, priceDays){
   const ach = [], sales = [], ev = [], lo = f - lb * 864e5;
   a.forEach((d)=>{ const m = d.data(); if(!m || m.type !== 'Achat' || m.statut === 'annule' || (m.bouton && m.bouton !== btnName)) return;
     const hm = m.heure || (m.creeLe ? cx_pad(new Date(m.creeLe).getHours()) + ':' + cx_pad(new Date(m.creeLe).getMinutes()) : '12:00'), ms = cx_ms(m.date + 'T' + hm);
-    if(isNaN(ms)) return; ach.push({ id:d.id, ms, name:String(m.articleNom || '').trim(), q:Number(m.quantite) || 0, u:m.unite || '', montant:Number(m.montant) || 0, who:m.creePar || '', heure:hm, noHeure:!m.heure }); });
+    if(isNaN(ms)) return; ach.push({ id:d.id, ms, name:String(m.articleNom || '').trim(), q:Number(m.quantite) || 0, u:m.unite || '', montant:Number(m.montant) || 0, who:m.creePar || '', heure:hm, noHeure:!m.heure, rep:(m.rep && typeof m.rep === 'object') ? m.rep : null }); });
   b.forEach((d)=>{ const day = d.data() || {}; (day.tickets || []).forEach((tk)=>{
     const h = String(tk.h || '').slice(0, 5); if(!/^\d\d:\d\d$/.test(h)) return;
     let dt = tk.date || d.id; if(!tk.date && h < '06:00'){ const x = new Date(d.id + 'T00:00'); x.setDate(x.getDate() + 1); dt = mep_ymd(x); }
@@ -6098,14 +6125,14 @@ function cx_lines(ing){
   mep_secList().forEach((sc)=>(mep_lists[sc.id] || []).forEach((l)=>{
     if(m[l.id] === undefined || m[l.id] === null) return;
     const v = Number(m[l.id]), a = cx_fam(l.u), f = v > 0 ? v : (a.b === fb ? a.f : 0);
-    out.push({ id:l.id, sec:sc.id, secName:sc.n, n:l.n, u:l.u || '', f, auto:!(v > 0) });
+    out.push({ id:l.id, sec:sc.id, secName:sc.n, n:l.n, u:l.u || '', f, auto:!(v > 0), role:(((cx_cfg.ing[ing.id] || {}).roles || {})[l.id] === 'perte') ? 'perte' : 'stock' });
   }));
   return out;
 }
 function cx_weighs(l){
   const out = [];
   mep_saisies.forEach((x)=>{ if(x.section !== l.sec) return; const it = (x.items || []).find(i=>i.id === l.id); if(!it || !mep_counts(x, l.id)) return;
-    const ms = new Date(mep_shownAt(x)).getTime(); if(isNaN(ms)) return; out.push({ ms, q:Number(it.q) || 0, who:x.name || '', corr:x.correctedBy || '', rec:String(x.at || '') }); });
+    const ms = new Date(mep_shownAt(x)).getTime(); if(isNaN(ms)) return; out.push({ ms, q:Number(it.q) || 0, who:x.name || '', corr:x.correctedBy || '', rec:String(x.at || ''), sid:x.id, iid:it.id }); });
   return out.sort((a, b)=>a.ms - b.ms || a.rec.localeCompare(b.rec));
 }
 const cx_lastW = (ws, lo, hi)=>{ let b = null; ws.forEach((w)=>{ if(w.ms > lo && w.ms <= hi) b = w; }); return b; };
@@ -6122,13 +6149,26 @@ function cx_histAdd(pl, ingId, q, from){
   const h = base.filter(x=>x.from !== from); h.push({ from, q }); return h.sort((a, b)=>a.from.localeCompare(b.from));
 }
 /* ajustements, achats et consommation sur ]lo, hi] */
-function cx_seg(ing, D, lo, hi, rend){
-  const adjL = [], achL = []; let adj = 0, ach = 0, bad = 0, used = 0, miss = 0; const missPl = {}, nm = ing.n.trim().toLowerCase();
+function cx_cc(ing){ const c = cx_cfg.ing[ing.id] || {}; return { rend:Number(c.rend) > 0 ? Number(c.rend) : 100, cuis:Number(c.cuis) > 0 ? Number(c.cuis) : 100 }; }
+const cx_fixOf = (D, pid)=>D.ev.find(e=>e.type === 'achatfix' && e.pid === pid) || null;
+function cx_kits(ing){ const out = [], seen = {}; cx_lines(ing).forEach((l)=>{ if(!seen[l.sec]){ seen[l.sec] = 1; out.push({ id:l.sec, n:l.secName }); } }); return out; }
+/* ajustements (anciens), achats (× taux d'achat), consommation (quantité servie × taux de cuisson) sur ]lo, hi] */
+function cx_seg(ing, D, lo, hi){
+  const { rend, cuis } = cx_cc(ing), nm = ing.n.trim().toLowerCase(), adjL = [], achL = [], usedK = {}, missPl = {}; let adj = 0, ach = 0, bad = 0, used = 0, miss = 0;
   D.ev.forEach((e)=>{ if(e.type !== 'ajust' || e.ing !== ing.id) return; const m = cx_ms(e.at); if(m > lo && m <= hi){ adj += Number(e.q) || 0; adjL.push(e); } });
-  D.ach.forEach((a)=>{ if(a.name.toLowerCase() !== nm || !(a.ms > lo && a.ms <= hi)) return; const v = cx_toBase(a.q, a.u, ing); if(v === null) bad++; else { ach += v; achL.push(Object.assign({ base:v }, a)); } });
-  D.sales.forEach((s)=>{ if(!(s.ms > lo && s.ms <= hi)) return; const gq = cx_gram(s.key, ing.id, s.ms); if(gq !== null) used += s.q * gq; else { miss += s.q; missPl[s.key] = s.name; } });
+  D.ach.forEach((a)=>{ if(a.name.toLowerCase() !== nm || !(a.ms > lo && a.ms <= hi)) return;
+    const fx = cx_fixOf(D, a.id), q = fx && fx.q !== undefined && fx.q !== null ? Number(fx.q) : a.q, rp = fx && fx.rep ? fx.rep : a.rep, v = cx_toBase(q, a.u, ing);
+    if(v === null){ bad++; return; } const base = v * rend / 100; ach += base;
+    achL.push(Object.assign({}, a, { q, origQ:a.q, base, rep:rp || null, fix:fx, fixed:!!fx, changed:!!(fx && Number(fx.seen) !== a.q) })); });
+  D.sales.forEach((s)=>{ if(!(s.ms > lo && s.ms <= hi)) return; const gq = cx_gram(s.key, ing.id, s.ms); if(gq === null){ miss += s.q; missPl[s.key] = s.name; return; }
+    const u = s.q * gq * cuis / 100; used += u; const pl = cx_cfg.plats[s.key], k = (pl && pl.k) || ''; usedK[k] = (usedK[k] || 0) + u; });
   adjL.sort((a, b)=>cx_ms(a.at) - cx_ms(b.at)); achL.sort((a, b)=>a.ms - b.ms);
-  return { adj, ach, used:used / (rend / 100), bad, miss, missPl, adjL, achL };
+  return { adj, ach, used, usedK, bad, miss, missPl, adjL, achL };
+}
+/* perte cuite : dernière pesée de chaque ligne « perte » pour chaque jour de contrôle de la fenêtre */
+function cx_perteRows(lines, lo, hi, cuis){
+  const per = {}; lines.forEach((l)=>cx_weighs(l).forEach((w)=>{ if(w.ms > lo && w.ms <= hi){ const key = l.id + '|' + mep_ymd(cx_dayStart(w.ms)); if(!per[key] || w.ms >= per[key].w.ms) per[key] = { l, w }; } }));
+  return Object.keys(per).map((k)=>{ const x = per[k]; return { l:x.l, w:x.w, raw:x.w.q * x.l.f, v:x.w.q * x.l.f * cuis / 100 }; }).sort((a, b)=>a.w.ms - b.w.ms);
 }
 function cx_price(ing, D, t){
   const nm = ing.n.trim().toLowerCase(); let list = D.ach.filter(a=>a.name.toLowerCase() === nm && a.ms <= t && a.montant > 0).map(a=>({ ms:a.ms, p:a.montant / (cx_toBase(a.q, a.u, ing) || NaN) })).filter(x=>isFinite(x.p) && x.p > 0).sort((a, b)=>b.ms - a.ms);
@@ -6136,43 +6176,60 @@ function cx_price(ing, D, t){
 }
 /* calcul complet d'un ingrédient sur [f, t] ; mode : {k:'reel'|'theo'|'qty', q} */
 function cx_calc(ing, f, t, mode, D){
-  const c = cx_cfg.ing[ing.id] || {}, rend = Number(c.rend) > 0 ? Number(c.rend) : 100, lines = cx_lines(ing), flags = [], k = (mode && mode.k) || 'reel';
-  const W = lines.map((l)=>({ l, ws:cx_weighs(l) }));
-  if(!lines.length) flags.push('aucune ligne de Mise en place liée (onglet Réglages)');
+  const { rend, cuis } = cx_cc(ing), lines = cx_lines(ing), stockL = lines.filter(l=>l.role === 'stock'), perteL = lines.filter(l=>l.role === 'perte'), kits = cx_kits(ing), flags = [], k = (mode && mode.k) || 'reel';
+  const W = stockL.map((l)=>({ l, ws:cx_weighs(l) }));
+  if(!stockL.length) flags.push('aucune ligne de Mise en place liée (⋯ › Réglages)');
   if(lines.some(l=>!l.f)) flags.push('équivalence manquante pour : ' + lines.filter(l=>!l.f).map(l=>l.secName + ' · ' + l.n).join(', '));
   const S = W.map((p)=>({ l:p.l, w:cx_lastW(p.ws, f - 3 * 864e5, f) }));
   const sumW = (a)=>a.reduce((s, p)=>s + (p.w ? p.w.q * p.l.f : 0), 0);
   const startW = sumW(S), TwMax = S.reduce((m, p)=>p.w && p.w.ms > m ? p.w.ms : m, 0);
-  let start = startW, startNote = '', segPrev = null;
+  let start = startW, startNote = '';
   if(k === 'qty'){ start = (ft_parseQ((mode && mode.q) || '') || 0) * cx_fam(ing.u).f; startNote = 'quantité saisie'; }
   else {
     const miss = S.filter(p=>!p.w);
-    if(lines.length && miss.length === lines.length) flags.push('aucune pesée récente avant le début (compté 0)');
+    if(stockL.length && miss.length === stockL.length) flags.push('aucune pesée récente avant le début (compté 0)');
     else if(miss.length) flags.push('pas de pesée de départ : ' + miss.map(p=>p.l.secName).join(', ') + ' (compté 0)');
     if(TwMax && f - TwMax > 36e5 * 14) flags.push('la dernière pesée de départ date du ' + cx_fmtD(TwMax));
-    if(k === 'theo' && TwMax){ segPrev = cx_seg(ing, D, TwMax, f, rend); start = startW + segPrev.adj + segPrev.ach - segPrev.used; startNote = 'théorique reporté depuis la pesée du ' + cx_fmtD(TwMax) + ' (écart passé conservé)'; }
+    if(k === 'theo' && TwMax){ const sp = cx_seg(ing, D, TwMax, f); start = startW + sp.adj + sp.ach - sp.used; startNote = 'théorique reporté depuis la pesée du ' + cx_fmtD(TwMax) + ' (écart passé conservé)'; }
     else startNote = TwMax ? 'pesée du ' + cx_fmtD(TwMax) : '';
   }
   const startCalc = start;
   const startEv = D.ev.find(e=>e.type === 'start' && e.ing === ing.id && cx_ms(e.at) === f) || null, startState = !startEv ? 'none' : (startEv.corrected ? 'corrige' : 'valide');
   if(startEv) start = Number(startEv.q) || 0;
-  const seg = cx_seg(ing, D, f, t, rend);
-  const theo = start + seg.adj + seg.ach - seg.used;
-  const R = W.map((p)=>({ l:p.l, w:cx_lastW(p.ws, f, t) })), have = R.filter(p=>p.w), real = have.length ? sumW(R) : null;
-  const missR = R.filter(p=>!p.w);
+  const seg = cx_seg(ing, D, f, t), PR = cx_perteRows(perteL, f, t, cuis), perte = PR.reduce((s, x)=>s + x.v, 0);
+  const theo = start + seg.adj + seg.ach - seg.used - perte;
+  const R = W.map((p)=>({ l:p.l, w:cx_lastW(p.ws, f, t) })), have = R.filter(p=>p.w), real = have.length ? sumW(R) : null, missR = R.filter(p=>!p.w);
   if(missR.length && have.length) flags.push('pesée de fin manquante : ' + missR.map(p=>p.l.secName + ' · ' + p.l.n).join(', '));
   const ecart = (real !== null && !missR.length) ? real - theo : null, den = seg.used > 0 ? seg.used : (Math.abs(theo) || 1);
   const pct = ecart === null ? null : ecart / den * 100, price = cx_price(ing, D, t), da = ecart === null ? null : ecart * price;
-  if(seg.miss) flags.push(Object.keys(seg.missPl).length + ' plat(s) vendu(s) sans grammage (' + cx_n(seg.miss) + ' portions non comptées)');
+  if(seg.miss) flags.push(Object.keys(seg.missPl).length + ' plat(s) vendu(s) sans quantité (' + cx_n(seg.miss) + ' portions non comptées)');
   if(seg.bad) flags.push(seg.bad + ' achat(s) dans une unité incompatible avec ' + ing.u);
+  if(kits.length >= 2 && seg.usedK['']) flags.push('des plats vendus n’ont pas de cuisine (« À définir ») : écart par cuisine incomplet');
   if(D.noDetail && D.noDetail.length) flags.push('jour(s) sans détail des tickets : ' + D.noDetail.join(', '));
-  return { ing, f, t, rend, lines, start, startCalc, startEv, startState, startW, startNote, seg, theo, real, R, S, ecart, pct, price, da, flags, k };
+  /* par cuisine : l'achat est global, réparti selon la déclaration du gérant, sinon d'après l'utilisation (estimé) */
+  const perteK = {}; PR.forEach((x)=>{ perteK[x.l.sec] = (perteK[x.l.sec] || 0) + x.v; });
+  const w8 = kits.map(kt=>(seg.usedK[kt.id] || 0) + (perteK[kt.id] || 0)), w8s = w8.reduce((a, b)=>a + b, 0), achK = {}; kits.forEach((kt)=>{ achK[kt.id] = 0; });
+  const achRows = seg.achL.map((a)=>{
+    const al = {}; kits.forEach((kt)=>{ al[kt.id] = 0; }); let decl = 0;
+    if(a.rep) Object.keys(a.rep).forEach((sec)=>{ const qv = Number(a.rep[sec]) || 0; if(qv > 0 && al[sec] !== undefined){ const b = (cx_toBase(qv, a.u, ing) || 0) * rend / 100; al[sec] += b; decl += b; } });
+    const rest = Math.max(0, a.base - decl), est = rest > 0.5 && kits.length >= 2;
+    if(est) kits.forEach((kt, i)=>{ al[kt.id] += rest * (w8s > 0 ? w8[i] / w8s : 1 / kits.length); });
+    kits.forEach((kt)=>{ achK[kt.id] += al[kt.id]; });
+    return Object.assign({}, a, { alloc:al, est });
+  });
+  const K = kits.map((kt)=>{
+    const sl = S.filter(p=>p.l.sec === kt.id), rl = R.filter(p=>p.l.sec === kt.id), sw = sumW(sl), sc = startW > 0 ? start / startW : null;
+    const sK = sc !== null ? sw * sc : (kits.length ? start / kits.length : 0), uK = seg.usedK[kt.id] || 0, pK = perteK[kt.id] || 0, th = sK + achK[kt.id] - uK - pK;
+    const rK = rl.length && rl.every(p=>p.w) ? sumW(rl) : null;
+    return { id:kt.id, n:kt.n, start:sK, ach:achK[kt.id], used:uK, perte:pK, theo:th, real:rK, ecart:rK === null ? null : rK - th, est:achRows.some(a=>a.est) };
+  });
+  return { ing, f, t, rend, cuis, lines, start, startCalc, startEv, startState, startW, startNote, seg, perte, PR, theo, real, R, S, ecart, pct, price, da, flags, k, K, achRows };
 }
 function cx_pack(r){
   const rd = (v)=>v === null || v === undefined || isNaN(v) ? null : Math.round(v * 100) / 100;
-  return { n:r.ing.n, u:r.ing.u, start:rd(r.start), adj:rd(r.seg.adj), ach:rd(r.seg.ach), used:rd(r.seg.used), theo:rd(r.theo), reel:rd(r.real), ecart:rd(r.ecart), pct:rd(r.pct), da:rd(r.da), startState:r.startState, flags:r.flags };
+  return { n:r.ing.n, u:r.ing.u, start:rd(r.start), adj:rd(r.seg.adj), ach:rd(r.seg.ach), used:rd(r.seg.used), perte:rd(r.perte), theo:rd(r.theo), reel:rd(r.real), ecart:rd(r.ecart), pct:rd(r.pct), da:rd(r.da), startState:r.startState, flags:r.flags,
+    k:r.K.map(x=>({ n:x.n, theo:rd(x.theo), reel:rd(x.real), ecart:rd(x.ecart) })) };
 }
-
 /* ---------- sauvegarde automatique du jour de contrôle ---------- */
 async function cx_snapDay(dayKey, by){
   const [f, t] = cx_dayWindow(dayKey), D = await cx_fetch(f, t), items = {};
@@ -6217,8 +6274,17 @@ function cx_track(id, on){
   dp_cfgTrack(id, on); cx_render();
 }
 async function cx_rend(id, v){
-  const n = ft_parseQ(v); if(n === null || !(n > 0) || n > 100){ alert('Rendement : un nombre entre 1 et 100 (%).'); cx_render(); return; }
+  const n = ft_parseQ(v); if(n === null || !(n > 0) || n > 100){ alert('Taux d’achat : un nombre entre 1 et 100 (%).'); cx_render(); return; }
   await cx_ingPatch(id, { rend:n }); cx_reload(); cx_render();
+}
+async function cx_cuis(id, v){
+  const n = ft_parseQ(v); if(n === null || !(n >= 50) || n > 500){ alert('Taux de cuisson : un nombre entre 50 et 500 (%), par exemple 130.'); cx_render(); return; }
+  await cx_ingPatch(id, { cuis:n }); cx_reload(); cx_render();
+}
+async function cx_lineRole(id, lineId, v){
+  const c = cx_cfg.ing[id] || {}, roles = Object.assign({}, c.roles); if(v === 'perte') roles[lineId] = 'perte'; else delete roles[lineId]; cx_cfg.ing[id] = Object.assign({}, c, { roles });
+  try{ await cx_cfgRef.set({ ing:{ [id]:{ roles:{ [lineId]:v === 'perte' ? 'perte' : PT_DEL() } } } }, { merge:true }); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+  cx_reload(); cx_render();
 }
 async function cx_link(id, lineId){
   if(!lineId) return; const c = cx_cfg.ing[id] || {}; const map = Object.assign({}, c.map, { [lineId]:0 });
@@ -6255,9 +6321,12 @@ async function cx_savePlat(key, edit){
     if(v === null || v < 0){ alert('Quantité non valide pour « ' + i.n + ' » : « ' + raw + ' ».'); bad = true; return; }
     if(edit && cx_hasGram(key, i.id) && Number(cur.g[i.id]) === v) return;
     const hh = cx_histAdd(cur, i.id, v, from); pl.h[i.id] = hh; pl.g[i.id] = hh[hh.length - 1].q; g[i.id] = pl.g[i.id]; h[i.id] = hh; n++; });
-  if(bad) return; if(!n){ if(!edit) alert('Saisis au moins une quantité (0 si le plat n’en contient pas).'); return; }
-  cx_cfg.plats[key] = pl;
-  try{ await cx_cfgRef.set({ plats:{ [key]:{ name, g, h } } }, { merge:true }); if(typeof pt_toast === 'function') pt_toast('Enregistré : ' + name + (edit ? ' (à partir du ' + rp_fmtDate(from) + ')' : '')); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  if(bad) return;
+  const multi = cx_allKits().length >= 2, kSel = cx_pk[key] !== undefined ? cx_pk[key] : (cur.k || ''), kChanged = multi && kSel !== (cur.k || '');
+  if(multi && !kSel){ alert('Choisis la cuisine où ce plat est préparé.'); return; }
+  if(!n && !kChanged){ if(!edit) alert('Saisis au moins une quantité (0 si le plat n’en contient pas).'); return; }
+  if(multi) pl.k = kSel; cx_cfg.plats[key] = pl;
+  try{ await cx_cfgRef.set({ plats:{ [key]:Object.assign({ name, g, h }, multi ? { k:kSel } : {}) } }, { merge:true }); if(typeof pt_toast === 'function') pt_toast('Enregistré : ' + name + (edit ? ' (à partir du ' + rp_fmtDate(from) + ')' : '')); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
   cx_reload(); cx_render();
 }
 function cx_none(key){ cx_ingList().forEach((i)=>{ const el = document.getElementById('cx-g-' + key + '-' + i.id); if(el && !cx_hasGram(key, i.id)) el.value = '0'; }); cx_savePlat(key, false); }
@@ -6265,18 +6334,25 @@ function cx_copy(key, src){
   const pl = cx_cfg.plats[src]; if(!pl) return;
   cx_ingList().forEach((i)=>{ const el = document.getElementById('cx-g-' + key + '-' + i.id); if(el && !cx_hasGram(key, i.id) && pl.g && pl.g[i.id] !== undefined && pl.g[i.id] !== null) el.value = String(pl.g[i.id]).replace('.', ','); });
 }
+function cx_allKits(){ const out = [], seen = {}; cx_ingList().forEach((i)=>cx_kits(i).forEach((k)=>{ if(!seen[k.id]){ seen[k.id] = 1; out.push(k); } })); return out; }
+function cx_pkSet(key, sec){ cx_pk[key] = sec; cx_render(); }
 function cx_todoList(){
-  const tr = cx_ingList(); return cx_salesTotals().map(s=>({ s, miss:tr.filter(i=>!cx_hasGram(s.key, i.id)) })).filter(x=>x.miss.length);
+  const tr = cx_ingList(), multi = cx_allKits().length >= 2;
+  return cx_salesTotals().map(s=>({ s, miss:tr.filter(i=>!cx_hasGram(s.key, i.id)), needK:multi && !(cx_cfg.plats[s.key] && cx_cfg.plats[s.key].k) })).filter(x=>x.miss.length || x.needK);
+}
+function cx_kChips(key, cur){
+  const ks = cx_allKits(); if(ks.length < 2) return '';
+  return `<div class="mep-w" style="margin-top:8px;">Cuisine où le plat est préparé</div><div class="filter-row" style="margin:4px 0;flex-wrap:wrap;">${ks.map(k=>`<button class="filter-chip ${cur === k.id ? 'active' : ''}" onclick="cx_pkSet('${key}','${k.id}')">${cx_e(k.n)}</button>`).join('')}</div>`;
 }
 function cx_todoHtml(){
   const todo = cx_todoList(); if(!todo.length) return '';
   const defined = Object.keys(cx_cfg.plats).map(k=>({ k, n:cx_cfg.plats[k].name || k })).sort((a, b)=>String(a.n).localeCompare(String(b.n), 'fr')), open = !cx_open.todoOff, all = !!cx_open.todoAll, shown = all ? todo : todo.slice(0, 4);
-  const cards = open ? shown.map(x=>`<div class="rp2-ing"><div class="row-between"><b>${cx_e(x.s.name)}</b><span class="pt-muted">vendu × ${cx_e(cx_n(x.s.q))}</span></div>${x.miss.map(i=>cx_inputRow(x.s.key, i)).join('')}
+  const cards = open ? shown.map(x=>`<div class="rp2-ing"><div class="row-between"><b>${cx_e(x.s.name)}</b><span class="pt-muted">vendu × ${cx_e(cx_n(x.s.q))}</span></div>${cx_kChips(x.s.key, cx_pk[x.s.key] !== undefined ? cx_pk[x.s.key] : ((cx_cfg.plats[x.s.key] || {}).k || ''))}${x.miss.map(i=>cx_inputRow(x.s.key, i)).join('')}
       <div style="margin-top:8px;">${defined.length ? `<select class="ft-in" onchange="if(this.value){ cx_copy('${x.s.key}',this.value); this.value=''; }"><option value="">Même chose que… (copier un plat)</option>${defined.map(d=>`<option value="${d.k}">${cx_e(d.n)}</option>`).join('')}</select>` : ''}</div>
       <div class="actions-row"><button class="btn small t-save" onclick="cx_savePlat('${x.s.key}',false)">Valider</button><button class="btn ghost small" onclick="cx_none('${x.s.key}')">Aucun ingrédient suivi</button></div></div>`).join('')
     + (todo.length > shown.length ? `<div class="actions-row"><button class="btn ghost small" onclick="cx_open.todoAll=true;cx_render()">Voir les ${todo.length - shown.length} autres</button></div>` : '') : '';
   return `<div class="ticket" style="border-color:var(--amber);"><div class="row-between" style="cursor:pointer;" onclick="cx_togTodo()"><div class="section-label" style="margin:0;color:var(--amber);">À définir (${todo.length} plat${todo.length > 1 ? 's' : ''})</div><span class="pt-chevron">${open ? '▾' : '▸'}</span></div>
-    ${open ? '<div class="pt-muted" style="margin:6px 0 8px;">Quantité <b>nette</b> de l’ingrédient dans une portion (poids cru, comme acheté). Mets 0 si le plat n’en contient pas.</div>' + cards : ''}</div>`;
+    ${open ? '<div class="pt-muted" style="margin:6px 0 8px;">Quantité <b>nette servie (cuite)</b> par portion. Mets 0 si le plat n’en contient pas.</div>' + cards : ''}</div>`;
 }
 function cx_platsHtml(){
   const tr = cx_ingList(); if(!tr.length) return '';
@@ -6289,8 +6365,8 @@ function cx_plistHtml(){
   const list = Object.keys(cx_cfg.plats).map(k=>({ k, pl:cx_cfg.plats[k] })).filter(x=>(!q || String(x.pl.name).toLowerCase().includes(q)) && tr.some(i=>cx_hasGram(x.k, i.id))).sort((a, b)=>String(a.pl.name).localeCompare(String(b.pl.name), 'fr'));
   if(!list.length) return '<div class="pt-muted">Aucun plat défini.</div>';
   return list.slice(0, 30).map((x)=>{
-    const open = !!cx_open['pl:' + x.k], sum = tr.filter(i=>cx_hasGram(x.k, i.id)).map(i=>i.n + ' ' + cx_n(x.pl.g[i.id]) + ' ' + cx_baseLbl(i)).join(' · ');
-    const body = open ? tr.map(i=>{ const hh = (x.pl.h && x.pl.h[i.id]) || [];
+    const open = !!cx_open['pl:' + x.k], kn = (cx_allKits().find(k=>k.id === x.pl.k) || {}).n, sum = (kn ? kn + ' · ' : '') + tr.filter(i=>cx_hasGram(x.k, i.id)).map(i=>i.n + ' ' + cx_n(x.pl.g[i.id]) + ' ' + cx_baseLbl(i)).join(' · ');
+    const body = open ? cx_kChips(x.k, cx_pk[x.k] !== undefined ? cx_pk[x.k] : (x.pl.k || '')) + tr.map(i=>{ const hh = (x.pl.h && x.pl.h[i.id]) || [];
         return cx_inputRow(x.k, i, cx_hasGram(x.k, i.id) ? String(x.pl.g[i.id]).replace('.', ',') : undefined) + (hh.length > 1 ? `<div class="mep-w">${hh.map(e=>(e.from === '0000-00-00' ? 'depuis toujours' : 'à partir du ' + rp_fmtDate(e.from)) + ' : ' + cx_n(e.q)).join(' → ')}</div>` : ''); }).join('')
       + `<div class="g2" style="margin-top:8px;align-items:end;"><div><label>Nouveau grammage à partir du</label><input type="date" class="ft-in" id="cx-gfrom-${x.k}" value="${todayISO()}"></div><div><button class="btn small t-save" onclick="cx_savePlat('${x.k}',true)">Appliquer</button></div></div>` : '';
     return `<div class="rp2-ing"><div class="row-between" style="cursor:pointer;" onclick="cx_open['pl:${x.k}']=!cx_open['pl:${x.k}'];cx_render()"><div><b>${cx_e(x.pl.name)}</b><div class="mep-w">${cx_e(sum)}</div></div><span class="pt-chevron">${open ? '▾' : '▸'}</span></div>${body}</div>`; }).join('') + (list.length > 30 ? '<div class="pt-muted">Affine la recherche pour voir les autres.</div>' : '');
@@ -6302,7 +6378,7 @@ function cx_salesTotals(){
   return Object.keys(map).map(k=>map[k]).sort((a, b)=>b.q - a.q || a.name.localeCompare(b.name, 'fr'));
 }
 function cx_inputRow(key, i, val){
-  return `<div class="g2" style="margin-top:8px;align-items:end;"><div><label>${cx_e(i.n)} — ${cx_e(cx_baseLbl(i))} net par plat</label><input type="text" inputmode="decimal" class="ft-in" id="cx-g-${key}-${i.id}" placeholder="${cx_e(cx_baseLbl(i))}" value="${cx_e(val === undefined ? '' : val)}"></div>
+  return `<div class="g2" style="margin-top:8px;align-items:end;"><div><label>${cx_e(i.n)} — ${cx_e(cx_baseLbl(i))} servi (cuit) par plat</label><input type="text" inputmode="decimal" class="ft-in" id="cx-g-${key}-${i.id}" placeholder="${cx_e(cx_baseLbl(i))}" value="${cx_e(val === undefined ? '' : val)}"></div>
     <div><button type="button" class="btn ghost small t-cancel" onclick="cx_zero('${key}','${i.id}')">∅ n’en contient pas</button></div></div>`;
 }
 function cx_settingsHtml(){
@@ -6314,15 +6390,15 @@ function cx_settingsHtml(){
     if(on && open){
       const linkedIds = new Set(lines.map(l=>l.id)), free = [];
       mep_secList().forEach((sc)=>(mep_lists[sc.id] || []).forEach((l)=>{ if(!linkedIds.has(l.id)) free.push({ l, sc }); }));
-      det = `<div style="margin-top:8px;"><label>Rendement (%) — part utilisable après découpe (ex. 1 kg acheté → 950 g utilisables = 95)</label><input type="text" inputmode="decimal" class="ft-in" placeholder="100" value="${cx_e(c.rend || '')}" onchange="cx_rend('${ing.id}',this.value)"></div>
-        <div class="pt-muted" style="margin-top:10px;">Lignes de Mise en place pesées (le stock = somme des poids, brut, mariné ou cuit, sans distinction) :</div>
-        ${lines.map(l=>`<div class="g2" style="margin-top:6px;align-items:end;"><div><label>${cx_e(l.secName)} · ${cx_e(l.n)} (${cx_e(l.u || 'unité')})</label>${l.auto && l.f ? '' : `<input type="text" inputmode="decimal" class="ft-in" placeholder="1 ${cx_e(l.u || 'unité')} = … ${cx_e(cx_baseLbl(ing))}" value="${l.auto ? '' : cx_e(l.f)}" onchange="cx_lineF('${ing.id}','${l.id}',this.value)">`}</div><div><button class="btn ghost small t-del" onclick="cx_unlink('${ing.id}','${l.id}')">Délier</button></div></div>`).join('') || '<div class="pt-muted">Aucune ligne liée.</div>'}
+      det = `<div style="margin-top:8px;"><div class="g2"><div><label>Taux d’achat (%) — ex. 1 kg acheté → 950 g utilisables = 95</label><input type="text" inputmode="decimal" class="ft-in" placeholder="100" value="${cx_e(c.rend || '')}" onchange="cx_rend('${ing.id}',this.value)"></div><div><label>Taux de cuisson (%) — ex. 230 g cuits = 300 g crus = 130</label><input type="text" inputmode="decimal" class="ft-in" placeholder="100" value="${cx_e(c.cuis || '')}" onchange="cx_cuis('${ing.id}',this.value)"></div></div></div>
+        <div class="pt-muted" style="margin-top:10px;">Lignes de Mise en place : « Stock cru » (pesée de fin de service, cru ou mariné) ou « Perte cuite » (cuit jeté en fin de service) :</div>
+        ${lines.map(l=>`<div class="g2" style="margin-top:6px;align-items:end;"><div><label>${cx_e(l.secName)} · ${cx_e(l.n)} (${cx_e(l.u || 'unité')})</label>${l.auto && l.f ? '' : `<input type="text" inputmode="decimal" class="ft-in" placeholder="1 ${cx_e(l.u || 'unité')} = … ${cx_e(cx_baseLbl(ing))}" value="${l.auto ? '' : cx_e(l.f)}" onchange="cx_lineF('${ing.id}','${l.id}',this.value)">`}</div><div><select class="ft-in" style="padding:6px;" onchange="cx_lineRole('${ing.id}','${l.id}',this.value)"><option value="stock" ${l.role === 'stock' ? 'selected' : ''}>Stock cru</option><option value="perte" ${l.role === 'perte' ? 'selected' : ''}>Perte cuite</option></select><button class="btn ghost small t-del" style="margin-top:4px;" onclick="cx_unlink('${ing.id}','${l.id}')">Délier</button></div></div>`).join('') || '<div class="pt-muted">Aucune ligne liée.</div>'}
         <select class="ft-in" style="margin-top:8px;" onchange="cx_link('${ing.id}',this.value)"><option value="">＋ Lier une ligne de Mise en place…</option>${free.map(x=>`<option value="${x.l.id}">${cx_e(x.sc.n)} · ${cx_e(x.l.n)} (${cx_e(x.l.u || 'unité')})</option>`).join('')}</select>
         <div class="actions-row"><button class="btn ghost small" onclick="cx_autoLink('${ing.id}')">Lier les lignes du même nom</button></div>`;
     }
     return `<div class="rp2-ing"><div class="row-between"><label style="display:flex;align-items:center;gap:8px;font-weight:700;"><input type="checkbox" ${on ? 'checked' : ''} onchange="cx_track('${ing.id}',this.checked)"> ${cx_e(ing.n)} <span class="pt-muted" style="font-weight:500;">(${cx_e(ing.u || '')})</span></label>
       ${on ? `<button class="btn ghost small t-edit" onclick="cx_toggleSet('${ing.id}')">${open ? 'Fermer' : 'Régler'}</button>` : ''}</div>
-      ${on ? `<div class="mep-w">rendement ${cx_e(c.rend || 100)} % · ${lines.length} ligne(s) liée(s)</div>` : ''}${det}</div>`;
+      ${on ? `<div class="mep-w">achat ${cx_e(c.rend || 100)} % · cuisson ${cx_e(c.cuis || 100)} % · ${lines.length} ligne(s) liée(s)</div>` : ''}${det}</div>`;
   }).join('');
   return `<div class="ticket"><div class="section-label">Ingrédients suivis</div><div class="pt-muted" style="margin-bottom:8px;">La liste vient de Dépenses › Sortie › Ingrédients. Coche ceux à suivre ; l’unité de chaque ingrédient est définie là-bas.</div>${rows || '<div class="pt-muted">Aucun ingrédient.</div>'}</div>` + cx_platsHtml();
 }
@@ -6373,6 +6449,71 @@ async function cx_rstApply(){
 }
 function cx_togPer(){ cx_perOpen = !cx_perOpen; cx_rst.open = false; cx_menu = false; cx_render(); }
 function cx_togMenu(){ cx_menu = !cx_menu; cx_render(); }
+/* ---------- formulaires de correction (un seul ouvert à la fois) ---------- */
+function cx_fSet(f, v){ if(cx_form) cx_form[f] = v; }
+function cx_fRep(kid, v){ if(cx_form) cx_form.rep[kid] = v; }
+function cx_fClose(){ cx_form = null; cx_adj = null; cx_render(); }
+function cx_tauxOpen(id){ const c = cx_cc(cx_ingById(id)); cx_adj = null; cx_form = { t:'taux', ing:id, rend:String(c.rend).replace('.', ','), cuis:String(c.cuis).replace('.', ','), cru:'', cuit:'' }; cx_open['ing:' + id] = true; cx_render(); }
+function cx_tauxCalc(){ const a = ft_parseQ(cx_form.cru), b = ft_parseQ(cx_form.cuit); if(!(a > 0) || !(b > 0)){ alert('Indique le poids cru et le poids cuit (nombres > 0).'); return; } cx_form.cuis = String(Math.round(a / b * 10000) / 100).replace('.', ','); cx_render(); }
+async function cx_tauxSave(){
+  const fm = cx_form; if(!fm) return; const a = ft_parseQ(fm.rend), c = ft_parseQ(fm.cuis);
+  if(a === null || !(a > 0) || a > 100){ alert('Taux d’achat : un nombre entre 1 et 100.'); return; }
+  if(c === null || !(c >= 50) || c > 500){ alert('Taux de cuisson : un nombre entre 50 et 500.'); return; }
+  await cx_ingPatch(fm.ing, { rend:a, cuis:c }); cx_form = null; await cx_reload(); cx_render();
+}
+function cx_achOpen(id, pid){
+  const r = cx_res[id]; if(!r) return; const a = r.achRows.find(x=>x.id === pid); if(!a) return; cx_adj = null; const rep = {};
+  r.K.forEach((k)=>{ const v = a.rep && a.rep[k.id]; rep[k.id] = v ? String(v).replace('.', ',') : ''; });
+  cx_form = { t:'ach', ing:id, pid, q:String(a.q).replace('.', ','), rep, note:(a.fix && a.fix.note) || '' }; cx_open['ing:' + id] = true; cx_render();
+}
+async function cx_achSave(){
+  const fm = cx_form; if(!fm) return; const r = cx_res[fm.ing], a = r && r.achRows.find(x=>x.id === fm.pid); if(!a) return;
+  const q = ft_parseQ(fm.q), note = String(fm.note || '').trim();
+  if(q === null || !(q > 0)){ alert('Indique la quantité achetée (un nombre supérieur à 0).'); return; }
+  const rp = {}; let sum = 0; r.K.forEach((k)=>{ const v = ft_parseQ(fm.rep[k.id] || ''); if(v !== null && v > 0){ rp[k.id] = v; sum += v; } });
+  if(sum > q + 1e-6){ alert('La répartition entre cuisines dépasse la quantité achetée.'); return; }
+  const qChanged = Math.abs(q - a.origQ) > 1e-9, origRep = JSON.stringify(a.fix ? (a.rep || {}) : (a.rep || {})), sameRep = JSON.stringify(rp) === JSON.stringify(a.fix ? {} : (a.rep || {}));
+  if(qChanged && !note){ alert('La note explicative est obligatoire quand tu changes la quantité.'); return; }
+  if(!qChanged && !Object.keys(rp).length && !a.fix){ alert('Rien à corriger.'); return; }
+  const rec = { type:'achatfix', ing:fm.ing, ingN:r.ing.n, pid:fm.pid, at:new Date(a.ms).toISOString(), q, orig:a.origQ, seen:a.origQ, rep:Object.keys(rp).length ? rp : null, note, by:cx_who(), cr:new Date().toISOString() };
+  try{ await cx_evCol.doc('af_' + fm.pid).set(rec); cx_form = null; await cx_resnapFor(a.ms); if(typeof pt_toast === 'function') pt_toast('Achat corrigé dans le Contrôle (Dépenses inchangé).'); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+  await cx_reload(); cx_render();
+}
+async function cx_achRevert(id, pid){
+  const r = cx_res[id], a = r && r.achRows.find(x=>x.id === pid); if(!a || !confirm('Revenir à la valeur saisie dans Dépenses ?')) return;
+  try{ await cx_evCol.doc('af_' + pid).delete(); await cx_resnapFor(a.ms); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+  await cx_reload(); cx_render();
+}
+async function cx_achKeep(id, pid){
+  const r = cx_res[id], a = r && r.achRows.find(x=>x.id === pid); if(!a) return;
+  try{ await cx_evCol.doc('af_' + pid).set({ seen:a.origQ }, { merge:true }); }catch(e){ alert('Erreur : ' + (e.message || e)); }
+  await cx_reload(); cx_render();
+}
+function cx_wOpen(id, role){
+  const r = cx_res[id]; if(!r) return; const rows = role === 'perte' ? r.PR : r.R.filter(p=>p.w); if(!rows.length){ alert('Aucune pesée dans la période à corriger.'); return; }
+  cx_adj = null; cx_form = { t:'w', ing:id, role }; cx_open['ing:' + id] = true; cx_render();
+}
+async function cx_wSave(){
+  const fm = cx_form; if(!fm || !mep_isAdmin()) return; const r = cx_res[fm.ing]; if(!r) return; const rows = fm.role === 'perte' ? r.PR.map(x=>({ l:x.l, w:x.w })) : r.R.filter(p=>p.w), patches = {};
+  for(let i = 0; i < rows.length; i++){
+    const p = rows[i], el = document.getElementById('cx-w-' + i); if(!el) continue; const v = ft_parseQ(el.value);
+    if(v === null || v < 0){ alert('Quantité non valide : « ' + el.value + ' ».'); return; }
+    if(v !== p.w.q){ const x = mep_saisies.find(s=>s.id === p.w.sid); if(!x) continue; const items = patches[p.w.sid] ? patches[p.w.sid].items : (x.items || []).map(it=>Object.assign({}, it)); const it = items.find(y=>y.id === p.w.iid); if(!it) continue; it.q = v; patches[p.w.sid] = { items, origItems:x.origItems || x.items, correctedBy:mep_who(), correctedAt:new Date().toISOString() }; }
+  }
+  const sids = Object.keys(patches); if(!sids.length){ alert('Aucune quantité n’a changé.'); return; }
+  try{ for(const sid of sids){ await mep_saisiesCol.doc(sid).set(patches[sid], { merge:true }); const x = mep_saisies.find(s=>s.id === sid); if(x) Object.assign(x, patches[sid]); } await mep_rebuildStock('', patches); cx_form = null; await cx_resnapFor(r.f); if(typeof pt_toast === 'function') pt_toast('Pesée corrigée (Mise en place mise à jour).'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  await cx_reload(); cx_render();
+}
+function cx_usedOpen(id){ cx_adj = null; cx_form = cx_form && cx_form.t === 'used' && cx_form.ing === id ? null : { t:'used', ing:id }; cx_open['ing:' + id] = true; cx_render(); }
+function cx_goPlat(key){ const pl = cx_cfg.plats[key]; cx_form = null; cx_tab = 'reg'; cx_pq = (pl && pl.name) || ''; cx_open['pl:' + key] = true; cx_render(); try{ window.scrollTo(0, 0); }catch(e){} }
+function cx_togK(id){ cx_byK[id] = !cx_byK[id]; cx_render(); }
+/* les cuisines d'un ingrédient sont recopiées dans la liste Dépenses (lue par le gérant) pour la répartition facultative d'un achat */
+function cx_syncKit(){
+  if(cx_kitBusy || !cx_isAdmin() || !cx_dpReady || !cx_ready || !mep_listsReady) return; let ch = false;
+  (dp_cfg.ingredients || []).forEach((it)=>{ if(!it.track) return; const kit = cx_kits(it); if(JSON.stringify(kit) !== JSON.stringify(it.kit || [])){ it.kit = kit; ch = true; } });
+  if(ch){ cx_kitBusy = true; Promise.resolve(dp_cfgSave()).finally(()=>{ cx_kitBusy = false; }); }
+}
 function cx_togTodo(){ cx_open.todoOff = !cx_open.todoOff; cx_render(); }
 function cx_toggleIng(id){ cx_open['ing:' + id] = !cx_open['ing:' + id]; cx_render(); }
 
@@ -6385,31 +6526,65 @@ function cx_badge(r){
   const ap = Math.abs(r.pct), col = r.flags.length ? 'var(--amber)' : ap <= 5 ? 'var(--moss)' : ap <= 15 ? 'var(--amber)' : 'var(--rust)';
   return `<span style="color:${col};font-weight:700;font-family:'IBM Plex Mono',monospace;">${cx_e(cx_fmt(r.ecart, r.ing, true))}</span>`;
 }
+function cx_zr(o){
+  const byK = o.byK, vals = o.v, ncol = byK ? vals.length : 1;
+  if(byK){ return `<div class="cxr ${o.tot ? 'tot' : ''}" style="grid-template-columns:1fr repeat(${vals.length - 1},66px) 74px;"><div class="l">${o.l}${o.btn ? ` <button class="cxe" onclick="${o.btn}">✎</button>` : ''}<small>${o.sub || ''}</small></div>${vals.map((v, i)=>`<div class="q ${o.est && i < vals.length - 1 ? 'est' : ''}" ${o.col && i === vals.length - 1 ? `style="color:var(--${o.col})"` : ''}>${v}</div>`).join('')}</div>`; }
+  return `<div class="cxr ${o.tot ? 'tot' : ''}"><div class="l">${o.l}<small>${o.sub || ''}</small></div><div class="p">${o.p || ''}</div><div class="q" ${o.col ? `style="color:var(--${o.col})"` : ''}>${vals[0]}</div>${o.btn ? `<button class="cxe" onclick="${o.btn}">✎</button>` : '<span></span>'}</div>`;
+}
 function cx_detailHtml(r){
-  const ing = r.ing, id = ing.id, a = cx_adj && cx_adj.ing === id ? cx_adj : null, se = r.startEv, none = r.startState === 'none';
-  const wtxt = (arr)=>arr.map(p=>`${cx_e(p.l.secName)} · ${cx_e(p.l.n)} : ${p.w ? cx_e(mep_fq(p.w.q)) + ' ' + cx_e(p.l.u) + ' (' + cx_e(cx_fmtD(p.w.ms)) + (p.w.corr ? ' ✎' : '') + ')' : '—'}`).join('<br>');
-  const startSub = none ? `<span class="rp2-bad">à valider</span> · ${cx_e(r.startNote)}${r.k === 'reel' ? '<br>' + wtxt(r.S) : ''}`
-    : r.startState === 'valide' ? `✓ validé par ${cx_e(se.by || '')} · ${cx_e(cx_fmtD(cx_ms(se.cr || se.at)))}`
-    : `✎ corrigé : calculé ${cx_e(cx_fmt(se.calc, ing))} → ${cx_e(cx_fmt(se.q, ing))} — ${cx_e(se.note || '')}<span class="pt-muted"> — ${cx_e(se.by || '')}</span>`;
-  const startBtns = `<div class="actions-row" style="margin:6px 0 4px;">${none ? `<button class="btn small t-save" onclick="cx_startValidate('${id}')">✓ Valider</button>` : ''}<button class="btn ghost small t-edit" onclick="cx_startOpen('${id}')">✎ ${none ? 'Corriger' : 'Modifier'}</button>${none ? '' : `<button class="btn ghost small" onclick="cx_startUndo('${id}')">↺ Revenir au calcul</button>`}</div>`;
-  const form = a ? `<div class="rp2-ing" style="margin:6px 0;"><div class="section-label">Corriger le stock de départ — ${cx_e(ing.n)}</div>
+  const ing = r.ing, id = ing.id, a = cx_adj && cx_adj.ing === id ? cx_adj : null, fm = cx_form && cx_form.ing === id ? cx_form : null, se = r.startEv, none = r.startState === 'none';
+  const byK = !!cx_byK[id] && r.K.length >= 2, F = (v)=>cx_e(cx_fmt(v, ing)), FS = (v, sg)=>cx_e(cx_fmt(v, ing, sg)), kn = r.K.map(k=>k.n);
+  const wtxt = (arr)=>arr.map(p=>`${cx_e(p.l.secName)} ${p.w ? cx_e(mep_fq(p.w.q)) + ' ' + cx_e(p.l.u) : '—'}`).join(' · ');
+  const hdr = byK ? `<div class="cxh" style="grid-template-columns:1fr repeat(${kn.length},66px) 74px;"><span></span>${kn.map(n=>`<span>${cx_e(n)}</span>`).join('')}<span>Total</span></div>` : '<div class="cxh"><span></span><span>Taux</span><span>Quantité</span><span></span></div>';
+  const Kv = (fn)=>r.K.map(fn);
+  const startSub = none ? '<span class="rp2-bad">à valider</span> · ' + cx_e(r.startNote) : r.startState === 'valide' ? '✓ validé · ' + cx_e(se.by || '') : '✎ corrigé : calculé ' + cx_e(cx_fmt(se.calc, ing)) + ' — ' + cx_e(se.note || '');
+  const startBtns = `<div class="actions-row" style="margin:4px 0 0;">${none ? `<button class="btn small t-save" onclick="cx_startValidate('${id}')">✓ Valider</button>` : ''}${none ? '' : `<button class="btn ghost small" onclick="cx_startUndo('${id}')">↺ Revenir au calcul</button>`}</div>`;
+  const z1 = `<div class="cxz"><h4>① Départ</h4>${hdr}${cx_zr({ byK, l:'Stock cru de départ', sub:startSub, p:'100 %', v:byK ? Kv(k=>F(k.start)).concat([F(r.start)]) : [F(r.start)], btn:`cx_startOpen('${id}')` })}${startBtns}</div>`;
+  const achRows = r.achRows.map((x)=>cx_zr({ byK, l:'Achat ' + cx_e(cx_pad(new Date(x.ms).getHours()) + ':' + cx_pad(new Date(x.ms).getMinutes())),
+      sub:cx_e(mep_fq(x.q)) + ' ' + cx_e(x.u) + ' · ' + cx_e(x.who) + (x.fixed ? ' · <b style="color:var(--amber)">✎ corrigé</b>' + (x.q !== x.origQ ? ' (' + cx_e(mep_fq(x.origQ)) + ' → ' + cx_e(mep_fq(x.q)) + ')' : '') + (x.fix && x.fix.note ? ' — ' + cx_e(x.fix.note) : '') : '') + (x.noHeure ? ' · <i>heure non saisie</i>' : '') + (x.est && byK ? ' · <i>répartition estimée</i>' : ''),
+      p:cx_e(cx_n(r.rend)) + ' %', est:x.est, v:byK ? r.K.map(k=>cx_e(cx_fmt(x.alloc[k.id] || 0, ing))).concat([cx_e('＋ ' + cx_fmt(x.base, ing))]) : [cx_e('＋ ' + cx_fmt(x.base, ing))], btn:`cx_achOpen('${id}','${x.id}')` })
+    + (x.changed ? `<div class="rp2-bad" style="margin:2px 0 6px;">⚠ Modifié dans Dépenses depuis : ${cx_e(mep_fq(x.origQ))} ${cx_e(x.u)} <span class="actions-row" style="display:inline-flex;margin:0 0 0 6px;"><button class="btn small t-save" onclick="cx_achKeep('${id}','${x.id}')">Garder ma valeur</button><button class="btn ghost small" onclick="cx_achRevert('${id}','${x.id}')">Prendre celle de Dépenses</button></span></div>` : '')
+    + (x.fixed && !x.changed ? `<div style="margin:0 0 4px;"><button class="btn ghost small" onclick="cx_achRevert('${id}','${x.id}')">↺ Revenir à la valeur de Dépenses</button></div>` : '')).join('');
+  const adjRow = r.seg.adjL.length ? cx_zr({ byK, l:'Ajustements (anciens)', sub:r.seg.adjL.map(e=>cx_e(e.note)).join(' · '), v:byK ? Kv(()=>'').concat([FS(r.seg.adj, true)]) : [FS(r.seg.adj, true)] }) + r.seg.adjL.map(e=>`<div style="text-align:right;"><button class="btn ghost small t-del" onclick="cx_adjDel('${e.id}')">✕ ${cx_e(cx_fmtD(cx_ms(e.at)))}</button></div>`).join('') : '';
+  const z2 = `<div class="cxz"><h4>② Entrées</h4>${hdr}${achRows || cx_zr({ byK, l:'Achats du gérant', sub:'aucun achat dans la période', p:cx_e(cx_n(r.rend)) + ' %', v:byK ? Kv(()=>'0').concat(['0']) : ['0']})}${adjRow}</div>`;
+  const z3 = `<div class="cxz"><h4>③ Sorties</h4>${hdr}${cx_zr({ byK, l:'Utilisé (ventes)', sub:'quantité servie × cuisson', p:cx_e(cx_n(r.cuis)) + ' %', v:byK ? Kv(k=>cx_e('− ' + cx_fmt(k.used, ing))).concat([cx_e('− ' + cx_fmt(r.seg.used, ing))]) : [cx_e('− ' + cx_fmt(r.seg.used, ing))], btn:`cx_usedOpen('${id}')` })}
+    ${cx_zr({ byK, l:'Perte cuite', sub:'fin de service · saisie par le cuisinier', p:cx_e(cx_n(r.cuis)) + ' %', v:byK ? Kv(k=>cx_e('− ' + cx_fmt(k.perte, ing))).concat([cx_e('− ' + cx_fmt(r.perte, ing))]) : [cx_e('− ' + cx_fmt(r.perte, ing))], btn:`cx_wOpen('${id}','perte')` })}</div>`;
+  const pct = r.ecart !== null && r.pct !== null ? (r.pct < 0 ? '−' : '+') + cx_n(Math.abs(r.pct)) + ' %' : '', da = r.da !== null && r.price > 0 ? ' · ' + (r.da < 0 ? '−' : '+') + cx_n(Math.abs(r.da)) + ' DA' : '';
+  const ecK = (k)=>k.ecart === null ? '—' : cx_e(cx_fmt(k.ecart, ing, true));
+  const z4 = `<div class="cxz"><h4>④ Résultat</h4>${hdr}${cx_zr({ byK, tot:1, l:'Théorique', sub:'① + ② − ③', v:byK ? Kv(k=>F(k.theo)).concat([F(r.theo)]) : [F(r.theo)] })}
+    ${cx_zr({ byK, tot:1, l:'Réel', sub:'pesée cru · ' + cx_e(wtxt(r.R)), v:byK ? Kv(k=>k.real === null ? '—' : F(k.real)).concat([F(r.real)]) : [F(r.real)], btn:`cx_wOpen('${id}','stock')` })}
+    ${cx_zr({ byK, tot:1, l:'Écart' + (byK ? '' : ' global'), sub:r.ecart !== null ? cx_e(pct + da) : 'pesée de chaque ligne liée requise', col:r.ecart === null ? '' : (r.flags.length ? 'amber' : Math.abs(r.pct) <= 5 ? 'moss' : Math.abs(r.pct) <= 15 ? 'amber' : 'rust'), v:byK ? Kv(ecK).concat([r.ecart === null ? '—' : FS(r.ecart, true)]) : [r.ecart === null ? '—' : FS(r.ecart, true)] })}</div>`;
+  /* formulaires */
+  let form = '';
+  if(a) form = `<div class="rp2-ing" style="margin:6px 0;"><div class="section-label">Corriger le stock de départ — ${cx_e(ing.n)}</div>
       <div><label>Quantité de départ (${cx_e(ing.u)})</label><input type="text" inputmode="decimal" class="ft-in" value="${cx_e(a.q)}" oninput="cx_adjSet('q',this.value)"></div>
       <div style="margin-top:8px;"><label>Note explicative (obligatoire si la quantité change)</label><input type="text" class="ft-in" placeholder="Ex. perte, don, erreur de pesée…" value="${cx_e(a.note)}" oninput="cx_adjSet('note',this.value)"></div>
-      <div class="pt-muted" style="margin-top:6px;">Calculé : ${cx_e(cx_fmt(r.startCalc, ing))}. L’écart est enregistré avec ton nom et l’heure.</div>
-      <div class="actions-row"><button class="btn small t-save" onclick="cx_startSave()">Enregistrer</button><button class="btn ghost small" onclick="cx_adj=null;cx_render()">Annuler</button></div></div>` : '';
-  const adjList = r.seg.adjL.map(e=>`<div class="row-between" style="padding:3px 0;"><span>${cx_e(cx_fmtD(cx_ms(e.at)))} · <b>${cx_e(cx_fmt(e.q, ing, true))}</b> · ${cx_e(e.note)}<span class="pt-muted"> — ${cx_e(e.by || '')}</span></span><button class="btn ghost small t-del" onclick="cx_adjDel('${e.id}')">✕</button></div>`).join('');
-  const achList = r.seg.achL.map(x=>`${cx_e(cx_fmtD(x.ms))} · ${cx_e(mep_fq(x.q))} ${cx_e(x.u)}${x.montant ? ' · ' + cx_e(cx_n(x.montant)) + ' DA' : ''}${x.noHeure ? ' <i>(heure non saisie)</i>' : ''}<span class="pt-muted"> — ${cx_e(x.who)}</span>`).join('<br>');
-  const pct = r.ecart !== null && r.pct !== null ? ' (' + (r.pct < 0 ? '−' : '+') + cx_n(Math.abs(r.pct)) + ' %)' : '';
-  const da = r.da !== null && r.price > 0 ? ' · ' + (r.da < 0 ? '−' : '+') + cx_n(Math.abs(r.da)) + ' DA' : '';
-  return `${cx_row('Stock de départ', cx_e(cx_fmt(r.start, ing)), startSub)}${startBtns}${form}
-    ${r.seg.adjL.length ? cx_row('± Ajustements (anciens)', cx_e(cx_fmt(r.seg.adj, ing, true)), adjList) : ''}
-    ${cx_row('＋ Achats', cx_e(cx_fmt(r.seg.ach, ing)), achList || 'Aucun achat dans la période')}
-    ${cx_row('− Utilisé (ventes)', cx_e(cx_fmt(r.seg.used, ing)), 'quantité nette par plat ÷ rendement ' + cx_e(cx_n(r.rend)) + ' %')}
-    <div style="padding:8px 0;border-top:1px solid var(--line);"><div class="row-between"><span>Rendement (utilisable / acheté)</span><span style="white-space:nowrap;"><input type="text" inputmode="decimal" class="ft-in" style="width:84px;display:inline-block;text-align:right;" value="${cx_e(cx_n(r.rend))}" onchange="cx_rend('${id}',this.value)"> %</span></div></div>
-    ${cx_row('= Théorique', cx_e(cx_fmt(r.theo, ing)), '', true)}
-    ${cx_row('Réel (pesée de fin)', cx_e(cx_fmt(r.real, ing)), wtxt(r.R), true)}
-    ${cx_row('Écart (réel − théorique)', cx_badge(r), r.ecart !== null ? 'négatif = il manque du stock' + cx_e(pct + da) : 'indisponible tant que la pesée de chaque ligne liée n’est pas faite')}
-    ${r.flags.length ? `<div class="rp2-bad" style="margin-top:8px;">${r.flags.map(f=>'⚠ ' + cx_e(f)).join('<br>')}</div>` : ''}`;
+      <div class="pt-muted" style="margin-top:6px;">Calculé : ${cx_e(cx_fmt(r.startCalc, ing))}. Enregistré uniquement dans le Contrôle, avec ton nom et l’heure.</div>
+      <div class="actions-row"><button class="btn small t-save" onclick="cx_startSave()">Enregistrer</button><button class="btn ghost small" onclick="cx_fClose()">Annuler</button></div></div>`;
+  else if(fm && fm.t === 'taux') form = `<div class="rp2-ing" style="margin:6px 0;"><div class="section-label">Taux — ${cx_e(ing.n)}</div>
+      <div class="g2"><div><label>Taux d’achat (%)</label><input type="text" inputmode="decimal" class="ft-in" value="${cx_e(fm.rend)}" oninput="cx_fSet('rend',this.value)"></div><div><label>Taux de cuisson (%)</label><input type="text" inputmode="decimal" class="ft-in" value="${cx_e(fm.cuis)}" oninput="cx_fSet('cuis',this.value)"></div></div>
+      <div class="pt-muted" style="margin-top:6px;">Achat : 1 kg acheté → 950 g utilisables = 95. Cuisson : 300 g crus → 230 g cuits = 130 (cru ÷ cuit).</div>
+      <div class="g2" style="margin-top:8px;align-items:end;"><div><label>Poids cru</label><input type="text" inputmode="decimal" class="ft-in" value="${cx_e(fm.cru)}" oninput="cx_fSet('cru',this.value)"></div><div><label>Poids cuit</label><input type="text" inputmode="decimal" class="ft-in" value="${cx_e(fm.cuit)}" oninput="cx_fSet('cuit',this.value)"></div></div>
+      <div class="actions-row"><button class="btn ghost small" onclick="cx_tauxCalc()">Calculer la cuisson</button><button class="btn small t-save" onclick="cx_tauxSave()">Enregistrer</button><button class="btn ghost small" onclick="cx_fClose()">Annuler</button></div></div>`;
+  else if(fm && fm.t === 'ach'){ const ax = r.achRows.find(x=>x.id === fm.pid); form = ax ? `<div class="rp2-ing" style="margin:6px 0;"><div class="section-label">Corriger l’achat de ${cx_e(cx_fmtD(ax.ms))}</div>
+      <div><label>Quantité (${cx_e(ax.u)}) — saisie dans Dépenses : ${cx_e(mep_fq(ax.origQ))}</label><input type="text" inputmode="decimal" class="ft-in" value="${cx_e(fm.q)}" oninput="cx_fSet('q',this.value)"></div>
+      ${r.K.length >= 2 ? `<div class="mep-w" style="margin-top:8px;">Répartition entre cuisines (facultatif, en ${cx_e(ax.u)})</div><div class="g2" style="margin-top:4px;">${r.K.map(k=>`<div><label>dont ${cx_e(k.n)}</label><input type="text" inputmode="decimal" class="ft-in" placeholder="—" value="${cx_e(fm.rep[k.id] || '')}" oninput="cx_fRep('${k.id}',this.value)"></div>`).join('')}</div>` : ''}
+      <div style="margin-top:8px;"><label>Note explicative (obligatoire si la quantité change)</label><input type="text" class="ft-in" placeholder="Ex. 200 g abîmés…" value="${cx_e(fm.note)}" oninput="cx_fSet('note',this.value)"></div>
+      <div class="pt-muted" style="margin-top:6px;">La correction reste dans le Contrôle : Dépenses n’est pas modifié, et ta valeur est figée même si le gérant modifie son achat.</div>
+      <div class="actions-row"><button class="btn small t-save" onclick="cx_achSave()">Enregistrer</button><button class="btn ghost small" onclick="cx_fClose()">Annuler</button></div></div>` : ''; }
+  else if(fm && fm.t === 'w'){ const rows = fm.role === 'perte' ? r.PR.map(x=>({ l:x.l, w:x.w })) : r.R.filter(p=>p.w);
+    form = `<div class="rp2-ing" style="margin:6px 0;"><div class="section-label">Corriger ${fm.role === 'perte' ? 'la perte cuite' : 'la pesée de fin de service'} — ${cx_e(ing.n)}</div>
+      ${rows.map((p, i)=>`<div style="margin-top:6px;"><label>${cx_e(p.l.secName)} · ${cx_e(p.l.n)} (${cx_e(p.l.u)}) — ${cx_e(cx_fmtD(p.w.ms))}, ${cx_e(p.w.who)}</label><input type="text" inputmode="decimal" class="ft-in" id="cx-w-${i}" value="${cx_e(String(p.w.q).replace('.', ','))}"></div>`).join('')}
+      <div class="pt-muted" style="margin-top:6px;">La saisie d’origine est corrigée dans la Mise en place (mention « modifié par toi »).</div>
+      <div class="actions-row"><button class="btn small t-save" onclick="cx_wSave()">Enregistrer</button><button class="btn ghost small" onclick="cx_fClose()">Annuler</button></div></div>`; }
+  else if(fm && fm.t === 'used'){ const per = {}; cx_data.sales.forEach((s)=>{ if(s.ms > r.f && s.ms <= r.t){ const o = per[s.key] || (per[s.key] = { key:s.key, name:s.name, q:0, ms:s.ms }); o.q += s.q; } });
+    const list = Object.keys(per).map(k=>per[k]).map(x=>({ x, g:cx_gram(x.key, id, x.ms) })).filter(y=>y.g !== null && y.g > 0).sort((p, q)=>q.x.q - p.x.q);
+    form = `<div class="rp2-ing" style="margin:6px 0;"><div class="section-label">Plats vendus — ${cx_e(ing.n)}</div>${list.map(y=>`<div class="row-between" style="padding:4px 0;"><span>${cx_e(y.x.name)} × ${cx_e(cx_n(y.x.q))}<div class="mep-w">${cx_e(cx_n(y.g))} ${cx_e(cx_baseLbl(ing))} servi × ${cx_e(cx_n(r.cuis))} % = ${cx_e(cx_fmt(y.x.q * y.g * r.cuis / 100, ing))}</div></span><button class="btn ghost small t-edit" onclick="cx_goPlat('${y.x.key}')">✎ grammage</button></div>`).join('') || '<div class="pt-muted">Aucune vente avec quantité.</div>'}
+      <div class="actions-row"><button class="btn ghost small" onclick="cx_fClose()">Fermer</button></div></div>`; }
+  const top = `<div class="row-between" style="margin-bottom:6px;"><div class="mep-w">achat ${cx_e(cx_n(r.rend))} % · cuisson ${cx_e(cx_n(r.cuis))} %</div><button class="btn ghost small t-edit" onclick="cx_tauxOpen('${id}')">Taux ✎</button></div>
+    ${r.K.length >= 2 ? `<div style="margin:2px 0 6px;"><span class="sw ${byK ? '' : 'off'}" onclick="cx_togK('${id}')" style="cursor:pointer;"><i></i> Écart par cuisine</span></div>` : ''}`;
+  return top + z1 + (a ? form : '') + z2 + (fm && fm.t === 'ach' ? form : '') + z3 + (fm && (fm.t === 'used' || fm.t === 'w' && fm.role === 'perte') ? form : '') + z4 + (fm && (fm.t === 'taux' || fm.t === 'w' && fm.role === 'stock') ? form : '')
+    + (r.flags.length ? `<div class="rp2-bad" style="margin-top:8px;">${r.flags.map(f=>'⚠ ' + cx_e(f)).join('<br>')}</div>` : '');
 }
 function cx_ctrlHtml(){
   const tr = cx_ingList(), [f, t] = cx_setWindow(), isDay = cx_from === cx_dt(cx_dayStart(Date.now())) && !cx_to;
@@ -6437,7 +6612,7 @@ function cx_ctrlHtml(){
   return head + rst + per + cx_todoHtml() + `<div class="ticket"><div class="section-label">Ingrédients${cx_loading ? ' · mise à jour…' : ''}</div>${cards}</div>`;
 }
 /* ---------- journal ---------- */
-const CX_TYPES = { achat:'Achat', pesee:'Pesée', depart:'Départ', ajust:'Ajustement', vente:'Ventes', restart:'Redémarrage', snap:'Sauvegarde' };
+const CX_TYPES = { corr:'Correction', achat:'Achat', pesee:'Pesée', depart:'Départ', ajust:'Ajustement', vente:'Ventes', restart:'Redémarrage', snap:'Sauvegarde' };
 function cx_jPreset(k, silent){
   const now = Date.now(), ds = cx_dayStart(now);
   if(k === 'today'){ cx_j.from = cx_dt(ds); cx_j.to = ''; }
@@ -6464,6 +6639,7 @@ function cx_jRows(){
   D.ev.forEach((e)=>{ const ms = cx_ms(e.at), ing = cx_ingById(e.ing); if(isNaN(ms) || (e.type !== 'start' && (ms < f || ms > t))) return;
     if(e.type === 'ajust') rows.push({ ms, type:'ajust', ing:e.ing, ingN:e.ingN || (ing && ing.n) || '', txt:`Ajustement ${ing ? cx_fmt(e.q, ing, true) : cx_n(e.q)} — ${e.note || ''}${e.modBy ? ' (modifié par ' + e.modBy + ')' : ''}`, who:e.by || '' });
     else if(e.type === 'start'){ const ms2 = cx_ms(e.cr || e.at); if(ms2 >= f && ms2 <= t) rows.push({ ms:ms2, type:'depart', ing:e.ing, ingN:e.ingN || (ing && ing.n) || '', txt:(e.corrected ? 'Départ corrigé : calculé ' + (ing ? cx_fmt(e.calc, ing) : cx_n(e.calc)) + ' → ' + (ing ? cx_fmt(e.q, ing) : cx_n(e.q)) + ' — ' + (e.note || '') : 'Départ validé : ' + (ing ? cx_fmt(e.q, ing) : cx_n(e.q))) + ' (période depuis ' + cx_fmtD(cx_ms(e.at)) + ')', who:e.by || '' }); }
+    else if(e.type === 'achatfix') rows.push({ ms:cx_ms(e.cr || e.at), type:'corr', ing:e.ing, ingN:e.ingN || (ing && ing.n) || '', txt:'Achat corrigé dans le Contrôle : ' + mep_fq(e.orig) + ' → ' + mep_fq(e.q) + (ing ? ' ' + ing.u : '') + (e.note ? ' — ' + e.note : ''), who:e.by || '' });
     else if(e.type === 'restart') rows.push({ ms, type:'restart', ing:e.ing, ingN:e.ingN || '', txt:`Contrôle redémarré à ${cx_fmtD(ms)} — départ : ${e.mode === 'theo' ? 'théorique (avec l’écart passé)' : e.mode === 'qty' ? 'quantité ' + e.qty : 'pesée réelle'}`, who:e.by || '' }); });
   const per = {}; D.sales.forEach((s)=>{ if(s.ms < f || s.ms > t) return; const o = per[s.key] || (per[s.key] = { name:s.name, key:s.key, q:0, ms:0 }); o.q += s.q; if(s.ms > o.ms) o.ms = s.ms; });
   Object.keys(per).forEach((k)=>{ const p = per[k], pl = cx_cfg.plats[k], ings = tr.filter(i=>pl && pl.g && pl.g[i.id] !== undefined && pl.g[i.id] !== null);
@@ -6534,6 +6710,7 @@ function cx_render(){
   const menu = cx_menu && cx_tab === 'ctrl' ? `<div class="ticket" style="padding:8px;"><button class="btn ghost" style="width:100%;text-align:left;margin-bottom:6px;" onclick="cx_setTab('jour')">📜 Journal (recherche, export Excel)</button><button class="btn ghost" style="width:100%;text-align:left;margin-bottom:6px;" onclick="cx_setTab('hist')">📈 Historique des écarts</button><button class="btn ghost" style="width:100%;text-align:left;" onclick="cx_setTab('reg')">⚙️ Réglages</button></div>` : '';
   const view = cx_tab === 'reg' ? cx_settingsHtml() : cx_tab === 'jour' ? cx_jourHtml() : cx_tab === 'hist' ? cx_histHtml() : cx_ctrlHtml();
   el.innerHTML = head + menu + view;
+  try{ cx_syncKit(); }catch(e){ console.warn(e); }
 }
 const dt_dettesCol = db.collection('dettes_perso');
 
