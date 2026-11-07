@@ -5382,7 +5382,7 @@ let dp_sortieBtn = null;     // id du bouton de sortie choisi
 let dp_cfgPanel = null;      // liste en cours de réglage : 'concepts' | 'ingredients' | 'livreurs' | 'boutons'
 let dp_fv = {}, dp_skipGrab = false;   // valeurs saisies, conservées quand l'écran est redessiné
 let dp_ptEmp = {};           // employés de la rubrique Pointage (documents pointage_config/employes)
-const DP_FIELDS = ['dp-concept','dp-montant','dp-ing','dp-unite','dp-qty','dp-pu','dp-tot','dp-livreur','dp-note','dp-employe','dp-heure','dp-rep-0','dp-rep-1','dp-rep-2'];
+const DP_FIELDS = ['dp-concept','dp-montant','dp-ing','dp-unite','dp-qty','dp-pu','dp-tot','dp-livreur','dp-note','dp-employe','dp-heure','dp-rep-0','dp-rep-1','dp-rep-d'];
 function dp_grabForm(){ DP_FIELDS.forEach(id=>{ const el = document.getElementById(id); if(el) dp_fv[id] = el.value; }); }
 function dp_fvReset(){ dp_fv = {}; dp_skipGrab = true; }
 function dp_cfgFix(){
@@ -5550,7 +5550,7 @@ function dp_openEditMouv(id){
   if(m.type === 'Achat'){
     dp_formKind = 'sortie'; dp_sortieBtn = (dp_cfg.boutons.find(b=>b.m === 'liste' && b.n === m.bouton) || dp_cfg.boutons.find(b=>b.m === 'achat') || {}).id;
     const q = Number(m.quantite) || 0, tot = Number(m.montant) || 0;
-    Object.assign(fv, { 'dp-ing':m.articleNom || '', 'dp-unite':m.unite || '', 'dp-qty':q ? String(q) : '', 'dp-tot':String(tot), 'dp-pu':q ? String(Math.round(tot / q * 100) / 100) : '', 'dp-note':m.note || '', 'dp-rep-0':'', 'dp-heure':m.heure || (m.creeLe ? (()=>{ const d = new Date(m.creeLe); return isNaN(d) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); })() : '') });
+    Object.assign(fv, { 'dp-ing':m.articleNom || '', 'dp-unite':m.unite || '', 'dp-qty':q ? String(q) : '', 'dp-tot':String(tot), 'dp-pu':q ? String(Math.round(tot / q * 100) / 100) : '', 'dp-note':m.note || '', 'dp-rep-0':(m.rep && m.rep[((dp_cfg.ingredients.find(i=>i.n === m.articleNom) || {}).kit || [])[0] && dp_cfg.ingredients.find(i=>i.n === m.articleNom).kit[0].id] !== undefined) ? String(m.rep[dp_cfg.ingredients.find(i=>i.n === m.articleNom).kit[0].id]) : '', 'dp-rep-1':(m.rep && ((dp_cfg.ingredients.find(i=>i.n === m.articleNom) || {}).kit || [])[1] && m.rep[dp_cfg.ingredients.find(i=>i.n === m.articleNom).kit[1].id] !== undefined) ? String(m.rep[dp_cfg.ingredients.find(i=>i.n === m.articleNom).kit[1].id]) : '', 'dp-rep-d':(m.dechet !== undefined && m.dechet !== null) ? String(m.dechet) : '', 'dp-heure':m.heure || (m.creeLe ? (()=>{ const d = new Date(m.creeLe); return isNaN(d) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); })() : '') });
   } else if(m.estAvanceSalaire){
     dp_formKind = 'avance'; Object.assign(fv, { 'dp-employe':m.employeNom || '', 'dp-montant':String(m.montant) });
   } else if(sign > 0){
@@ -5571,7 +5571,7 @@ function dp_r2(x){ return String(Math.round(x * 100) / 100); }
 function dp_achSet(id, v){ const el = document.getElementById(id); if(el) el.value = v; }
 function dp_nowHM(){ const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
 function dp_achVal(id){ const el = document.getElementById(id); return el ? el.value.trim() : ''; }
-function dp_achQty(){
+function dp_achQty(){ if(typeof dp_repCalc === "function") dp_repCalc();
   const q = dp_parseNum(dp_achVal('dp-qty')), pu = dp_achVal('dp-pu'), tot = dp_achVal('dp-tot'), hint = document.getElementById('dp-ach-hint');
   if(pu && tot){ dp_achSet('dp-pu', ''); dp_achSet('dp-tot', ''); if(hint) hint.textContent = 'Quantité modifiée : saisis à nouveau le prix unitaire ou le total.'; return; }
   if(hint) hint.textContent = '';
@@ -5582,7 +5582,17 @@ function dp_achPu(){ const q = dp_parseNum(dp_achVal('dp-qty')), pu = dp_achVal(
 function dp_achTot(){ const q = dp_parseNum(dp_achVal('dp-qty')), tot = dp_achVal('dp-tot'); dp_achSet('dp-pu', (q > 0 && tot) ? dp_r2(dp_parseNum(tot) / q) : ''); }
 function dp_repHtml(name){
   const it = (dp_cfg.ingredients || []).find(i=>i.n === name); if(!it || !it.track || !Array.isArray(it.kit) || it.kit.length < 2) return '';
-  return `<div style="font-size:12px;color:var(--ink-muted);margin-top:10px;">Répartition entre cuisines <i>(facultatif)</i></div><div class="grid grid-2" style="margin-top:4px;">${it.kit.slice(0, 3).map((k, i)=>`<div class="field"><label>dont ${esc(k.n)}</label><input type="text" inputmode="decimal" id="dp-rep-${i}" placeholder="—" value="${esc(dp_fv['dp-rep-' + i] || '')}" /></div>`).join('')}</div>`;
+  const inp = (id, lab)=>`<div class="field"><label>${lab}</label><input type="text" inputmode="decimal" id="${id}" placeholder="—" oninput="dp_repCalc()" value="${esc(dp_fv[id] || '')}" /></div>`;
+  return `<div style="font-size:12px;color:var(--ink-muted);margin-top:10px;">Répartition de l’achat <i>(facultatif : si tu remplis un champ, remplis les trois — 0 autorisé)</i></div><div class="grid grid-2" style="margin-top:4px;">${inp('dp-rep-0', esc(it.kit[0].n))}${inp('dp-rep-1', esc(it.kit[1].n))}${inp('dp-rep-d', 'Déchet')}</div><div id="dp-rep-diff" style="font-size:12px;margin-top:4px;"></div>`;
+}
+function dp_repCalc(){
+  const g = id=>{ const el = document.getElementById(id); return el ? el.value.trim() : ''; }, out = document.getElementById('dp-rep-diff'); if(!out) return;
+  const a = g('dp-rep-0'), b = g('dp-rep-1'), d = g('dp-rep-d');
+  if(!a && !b && !d){ out.textContent = ''; return; }
+  const qty = dp_parseNum(dp_achVal('dp-qty')) || 0, sum = (dp_parseNum(a) || 0) + (dp_parseNum(b) || 0) + (dp_parseNum(d) || 0), diff = Math.round((qty - sum) * 1000) / 1000;
+  const u = (document.getElementById('dp-unite') || {}).value || '';
+  out.style.color = diff < -1e-6 ? 'var(--rust)' : 'var(--ink-muted)';
+  out.textContent = diff < -1e-6 ? `La somme dépasse l’achat de ${String(-diff).replace('.', ',')} ${u}.` : `Perte pesée : ${String(diff).replace('.', ',')} ${u}`;
 }
 function dp_ingPick(name){ const un = dp_unitOf(dp_curBtn(), name); const u = document.getElementById('dp-unite'); if(un && u && Array.from(u.options).some(o=>o.value === un)) u.value = un; if(dp_curBtn().m === 'achat'){ dp_grabForm(); const box = document.getElementById('dp-rep-box'); if(box) box.innerHTML = dp_repHtml(name); } }
 
@@ -5690,10 +5700,18 @@ async function dp_submitMouv(){
       if(!ing){ alert('Choisis un ingrédient dans la liste.'); return; }
       if(!(qty > 0)){ alert('Merci de renseigner une quantité.'); return; }
       if(!(tot > 0)){ alert('Merci de renseigner le prix unitaire ou le total.'); return; }
-      const itI = (dp_cfg.ingredients || []).find(i=>i.n === ing), kit = itI && itI.track && Array.isArray(itI.kit) && itI.kit.length >= 2 ? itI.kit.slice(0, 3) : [], repo = {}; let sumR = 0;
-      kit.forEach((k, i)=>{ const v = dp_parseNum(V('dp-rep-' + i)); if(v > 0){ repo[k.id] = v; sumR += v; } });
-      if(sumR > qty + 1e-6){ alert('La répartition entre cuisines dépasse la quantité achetée.'); return; }
-      base = { type:'Achat', articleNom:ing, quantite:qty, unite, fournisseur:E.fournisseur || '', montant:Math.round(tot * 100) / 100, bouton:btn.n, heure:V('dp-heure') || dp_nowHM(), rep:Object.keys(repo).length ? repo : null };
+      const itI = (dp_cfg.ingredients || []).find(i=>i.n === ing), kit = itI && itI.track && Array.isArray(itI.kit) && itI.kit.length >= 2 ? itI.kit.slice(0, 2) : [], repo = {}; let dech = null, perteP = null;
+      if(kit.length){
+        const raw = [V('dp-rep-0'), V('dp-rep-1'), V('dp-rep-d')].map(x=>String(x).trim());
+        if(raw.some(x=>x !== '')){
+          if(raw.some(x=>x === '')){ alert('Répartition : remplis les trois champs (Sushi, Chaud, Déchet), avec 0 si besoin, ou laisse-les tous vides.'); return; }
+          const vals = raw.map(x=>dp_parseNum(x)); if(vals.some(v=>isNaN(v) || v < 0)){ alert('Répartition : valeurs invalides.'); return; }
+          const sumR = vals[0] + vals[1] + vals[2];
+          if(sumR > qty + 1e-6){ alert('La somme Sushi + Chaud + Déchet dépasse la quantité achetée.'); return; }
+          repo[kit[0].id] = vals[0]; repo[kit[1].id] = vals[1]; dech = vals[2]; perteP = Math.round((qty - sumR) * 1000) / 1000;
+        }
+      }
+      base = { type:'Achat', articleNom:ing, quantite:qty, unite, fournisseur:E.fournisseur || '', montant:Math.round(tot * 100) / 100, bouton:btn.n, heure:V('dp-heure') || dp_nowHM(), rep:Object.keys(repo).length ? repo : null, dechet:dech, perteP:perteP };
     } else if(btn.m === 'liste'){
       const ch = dp_champs(btn), ing = V('dp-ing'), unite = ch.unite ? V('dp-unite') : '', qty = ch.qte ? dp_parseNum(V('dp-qty')) : 0;
       const tot = dp_parseNum(V('dp-tot')) || (ch.qte && ch.pu ? qty * dp_parseNum(V('dp-pu')) : 0), note = ch.note ? V('dp-note') : '';
@@ -6011,7 +6029,7 @@ function dp_start(){
    Données :
      mise_en_place/controle2        : { ing:{ <id ingrédient>:{ rend (%), map:{ <id ligne>: base par unité (0 = auto) } } }, plats:{ <clé>:{ name, g:{ <id ingrédient>: qté nette } } }, snapFrom }
      controle_events/<id>           : { type:'ajust'|'restart', ing, ingN, at (ISO), q (base, signé) | mode/qty, note, by, cr, modBy, modAt }
-     controle_jours/<AAAA-MM-JJ>    : sauvegarde automatique du jour de contrôle (2 h → 2 h) : { day, from, to, gen, by, items:{ <id>:{…} } } */
+     controle_jours/<AAAA-MM-JJ>    : sauvegarde automatique du jour de contrôle (00h00 → 23h59) : { day, from, to, gen, by, items:{ <id>:{…} } } */
 const cx_cfgRef = db.collection('mise_en_place').doc('controle2');
 const cx_evCol = db.collection('controle_events');
 const cx_jourCol = db.collection('controle_jours');
@@ -6030,9 +6048,9 @@ const cx_key = (n)=>String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 const cx_who = ()=>(typeof currentUser !== 'undefined' && currentUser) ? currentUser : 'administrateur';
 const cx_isAdmin = ()=>!!(session && session.isAdmin);
 function cx_typing(){ try{ const a = document.activeElement, b = document.getElementById('cx-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
-/* jour de contrôle : de 2 h à 2 h */
-function cx_dayStart(ms){ const d = new Date(ms); d.setHours(2, 0, 0, 0); if(ms < d.getTime()) d.setDate(d.getDate() - 1); return d; }
-function cx_dayWindow(dayKey){ const a = new Date(dayKey + 'T02:00'), b = new Date(a); b.setDate(b.getDate() + 1); return [a.getTime(), b.getTime()]; }
+/* jour de contrôle : jour calendaire, de 00h00 à 23h59 */
+function cx_dayStart(ms){ const d = new Date(ms); d.setHours(0, 0, 0, 0); return d; }
+function cx_dayWindow(dayKey){ const a = new Date(dayKey + 'T00:00'), b = new Date(a); b.setDate(b.getDate() + 1); return [a.getTime(), b.getTime()]; }
 /* unités : kg/g → g ; L/cl/ml → ml ; autre → l'unité elle-même */
 function cx_fam(u){ const x = String(u || '').trim().toLowerCase(); if(x === 'kg') return { b:'g', f:1000 }; if(x === 'g') return { b:'g', f:1 }; if(x === 'l') return { b:'ml', f:1000 }; if(x === 'cl') return { b:'ml', f:10 }; if(x === 'ml') return { b:'ml', f:1 }; return { b:x || 'unité', f:1 }; }
 function cx_toBase(q, u, ing){ const a = cx_fam(u), b = cx_fam(ing.u); return a.b === b.b ? Number(q) * a.f : null; }
@@ -6085,7 +6103,7 @@ async function cx_fetch(f, t, lookDays, priceDays){
   const ach = [], sales = [], ev = [], lo = f - lb * 864e5;
   a.forEach((d)=>{ const m = d.data(); if(!m || m.type !== 'Achat' || m.statut === 'annule' || (m.bouton && m.bouton !== btnName)) return;
     const hm = m.heure || (m.creeLe ? cx_pad(new Date(m.creeLe).getHours()) + ':' + cx_pad(new Date(m.creeLe).getMinutes()) : '12:00'), ms = cx_ms(m.date + 'T' + hm);
-    if(isNaN(ms)) return; ach.push({ id:d.id, ms, name:String(m.articleNom || '').trim(), q:Number(m.quantite) || 0, u:m.unite || '', montant:Number(m.montant) || 0, who:m.creePar || '', heure:hm, noHeure:!m.heure, rep:(m.rep && typeof m.rep === 'object') ? m.rep : null }); });
+    if(isNaN(ms)) return; ach.push({ id:d.id, ms, name:String(m.articleNom || '').trim(), q:Number(m.quantite) || 0, u:m.unite || '', montant:Number(m.montant) || 0, who:m.creePar || '', heure:hm, noHeure:!m.heure, rep:(m.rep && typeof m.rep === 'object') ? m.rep : null, dechet:(m.dechet === undefined || m.dechet === null) ? null : Number(m.dechet) || 0 }); });
   b.forEach((d)=>{ const day = d.data() || {}; (day.tickets || []).forEach((tk)=>{
     const h = String(tk.h || '').slice(0, 5); if(!/^\d\d:\d\d$/.test(h)) return;
     let dt = tk.date || d.id; if(!tk.date && h < '06:00'){ const x = new Date(d.id + 'T00:00'); x.setDate(x.getDate() + 1); dt = mep_ymd(x); }
@@ -6152,18 +6170,34 @@ function cx_histAdd(pl, ingId, q, from){
 function cx_cc(ing){ const c = cx_cfg.ing[ing.id] || {}; return { rend:Number(c.rend) > 0 ? Number(c.rend) : 100, cuis:Number(c.cuis) > 0 ? Number(c.cuis) : 100 }; }
 const cx_fixOf = (D, pid)=>D.ev.find(e=>e.type === 'achatfix' && e.pid === pid) || null;
 function cx_kits(ing){ const out = [], seen = {}; cx_lines(ing).forEach((l)=>{ if(!seen[l.sec]){ seen[l.sec] = 1; out.push({ id:l.sec, n:l.secName }); } }); return out; }
+/* rendement du jour : achats déclarés (Sushi+Chaud+Déchet) → moyenne pondérée de leur rendement réel ; sinon choix validé (95 % ou moyenne), sinon 95 % provisoire */
+function cx_isDecl(a){ return a.dechet !== null && a.dechet !== undefined && a.rep && typeof a.rep === 'object' && a.q > 0; }
+function cx_declYield(list){ let sq = 0, ss = 0; list.forEach((a)=>{ if(!cx_isDecl(a)) return; const sc = Object.keys(a.rep).reduce((t, k)=>t + (Number(a.rep[k]) || 0), 0); sq += a.q; ss += sc; }); return sq > 0 ? ss / sq * 100 : null; }
+function cx_movAvg(ing, D, dayKey){ const nm = ing.n.trim().toLowerCase(), f0 = cx_ms(dayKey + 'T00:00'); return cx_declYield(D.ach.filter(a=>a.name.toLowerCase() === nm && a.ms < f0 && a.ms >= f0 - 30 * 864e5)); }
+function cx_dayYield(ing, D, dayKey){
+  const nm = ing.n.trim().toLowerCase(), day = D.ach.filter(a=>a.name.toLowerCase() === nm && mep_ymd(new Date(a.ms)) === dayKey), y = cx_declYield(day);
+  const ev = D.ev.find(e=>e.type === 'rdt' && e.ing === ing.id && e.day === dayKey), mov = cx_movAvg(ing, D, dayKey);
+  if(y !== null) return { pct:y, src:'decl', valid:true, mov, ev };
+  if(ev) return { pct:Number(ev.pct) > 0 ? Number(ev.pct) : 95, src:ev.mode === 'moy' ? 'moy' : '95', valid:true, mov, ev };
+  return { pct:95, src:'prov', valid:false, mov, ev:null };
+}
 /* ajustements (anciens), achats (× taux d'achat), consommation (quantité servie × taux de cuisson) sur ]lo, hi] */
 function cx_seg(ing, D, lo, hi){
-  const { rend, cuis } = cx_cc(ing), nm = ing.n.trim().toLowerCase(), adjL = [], achL = [], usedK = {}, missPl = {}; let adj = 0, ach = 0, bad = 0, used = 0, miss = 0;
+  const { rend, cuis } = cx_cc(ing), ydc = {}, nm = ing.n.trim().toLowerCase(), adjL = [], achL = [], usedK = {}, missPl = {}; let adj = 0, ach = 0, bad = 0, used = 0, miss = 0;
   D.ev.forEach((e)=>{ if(e.type !== 'ajust' || e.ing !== ing.id) return; const m = cx_ms(e.at); if(m > lo && m <= hi){ adj += Number(e.q) || 0; adjL.push(e); } });
   D.ach.forEach((a)=>{ if(a.name.toLowerCase() !== nm || !(a.ms > lo && a.ms <= hi)) return;
     const fx = cx_fixOf(D, a.id), q = fx && fx.q !== undefined && fx.q !== null ? Number(fx.q) : a.q, rp = fx && fx.rep ? fx.rep : a.rep, v = cx_toBase(q, a.u, ing);
-    if(v === null){ bad++; return; } const base = v * rend / 100; ach += base;
-    achL.push(Object.assign({}, a, { q, origQ:a.q, base, rep:rp || null, fix:fx, fixed:!!fx, changed:!!(fx && Number(fx.seen) !== a.q) })); });
+    if(v === null){ bad++; return; }
+    const dk = mep_ymd(new Date(a.ms)); if(!ydc[dk]) ydc[dk] = cx_dayYield(ing, D, dk); const yd = ydc[dk], decl = cx_isDecl(a) && !fx;
+    let base, lossBase = 0, yp = yd.pct;
+    if(decl){ const sc = Object.keys(a.rep).reduce((t, k)=>t + (Number(a.rep[k]) || 0), 0); base = cx_toBase(sc, a.u, ing) || 0; lossBase = Math.max(0, v - base); yp = a.q > 0 ? sc / a.q * 100 : 0; }
+    else base = v * yd.pct / 100;
+    ach += base;
+    achL.push(Object.assign({}, a, { q, origQ:a.q, base, rep:rp || null, fix:fx, fixed:!!fx, changed:!!(fx && Number(fx.seen) !== a.q), decl, lossBase, yp, ysrc:decl ? 'decl' : yd.src, yvalid:decl ? true : yd.valid })); });
   D.sales.forEach((s)=>{ if(!(s.ms > lo && s.ms <= hi)) return; const gq = cx_gram(s.key, ing.id, s.ms); if(gq === null){ miss += s.q; missPl[s.key] = s.name; return; }
     const u = s.q * gq * cuis / 100; used += u; const pl = cx_cfg.plats[s.key], k = (pl && pl.k) || ''; usedK[k] = (usedK[k] || 0) + u; });
   adjL.sort((a, b)=>cx_ms(a.at) - cx_ms(b.at)); achL.sort((a, b)=>a.ms - b.ms);
-  return { adj, ach, used, usedK, bad, miss, missPl, adjL, achL };
+  return { adj, ach, used, usedK, bad, miss, missPl, adjL, achL, ydc };
 }
 /* perte cuite : dernière pesée de chaque ligne « perte » pour chaque jour de contrôle de la fenêtre */
 function cx_perteRows(lines, lo, hi, cuis){
@@ -6203,6 +6237,7 @@ function cx_calc(ing, f, t, mode, D){
   const ecart = (real !== null && !missR.length) ? real - theo : null, den = seg.used > 0 ? seg.used : (Math.abs(theo) || 1);
   const pct = ecart === null ? null : ecart / den * 100, price = cx_price(ing, D, t), da = ecart === null ? null : ecart * price;
   if(seg.miss) flags.push(Object.keys(seg.missPl).length + ' plat(s) vendu(s) sans quantité (' + cx_n(seg.miss) + ' portions non comptées)');
+  if(Object.keys(seg.achL.reduce((o, a)=>{ if(a.ysrc === 'prov') o[mep_ymd(new Date(a.ms))] = 1; return o; }, {})).length) flags.push('rendement du jour à choisir (95 % provisoire, non définitif)');
   if(seg.bad) flags.push(seg.bad + ' achat(s) dans une unité incompatible avec ' + ing.u);
   if(kits.length >= 2 && seg.usedK['']) flags.push('des plats vendus n’ont pas de cuisine (« À définir ») : écart par cuisine incomplet');
   if(D.noDetail && D.noDetail.length) flags.push('jour(s) sans détail des tickets : ' + D.noDetail.join(', '));
@@ -6211,8 +6246,8 @@ function cx_calc(ing, f, t, mode, D){
   const w8 = kits.map(kt=>(seg.usedK[kt.id] || 0) + (perteK[kt.id] || 0)), w8s = w8.reduce((a, b)=>a + b, 0), achK = {}; kits.forEach((kt)=>{ achK[kt.id] = 0; });
   const achRows = seg.achL.map((a)=>{
     const al = {}; kits.forEach((kt)=>{ al[kt.id] = 0; }); let decl = 0;
-    if(a.rep) Object.keys(a.rep).forEach((sec)=>{ const qv = Number(a.rep[sec]) || 0; if(qv > 0 && al[sec] !== undefined){ const b = (cx_toBase(qv, a.u, ing) || 0) * rend / 100; al[sec] += b; decl += b; } });
-    const rest = Math.max(0, a.base - decl), est = rest > 0.5 && kits.length >= 2;
+    if(a.rep) Object.keys(a.rep).forEach((sec)=>{ const qv = Number(a.rep[sec]) || 0; if(qv > 0 && al[sec] !== undefined){ const b = (cx_toBase(qv, a.u, ing) || 0) * (a.decl ? 100 : a.yp) / 100; al[sec] += b; decl += b; } });
+    const rest = a.decl ? 0 : Math.max(0, a.base - decl), est = rest > 0.5 && kits.length >= 2;
     if(est) kits.forEach((kt, i)=>{ al[kt.id] += rest * (w8s > 0 ? w8[i] / w8s : 1 / kits.length); });
     kits.forEach((kt)=>{ achK[kt.id] += al[kt.id]; });
     return Object.assign({}, a, { alloc:al, est });
@@ -6258,7 +6293,7 @@ async function cx_resnapFor(ms){
 }
 async function cx_snapManual(){
   const el = document.getElementById('cx-snapday'), k = el && el.value; if(!k){ alert('Choisis un jour.'); return; }
-  if(k >= mep_ymd(cx_dayStart(Date.now()))){ alert('Ce jour de contrôle n’est pas terminé (il se termine à 2 h).'); return; }
+  if(k >= mep_ymd(cx_dayStart(Date.now()))){ alert('Ce jour de contrôle n’est pas terminé (il se termine à minuit).'); return; }
   cx_h.busy = true; cx_render();
   try{ await cx_snapDay(k, cx_who() + ' (manuel)'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
   cx_h.busy = false; await cx_hLoad();
@@ -6329,7 +6364,7 @@ async function cx_savePlat(key, edit){
   try{ await cx_cfgRef.set({ plats:{ [key]:Object.assign({ name, g, h }, multi ? { k:kSel } : {}) } }, { merge:true }); if(typeof pt_toast === 'function') pt_toast('Enregistré : ' + name + (edit ? ' (à partir du ' + rp_fmtDate(from) + ')' : '')); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
   cx_reload(); cx_render();
 }
-function cx_none(key){ cx_ingList().forEach((i)=>{ const el = document.getElementById('cx-g-' + key + '-' + i.id); if(el && !cx_hasGram(key, i.id)) el.value = '0'; }); cx_savePlat(key, false); }
+function cx_none(key){ if(cx_allKits().length >= 2 && !(cx_pk[key] || (cx_cfg.plats[key] || {}).k)) cx_pk[key] = '_none'; cx_ingList().forEach((i)=>{ const el = document.getElementById('cx-g-' + key + '-' + i.id); if(el && !cx_hasGram(key, i.id)) el.value = '0'; }); cx_savePlat(key, false); }
 function cx_copy(key, src){
   const pl = cx_cfg.plats[src]; if(!pl) return;
   cx_ingList().forEach((i)=>{ const el = document.getElementById('cx-g-' + key + '-' + i.id); if(el && !cx_hasGram(key, i.id) && pl.g && pl.g[i.id] !== undefined && pl.g[i.id] !== null) el.value = String(pl.g[i.id]).replace('.', ','); });
@@ -6342,7 +6377,7 @@ function cx_todoList(){
 }
 function cx_kChips(key, cur){
   const ks = cx_allKits(); if(ks.length < 2) return '';
-  return `<div class="mep-w" style="margin-top:8px;">Cuisine où le plat est préparé</div><div class="filter-row" style="margin:4px 0;flex-wrap:wrap;">${ks.map(k=>`<button class="filter-chip ${cur === k.id ? 'active' : ''}" onclick="cx_pkSet('${key}','${k.id}')">${cx_e(k.n)}</button>`).join('')}</div>`;
+  return `<div class="mep-w" style="margin-top:8px;">Cuisine où le plat est préparé</div><div class="filter-row" style="margin:4px 0;flex-wrap:wrap;">${ks.map(k=>`<button class="filter-chip ${cur === k.id ? 'active' : ''}" onclick="cx_pkSet('${key}','${k.id}')">${cx_e(k.n)}</button>`).join('')}<button class="filter-chip ${cur === '_bar' ? 'active' : ''}" onclick="cx_pkSet('${key}','_bar')">Bar</button></div>`;
 }
 function cx_todoHtml(){
   const todo = cx_todoList(); if(!todo.length) return '';
@@ -6365,7 +6400,7 @@ function cx_plistHtml(){
   const list = Object.keys(cx_cfg.plats).map(k=>({ k, pl:cx_cfg.plats[k] })).filter(x=>(!q || String(x.pl.name).toLowerCase().includes(q)) && tr.some(i=>cx_hasGram(x.k, i.id))).sort((a, b)=>String(a.pl.name).localeCompare(String(b.pl.name), 'fr'));
   if(!list.length) return '<div class="pt-muted">Aucun plat défini.</div>';
   return list.slice(0, 30).map((x)=>{
-    const open = !!cx_open['pl:' + x.k], kn = (cx_allKits().find(k=>k.id === x.pl.k) || {}).n, sum = (kn ? kn + ' · ' : '') + tr.filter(i=>cx_hasGram(x.k, i.id)).map(i=>i.n + ' ' + cx_n(x.pl.g[i.id]) + ' ' + cx_baseLbl(i)).join(' · ');
+    const open = !!cx_open['pl:' + x.k], kn = x.pl.k === '_bar' ? 'Bar' : (cx_allKits().find(k=>k.id === x.pl.k) || {}).n, sum = (kn ? kn + ' · ' : '') + tr.filter(i=>cx_hasGram(x.k, i.id)).map(i=>i.n + ' ' + cx_n(x.pl.g[i.id]) + ' ' + cx_baseLbl(i)).join(' · ');
     const body = open ? cx_kChips(x.k, cx_pk[x.k] !== undefined ? cx_pk[x.k] : (x.pl.k || '')) + tr.map(i=>{ const hh = (x.pl.h && x.pl.h[i.id]) || [];
         return cx_inputRow(x.k, i, cx_hasGram(x.k, i.id) ? String(x.pl.g[i.id]).replace('.', ',') : undefined) + (hh.length > 1 ? `<div class="mep-w">${hh.map(e=>(e.from === '0000-00-00' ? 'depuis toujours' : 'à partir du ' + rp_fmtDate(e.from)) + ' : ' + cx_n(e.q)).join(' → ')}</div>` : ''); }).join('')
       + `<div class="g2" style="margin-top:8px;align-items:end;"><div><label>Nouveau grammage à partir du</label><input type="date" class="ft-in" id="cx-gfrom-${x.k}" value="${todayISO()}"></div><div><button class="btn small t-save" onclick="cx_savePlat('${x.k}',true)">Appliquer</button></div></div>` : '';
@@ -6401,6 +6436,17 @@ function cx_settingsHtml(){
       ${on ? `<div class="mep-w">achat ${cx_e(c.rend || 100)} % · cuisson ${cx_e(c.cuis || 100)} % · ${lines.length} ligne(s) liée(s)</div>` : ''}${det}</div>`;
   }).join('');
   return `<div class="ticket"><div class="section-label">Ingrédients suivis</div><div class="pt-muted" style="margin-bottom:8px;">La liste vient de Dépenses › Sortie › Ingrédients. Coche ceux à suivre ; l’unité de chaque ingrédient est définie là-bas.</div>${rows || '<div class="pt-muted">Aucun ingrédient.</div>'}</div>` + cx_platsHtml();
+}
+/* ---------- rendement du jour : choix validé par jour (95 % modifiable ou moyenne des derniers jours renseignés) ---------- */
+async function cx_ryPick(ingId, dayKey, mode){
+  const ing = cx_ingById(ingId), r = cx_res[ingId]; if(!ing || !r) return; const y = r.seg.ydc && r.seg.ydc[dayKey]; if(!y) return;
+  let pct;
+  if(mode === 'moy'){ if(y.mov === null || y.mov === undefined){ alert('Aucun achat renseigné récemment.'); return; } pct = Math.round(y.mov * 10) / 10; }
+  else { const el = document.getElementById('cx-ry-' + ingId + '-' + dayKey); pct = el ? ft_parseQ(el.value) : 95; if(pct === null || !(pct > 0) || pct > 100){ alert('Taux invalide (entre 1 et 100).'); return; } }
+  const rec = { type:'rdt', ing:ingId, ingN:ing.n, day:dayKey, mode, pct, at:new Date(dayKey + 'T12:00').toISOString(), by:cx_who(), cr:new Date().toISOString() };
+  try{ await cx_evCol.doc('ry_' + ingId + '_' + dayKey).set(rec); await cx_resnapFor(cx_ms(dayKey + 'T12:00')); if(typeof pt_toast === 'function') pt_toast('Rendement du jour validé : ' + pct + ' %.'); }
+  catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+  await cx_reload(); cx_render();
 }
 /* ---------- ajustements, redémarrage ---------- */
 function cx_startOpen(ingId){
@@ -6541,12 +6587,19 @@ function cx_detailHtml(r){
   const startBtns = `<div class="actions-row" style="margin:4px 0 0;">${none ? `<button class="btn small t-save" onclick="cx_startValidate('${id}')">✓ Valider</button>` : ''}${none ? '' : `<button class="btn ghost small" onclick="cx_startUndo('${id}')">↺ Revenir au calcul</button>`}</div>`;
   const z1 = `<div class="cxz"><h4>① Départ</h4>${hdr}${cx_zr({ byK, l:'Stock cru de départ', sub:startSub, p:'100 %', v:byK ? Kv(k=>F(k.start)).concat([F(r.start)]) : [F(r.start)], btn:`cx_startOpen('${id}')` })}${startBtns}</div>`;
   const achRows = r.achRows.map((x)=>cx_zr({ byK, l:'Achat ' + cx_e(cx_pad(new Date(x.ms).getHours()) + ':' + cx_pad(new Date(x.ms).getMinutes())),
-      sub:cx_e(mep_fq(x.q)) + ' ' + cx_e(x.u) + ' · ' + cx_e(x.who) + (x.fixed ? ' · <b style="color:var(--amber)">✎ corrigé</b>' + (x.q !== x.origQ ? ' (' + cx_e(mep_fq(x.origQ)) + ' → ' + cx_e(mep_fq(x.q)) + ')' : '') + (x.fix && x.fix.note ? ' — ' + cx_e(x.fix.note) : '') : '') + (x.noHeure ? ' · <i>heure non saisie</i>' : '') + (x.est && byK ? ' · <i>répartition estimée</i>' : ''),
-      p:cx_e(cx_n(r.rend)) + ' %', est:x.est, v:byK ? r.K.map(k=>cx_e(cx_fmt(x.alloc[k.id] || 0, ing))).concat([cx_e('＋ ' + cx_fmt(x.base, ing))]) : [cx_e('＋ ' + cx_fmt(x.base, ing))], btn:`cx_achOpen('${id}','${x.id}')` })
+      sub:cx_e(mep_fq(x.q)) + ' ' + cx_e(x.u) + ' · ' + cx_e(x.who) + (x.fixed ? ' · <b style="color:var(--amber)">✎ corrigé</b>' + (x.q !== x.origQ ? ' (' + cx_e(mep_fq(x.origQ)) + ' → ' + cx_e(mep_fq(x.q)) + ')' : '') + (x.fix && x.fix.note ? ' — ' + cx_e(x.fix.note) : '') : '') + (x.noHeure ? ' · <i>heure non saisie</i>' : '') + (x.est && byK ? ' · <i>répartition estimée</i>' : '') + (x.decl ? ' · déclaré : perte ' + cx_e(cx_fmt(x.lossBase, ing)) + ' (déchet + perte pesée)' : (x.ysrc === 'prov' ? ' · <span class="rp2-bad">rendement à choisir</span>' : '')),
+      p:cx_e(cx_n(Math.round(x.yp * 10) / 10)) + ' %' + (x.ysrc === 'prov' ? '*' : ''), est:x.est, v:byK ? r.K.map(k=>cx_e(cx_fmt(x.alloc[k.id] || 0, ing))).concat([cx_e('＋ ' + cx_fmt(x.base, ing))]) : [cx_e('＋ ' + cx_fmt(x.base, ing))], btn:`cx_achOpen('${id}','${x.id}')` })
     + (x.changed ? `<div class="rp2-bad" style="margin:2px 0 6px;">⚠ Modifié dans Dépenses depuis : ${cx_e(mep_fq(x.origQ))} ${cx_e(x.u)} <span class="actions-row" style="display:inline-flex;margin:0 0 0 6px;"><button class="btn small t-save" onclick="cx_achKeep('${id}','${x.id}')">Garder ma valeur</button><button class="btn ghost small" onclick="cx_achRevert('${id}','${x.id}')">Prendre celle de Dépenses</button></span></div>` : '')
     + (x.fixed && !x.changed ? `<div style="margin:0 0 4px;"><button class="btn ghost small" onclick="cx_achRevert('${id}','${x.id}')">↺ Revenir à la valeur de Dépenses</button></div>` : '')).join('');
   const adjRow = r.seg.adjL.length ? cx_zr({ byK, l:'Ajustements (anciens)', sub:r.seg.adjL.map(e=>cx_e(e.note)).join(' · '), v:byK ? Kv(()=>'').concat([FS(r.seg.adj, true)]) : [FS(r.seg.adj, true)] }) + r.seg.adjL.map(e=>`<div style="text-align:right;"><button class="btn ghost small t-del" onclick="cx_adjDel('${e.id}')">✕ ${cx_e(cx_fmtD(cx_ms(e.at)))}</button></div>`).join('') : '';
-  const z2 = `<div class="cxz"><h4>② Entrées</h4>${hdr}${achRows || cx_zr({ byK, l:'Achats du gérant', sub:'aucun achat dans la période', p:cx_e(cx_n(r.rend)) + ' %', v:byK ? Kv(()=>'0').concat(['0']) : ['0']})}${adjRow}</div>`;
+  const z2 = `<div class="cxz"><h4>② Entrées</h4>${hdr}${achRows || cx_zr({ byK, l:'Achats du gérant', sub:'aucun achat dans la période', p:'', v:byK ? Kv(()=>'0').concat(['0']) : ['0']})}${adjRow}</div>`;
+  const ryDays = Object.keys(r.seg.ydc || {}).sort();
+  const ryHtml = ryDays.map((dk)=>{ const y = r.seg.ydc[dk], lab = dk.slice(8) + '/' + dk.slice(5, 7), sel = (m)=>y.ev && y.ev.mode === m ? 'font-weight:800;outline:2px solid var(--moss);' : '';
+    if(y.src === 'decl') return `<div class="cxz"><h4>Rendement du jour · ${cx_e(lab)}</h4><div class="pt-muted">Réel déclaré par le gérant : <b>${cx_e(cx_n(Math.round(y.pct * 10) / 10))} %</b> (moyenne pondérée des achats renseignés), appliqué aussi aux achats non renseignés du jour.</div></div>`;
+    const cur95 = y.ev && y.ev.mode === '95' ? y.ev.pct : 95, mov = y.mov === null || y.mov === undefined ? null : Math.round(y.mov * 10) / 10;
+    return `<div class="cxz"><h4>Rendement du jour · ${cx_e(lab)}</h4><div class="pt-muted" style="margin-bottom:6px;">${y.valid ? '✓ validé : ' + cx_e(cx_n(y.pct)) + ' %' + (y.ev && y.ev.by ? ' · ' + cx_e(y.ev.by) : '') : '<span class="rp2-bad">Rendement à choisir</span> — 95 % provisoire, calcul non définitif'}</div>
+      <div class="g2" style="align-items:end;"><div><label>Taux fixe (%)</label><input type="text" inputmode="decimal" class="ft-in" id="cx-ry-${id}-${dk}" value="${cx_e(cx_n(cur95))}"></div><div><button class="btn small t-save" style="${sel('95')}" onclick="cx_ryPick('${id}','${dk}','95')">✓ Valider ce taux</button></div></div>
+      <div style="margin-top:6px;"><button class="btn ghost small" style="${sel('moy')}" ${mov === null ? 'disabled' : ''} onclick="cx_ryPick('${id}','${dk}','moy')">Moyenne des derniers jours renseignés : ${mov === null ? 'aucun achat renseigné' : cx_e(cx_n(mov)) + ' %'}</button></div></div>`; }).join('');
   const z3 = `<div class="cxz"><h4>③ Sorties</h4>${hdr}${cx_zr({ byK, l:'Utilisé (ventes)', sub:'quantité servie × cuisson', p:cx_e(cx_n(r.cuis)) + ' %', v:byK ? Kv(k=>cx_e('− ' + cx_fmt(k.used, ing))).concat([cx_e('− ' + cx_fmt(r.seg.used, ing))]) : [cx_e('− ' + cx_fmt(r.seg.used, ing))], btn:`cx_usedOpen('${id}')` })}
     ${cx_zr({ byK, l:'Perte cuite', sub:'fin de service · saisie par le cuisinier', p:cx_e(cx_n(r.cuis)) + ' %', v:byK ? Kv(k=>cx_e('− ' + cx_fmt(k.perte, ing))).concat([cx_e('− ' + cx_fmt(r.perte, ing))]) : [cx_e('− ' + cx_fmt(r.perte, ing))], btn:`cx_wOpen('${id}','perte')` })}</div>`;
   const pct = r.ecart !== null && r.pct !== null ? (r.pct < 0 ? '−' : '+') + cx_n(Math.abs(r.pct)) + ' %' : '', da = r.da !== null && r.price > 0 ? ' · ' + (r.da < 0 ? '−' : '+') + cx_n(Math.abs(r.da)) + ' DA' : '';
@@ -6583,7 +6636,7 @@ function cx_detailHtml(r){
       <div class="actions-row"><button class="btn ghost small" onclick="cx_fClose()">Fermer</button></div></div>`; }
   const top = `<div class="row-between" style="margin-bottom:6px;"><div class="mep-w">achat ${cx_e(cx_n(r.rend))} % · cuisson ${cx_e(cx_n(r.cuis))} %</div><button class="btn ghost small t-edit" onclick="cx_tauxOpen('${id}')">Taux ✎</button></div>
     ${r.K.length >= 2 ? `<div style="margin:2px 0 6px;"><span class="sw ${byK ? '' : 'off'}" onclick="cx_togK('${id}')" style="cursor:pointer;"><i></i> Écart par cuisine</span></div>` : ''}`;
-  return top + z1 + (a ? form : '') + z2 + (fm && fm.t === 'ach' ? form : '') + z3 + (fm && (fm.t === 'used' || fm.t === 'w' && fm.role === 'perte') ? form : '') + z4 + (fm && (fm.t === 'taux' || fm.t === 'w' && fm.role === 'stock') ? form : '')
+  return top + z1 + (a ? form : '') + z2 + ryHtml + (fm && fm.t === 'ach' ? form : '') + z3 + (fm && (fm.t === 'used' || fm.t === 'w' && fm.role === 'perte') ? form : '') + z4 + (fm && (fm.t === 'taux' || fm.t === 'w' && fm.role === 'stock') ? form : '')
     + (r.flags.length ? `<div class="rp2-bad" style="margin-top:8px;">${r.flags.map(f=>'⚠ ' + cx_e(f)).join('<br>')}</div>` : '');
 }
 function cx_ctrlHtml(){
@@ -6592,7 +6645,7 @@ function cx_ctrlHtml(){
   const per = cx_perOpen ? `<div class="ticket" style="border-color:var(--forest);"><div class="row-between"><div class="section-label" style="margin:0;">Période</div><button class="btn ghost small" onclick="cx_togPer()">Fermer</button></div>
       <div class="grid grid-2" style="margin-top:8px;"><div class="field"><label>De</label><input type="datetime-local" id="cx-from" value="${cx_e(cx_from)}" onchange="cx_setRange()"></div><div class="field"><label>À ${cx_to ? '' : '(maintenant)'}</label><input type="datetime-local" id="cx-to" value="${cx_e(cx_to)}" onchange="cx_setRange()"></div></div>
       <div class="filter-row" style="flex-wrap:wrap;margin-bottom:0;"><button class="filter-chip" onclick="cx_preset('today')">Jour en cours</button><button class="filter-chip" onclick="cx_preset('yesterday')">Hier</button><button class="filter-chip" onclick="cx_preset('3h')">3 dernières h</button><button class="filter-chip" onclick="cx_preset('7d')">7 jours</button>${cx_to ? '<button class="filter-chip" onclick="cx_nowTo()">Jusqu’à maintenant</button>' : ''}</div>
-      <div class="pt-muted" style="margin-top:8px;">« À » vide = jusqu’à maintenant. Le jour de contrôle va de 2 h à 2 h.</div></div>`
+      <div class="pt-muted" style="margin-top:8px;">« À » vide = jusqu’à maintenant. Chaque jour est calculé à part, de 00h00 à 23h59.</div></div>`
     : `<div class="ticket" style="padding:12px;"><div class="row-between"><div><div class="mep-w">Période</div>${perLbl}</div><button class="btn ghost small" onclick="cx_togPer()">Modifier</button></div></div>`;
   const rst = cx_rst.open ? `<div class="ticket" style="border-color:var(--forest);"><div class="row-between"><div class="section-label" style="margin:0;">⏱ Recommencer à une heure</div><button class="btn ghost small" onclick="cx_rstOpen()">Annuler</button></div>
       <div class="grid grid-2" style="margin-top:8px;"><div class="field"><label>À partir de</label><input type="datetime-local" value="${cx_e(cx_rst.at)}" onchange="cx_rstSet('at',this.value)"></div><div class="field"><label>Ingrédient</label><select class="ft-in" onchange="cx_rstSet('ing',this.value)"><option value="">Tous</option>${tr.map(i=>`<option value="${i.id}" ${cx_rst.ing === i.id ? 'selected' : ''}>${cx_e(i.n)}</option>`).join('')}</select></div></div>
@@ -6612,7 +6665,7 @@ function cx_ctrlHtml(){
   return head + rst + per + cx_todoHtml() + `<div class="ticket"><div class="section-label">Ingrédients${cx_loading ? ' · mise à jour…' : ''}</div>${cards}</div>`;
 }
 /* ---------- journal ---------- */
-const CX_TYPES = { corr:'Correction', achat:'Achat', pesee:'Pesée', depart:'Départ', ajust:'Ajustement', vente:'Ventes', restart:'Redémarrage', snap:'Sauvegarde' };
+const CX_TYPES = { corr:'Correction', achat:'Achat', pesee:'Pesée', depart:'Départ', ajust:'Ajustement', vente:'Ventes', restart:'Redémarrage', rendement:'Rendement', snap:'Sauvegarde' };
 function cx_jPreset(k, silent){
   const now = Date.now(), ds = cx_dayStart(now);
   if(k === 'today'){ cx_j.from = cx_dt(ds); cx_j.to = ''; }
@@ -6640,6 +6693,7 @@ function cx_jRows(){
     if(e.type === 'ajust') rows.push({ ms, type:'ajust', ing:e.ing, ingN:e.ingN || (ing && ing.n) || '', txt:`Ajustement ${ing ? cx_fmt(e.q, ing, true) : cx_n(e.q)} — ${e.note || ''}${e.modBy ? ' (modifié par ' + e.modBy + ')' : ''}`, who:e.by || '' });
     else if(e.type === 'start'){ const ms2 = cx_ms(e.cr || e.at); if(ms2 >= f && ms2 <= t) rows.push({ ms:ms2, type:'depart', ing:e.ing, ingN:e.ingN || (ing && ing.n) || '', txt:(e.corrected ? 'Départ corrigé : calculé ' + (ing ? cx_fmt(e.calc, ing) : cx_n(e.calc)) + ' → ' + (ing ? cx_fmt(e.q, ing) : cx_n(e.q)) + ' — ' + (e.note || '') : 'Départ validé : ' + (ing ? cx_fmt(e.q, ing) : cx_n(e.q))) + ' (période depuis ' + cx_fmtD(cx_ms(e.at)) + ')', who:e.by || '' }); }
     else if(e.type === 'achatfix') rows.push({ ms:cx_ms(e.cr || e.at), type:'corr', ing:e.ing, ingN:e.ingN || (ing && ing.n) || '', txt:'Achat corrigé dans le Contrôle : ' + mep_fq(e.orig) + ' → ' + mep_fq(e.q) + (ing ? ' ' + ing.u : '') + (e.note ? ' — ' + e.note : ''), who:e.by || '' });
+    else if(e.type === 'rdt') rows.push({ ms:cx_ms(e.cr || e.at), type:'rendement', ing:e.ing, ingN:e.ingN || (ing && ing.n) || '', txt:`Rendement du ${e.day} validé : ${e.pct} % (${e.mode === 'moy' ? 'moyenne des derniers jours renseignés' : 'taux fixe'})`, who:e.by || '' });
     else if(e.type === 'restart') rows.push({ ms, type:'restart', ing:e.ing, ingN:e.ingN || '', txt:`Contrôle redémarré à ${cx_fmtD(ms)} — départ : ${e.mode === 'theo' ? 'théorique (avec l’écart passé)' : e.mode === 'qty' ? 'quantité ' + e.qty : 'pesée réelle'}`, who:e.by || '' }); });
   const per = {}; D.sales.forEach((s)=>{ if(s.ms < f || s.ms > t) return; const o = per[s.key] || (per[s.key] = { name:s.name, key:s.key, q:0, ms:0 }); o.q += s.q; if(s.ms > o.ms) o.ms = s.ms; });
   Object.keys(per).forEach((k)=>{ const p = per[k], pl = cx_cfg.plats[k], ings = tr.filter(i=>pl && pl.g && pl.g[i.id] !== undefined && pl.g[i.id] !== null);
@@ -6690,7 +6744,7 @@ function cx_histHtml(){
   const yest = new Date(cx_dayStart(Date.now())); yest.setDate(yest.getDate() - 1);
   const head = `<div class="ticket"><div class="section-label">Historique des écarts</div>
     <select class="ft-in" onchange="cx_h.ing=this.value;cx_render()">${tr.map(i=>`<option value="${i.id}" ${i.id === id ? 'selected' : ''}>${cx_e(i.n)}</option>`).join('')}</select>
-    <div class="pt-muted" style="margin-top:8px;">Chaque jour de contrôle (2 h → 2 h) est sauvegardé automatiquement à la première ouverture de l’application après 2 h. Un ajustement sur un jour passé remplace la sauvegarde par le nouveau calcul.</div>
+    <div class="pt-muted" style="margin-top:8px;">Chaque jour (00h00 → 23h59) est sauvegardé automatiquement à la première ouverture de l’application après minuit. Un ajustement sur un jour passé remplace la sauvegarde par le nouveau calcul.</div>
     <div class="g2" style="margin-top:10px;align-items:end;"><div><label>Calculer / recalculer un jour</label><input type="date" id="cx-snapday" class="ft-in" value="${mep_ymd(yest)}"></div><div><button class="btn small t-save" ${cx_h.busy ? 'disabled' : ''} onclick="cx_snapManual()">Calculer et enregistrer</button></div></div></div>`;
   if(!ing) return head + '<div class="ticket"><div class="empty-state">Aucun ingrédient suivi.</div></div>';
   const lines = rows.filter(r=>r.items && r.items[id]).map((r)=>{ const x = r.items[id], col = x.ecart === null || x.ecart === undefined ? 'var(--ink-muted)' : Math.abs(x.pct || 0) <= 5 ? 'var(--moss)' : Math.abs(x.pct || 0) <= 15 ? 'var(--amber)' : 'var(--rust)';
