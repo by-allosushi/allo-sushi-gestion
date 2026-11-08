@@ -1744,7 +1744,7 @@ function pt_codes(){
 }
 function pt_name(c){ const e=pt_emp[c]; if(e && e.name) return e.name; if(PT_DEFAULT_NAMES[c]) return PT_DEFAULT_NAMES[c]; return 'Code ' + c + ' (à identifier)'; }
 function pt_poste(c){ return (pt_emp[c] && pt_emp[c].poste) || ''; }
-function pt_label(c){ const p=pt_poste(c); return pt_name(c) + (p ? ' — ' + p : ''); }
+function pt_label(c){ const p=pt_poste(c), dp = (typeof pt_departDate === 'function') ? pt_departDate(c) : ''; return pt_name(c) + (p ? ' — ' + p : '') + (dp ? ' — sorti le ' + dp.slice(8) + '/' + dp.slice(5, 7) : ''); }
 function pt_rate(c){ return Number(pt_emp[c] && pt_emp[c].rate) || 0; }
 function pt_mode(c){ return (pt_emp[c] && pt_emp[c].payMode) === 'daily' ? 'daily' : 'hourly'; }
 function pt_transport(c){ const t=(pt_emp[c] && pt_emp[c].transport) || {}; return { enabled:!!t.enabled, amount:Number(t.amount)||0 }; }
@@ -2107,13 +2107,17 @@ function pt_autoDays(code){
   for(let d = from; d <= to && out.length < 400; d = pt_addDays(d, 1)) if(!abs.has(d)) out.push(d);
   return out;
 }
+/* ---- départ (démission / fin de contrat) : document pointage_entries/depart_<code> { kind:'depart', code, date, from, congeFixed, note, by, savedAt } ---- */
+function pt_departOf(code){ return pt_entries.find(e=>e.kind === 'depart' && String(e.code) === String(code)) || null; }
+function pt_departDate(code){ const d = pt_departOf(code); return d && d.date ? d.date : ''; }
 function pt_baseOf(code, sessions){
-  const mySess = sessions.filter(s=>s.code === code);
-  const myManual = pt_entries.filter(e=>e.kind === 'manual' && e.code === code && pt_inRange(e.date));
+  const dep = pt_departDate(code);
+  const mySess = sessions.filter(s=>s.code === code && (!dep || pt_day(s.date) <= dep));
+  const myManual = pt_entries.filter(e=>e.kind === 'manual' && e.code === code && pt_inRange(e.date) && (!dep || e.date <= dep));
   const totalHours = mySess.reduce((s,x)=>s+x.hours, 0) + myManual.reduce((s,x)=>s+(Number(x.hours)||0), 0);
   const rate = pt_rate(code), mode = pt_mode(code);
   let dset = new Set([...mySess.map(s=>pt_day(s.date)), ...myManual.map(m=>m.date)]);
-  if(pt_isAuto(code)){ dset = new Set([...dset].filter(d=>d < PT_AUTO_START)); pt_autoDays(code).forEach(d=>dset.add(d)); }
+  if(pt_isAuto(code)){ dset = new Set([...dset].filter(d=>d < PT_AUTO_START)); pt_autoDays(code).forEach(d=>{ if(!dep || d <= dep) dset.add(d); }); }
   const workedDays = dset.size;
   const baseWage = mode === 'daily' ? workedDays * rate : totalHours * rate;
   return { totalHours, rate, mode, workedDays, baseWage };
@@ -2169,6 +2173,14 @@ function pt_payroll(code, sessions){
    Le Jour Off n'entre pas dans le congé. Solde initial : doc congeopen_<code> ; versements : kind 'congepaid'. */
 const PT_CONGE_START = '2026-10-24';
 function pt_congeOpen(code){ const d = pt_entries.find(e=>e.kind === 'congeopen' && e.code === code); return d ? (Number(d.amount) || 0) : 0; }
+/* mode de calcul du congé, au choix par employé : 'twelfth' (1/12 du salaire perçu, arrondi) ou 'jours' (2,5 jours par mois travaillé × 250 DA × 8 h) */
+const PT_CONGE_JOUR = 250 * 8, PT_CONGE_JOURS_MOIS = 2.5;
+function pt_congeMode(code){ const d = pt_entries.find(e=>e.kind === 'congemode' && e.code === code); return d && (d.mode === 'jours' || d.mode === 'twelfth') ? d.mode : 'min'; }
+function pt_congeMonths(from, to){ const a = from.split('-').map(Number), b = to.split('-').map(Number); if(to < from) return 0; return Math.max(0, (b[0] - a[0]) * 12 + (b[1] - a[1]) - (b[2] < a[2] ? 1 : 0)); }
+async function pt_congeSaveMode(code, mode){
+  try{ await pt_entriesCol.doc('congemode_' + code).set({ kind:'congemode', code, mode:(mode === 'jours' || mode === 'twelfth') ? mode : 'min', savedAt:new Date().toISOString() }, { merge:true }); pt_toast('Mode de calcul du congé enregistré.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
 function pt_congePaidList(code){ return pt_entries.filter(e=>e.kind === 'congepaid' && e.code === code).sort((a,b)=>String(b.date).localeCompare(String(a.date))); }
 /* Employé payé au jour (paie forfaitaire) : son congé n'est pas calculé sur son taux journalier mais, pour chaque jour travaillé, sur 8 h × 250 DA (1/12 × 8 h × 250 DA = 166,67 DA par jour). Modifiable via congeHours / congeRate de la fiche employé. */
 function pt_congeForfait(code){
@@ -2176,14 +2188,62 @@ function pt_congeForfait(code){
   const e = pt_emp[code] || {}, h = Number(e.congeHours) > 0 ? Number(e.congeHours) : 8, r = Number(e.congeRate) > 0 ? Number(e.congeRate) : 250;
   return { hours:h, rate:r };
 }
+/* Congé : 3 modes — 'min' (défaut : le plus petit des deux montants), 'twelfth' (1/12 du salaire perçu, arrondi), 'jours' (2,5 jours par 30 jours travaillés,
+   1 jour = taux horaire × 8 h). Départ : le calcul s'arrête à la date de sortie ; un montant connu (congeFixed) remplace le calcul. */
+function pt_congeJourValue(code){ const fo = pt_congeForfait(code); if(fo) return fo.hours * fo.rate; const r = pt_rate(code); return r > 0 ? r * 8 : PT_CONGE_JOUR; }
 function pt_conge(code, asOf){
-  const to = asOf || todayISO(), from = PT_CONGE_START;
-  const forfait = pt_congeForfait(code);
-  const base = to < from ? 0 : pt_withFilter(from, to, ()=>{ const b = pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))); return forfait ? b.workedDays * forfait.hours * forfait.rate : b.baseWage; });
-  const computed = pt_ceil10(base / 12), open = pt_congeOpen(code);
+  const dep = pt_departOf(code); let to = asOf || todayISO(); if(dep && dep.date && to > dep.date) to = dep.date;
+  const from = PT_CONGE_START, forfait = pt_congeForfait(code); let workedDays = 0;
+  const base = to < from ? 0 : pt_withFilter(from, to, ()=>{ const b = pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))); workedDays = b.workedDays; return forfait ? b.workedDays * forfait.hours * forfait.rate : b.baseWage; });
+  const mode = pt_congeMode(code), days = workedDays / 30 * PT_CONGE_JOURS_MOIS, jourVal = pt_congeJourValue(code);
+  const amtTwelfth = pt_ceil10(base / 12), amtJours = Math.round(days * jourVal * 100) / 100;
+  let computed = mode === 'jours' ? amtJours : mode === 'twelfth' ? amtTwelfth : Math.min(amtJours, amtTwelfth);
+  const fixed = dep && dep.congeFixed !== undefined && dep.congeFixed !== null && dep.congeFixed !== '' ? Number(dep.congeFixed) : null;
+  if(fixed !== null && !isNaN(fixed)) computed = fixed; const open = pt_congeOpen(code);
   const taken = pt_congePaidList(code).filter(e=>e.date <= to).reduce((t,e)=>t + (Number(e.amount) || 0), 0);
   const total = Math.round((open + computed) * 100) / 100;
-  return { from, to, base, computed, open, total, taken, left:Math.round((total - taken) * 100) / 100 };
+  return { mode, workedDays, days, jourVal, amtTwelfth, amtJours, fixed:(fixed !== null && !isNaN(fixed)) ? fixed : null, from, to, base, computed, open, total, taken, left:Math.round((total - taken) * 100) / 100 };
+}
+/* solde de tout compte d'un employé sorti : paie de la dernière période jusqu'à la date de sortie + congé restant à verser */
+function pt_departDefaultFrom(code, date){
+  let best = ''; pt_clotures.forEach(c=>{ if((c.kind === 'week' || c.kind === 'period') && c.to && c.to < date && c.rows && c.rows[code] && c.to > best) best = c.to; });
+  if(best){ const d = new Date(best + 'T12:00:00'); d.setDate(d.getDate() + 1); return mep_ymd(d); }
+  return date.slice(0, 8) + '01';
+}
+function pt_departSolde(code){
+  const d = pt_departOf(code); if(!d || !d.date) return null; const from = d.from || pt_departDefaultFrom(code, d.date);
+  const q = pt_withFilter(from, d.date, ()=>pt_payroll(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))));
+  const k = pt_conge(code), lb = pt_loanBalance(code, d.date);
+  return { from, q, k, loanDue:Math.max(0, lb.due), total:Math.round((q.solde + k.left) * 100) / 100 };
+}
+async function pt_departSave(code){
+  const g = (id)=>{ const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const date = g('pt-dp-date'); if(!date){ alert('Choisis la date de sortie.'); return; }
+  const from = g('pt-dp-from') || pt_departDefaultFrom(code, date); if(from > date){ alert('Le début du calcul est après la date de sortie.'); return; }
+  const rawC = g('pt-dp-conge'); let congeFixed = null;
+  if(rawC !== ''){ congeFixed = Number(rawC.replace(',', '.')); if(isNaN(congeFixed) || congeFixed < 0){ alert('Montant du congé non valide.'); return; } }
+  if(!confirm('Enregistrer la sortie de ' + pt_name(code) + ' au ' + fmtDateShort(date) + ' ? Plus aucune heure ni aucun congé ne sera compté après cette date.')) return;
+  try{ await pt_entriesCol.doc('depart_' + code).set({ kind:'depart', code, date, from, congeFixed, note:g('pt-dp-note'), by:(typeof currentUser !== 'undefined' ? currentUser : ''), savedAt:new Date().toISOString() }); pt_toast('Sortie enregistrée.'); }
+  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_departUndo(code){
+  if(!confirm('Annuler la sortie de ' + pt_name(code) + ' ? Ses heures et son congé seront de nouveau comptés.')) return;
+  try{ await pt_entriesCol.doc('depart_' + code).delete(); pt_toast('Sortie annulée.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+function pt_departHtml(code){
+  const d = pt_departOf(code), S = d ? pt_departSolde(code) : null, today = todayISO();
+  const row = (l, v, b)=>`<tr${b ? ' class="pt-total"' : ''}><td>${l}</td><td>${v}</td></tr>`;
+  const sum = S ? `<div class="pt-muted" style="margin-bottom:8px;">✓ Sortie enregistrée le <b>${fmtDateShort(d.date)}</b> par ${pt_e(d.by || '')} (${pt_e(String(d.savedAt || '').slice(0, 16).replace('T', ' '))})${d.note ? ' — ' + pt_e(d.note) : ''}. Plus aucune heure ni congé compté après cette date.</div>
+    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Solde de tout compte</th><th>Montant</th></tr></thead><tbody>
+      ${row('Paie du ' + fmtDateShort(S.from) + ' au ' + fmtDateShort(d.date) + ' (base + transport + primes − avances − prêt déduit ± report)', pt_money2(S.q.solde))}
+      ${row('Congé ' + (S.k.fixed !== null ? '(montant connu)' : '(calculé)') + ' − déjà versé', pt_money2(S.k.left))}
+      ${row('Total à verser à l’employé', pt_money2(S.total), true)}
+    </tbody></table></div>${S.loanDue > 0.004 ? `<div class="pt-muted" style="margin-top:6px;color:var(--rust);">⚠ Prêt restant dû par l’employé : ${pt_fmtMoney(S.loanDue)} (non déduit automatiquement ci-dessus, hors remboursements sur salaire de la période).</div>` : ''}
+    <div class="actions-row"><button class="btn ghost small t-del" onclick="pt_departUndo(${code})">Annuler la sortie</button></div>` : '<div class="pt-muted" style="margin-bottom:8px;">Employé en poste. Enregistre ici sa démission ou fin de contrat : le calcul s’arrête à la date de sortie et le solde de tout compte est calculé.</div>';
+  const dt = d ? d.date : today;
+  return sum + `<div class="pt-row" style="margin-top:10px;flex-wrap:wrap;"><div class="field"><label>Date de sortie</label><input type="date" id="pt-dp-date" value="${pt_e(dt)}"></div><div class="field"><label>Début du calcul de la dernière paie</label><input type="date" id="pt-dp-from" value="${pt_e((d && d.from) || '')}"></div><div class="field"><label>Congé : montant connu (DA, facultatif)</label><input type="text" inputmode="decimal" id="pt-dp-conge" class="pt-w90" value="${pt_e(d && d.congeFixed !== null && d.congeFixed !== undefined ? d.congeFixed : '')}" placeholder="auto"></div><div class="field"><label>Note</label><input type="text" id="pt-dp-note" value="${pt_e((d && d.note) || '')}" placeholder="Démission…"></div></div>
+    <div class="pt-muted">Début vide = après la dernière clôture de l’employé, sinon le 1er du mois de sortie. Montant du congé vide = calcul automatique (mode choisi dans « Congé »).</div>
+    <div class="actions-row"><button class="btn small t-save" onclick="pt_departSave(${code})">${d ? 'Modifier la sortie' : 'Enregistrer la démission'}</button></div>`;
 }
 
 /* ==================== ANCIENNES CORRECTIONS AUTOMATIQUES (annulation seulement) ==================== */
@@ -2903,10 +2963,11 @@ function pt_congeEmpHtml(code){
   const fo = pt_congeForfait(code);
   const rows = list.map(e=>`<tr><td>${fmtDateShort(e.date)}</td><td>${pt_e(e.note || '')}</td><td>${pt_fmtMoney(e.amount)}</td><td><button class="btn ghost small t-del" onclick="pt_congePayDel('${e.id}')">Supprimer</button></td></tr>`).join('');
   return `<div class="pt-muted">Période de calcul : du <b>${fmtDateShort(k.from)}</b> au <b>${fmtDateShort(k.to)}</b> (aujourd’hui). Congé = 1/12 × ${mode ? (fo ? 'jours travaillés × ' + fo.hours + ' h × ' + fo.rate + ' DA (paie forfaitaire)' : 'jours travaillés × taux journalier') : 'heures travaillées × taux'}, arrondi vers le haut au multiple de 10 DA. Le Jour Off n’est pas compté.</div>
+    <div class="field" style="margin-top:10px;"><label>Mode de calcul du congé</label><select class="ft-in" onchange="pt_congeSaveMode(${code}, this.value)"><option value="min" ${k.mode === 'min' ? 'selected' : ''}>Le plus petit des deux (par défaut)</option><option value="twelfth" ${k.mode === 'twelfth' ? 'selected' : ''}>1/12 du salaire perçu (arrondi)</option><option value="jours" ${k.mode === 'jours' ? 'selected' : ''}>2,5 jours par 30 jours travaillés (1 jour = taux horaire × 8 h)</option></select></div>
     <div class="pt-row" style="margin-top:10px;"><div class="field"><label>Solde initial de congé (DA)</label><input type="text" inputmode="decimal" id="pt-co-open" class="pt-w90" value="${pt_e(k.open || '')}" placeholder="0"></div><button class="btn small t-save" onclick="pt_congeSaveOpen(${code})">Enregistrer</button></div>
     <div class="pt-muted" style="margin:4px 0 8px;">À saisir une fois (tu peux le modifier). Mets un montant négatif si l’employé te doit déjà du congé.</div>
-    <div class="pt-cards">${card('c-hours', 'Solde initial', pt_money2(k.open))}${card('c-base', 'Congé calculé (1/12, arrondi)', pt_fmtMoney(k.computed))}${card('c-days', 'Congé de toute la période', pt_money2(k.total))}${card('c-bonus', 'Congé versé', pt_fmtMoney(k.taken))}${card(k.left < 0 ? 'c-adv' : 'c-transport', 'Reste à verser', pt_money2(k.left))}</div>
-    <div class="pt-muted">Calcul : ${fo ? 'base forfaitaire (jours travaillés × ' + fo.hours + ' h × ' + fo.rate + ' DA)' : 'salaire de base'} ${pt_fmtMoney(k.base)} ÷ 12 = ${(k.base / 12).toLocaleString('fr-FR', { maximumFractionDigits:2 })} DA → arrondi ${pt_fmtMoney(k.computed)}. Total = solde initial + congé calculé.</div>
+    <div class="pt-cards">${card('c-hours', 'Solde initial', pt_money2(k.open))}${card('c-base', k.fixed !== null ? 'Congé (montant connu)' : k.mode === 'jours' ? 'Congé calculé (2,5 j / 30 j)' : k.mode === 'twelfth' ? 'Congé calculé (1/12, arrondi)' : 'Congé calculé (le plus petit)', pt_fmtMoney(k.computed))}${card('c-days', 'Congé de toute la période', pt_money2(k.total))}${card('c-bonus', 'Congé versé', pt_fmtMoney(k.taken))}${card(k.left < 0 ? 'c-adv' : 'c-transport', 'Reste à verser', pt_money2(k.left))}</div>
+    <div class="pt-muted"><b>Mode 1/12</b> : ${fo ? 'base forfaitaire (jours travaillés × ' + fo.hours + ' h × ' + fo.rate + ' DA)' : 'salaire de base'} ${pt_fmtMoney(k.base)} ÷ 12 = ${(k.base / 12).toLocaleString('fr-FR', { maximumFractionDigits:2 })} DA → arrondi <b>${pt_fmtMoney(k.amtTwelfth)}</b>.<br><b>Mode jours</b> : ${k.workedDays} jour(s) travaillé(s) depuis le ${fmtDateShort(k.from)} ÷ 30 × 2,5 = ${(k.days).toLocaleString('fr-FR', { maximumFractionDigits:2 })} jours × ${pt_fmtMoney(k.jourVal)} (jour = taux horaire × 8 h) = <b>${pt_fmtMoney(k.amtJours)}</b>.<br>${k.fixed !== null ? 'Montant connu saisi dans « Démission » : <b>' + pt_fmtMoney(k.fixed) + '</b> (remplace le calcul).' : 'Retenu : <b>' + pt_fmtMoney(k.computed) + '</b>' + (k.mode === 'min' ? ' (le plus petit des deux ; c’est ce montant que l’employé voit)' : '') + '.'} Total = solde initial + congé calculé.</div>
     <h2 class="section" style="margin-top:16px;">Congés versés</h2>
     <div class="pt-row"><input type="date" id="pt-cp-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-cp-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-cp-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small b-add t-add" onclick="pt_congePayAdd(${code})">Ajouter</button></div>
     <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="pt-muted">Aucun congé versé.</td></tr>'}${list.length ? `<tr class="pt-total"><td colspan="2">Total versé</td><td>${pt_fmtMoney(k.taken)}</td><td></td></tr>` : ''}</tbody></table></div>`;
@@ -3084,6 +3145,7 @@ function pt_tabEmployes(codes, sessions, anoms, overlaps){
   if(isAdmin) html += pt_accordion('prets', 'Prêts', pt_pretsHtml(c));
   if(isAdmin) html += pt_accordion('clotures', 'Clôtures', pt_cloturesSection());
   if(isAdmin) html += pt_accordion('conge', 'Congé', pt_congeEmpHtml(c));
+  if(isAdmin) html += pt_accordion('depart', 'Démission / fin de contrat', pt_departHtml(c));
   return html;
 }
 async function pt_addEventUI(){
