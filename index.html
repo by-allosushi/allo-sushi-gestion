@@ -3063,8 +3063,8 @@ function pt_vsPreview(solde){
 }
 function pt_versementHtml(p, sessions){
   const cl = pt_currentClosure(pt_sel), v = p.validated, solde = p.solde;
-  const paid = v ? Number(v.paidAmt) || 0 : pt_netOf(solde), r = pt_reportOf(solde, paid);
-  const rep = r > 0.004 ? '<span style="color:var(--moss);">Reste dû reporté sur la semaine suivante : +' + pt_fmtMoney(r) + '</span>' : r < -0.004 ? '<span style="color:var(--rust);">Solde négatif reporté sur la semaine suivante : −' + pt_fmtMoney(-r) + '</span>' : 'Rien à reporter.';
+  const paid = v ? Number(v.paidAmt) || 0 : pt_netOf(solde), dep = pt_departOf(pt_sel), r = (dep && v && v.reportOut !== undefined && String(v.validatedBy || '') !== '' && dep.soldeOk) ? Number(v.reportOut) || 0 : pt_reportOf(solde, paid);
+  const rep = (dep && dep.soldeOk && Math.abs(r) < 0.004) ? '<span style="color:var(--moss);">Employé sorti : solde de tout compte réglé, rien à reporter.</span>' : r > 0.004 ? '<span style="color:var(--moss);">Reste dû reporté sur la semaine suivante : +' + pt_fmtMoney(r) + '</span>' : r < -0.004 ? '<span style="color:var(--rust);">Solde négatif reporté sur la semaine suivante : −' + pt_fmtMoney(-r) + '</span>' : 'Rien à reporter.';
   const stale = v && !cl && Math.abs(pt_roundSolde(v.solde) - solde) > 0.5;
   const status = cl ? '<span class="pt-badge pt-b-off">🔒 Période clôturée</span>' : v ? '<span class="pt-badge pt-b-prime">✓ Validé le ' + fmtDateShort(String(v.validatedAt || '').slice(0,10)) + '</span>' : '<span class="pt-muted">Non validé</span>';
   return `<h2 class="section" style="margin-top:20px;">Versement de la période</h2>
