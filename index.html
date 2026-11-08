@@ -2196,7 +2196,7 @@ function pt_conge(code, asOf){
   const from = PT_CONGE_START, forfait = pt_congeForfait(code); let workedDays = 0;
   const base = to < from ? 0 : pt_withFilter(from, to, ()=>{ const b = pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))); workedDays = b.workedDays; return forfait ? b.workedDays * forfait.hours * forfait.rate : b.baseWage; });
   const mode = pt_congeMode(code), days = workedDays / 30 * PT_CONGE_JOURS_MOIS, jourVal = pt_congeJourValue(code);
-  const amtTwelfth = pt_ceil10(base / 12), amtJours = Math.round(days * jourVal * 100) / 100;
+  const amtTwelfth = pt_ceil10(base / 12), amtJours = pt_ceil10(days * jourVal);
   let computed = mode === 'jours' ? amtJours : mode === 'twelfth' ? amtTwelfth : Math.min(amtJours, amtTwelfth);
   const fixed = dep && dep.congeFixed !== undefined && dep.congeFixed !== null && dep.congeFixed !== '' ? Number(dep.congeFixed) : null;
   if(fixed !== null && !isNaN(fixed)) computed = fixed; const open = pt_congeOpen(code);
