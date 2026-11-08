@@ -2247,12 +2247,15 @@ async function pt_departSettle(code){
   if(!confirm('Valider et solder ' + pt_name(code) + ' ?\n\n• Salaire restant : ' + pt_money2(S.sal) + ' (paie clôturée du ' + fmtDateShort(from) + ' au ' + fmtDateShort(to) + ')\n• Congé : ' + pt_money2(S.cg) + ' (marqué comme versé, reste à verser = 0)\n• Total : ' + pt_money2(S.total))) return;
   try{
     const q = pt_withFilter(from, to, ()=>pt_payroll(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))));
-    const paid = Math.max(0, S.sal), out = pt_reportOf(q.solde, paid);
+    const paid = Math.max(0, S.sal), out = 0; /* employé sorti : plus de report sur une période suivante (un salaire négatif est compensé par le congé) */
     await pt_entriesCol.doc('val_' + code + '_' + from + '_' + to).set({ kind:'valid', code, from, to, solde:Math.round(q.solde * 100) / 100, paidAmt:paid, reportOut:out, validatedAt:now, validatedBy:who });
     await pt_entriesCol.add({ kind:'congepaid', code, date:to, amount:S.cg, note:'Solde de tout compte', creePar:who, creeLe:now });
     await pt_entriesCol.doc('depart_' + code).set({ soldeOk:true, soldeBy:who, soldeAt:now, congeFixed:Math.round((S.cg + S.k.taken - S.k.open) * 100) / 100 }, { merge:true });
   }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); return; }
   await pt_closeRange(from, to, 'period', code);
+  await new Promise(r=>setTimeout(r, 800));
+  if(pt_closureFor(from, to, code)){ pt_sel = code; pt_selAll = false; pt_setFilter(from, to); pt_toast('Paie clôturée du ' + fmtDateShort(from) + ' au ' + fmtDateShort(to) + '.'); }
+  else alert('Le congé est soldé, mais la paie n’a pas été clôturée (confirmation annulée ?). Clique de nouveau sur « Clôturer » pour la période ' + fmtDateShort(from) + ' → ' + fmtDateShort(to) + '.');
 }
 async function pt_departUndo(code){
   if(!confirm('Annuler la sortie de ' + pt_name(code) + ' ? Ses heures et son congé seront de nouveau comptés.')) return;
