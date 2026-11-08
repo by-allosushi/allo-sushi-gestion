@@ -2237,6 +2237,23 @@ async function pt_dpZoneSave(code, zone){
   const who = (typeof currentUser !== 'undefined' ? currentUser : ''), at = new Date().toISOString(), data = zone === 'sal' ? { salVal:n, salOk:true, salBy:who, salAt:at } : { cgVal:n, cgOk:true, cgBy:who, cgAt:at };
   try{ await pt_entriesCol.doc('depart_' + code).set(data, { merge:true }); pt_toast('Validé.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
+/* Valider et solder : verse le congé (Reste à verser → 0), valide le salaire restant et clôture la paie de l'employé jusqu'à la date de sortie */
+async function pt_departSettle(code){
+  const d = pt_departOf(code), S = pt_departSolde(code); if(!d || !S) return;
+  if(!S.salOk || !S.cgOk){ alert('Valide d’abord le salaire restant ① et le congé ②.'); return; }
+  if(d.soldeOk){ alert('Le solde de tout compte est déjà soldé.'); return; }
+  const from = S.from, to = d.date, who = (typeof currentUser !== 'undefined' ? currentUser : ''), now = new Date().toISOString();
+  if(pt_closureFor(from, to, code)){ alert('La période ' + fmtDateShort(from) + ' → ' + fmtDateShort(to) + ' est déjà clôturée pour cet employé. Rouvre-la d’abord (Clôtures).'); return; }
+  if(!confirm('Valider et solder ' + pt_name(code) + ' ?\n\n• Salaire restant : ' + pt_money2(S.sal) + ' (paie clôturée du ' + fmtDateShort(from) + ' au ' + fmtDateShort(to) + ')\n• Congé : ' + pt_money2(S.cg) + ' (marqué comme versé, reste à verser = 0)\n• Total : ' + pt_money2(S.total))) return;
+  try{
+    const q = pt_withFilter(from, to, ()=>pt_payroll(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))));
+    const paid = Math.max(0, S.sal), out = pt_reportOf(q.solde, paid);
+    await pt_entriesCol.doc('val_' + code + '_' + from + '_' + to).set({ kind:'valid', code, from, to, solde:Math.round(q.solde * 100) / 100, paidAmt:paid, reportOut:out, validatedAt:now, validatedBy:who });
+    await pt_entriesCol.add({ kind:'congepaid', code, date:to, amount:S.cg, note:'Solde de tout compte', creePar:who, creeLe:now });
+    await pt_entriesCol.doc('depart_' + code).set({ soldeOk:true, soldeBy:who, soldeAt:now, congeFixed:Math.round((S.cg + S.k.taken - S.k.open) * 100) / 100 }, { merge:true });
+  }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); return; }
+  await pt_closeRange(from, to, 'period', code);
+}
 async function pt_departUndo(code){
   if(!confirm('Annuler la sortie de ' + pt_name(code) + ' ? Ses heures et son congé seront de nouveau comptés.')) return;
   try{ await pt_entriesCol.doc('depart_' + code).delete(); pt_toast('Sortie annulée.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
@@ -2262,6 +2279,7 @@ function pt_departHtml(code){
         <div class="pt-muted" style="font-size:12px;flex:1;">Somme du salaire restant et du congé</div>
         <div style="font-size:12px;font-weight:600;color:${S.salOk && S.cgOk ? 'var(--moss)' : 'var(--amber)'};">${S.salOk && S.cgOk ? '✓ définitif' : 'provisoire : valide ① et ②'}</div>
       </div></div>
+    <div class="actions-row" style="margin-top:10px;">${d.soldeOk ? `<span style="font-weight:700;color:var(--moss);">✓ Soldé le ${fmtDateShort(String(d.soldeAt || '').slice(0, 10))} par ${pt_e(d.soldeBy || '')} — congé versé, paie clôturée.</span>` : `<button class="btn t-save" style="width:100%;height:46px;" ${S.salOk && S.cgOk ? '' : 'disabled'} onclick="pt_departSettle(${code})">✓ Valider et solder</button>`}</div>${d.soldeOk ? '' : '<div class="pt-muted" style="margin-top:4px;">Disponible quand ① et ② sont validés. Marque le congé comme versé (Reste à verser = 0) et clôture la paie jusqu’à la date de sortie.</div>'}
     ${S.loanDue > 0.004 ? `<div class="pt-muted" style="margin-top:8px;color:var(--rust);">⚠ Prêt restant dû par l’employé : ${pt_fmtMoney(S.loanDue)} (non déduit automatiquement, hors remboursements sur salaire de la période).</div>` : ''}
     <div class="actions-row"><button class="btn ghost small t-del" onclick="pt_departUndo(${code})">Annuler la sortie</button></div>` : '<div class="pt-muted" style="margin-bottom:8px;">Employé en poste. Enregistre ici sa démission ou fin de contrat : le calcul s’arrête à la date de sortie et le solde de tout compte est calculé.</div>';
   const dt = d ? d.date : today;
