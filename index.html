@@ -4173,10 +4173,42 @@ function mep_maybeBoot(){ // administrateur : garde le « dernier inventaire » 
   mep_rebuildStock('').catch(e=>console.error(e));
 }
 /* ---------- saisie (cuisinier ; administrateur : onglet « Saisie ») ---------- */
-function mep_resetForm(){ mep_form = { sec:mep_sec, emp:'', vals:{}, mode:'new' }; }
+/* ---- brouillon local (survit à la fermeture de la page) et file d'envoi en attente (mauvaise connexion) ---- */
+const MEP_LS_DRAFT = 'mep_draft_v1', MEP_LS_PEND = 'mep_pending_v1';
+function mep_lsGet(k, d){ try{ const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }catch(e){ return d; } }
+function mep_lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function mep_draftSave(){ const f = mep_form; if(!f || f.mode !== 'new') return; const all = mep_lsGet(MEP_LS_DRAFT, {}); all[f.sec] = { emp:f.emp, vals:f.vals, t:Date.now() }; mep_lsSet(MEP_LS_DRAFT, all); }
+function mep_draftClear(sec){ const all = mep_lsGet(MEP_LS_DRAFT, {}); delete all[sec]; mep_lsSet(MEP_LS_DRAFT, all); }
+function mep_pending(){ return mep_lsGet(MEP_LS_PEND, []); }
+let mep_flushing = false;
+const mep_timeout = (ms)=>new Promise((_, rej)=>setTimeout(()=>rej(new Error('délai dépassé (connexion trop lente)')), ms));
+async function mep_flush(){
+  if(mep_flushing) return; let list = mep_pending(); if(!list.length) return; mep_flushing = true; let sent = 0;
+  try{
+    for(const p of list){
+      try{
+        const cur = mep_stock[p.sec], withStock = !cur || String(cur.at) <= String(p.snap.at), b = db.batch();
+        b.set(mep_saisiesCol.doc(p.id), p.doc); if(withStock) b.set(mep_stockRef, { s:{ [p.sec]:p.snap } }, { merge:true });
+        await Promise.race([b.commit(), mep_timeout(15000)]);
+        if(withStock) mep_stock[p.sec] = p.snap;
+        mep_lsSet(MEP_LS_PEND, mep_pending().filter(x=>x.id !== p.id)); sent++;
+      }catch(e){ console.warn('Mise en place : envoi en attente', e); break; }
+    }
+  } finally { mep_flushing = false; }
+  if(sent && typeof pt_toast === 'function') pt_toast('✓ Enregistré sur le serveur' + (sent > 1 ? ' (' + sent + ' saisies)' : '') + '.');
+  if(activeModule === 'mise_en_place' || document.getElementById('mep-body')) mep_render();
+}
+function mep_pendBanner(){
+  const n = mep_pending().length; if(!n) return '';
+  return `<div class="ticket" style="border-color:var(--rust);background:rgba(200,60,40,.12);"><div style="font-weight:700;">⚠ Non enregistré sur le serveur (${n})</div><div class="pt-muted" style="margin-top:4px;">Mauvaise connexion : ta saisie est gardée sur ce téléphone et sera envoyée automatiquement dès que le réseau revient. Ne vide pas les données du navigateur.</div><div class="actions-row"><button class="btn small t-save" onclick="mep_flush()">Réessayer maintenant</button></div></div>`;
+}
+window.addEventListener('online', ()=>{ mep_flush(); });
+setInterval(()=>{ if(mep_pending().length) mep_flush(); }, 20000);
+window.addEventListener('beforeunload', (e)=>{ if(mep_pending().length){ e.preventDefault(); e.returnValue = ''; } });
+function mep_resetForm(){ mep_form = { sec:mep_sec, emp:'', vals:{}, mode:'new' }; const d = mep_lsGet(MEP_LS_DRAFT, {})[mep_sec]; if(d && d.vals){ mep_form.emp = d.emp || ''; mep_form.vals = d.vals; } }
 function mep_pickSec(k){ mep_sec = k; mep_resetForm(); mep_render(); }
-function mep_setEmp(v){ if(!mep_form) mep_resetForm(); mep_form.emp = v; }
-function mep_setVal(id, v){ if(!mep_form) mep_resetForm(); mep_form.vals[id] = v; }
+function mep_setEmp(v){ if(!mep_form) mep_resetForm(); mep_form.emp = v; mep_draftSave(); }
+function mep_setVal(id, v){ if(!mep_form) mep_resetForm(); mep_form.vals[id] = v; mep_draftSave(); }
 function mep_correctStart(){ // administrateur : repart du dernier inventaire
   const st = mep_stockOf(mep_sec); if(!mep_isAdmin() || !st) return;
   mep_form = { sec:mep_sec, emp:'', vals:{}, mode:'correct', base:{} };
@@ -4236,13 +4268,12 @@ async function mep_submit(){
     snap = { at:nowIso, name:emp.name, emp:String(emp.code), items, correctedBy:'', correctedAt:'' };
   }
   mep_busy = true;
-  try{
-    const b = db.batch(); b.set(mep_saisiesCol.doc(), doc); b.set(mep_stockRef, { s:{ [f.sec]:snap } }, { merge:true });
-    await b.commit();
-    mep_stock[f.sec] = snap; mep_resetForm(); mep_render(); window.scrollTo && window.scrollTo(0, 0);
-    if(typeof pt_toast === 'function') pt_toast(correct ? 'Correction enregistrée.' : 'Inventaire enregistré.');
-  }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e) + '\nRéessaie.'); }
+  /* 1) la saisie est d'abord gardée sur le téléphone, 2) puis envoyée ; elle n'est « enregistrée » qu'une fois le serveur confirmé */
+  const pend = mep_pending(); pend.push({ id:mep_saisiesCol.doc().id, sec:f.sec, doc, snap, ts:Date.now() }); mep_lsSet(MEP_LS_PEND, pend);
+  const sec0 = f.sec; mep_draftClear(sec0); mep_resetForm(); mep_render(); window.scrollTo && window.scrollTo(0, 0);
   mep_busy = false;
+  await mep_flush();
+  if(mep_pending().length) alert('⚠ Connexion trop faible : ta saisie n’est PAS encore enregistrée sur le serveur.\nElle est gardée sur ce téléphone et sera envoyée automatiquement dès que le réseau revient. Garde l’application ouverte et regarde le bandeau rouge.');
 }
 /* ---------- administrateur : historique ---------- */
 function mep_setTab(t){ mep_tab = t; mep_edit = null; if(t === 'listes' && !mep_draft) mep_draft = JSON.parse(JSON.stringify({ cooks:[], ...mep_lists, sections:mep_secList() })); if(t !== 'listes') mep_draft = null; if(t === 'saisie') mep_resetForm(); mep_render(); }
@@ -4426,10 +4457,10 @@ function mep_render(){
   if(!mep_listsReady){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
   const admin = mep_isAdmin();
   const head = `<div style="font-weight:700;font-size:18px;margin-bottom:10px;">Mise en place</div>`;
-  if(!admin){ body.innerHTML = head + mep_entryView(); return; }
+  if(!admin){ body.innerHTML = head + mep_pendBanner() + mep_entryView(); return; }
   const tabs = `<div class="mep-seg">${[['hist', 'Historique'], ['saisie', 'Saisie'], ['listes', 'Listes']].map(t=>`<button class="${mep_tab === t[0] ? 'on' : ''}" onclick="mep_setTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
   const view = mep_tab === 'listes' ? mep_listsView() : mep_tab === 'saisie' ? mep_entryView() : (mep_saisiesReady ? mep_histView() : '<div class="empty-state">Chargement…</div>');
-  body.innerHTML = head + tabs + view;
+  body.innerHTML = head + mep_pendBanner() + tabs + view;
 }
 
 /* ==================== MODULE DÉPENSES & POINTAGE (gérant) — repris de l'ancienne application ====================
