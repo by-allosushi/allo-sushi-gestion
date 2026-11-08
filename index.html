@@ -2194,7 +2194,7 @@ function pt_congeJourValue(code){ const fo = pt_congeForfait(code); if(fo) retur
 function pt_conge(code, asOf){
   const dep = pt_departOf(code); let to = asOf || todayISO(); if(dep && dep.date && to > dep.date) to = dep.date;
   const from = PT_CONGE_START, forfait = pt_congeForfait(code); let workedDays = 0;
-  const base = to < from ? 0 : pt_withFilter(from, to, ()=>{ const b = pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))); workedDays = b.workedDays; return forfait ? b.workedDays * forfait.hours * forfait.rate : b.baseWage; });
+  const base = to < from ? 0 : pt_withFilter(from, to, ()=>{ const b = pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))); workedDays = b.workedDays; return b.baseWage; /* salaire réellement perçu (jours × taux journalier, ou heures × taux) */ });
   const mode = pt_congeMode(code), days = workedDays / 30 * PT_CONGE_JOURS_MOIS, jourVal = pt_congeJourValue(code);
   const amtTwelfth = pt_ceil10(base / 12), amtJours = pt_ceil10(days * jourVal);
   let computed = mode === 'jours' ? amtJours : mode === 'twelfth' ? amtTwelfth : Math.min(amtJours, amtTwelfth);
@@ -2214,7 +2214,8 @@ function pt_departSolde(code){
   const d = pt_departOf(code); if(!d || !d.date) return null; const from = d.from || pt_departDefaultFrom(code, d.date);
   const q = pt_withFilter(from, d.date, ()=>pt_payroll(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))));
   const k = pt_conge(code), lb = pt_loanBalance(code, d.date);
-  return { from, q, k, loanDue:Math.max(0, lb.due), total:Math.round((q.solde + k.left) * 100) / 100 };
+  const sal = d.salVal !== undefined && d.salVal !== null ? Number(d.salVal) : q.solde, cg = d.cgVal !== undefined && d.cgVal !== null ? Number(d.cgVal) : k.left;
+  return { from, q, k, sal, cg, salOk:!!d.salOk, cgOk:!!d.cgOk, loanDue:Math.max(0, lb.due), total:Math.round((sal + cg) * 100) / 100 };
 }
 async function pt_departSave(code){
   const g = (id)=>{ const el = document.getElementById(id); return el ? el.value.trim() : ''; };
@@ -2226,19 +2227,42 @@ async function pt_departSave(code){
   try{ await pt_entriesCol.doc('depart_' + code).set({ kind:'depart', code, date, from, congeFixed, note:g('pt-dp-note'), by:(typeof currentUser !== 'undefined' ? currentUser : ''), savedAt:new Date().toISOString() }); pt_toast('Sortie enregistrée.'); }
   catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
+function pt_dpEdit(zone){ const w = document.getElementById('pt-dpz-' + zone); if(w){ w.style.display = w.style.display === 'none' ? '' : 'none'; const i = document.getElementById('pt-dpv-' + zone); if(i) i.focus(); } }
+async function pt_dpZoneSave(code, zone){
+  const S = pt_departSolde(code); if(!S) return; const el = document.getElementById('pt-dpv-' + zone), w = document.getElementById('pt-dpz-' + zone), shown = w && w.style.display !== 'none';
+  const n = shown && el ? Number(String(el.value).replace(/\s/g, '').replace(',', '.')) : (zone === 'sal' ? S.sal : S.cg);
+  if(isNaN(n)){ alert('Montant non valide.'); return; }
+  const lab = zone === 'sal' ? 'le salaire restant' : 'le congé';
+  if(!confirm('Valider ' + lab + ' de ' + pt_name(code) + ' : ' + pt_money2(n) + ' ?')) return;
+  const who = (typeof currentUser !== 'undefined' ? currentUser : ''), at = new Date().toISOString(), data = zone === 'sal' ? { salVal:n, salOk:true, salBy:who, salAt:at } : { cgVal:n, cgOk:true, cgBy:who, cgAt:at };
+  try{ await pt_entriesCol.doc('depart_' + code).set(data, { merge:true }); pt_toast('Validé.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
 async function pt_departUndo(code){
   if(!confirm('Annuler la sortie de ' + pt_name(code) + ' ? Ses heures et son congé seront de nouveau comptés.')) return;
   try{ await pt_entriesCol.doc('depart_' + code).delete(); pt_toast('Sortie annulée.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
+function pt_congeModeLabel(k){ return pt_fmtMoney(k.amtTwelfth) + ' (1/12) · ' + pt_fmtMoney(k.amtJours) + ' (2,5 j) → retenu ' + pt_fmtMoney(k.computed); }
 function pt_departHtml(code){
   const d = pt_departOf(code), S = d ? pt_departSolde(code) : null, today = todayISO();
-  const row = (l, v, b)=>`<tr${b ? ' class="pt-total"' : ''}><td>${l}</td><td>${v}</td></tr>`;
+  const zone = (zk, title, sub, val, ok, by)=>`<div style="border:2px solid ${ok ? 'var(--moss)' : 'var(--line)'};border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;min-height:190px;">
+      <div class="section-label" style="margin:0;">${title}</div>
+      <div style="font-size:1.5em;font-weight:800;">${pt_money2(val)}</div>
+      <div class="pt-muted" style="font-size:12px;flex:1;">${sub}</div>
+      <div style="font-size:12px;font-weight:600;color:${ok ? 'var(--moss)' : 'var(--amber)'};">${ok ? '✓ validé' + (by ? ' · ' + pt_e(by) : '') : 'à valider'}</div>
+      <div id="pt-dpz-${zk}" style="display:none;"><input type="text" inputmode="decimal" id="pt-dpv-${zk}" class="ft-in" style="width:100%;" value="${pt_e(Math.round(val * 100) / 100)}"></div>
+      <div class="actions-row" style="margin:0;"><button class="btn ghost small" onclick="pt_dpEdit('${zk}')">✎ Corriger</button><button class="btn small t-save" onclick="pt_dpZoneSave(${code}, '${zk}')">✓ Valider</button></div></div>`;
   const sum = S ? `<div class="pt-muted" style="margin-bottom:8px;">✓ Sortie enregistrée le <b>${fmtDateShort(d.date)}</b> par ${pt_e(d.by || '')} (${pt_e(String(d.savedAt || '').slice(0, 16).replace('T', ' '))})${d.note ? ' — ' + pt_e(d.note) : ''}. Plus aucune heure ni congé compté après cette date.</div>
-    <div class="pt-scroll"><table class="pt-table"><thead><tr><th>Solde de tout compte</th><th>Montant</th></tr></thead><tbody>
-      ${row('Paie du ' + fmtDateShort(S.from) + ' au ' + fmtDateShort(d.date) + ' (base + transport + primes − avances − prêt déduit ± report)', pt_money2(S.q.solde))}
-      ${row('Congé ' + (S.k.fixed !== null ? '(montant connu)' : '(calculé)') + ' − déjà versé', pt_money2(S.k.left))}
-      ${row('Total à verser à l’employé', pt_money2(S.total), true)}
-    </tbody></table></div>${S.loanDue > 0.004 ? `<div class="pt-muted" style="margin-top:6px;color:var(--rust);">⚠ Prêt restant dû par l’employé : ${pt_fmtMoney(S.loanDue)} (non déduit automatiquement ci-dessus, hors remboursements sur salaire de la période).</div>` : ''}
+    <div class="section-label" style="margin:8px 0;">Solde de tout compte</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:stretch;">
+      ${zone('sal', '① Salaire restant', 'Net à payer + report, du ' + fmtDateShort(S.from) + ' au ' + fmtDateShort(d.date) + (S.sal !== S.q.solde ? ' · calculé : ' + pt_money2(S.q.solde) : ''), S.sal, S.salOk, d.salBy)}
+      ${zone('cg', '② Congé', 'Reste à verser (solde initial + congé − déjà versé)' + (S.cg !== S.k.left ? ' · calculé : ' + pt_money2(S.k.left) : ''), S.cg, S.cgOk, d.cgBy)}
+      <div style="border:2px solid ${S.salOk && S.cgOk ? 'var(--moss)' : 'var(--line)'};border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;min-height:190px;background:rgba(255,255,255,.03);">
+        <div class="section-label" style="margin:0;">③ Total (① + ②)</div>
+        <div style="font-size:1.5em;font-weight:800;">${pt_money2(S.total)}</div>
+        <div class="pt-muted" style="font-size:12px;flex:1;">Somme du salaire restant et du congé</div>
+        <div style="font-size:12px;font-weight:600;color:${S.salOk && S.cgOk ? 'var(--moss)' : 'var(--amber)'};">${S.salOk && S.cgOk ? '✓ définitif' : 'provisoire : valide ① et ②'}</div>
+      </div></div>
+    ${S.loanDue > 0.004 ? `<div class="pt-muted" style="margin-top:8px;color:var(--rust);">⚠ Prêt restant dû par l’employé : ${pt_fmtMoney(S.loanDue)} (non déduit automatiquement, hors remboursements sur salaire de la période).</div>` : ''}
     <div class="actions-row"><button class="btn ghost small t-del" onclick="pt_departUndo(${code})">Annuler la sortie</button></div>` : '<div class="pt-muted" style="margin-bottom:8px;">Employé en poste. Enregistre ici sa démission ou fin de contrat : le calcul s’arrête à la date de sortie et le solde de tout compte est calculé.</div>';
   const dt = d ? d.date : today;
   return sum + `<div class="pt-row" style="margin-top:10px;flex-wrap:wrap;"><div class="field"><label>Date de sortie</label><input type="date" id="pt-dp-date" value="${pt_e(dt)}"></div><div class="field"><label>Début du calcul de la dernière paie</label><input type="date" id="pt-dp-from" value="${pt_e((d && d.from) || '')}"></div><div class="field"><label>Congé : montant connu (DA, facultatif)</label><input type="text" inputmode="decimal" id="pt-dp-conge" class="pt-w90" value="${pt_e(d && d.congeFixed !== null && d.congeFixed !== undefined ? d.congeFixed : '')}" placeholder="auto"></div><div class="field"><label>Note</label><input type="text" id="pt-dp-note" value="${pt_e((d && d.note) || '')}" placeholder="Démission…"></div></div>
@@ -2962,12 +2986,12 @@ function pt_congeEmpHtml(code){
   const mode = pt_mode(code) === 'daily';
   const fo = pt_congeForfait(code);
   const rows = list.map(e=>`<tr><td>${fmtDateShort(e.date)}</td><td>${pt_e(e.note || '')}</td><td>${pt_fmtMoney(e.amount)}</td><td><button class="btn ghost small t-del" onclick="pt_congePayDel('${e.id}')">Supprimer</button></td></tr>`).join('');
-  return `<div class="pt-muted">Période de calcul : du <b>${fmtDateShort(k.from)}</b> au <b>${fmtDateShort(k.to)}</b> (aujourd’hui). Congé = 1/12 × ${mode ? (fo ? 'jours travaillés × ' + fo.hours + ' h × ' + fo.rate + ' DA (paie forfaitaire)' : 'jours travaillés × taux journalier') : 'heures travaillées × taux'}, arrondi vers le haut au multiple de 10 DA. Le Jour Off n’est pas compté.</div>
+  return `<div class="pt-muted">Période de calcul : du <b>${fmtDateShort(k.from)}</b> au <b>${fmtDateShort(k.to)}</b> (aujourd’hui). Congé = 1/12 × ${mode ? 'jours travaillés × taux journalier' : 'heures travaillées × taux'}, arrondi vers le haut au multiple de 10 DA. Le Jour Off n’est pas compté.</div>
     <div class="pt-row" style="margin-top:10px;"><div class="field"><label>Solde initial de congé (DA)</label><input type="text" inputmode="decimal" id="pt-co-open" class="pt-w90" value="${pt_e(k.open || '')}" placeholder="0"></div><button class="btn small t-save" onclick="pt_congeSaveOpen(${code})">Enregistrer</button></div>
     <div class="pt-muted" style="margin:4px 0 8px;">À saisir une fois (tu peux le modifier). Mets un montant négatif si l’employé te doit déjà du congé.</div>
     <div class="pt-cards">${card('c-hours', 'Solde initial', pt_money2(k.open))}${(()=>{ const small = k.amtJours < k.amtTwelfth ? 'jours' : 'twelfth', eff = k.mode === 'min' ? small : k.mode, pick = (m, l, amt)=>`<div class="pt-card c-base" style="cursor:pointer;${eff === m && k.fixed === null ? 'outline:3px solid var(--moss);outline-offset:-2px;' : 'opacity:.75;'}" onclick="pt_congeSaveMode(${code}, '${m}')"><div class="l">${l}</div><div class="n">${pt_fmtMoney(amt)}</div><div class="pa-dt" style="font-size:11px;">${eff === m && k.fixed === null ? '✓ retenu' + (k.mode === 'min' ? ' (le plus petit)' : '') : 'cliquer pour choisir'}</div></div>`; return pick('twelfth', 'Congé calculé (1/12, arrondi)', k.amtTwelfth) + pick('jours', 'Congé calculé (2,5 j / 30 j)', k.amtJours); })()}${card('c-days', 'Congé de toute la période', pt_money2(k.total))}${card('c-bonus', 'Congé versé', pt_fmtMoney(k.taken))}${card(k.left < 0 ? 'c-adv' : 'c-transport', 'Reste à verser', pt_money2(k.left))}</div>
     ${k.mode !== 'min' && k.fixed === null ? `<div class="actions-row" style="margin:4px 0;"><button class="btn ghost small" onclick="pt_congeSaveMode(${code}, 'min')">↺ Revenir au choix automatique (le plus petit)</button></div>` : ''}
-    <div class="pt-muted"><b>Mode 1/12</b> : ${fo ? 'base forfaitaire (jours travaillés × ' + fo.hours + ' h × ' + fo.rate + ' DA)' : 'salaire de base'} ${pt_fmtMoney(k.base)} ÷ 12 = ${(k.base / 12).toLocaleString('fr-FR', { maximumFractionDigits:2 })} DA → arrondi <b>${pt_fmtMoney(k.amtTwelfth)}</b>.<br><b>Mode jours</b> : ${k.workedDays} jour(s) travaillé(s) depuis le ${fmtDateShort(k.from)} ÷ 30 × 2,5 = ${(k.days).toLocaleString('fr-FR', { maximumFractionDigits:2 })} jours × ${pt_fmtMoney(k.jourVal)} (jour = taux horaire × 8 h) = <b>${pt_fmtMoney(k.amtJours)}</b>.<br>${k.fixed !== null ? 'Montant connu saisi dans « Démission » : <b>' + pt_fmtMoney(k.fixed) + '</b> (remplace le calcul).' : 'Retenu : <b>' + pt_fmtMoney(k.computed) + '</b>' + (k.mode === 'min' ? ' (le plus petit des deux ; c’est ce montant que l’employé voit)' : '') + '.'} Total = solde initial + congé calculé.</div>
+    <div class="pt-muted"><b>Mode 1/12</b> : salaire de base perçu ${pt_fmtMoney(k.base)} ÷ 12 = ${(k.base / 12).toLocaleString('fr-FR', { maximumFractionDigits:2 })} DA → arrondi <b>${pt_fmtMoney(k.amtTwelfth)}</b>.<br><b>Mode jours</b> : ${k.workedDays} jour(s) travaillé(s) depuis le ${fmtDateShort(k.from)} ÷ 30 × 2,5 = ${(k.days).toLocaleString('fr-FR', { maximumFractionDigits:2 })} jours × ${pt_fmtMoney(k.jourVal)} (jour = taux horaire × 8 h) = <b>${pt_fmtMoney(k.amtJours)}</b>.<br>${k.fixed !== null ? 'Montant connu saisi dans « Démission » : <b>' + pt_fmtMoney(k.fixed) + '</b> (remplace le calcul).' : 'Retenu : <b>' + pt_fmtMoney(k.computed) + '</b>' + (k.mode === 'min' ? ' (le plus petit des deux ; c’est ce montant que l’employé voit)' : '') + '.'} Total = solde initial + congé calculé.</div>
     <h2 class="section" style="margin-top:16px;">Congés versés</h2>
     <div class="pt-row"><input type="date" id="pt-cp-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-cp-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-cp-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small b-add t-add" onclick="pt_congePayAdd(${code})">Ajouter</button></div>
     <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="pt-muted">Aucun congé versé.</td></tr>'}${list.length ? `<tr class="pt-total"><td colspan="2">Total versé</td><td>${pt_fmtMoney(k.taken)}</td><td></td></tr>` : ''}</tbody></table></div>`;
