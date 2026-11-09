@@ -1132,6 +1132,14 @@ function uu_viewPassword(userId){
   }
   uu_render();
 }
+function uu_mepRows(u, perms){
+  if(u.isAdmin) return '';
+  const secs = (typeof mep_secList === 'function') ? mep_secList() : [];
+  const on = !!perms.mep;
+  const sw = (x)=>`<div class="perm-row"><span>↳ ${esc(x.n)}</span><label class="switch"><input type="checkbox" ${perms['mepSec_' + x.id] ? 'checked' : ''} onchange="uu_togglePerm('${u.id}','mepSec_${esc(x.id)}',this.checked)"><span class="slider"></span></label></div>`;
+  const noEmp = (u.empCode === undefined || u.empCode === null || u.empCode === '');
+  return `<div style="padding:2px 0 0 10px;font-size:12px;color:var(--ink-muted);">Sections visibles (aucune cochée = toutes)</div>${secs.map(sw).join('')}` + (on && noEmp ? `<div style="padding:4px 0 6px 10px;font-size:12px;color:var(--rust);">⚠ Aucun employé relié : il ne pourra pas valider d’inventaire (choisis l’employé ci-dessous).</div>` : '');
+}
 function uu_depPermRows(u, perms){
   const row = (ic, lab, key, on, dis)=>`<div class="perm-row"><span>${ic} ${lab}</span><label class="switch"><input type="checkbox" ${on?'checked':''} ${dis?'disabled':''} onchange="uu_togglePerm('${u.id}','${key}',this.checked)"><span class="slider"></span></label></div>`;
   return row('💵','Dépenses : saisie du solde réel','soldeReel',perms.soldeReel!==false,u.isAdmin) + row('🔎','Dépenses : vérification / écart','verification',perms.verification!==false,u.isAdmin);
@@ -1149,7 +1157,7 @@ function uu_render(){
             onchange="uu_togglePerm('${u.id}','${m.key}',this.checked)">
           <span class="slider"></span>
         </label>
-      </div>` + (m.key === 'paie' ? uu_empSelect(u) : '') + (m.key === 'depenses' ? uu_depPermRows(u, perms) : '') + (m.key === 'caisse' ? `<div class="perm-row"><span>↳ Caisse : accès limité (début de caisse, sorties, retenu)</span><label class="switch"><input type="checkbox" ${perms.caisseLim?'checked':''} ${u.isAdmin?'disabled':''} onchange="uu_togglePerm('${u.id}','caisseLim',this.checked)"><span class="slider"></span></label></div>` : '')).join('');
+      </div>` + (m.key === 'paie' ? uu_empSelect(u) : '') + (m.key === 'depenses' ? uu_depPermRows(u, perms) : '') + (m.key === 'mep' ? uu_mepRows(u, perms) : '') + (m.key === 'caisse' ? `<div class="perm-row"><span>↳ Caisse : accès limité (début de caisse, sorties, retenu)</span><label class="switch"><input type="checkbox" ${perms.caisseLim?'checked':''} ${u.isAdmin?'disabled':''} onchange="uu_togglePerm('${u.id}','caisseLim',this.checked)"><span class="slider"></span></label></div>` : '')).join('');
     return `<div class="user-card">
       <div class="uh">
         <div class="uname">${esc(u.username||u.id)}${u.isAdmin?'<span class="badge-admin">Admin</span>':''}</div>
@@ -1206,14 +1214,14 @@ function showModule(name){
     b.classList.toggle('active', b.getAttribute('data-mod')===name);
   });
   if(name==='home') renderHome();
-  if(name==='users'){ if(typeof pt_start==='function') pt_start(); uu_render(); uu_fillNewEmp(); }
+  if(name==='users'){ if(typeof pt_start==='function') pt_start(); if(typeof mep_start==='function') mep_start(); uu_render(); uu_fillNewEmp(); }
   if(name==='caisse' && typeof ca_render==='function') ca_render();
   if(name==='depenses'){ if(typeof dp_start==='function') dp_start(); if(typeof dp_render==='function') dp_render(); }
   if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
   if(name==='fiches'){ if(typeof ft_start==='function') ft_start(); if(typeof ft_render==='function') ft_render(); }
   if(name==='restopro'){ if(typeof rp_start==='function') rp_start(); }
   if(name==='controle'){ if(typeof cx_start==='function'){ cx_start(); cx_render(); cx_reload(); } }
-  if(name==='mep'){ if(typeof mep_start==='function') mep_start(); if(typeof mep_render==='function') mep_render(); }
+  if(name==='mep'){ if(typeof pt_start==='function') pt_start(); if(typeof mep_start==='function') mep_start(); if(typeof mep_render==='function') mep_render(); }
   if(name==='dettes'){ if(typeof dt_start==='function') dt_start(); if(typeof dt_render==='function') dt_render(); }
   if(name==='paie'){ if(typeof pt_start==='function') pt_start(); if(typeof pa_render==='function') pa_render(); }
 }
@@ -1961,7 +1969,7 @@ function pt_start(){
   }, onErr);
   pt_configRef.onSnapshot((doc)=>{
     const data = doc.exists ? (doc.data() || {}) : {};
-    pt_emp = data.emp || {}; pt_ready.cfg = true; pt_scheduleRender();
+    pt_emp = data.emp || {}; pt_ready.cfg = true; pt_scheduleRender(); try{ if(typeof mep_render === 'function' && document.getElementById('mep-body') && !mep_typing()) mep_render(); }catch(e){}
   }, onErr);
   pt_ignoreRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
@@ -4382,7 +4390,12 @@ let mep_tab = 'hist', mep_sec = 'sushi', mep_date = '', mep_form = null, mep_dra
 const mep_e = (v)=>esc(v == null ? '' : String(v));
 const mep_isAdmin = ()=>!!(session && session.isAdmin);
 const mep_secList = ()=>(mep_lists.sections && mep_lists.sections.length ? mep_lists.sections : MEP_DEFAULT_SECS);
-const mep_secs = ()=>mep_secList().map(x=>[x.id, x.n]);
+function mep_allowedIds(){   // sections visibles : l'administrateur voit tout ; sinon les sections cochées dans Utilisateurs (aucune cochée = toutes)
+  const all = mep_secList().map(x=>x.id); if(mep_isAdmin()) return all;
+  const p = (session && session.permissions) || {}, sel = all.filter(id=>p['mepSec_' + id]);
+  return sel.length ? sel : all;
+}
+const mep_secs = ()=>{ const ok = mep_allowedIds(); return mep_secList().filter(x=>ok.includes(x.id)).map(x=>[x.id, x.n]); };
 const mep_secName = (k)=>(mep_secs().find(x=>x[0] === k) || [k, k])[1];
 function mep_secOk(){ const l = mep_secs(); if(!l.some(x=>x[0] === mep_sec)) mep_sec = l.length ? l[0][0] : ''; }
 const mep_hasSaisies = (id)=>mep_saisies.some(x=>x.section === id);
@@ -4390,8 +4403,18 @@ function mep_ymd(d){ d = d || new Date(); return d.getFullYear() + '-' + String(
 function mep_frDate(ymd){ const p = String(ymd || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : ymd; }
 function mep_hm(iso){ const d = new Date(iso); return isNaN(d) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
 function mep_newId(){ return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
-/* cuisiniers proposés : la liste gérée par l'administrateur (Listes) */
-function mep_empList(){ return (mep_lists.cooks || []).filter(c=>c && c.n).map(c=>({ code:c.id, name:c.n })).sort((a, b)=>a.name.localeCompare(b.name, 'fr')); }
+/* cuisiniers : les employés du pointage. Un employé connecté n'a que son propre nom (l'employé relié à son compte dans Utilisateurs). */
+function mep_myCode(){ const c = session && session.empCode; return (c === null || c === undefined || c === '') ? null : c; }
+function mep_empName(c){ const e = (typeof pt_emp !== 'undefined' && pt_emp) ? pt_emp[c] : null; return (e && e.name) || (typeof PT_DEFAULT_NAMES !== 'undefined' && PT_DEFAULT_NAMES[c]) || (session && session.username) || ('Code ' + c); }
+function mep_empList(){
+  if(!mep_isAdmin()){ const c = mep_myCode(); return c === null ? [] : [{ code:c, name:mep_empName(c) }]; }
+  const codes = (typeof pt_codes === 'function') ? pt_codes() : [];
+  return codes.filter(c=>((pt_emp[c] && pt_emp[c].name) || PT_DEFAULT_NAMES[c]) && !(typeof pt_departDate === 'function' && pt_departDate(c))).map(c=>({ code:c, name:mep_empName(c) })).sort((a, b)=>a.name.localeCompare(b.name, 'fr'));
+}
+function mep_canCorrect(st){   // l'administrateur corrige le dernier inventaire ; un cuisinier seulement le sien, du jour en cours
+  if(!st) return false; if(mep_isAdmin()) return true;
+  const c = mep_myCode(); return c !== null && String(st.emp) === String(c) && mep_ymd(new Date(st.at)) === mep_ymd();
+}
 function mep_typing(){ try{ const a = document.activeElement, b = document.getElementById('mep-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
 function mep_start(){
   if(mep_isAdmin() && !mep_adminStarted){ mep_adminStarted = true; mep_watchSaisies(); mep_watchRp(); }
@@ -4401,6 +4424,7 @@ function mep_start(){
     mep_lists = Object.assign({ sushi:[], chaud:[], bar:[], cooks:[] }, d); mep_listsReady = true;
     if((mep_tab !== 'listes' || !mep_draft) && !mep_typing()) mep_render();
     if(typeof cx_refresh === 'function') cx_refresh();
+    if(activeModule === 'users' && typeof uu_render === 'function') uu_render();
   }, (e)=>{ console.error(e); mep_listsReady = true; mep_render(); });
   mep_stockRef.onSnapshot((doc)=>{ const d = doc.exists ? (doc.data() || {}) : {}; mep_stock = d.s || {}; mep_stockReady = true; if(!mep_typing()) mep_render(); mep_maybeBoot(); }, (e)=>{ console.error(e); mep_stockReady = true; });
 }
@@ -4494,12 +4518,12 @@ function mep_pendBanner(){
 window.addEventListener('online', ()=>{ mep_flush(); });
 setInterval(()=>{ if(mep_pending().length) mep_flush(); }, 20000);
 window.addEventListener('beforeunload', (e)=>{ if(mep_pending().length){ e.preventDefault(); e.returnValue = ''; } });
-function mep_resetForm(){ mep_form = { sec:mep_sec, emp:'', vals:{}, mode:'new' }; const d = mep_lsGet(MEP_LS_DRAFT, {})[mep_sec]; if(d && d.vals){ mep_form.emp = d.emp || ''; mep_form.vals = d.vals; } }
+function mep_resetForm(){ mep_form = { sec:mep_sec, emp:'', vals:{}, mode:'new' }; const d = mep_lsGet(MEP_LS_DRAFT, {})[mep_sec]; if(d && d.vals){ mep_form.emp = d.emp || ''; mep_form.vals = d.vals; } if(!mep_isAdmin()){ const c = mep_myCode(); mep_form.emp = c === null ? '' : String(c); } }
 function mep_pickSec(k){ mep_sec = k; mep_resetForm(); mep_render(); }
 function mep_setEmp(v){ if(!mep_form) mep_resetForm(); mep_form.emp = v; mep_draftSave(); }
 function mep_setVal(id, v){ if(!mep_form) mep_resetForm(); mep_form.vals[id] = v; mep_draftSave(); }
-function mep_correctStart(){ // administrateur : repart du dernier inventaire
-  const st = mep_stockOf(mep_sec); if(!mep_isAdmin() || !st) return;
+function mep_correctStart(){ // repart du dernier inventaire (administrateur ; cuisinier : le sien, du jour)
+  const st = mep_stockOf(mep_sec); if(!st || !mep_canCorrect(st)) return;
   mep_form = { sec:mep_sec, emp:'', vals:{}, mode:'correct', base:{} };
   (mep_lists[mep_sec] || []).forEach(i=>{ const it = st.items.find(x=>x.id === i.id); const v = it ? mep_fmtIn(it.q) : ''; mep_form.vals[i.id] = v; mep_form.base[i.id] = v; });
   mep_render();
@@ -4517,10 +4541,11 @@ function mep_entryView(){
   const rows = list.map((i, k)=>`<tr><td><span class="mep-num s">${k + 1}</span>${mep_e(i.n)}${i.u ? ` <span class="pt-muted">(${mep_e(i.u)})</span>` : ''}</td><td class="i"><input id="mep-in-${i.id}" class="ft-in ${correct && !mep_same(f.vals[i.id], f.base && f.base[i.id]) ? 'chg' : ''}" type="text" inputmode="decimal" placeholder="0" value="${mep_e(f.vals[i.id] || '')}" oninput="mep_setVal('${i.id}', this.value)"></td><td class="l">${lastQ(i.id)}</td></tr>`).join('');
   const table = list.length ? `<div style="overflow-x:auto;"><table class="mep-g mep-in"><tr><th>Article</th><th>${correct ? 'Correction' : 'En cours'}</th><th class="l">${mep_lastHead(st)}</th></tr>${rows}</table></div>` : `<div class="pt-muted">Aucun ingrédient défini pour cette section.${mep_isAdmin() ? ' Ajoute-les dans « Listes ».' : ''}</div>`;
   const nameBox = correct ? `<div class="ticket"><div class="pt-muted">Tu corriges le dernier inventaire de <b>${mep_e(st.name)}</b> (${mep_e(mep_fdt(st.at))}). Change les quantités en erreur, puis enregistre.</div></div>`
+    : !mep_isAdmin() ? (emps.length ? `<div class="ticket"><div class="field"><label>Cuisinier</label><div class="ft-in" style="display:flex;align-items:center;gap:8px;">🔒 ${mep_e(emps[0].name)}</div></div></div>` : `<div class="ticket" style="border-color:var(--rust);"><div style="color:var(--rust);font-weight:600;">Ton compte n’est pas relié à un employé.</div><div class="pt-muted" style="margin-top:4px;">Demande à l’administrateur de le relier à ton nom (rubrique Utilisateurs).</div></div>`)
     : `<div class="ticket"><div class="field"><label>Cuisinier</label><select class="ft-in" id="mep-emp" onchange="mep_setEmp(this.value)"><option value="">Choisis ton nom</option>${emps.map(x=>`<option value="${mep_e(x.code)}" ${String(f.emp) === String(x.code) ? 'selected' : ''}>${mep_e(x.name)}</option>`).join('')}</select></div></div>`;
   const btns = !list.length ? '' : correct
-    ? `<div class="actions-row"><button class="btn t-edit" style="flex:1 1 60%;height:48px;" onclick="mep_submit()">Enregistrer la correction</button><button class="btn ghost t-cancel" style="flex:1 1 30%;height:48px;" onclick="mep_correctCancel()">Annuler</button></div>`
-    : `<div class="actions-row"><button class="btn t-save" style="width:100%;height:48px;" onclick="mep_submit()">Valider l’inventaire</button></div>${mep_isAdmin() && st ? '<div class="actions-row"><button class="btn ghost small t-edit" onclick="mep_correctStart()">Corriger le dernier inventaire</button></div>' : ''}`;
+    ? `<div style="display:flex;gap:10px;margin-top:10px;"><button class="btn t-edit" style="flex:1 1 0;height:48px;" onclick="mep_submit()">Enregistrer la correction</button><button class="btn ghost t-cancel" style="flex:1 1 0;height:48px;" onclick="mep_correctCancel()">Annuler</button></div>`
+    : `<div style="display:flex;gap:10px;margin-top:10px;"><button class="btn t-save" style="flex:1 1 0;height:48px;" onclick="mep_submit()">Valider l’inventaire</button>${mep_canCorrect(st) ? `<button class="btn t-edit" style="flex:1 1 0;height:48px;" onclick="mep_correctStart()">${mep_isAdmin() ? '✎ Corriger la saisie' : '✎ Corriger ma saisie'}</button>` : ''}</div>`;
   return `<div class="mep-seg">${mep_secs().map(x=>`<button class="${mep_sec === x[0] ? 'on' : ''}" onclick="mep_pickSec('${x[0]}')">${x[1]}</button>`).join('')}</div>
     ${nameBox}<div class="ticket"><div class="section-label">${mep_e(mep_secName(mep_sec))} — ${correct ? 'correction' : 'inventaire'}</div>${table}</div>${btns}`;
 }
@@ -4542,6 +4567,7 @@ async function mep_submit(){
   const f = mep_form, list = mep_lists[f.sec] || [], st = mep_stockOf(f.sec), correct = f.mode === 'correct' && !!st;
   let emp = null;
   if(!correct){
+    if(!mep_isAdmin() && mep_myCode() === null){ alert('Ton compte n’est pas relié à un employé : demande à l’administrateur.'); return; }
     if(!f.emp){ alert('Choisis ton nom avant de valider.'); return; }
     emp = mep_empList().find(x=>String(x.code) === String(f.emp)); if(!emp){ alert('Choisis ton nom avant de valider.'); return; }
   }
@@ -4549,6 +4575,7 @@ async function mep_submit(){
   const now = new Date(), nowIso = now.toISOString();
   let doc, snap;
   if(correct){
+    if(!mep_canCorrect(st)){ alert('Tu ne peux corriger que ta propre saisie du jour en cours.'); return; }
     if(!items.some(i=>{ const o = st.items.find(x=>x.id === i.id); return !o || Number(o.q) !== i.q; })){ alert('Aucune quantité n’a changé.'); return; }
     doc = { section:f.sec, date:mep_ymd(new Date(st.at)), at:nowIso, origAt:st.at, emp:String(st.emp), name:st.name, items, kind:'correction', correctedBy:mep_who(), correctedAt:nowIso, by:mep_who() };
     snap = { at:st.at, name:st.name, emp:String(st.emp), items, correctedBy:mep_who(), correctedAt:nowIso };
@@ -4734,7 +4761,7 @@ async function mep_saveLists(){
 function mep_listsView(){
   const d = mep_draft || { ...mep_lists, sections:mep_secList() };
   return `<div class="pt-muted" style="margin-bottom:8px;">Les ingrédients que les cuisiniers doivent compter à la fin de leur service. Les anciennes saisies gardent le nom et l’unité d’origine.</div>
-    <div class="ticket"><div class="section-label">Cuisiniers</div><div class="pt-muted" style="margin-bottom:8px;">Les noms proposés aux cuisiniers dans « Choisis ton nom ».</div>${(d.cooks || []).map((c, n)=>`<div class="ft-edrow"><input type="text" class="ft-in mep-name-cooks" style="flex:1 1 calc(100% - 56px);min-width:0;" placeholder="Prénom" value="${mep_e(c.n)}" oninput="mep_cName(${n},this.value)"><button class="btn ghost small t-del" onclick="mep_cDel(${n})" aria-label="Retirer">✕</button></div>`).join('') || '<div class="pt-muted">Aucun cuisinier.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_cAdd()">＋ Cuisinier</button></div></div>
+    <div class="pt-muted" style="margin-bottom:8px;">Les noms des cuisiniers viennent de la liste des employés (Pointage) ; chaque employé est relié à son compte dans « Utilisateurs », où l’on choisit aussi les sections qu’il voit.</div>
     <div class="ticket"><div class="section-label">Sections</div><div class="pt-muted" style="margin-bottom:8px;">Une section qui a déjà des saisies peut être renommée mais pas supprimée (🔒).</div>${(d.sections || []).map((x, n)=>`<div class="ft-edrow"><input type="text" class="ft-in mep-name-secs" style="flex:1 1 calc(100% - 56px);min-width:0;" placeholder="Nom de la section" value="${mep_e(x.n)}" oninput="mep_sName(${n},this.value)">${mep_hasSaisies(x.id) ? '<button class="btn ghost small" disabled title="Historique conservé" aria-label="Verrouillée">🔒</button>' : `<button class="btn ghost small t-del" onclick="mep_sDel(${n})" aria-label="Retirer">✕</button>`}
       <div class="ft-mv" style="flex:1 1 100%;"><button class="btn ghost small" onclick="mep_sMove(${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_sMove(${n},1)" aria-label="Descendre">↓</button></div></div>`).join('')}<div class="actions-row"><button class="btn small t-add" onclick="mep_sAdd()">＋ Section</button></div></div>
     ${(d.sections || []).map(sc=>{ const k = sc.id; return `<div class="ticket"><div class="section-label">Ingrédients — ${mep_e(sc.n || 'Nouvelle section')}</div>${mep_rpBar()}${(d[k] || []).map((i, n)=>mep_ingCard(k, n, i)).join('') || '<div class="pt-muted">Aucun ingrédient.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_dAdd('${k}')">＋ Ingrédient</button></div></div>`; }).join('')}
