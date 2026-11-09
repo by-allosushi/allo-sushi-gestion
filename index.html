@@ -601,13 +601,14 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
   .cg-mod{border:1px solid var(--line);background:none;color:var(--ink);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;}
   .cg-plus{width:38px;height:38px;border-radius:50%;background:#1B2A3F;border:1px solid var(--forest);color:#93C5FD;font-size:22px;font-weight:800;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
   .cg-link{align-self:flex-start;background:none;border:none;color:#93C5FD;font-size:11.5px;font-weight:700;cursor:pointer;padding:2px 0;}
-  .cg-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:60;display:flex;align-items:flex-end;justify-content:center;}
-  .cg-sheet{width:100%;max-width:520px;max-height:80vh;overflow-y:auto;background:#10151A;border:1px solid var(--forest);border-radius:16px 16px 0 0;padding:14px;}
+  .cg-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;}
+  .cg-sheet{width:100%;max-width:520px;max-height:85vh;overflow-y:auto;background:#10151A;border:1px solid var(--forest);border-radius:16px;padding:14px;}
   .cg-hrow{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line);font-size:13px;}
   .cg-hrow.edit{flex-wrap:wrap;}
   .cg-hmain{flex:1;min-width:0;}.cg-hmain small{display:block;color:var(--ink-muted);font-size:10.5px;}
   .cg-mini{border:1px solid var(--line);background:none;color:var(--ink);border-radius:8px;padding:5px 9px;font-size:12px;cursor:pointer;}
-  .cg-mini.del{color:var(--rust);}.cg-mini.ok{color:var(--moss);}
+  .cg-mini.del{color:var(--rust);}.cg-mini.xclose{color:var(--rust);background:var(--rust-bg);border-color:var(--rust);font-weight:700;}
+  .x-btn,.line-row .x-btn{color:var(--rust) !important;}.cg-mini.ok{color:var(--moss);}
 </style>
 </head>
 <body>
@@ -1648,7 +1649,7 @@ function ca_renderHistModal(){
     rows = `<div class="cg-gh"><span>Entrées (${shown.length})</span><b>${ca_fmtMoney(ca_sumLines(shown))}</b></div>${shown.map(rowHtml).join('')}`;
   }
   return `<div class="cg-overlay" onclick="ca_closeHist()"><div class="cg-sheet" onclick="event.stopPropagation()">
-    <div style="display:flex;justify-content:space-between;align-items:center;font-weight:700;margin-bottom:6px;"><span>${title}</span><button class="cg-mini" onclick="ca_closeHist()">✕</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;font-weight:700;margin-bottom:6px;"><span>${title}</span><button class="cg-mini xclose" onclick="ca_closeHist()" aria-label="Fermer">✕</button></div>
     <div class="cg-nav"><button class="cg-mini" title="Jour précédent" onclick="ca_histNav(-1)">‹</button><b>${fmtDateShort(vd)}</b><button class="cg-mini" title="Jour suivant" onclick="ca_histNav(1)">›</button></div>
     ${isWork ? '' : `<div style="font-size:11px;color:var(--ink-muted);text-align:center;margin-bottom:4px;">Consultation seule : ouvre ce jour dans « Caisse du jour » pour le modifier.</div>`}
     <div class="cg-card" style="flex-direction:row;justify-content:space-between;align-items:center;margin:8px 0;"><div><div class="cg-t">Total du jour</div><div class="cg-big" style="color:var(--amber);">${ca_fmtMoney(total)}</div></div><div class="cg-sub">${lines.length} ligne${lines.length > 1 ? 's' : ''}</div></div>
@@ -3388,7 +3389,7 @@ function pt_tabReglages(codes){
 }
 function pt_groupsSection(codes){
   const rows = pt_groups.map((g, gi)=>{
-    const chips = (g || []).map(c=>`<span class="pt-badge pt-b-prime">${pt_e(pt_name(c))} <a href="#" onclick="pt_grpRemove(${gi},${c});return false;" style="color:inherit;text-decoration:none;">✕</a></span>`).join(' ');
+    const chips = (g || []).map(c=>`<span class="pt-badge pt-b-prime">${pt_e(pt_name(c))} <a href="#" onclick="pt_grpRemove(${gi},${c});return false;" style="color:var(--rust);text-decoration:none;">✕</a></span>`).join(' ');
     const avail = codes.filter(c=>!(g || []).includes(c));
     const addRow = avail.length ? `<select id="pt-grp-add-${gi}" style="width:auto;display:inline-block;"><option value="">+ ajouter…</option>${avail.map(c=>`<option value="${c}">${pt_e(pt_name(c))}</option>`).join('')}</select> <button class="btn ghost small b-add t-add" onclick="pt_grpAdd(${gi})">Ajouter</button>` : '';
     return `<div class="ticket">
