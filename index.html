@@ -587,7 +587,11 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
 .pt-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--surface);border:1px solid var(--moss);color:var(--moss);padding:10px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:60;}
 .pt-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   /* ---- Caisse : grille de saisie ---- */
-  .cg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 12px;align-items:start;}
+  .cg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 12px;align-items:stretch;}
+  .cg-grid .cg-card{min-height:176px;} .cg-body{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;} .cg-foot{display:flex;flex-direction:column;gap:6px;margin-top:auto;}
+  .cg-big{font-family:'IBM Plex Mono',monospace;font-weight:800;font-size:22px;}
+  .cg-gh{display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;font-size:12px;font-weight:600;color:var(--ink-muted);border-bottom:1px solid var(--line);padding-bottom:3px;} .cg-gh b{color:var(--service);font-size:13px;}
+  .cg-nav{display:flex;justify-content:space-between;align-items:center;margin:6px 0;}
   .cg-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0;}
   .cg-t{font-size:12px;font-weight:600;color:var(--ink-muted);}
   .cg-val{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:18px;}
@@ -773,6 +777,7 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
       </div>
       <div id="nu-perm-detail">
         <div class="perm-row"><span>Accès Caisse</span><label class="switch"><input type="checkbox" id="nu-perm-caisse"><span class="slider"></span></label></div>
+        <div class="perm-row"><span>↳ Caisse : accès limité (début de caisse, sorties, retenu)</span><label class="switch"><input type="checkbox" id="nu-perm-caisselim"><span class="slider"></span></label></div>
         <div class="perm-row"><span>Accès Dépenses</span><label class="switch"><input type="checkbox" id="nu-perm-depenses"><span class="slider"></span></label></div>
         <div class="perm-row"><span>↳ Dépenses : saisie du solde réel</span><label class="switch"><input type="checkbox" id="nu-perm-solde-reel" checked><span class="slider"></span></label></div>
         <div class="perm-row"><span>↳ Dépenses : vérification / écart</span><label class="switch"><input type="checkbox" id="nu-perm-verification" checked><span class="slider"></span></label></div>
@@ -843,6 +848,7 @@ function hasAccess(moduleKey){
   }
   if(moduleKey === 'controle') return !!session.isAdmin;   // réservé à l'administrateur
   if(session.isAdmin) return true;
+  if(moduleKey === 'caisse' && session.permissions && session.permissions.caisseLim) return true;   // accès limité « saisie du soir »
   return !!(session.permissions && session.permissions[moduleKey]);
 }
 
@@ -1037,6 +1043,7 @@ async function uu_createUser(){
       verification: document.getElementById('nu-perm-verification').checked,
       historiqueVerification: false,
       caisse: document.getElementById('nu-perm-caisse').checked,
+      caisseLim: document.getElementById('nu-perm-caisselim').checked,
       pointage: document.getElementById('nu-perm-pointage').checked,
       fiches: document.getElementById('nu-perm-fiches').checked,
       mep: document.getElementById('nu-perm-mep').checked,
@@ -1050,7 +1057,7 @@ async function uu_createUser(){
   document.getElementById('nu-username').value = '';
   document.getElementById('nu-password').value = '';
   document.getElementById('nu-admin').checked = false;
-  ['caisse', 'pointage', 'fiches', 'mep', 'paie'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
+  ['caisse', 'caisselim', 'pointage', 'fiches', 'mep', 'paie'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
   document.getElementById('nu-emp').value = '';
   uu_toggleAdminFields();
 }
@@ -1114,6 +1121,16 @@ async function uu_setEmp(userId, v){
   const code = v === '' ? null : Number(v);
   await appUsersCol.doc(userId).set({ empCode: code }, { merge:true });
 }
+var uu_pwShown = {}, uu_pwTimers = {};
+function uu_viewPassword(userId){
+  if(uu_pwTimers[userId]){ clearTimeout(uu_pwTimers[userId]); delete uu_pwTimers[userId]; }
+  if(uu_pwShown[userId]){ delete uu_pwShown[userId]; }
+  else {
+    uu_pwShown[userId] = true;
+    uu_pwTimers[userId] = setTimeout(function(){ delete uu_pwShown[userId]; delete uu_pwTimers[userId]; uu_render(); }, 10000);
+  }
+  uu_render();
+}
 function uu_depPermRows(u, perms){
   const row = (ic, lab, key, on, dis)=>`<div class="perm-row"><span>${ic} ${lab}</span><label class="switch"><input type="checkbox" ${on?'checked':''} ${dis?'disabled':''} onchange="uu_togglePerm('${u.id}','${key}',this.checked)"><span class="slider"></span></label></div>`;
   return row('💵','Dépenses : saisie du solde réel','soldeReel',perms.soldeReel!==false,u.isAdmin) + row('🔎','Dépenses : vérification / écart','verification',perms.verification!==false,u.isAdmin);
@@ -1131,11 +1148,13 @@ function uu_render(){
             onchange="uu_togglePerm('${u.id}','${m.key}',this.checked)">
           <span class="slider"></span>
         </label>
-      </div>` + (m.key === 'paie' ? uu_empSelect(u) : '') + (m.key === 'depenses' ? uu_depPermRows(u, perms) : '')).join('');
+      </div>` + (m.key === 'paie' ? uu_empSelect(u) : '') + (m.key === 'depenses' ? uu_depPermRows(u, perms) : '') + (m.key === 'caisse' ? `<div class="perm-row"><span>↳ Caisse : accès limité (début de caisse, sorties, retenu)</span><label class="switch"><input type="checkbox" ${perms.caisseLim?'checked':''} ${u.isAdmin?'disabled':''} onchange="uu_togglePerm('${u.id}','caisseLim',this.checked)"><span class="slider"></span></label></div>` : '')).join('');
     return `<div class="user-card">
       <div class="uh">
         <div class="uname">${esc(u.username||u.id)}${u.isAdmin?'<span class="badge-admin">Admin</span>':''}</div>
         <div style="display:flex;gap:6px;">
+          <span id="uu-pw-${u.id}" style="font-family:monospace;font-size:13px;align-self:center;${uu_pwShown[u.id] ? '' : 'display:none;'}">${uu_pwShown[u.id] ? esc(u.password || '(vide)') : ''}</span>
+          <button class="btn ghost small b-neutral" onclick="uu_viewPassword('${u.id}')">${uu_pwShown[u.id] ? '🙈 Cacher' : '👁 Voir'}</button>
           <button class="btn ghost small b-neutral" onclick="uu_resetPassword('${u.id}')">🔑 Mot de passe</button>
           <button class="btn rust small b-neutral" onclick="uu_deleteUser('${u.id}')">🗑️</button>
         </div>
@@ -1281,13 +1300,14 @@ function ca_normalizeSession(s, date){
     sorties: sorties,
     montantCompte: s.montantCompte!==undefined ? s.montantCompte : '',
     noteValidation: s.noteValidation!==undefined ? s.noteValidation : '',
+    debutValidations: Array.isArray(s.debutValidations) ? s.debutValidations : [],
     enregistreParEn: s.enregistreParEn,
     enregistreLe: s.enregistreLe,
   };
 }
 function ca_blankSession(date){
   const prev = ca_allSessions[prevDateStr(date)];
-  const base = { date, entrees: [], totalVentesErp: '', sorties: [], montantCompte: '', noteValidation: '' };
+  const base = { date, entrees: [], totalVentesErp: '', sorties: [], montantCompte: '', noteValidation: '', debutValidations: [] };
   if(prev){
     return { ...base, debutCaisse: ca_montantPourLendemain(prev), debutCaisseAuto: true };
   }
@@ -1322,6 +1342,11 @@ ca_caisseCol.onSnapshot((snap)=>{
   const next = {};
   snap.forEach(doc=>{ next[doc.id] = doc.data(); });
   ca_allSessions = next;
+  { const srv = next[ca_workingDate];   // lignes / validations saisies entre-temps par un employé à accès limité : ne pas les écraser à l'enregistrement de la clôture
+    if(srv && ca_session && ca_session.date === ca_workingDate){
+      (Array.isArray(srv.sorties) ? srv.sorties : []).forEach(l=>{ if(l && l.par && !(ca_session.sorties || []).some(x=>x.id === l.id)){ if(!Array.isArray(ca_session.sorties)) ca_session.sorties = []; ca_session.sorties.push(l); } });
+      if(Array.isArray(srv.debutValidations)) ca_session.debutValidations = srv.debutValidations;
+    } }
   if(!ca_allSessions[ca_workingDate] && !ca_session.debutCaisseManuel){
     const prev = ca_allSessions[prevDateStr(ca_workingDate)];
     if(prev){
@@ -1374,13 +1399,86 @@ async function ca_syncRetraits(sess){
       if(!reportLoaded){ const r = await col.doc('report_solde').get(); report = r.exists ? r.data() : null; reportLoaded = true; }
       if(report && report.date >= date){ console.warn('Période déjà supprimée dans Dépenses : retrait non recréé', date); continue; }
     }
-    const base = ex ? { ...ex } : { id, type:'AppointCaisse', libelle:'Caisse', concept:'Caisse', bouton:'Retrait caisse', source:'caisse', caisseDate:date, caisseLineId:l.id, date, creePar:currentUser, creeLe:new Date().toISOString() };
+    const base = ex ? { ...ex } : { id, type:'AppointCaisse', libelle:'Caisse', concept:'Caisse', bouton:'Retrait caisse', source:'caisse', caisseDate:date, caisseLineId:l.id, date, remisPar:(l.par || null), creePar:currentUser, creeLe:new Date().toISOString() };
     batch.set(col.doc(id), { ...base, statut:'attente', montantCaisse:m, montant:m }); ops++;
   }
   Object.values(ca_retraitDocs).forEach(d=>{
     if(d.caisseDate === date && d.statut === 'attente' && !keep.has(d.id)){ batch.delete(col.doc(d.id)); ops++; }
   });
   if(ops) await batch.commit();
+}
+
+/* ---------------- Accès limité « saisie du soir » : début de caisse, sorties (ajout seulement), retenu pour demain ---------------- */
+function ca_isLimited(){ return !!(session && !session.isAdmin && session.permissions && session.permissions.caisseLim && !session.permissions.caisse); }
+let ca_lim = { debut:'', note:'', sortie:'', busy:false };
+async function ca_limTx(mutate){
+  const date = ca_session.date, ref = ca_caisseCol.doc(date);
+  return db.runTransaction(async (tx)=>{
+    const snap = await tx.get(ref);
+    const cur = snap.exists ? snap.data() : { date, debutCaisse:ca_session.debutCaisse, entrees:[], totalVentesErp:ca_session.totalVentesErp || '', sorties:[], montantCompte:'', noteValidation:'', debutValidations:[] };
+    const out = mutate({ ...cur });
+    tx.set(ref, out); return out;
+  });
+}
+async function ca_limValidateDebut(){
+  if(ca_lim.busy) return;
+  if(!currentUser){ askUserName(false); if(!currentUser) return; }
+  const raw = String(ca_lim.debut).trim(); if(raw === ''){ alert('Saisis le montant que tu comptes dans la caisse.'); return; }
+  const m = ca_parseNum(raw), attendu = ca_parseNum(ca_session.debutCaisse), ecart = Math.round((m - attendu) * 100) / 100, note = String(ca_lim.note || '').trim();
+  if(Math.abs(ecart) > 0.004 && !note){ alert('Le montant diffère de l’attendu (' + ca_fmtMoney(attendu) + ') : la note d’explication est obligatoire.'); return; }
+  const v = { id:uid(), par:currentUser, heure:ca_nowHM(), at:new Date().toISOString(), montant:m, attendu, ecart, note:Math.abs(ecart) > 0.004 ? note : '' };
+  ca_lim.busy = true;
+  try{
+    const out = await ca_limTx(c=>({ ...c, debutValidations:[...(Array.isArray(c.debutValidations) ? c.debutValidations : []), v] }));
+    ca_session.debutValidations = out.debutValidations; ca_lim.debut = ''; ca_lim.note = '';
+    alert('Début de caisse validé : ' + ca_fmtMoney(m) + (Math.abs(ecart) > 0.004 ? ' (écart ' + (ecart > 0 ? '+' : '') + ca_fmtMoney(ecart) + ')' : '') + '.');
+  }catch(e){ console.error(e); alert('Erreur : validation non enregistrée (' + (e.message || e) + '). Réessaie.'); }
+  ca_lim.busy = false; ca_render();
+}
+async function ca_limAddSortie(){
+  if(ca_lim.busy) return;
+  if(!currentUser){ askUserName(false); if(!currentUser) return; }
+  const m = ca_parseNum(ca_lim.sortie); if(!(m > 0)){ alert('Saisis le montant de la sortie.'); return; }
+  const line = { id:uid(), montant:String(ca_lim.sortie).trim().replace(',', '.'), heure:ca_nowHM(), motif:'retrait', note:'Sidahmed', par:currentUser };
+  ca_lim.busy = true;
+  try{
+    const out = await ca_limTx(c=>({ ...c, sorties:[...(Array.isArray(c.sorties) ? c.sorties : []), line] }));
+    ca_session.sorties = out.sorties; ca_lim.sortie = '';
+    try{ if(ca_retraitReady) await ca_syncRetraits({ ...out, date:ca_session.date }); }catch(e){ console.warn('Sync retraits', e); }
+    alert('Sortie enregistrée : ' + ca_fmtMoney(m) + '. Ce montant doit être remis à Sidahmed.');
+  }catch(e){ console.error(e); alert('Erreur : sortie non enregistrée (' + (e.message || e) + '). Réessaie.'); }
+  ca_lim.busy = false; ca_render();
+}
+function ca_renderLimited(){
+  const today = todayISO();
+  if(ca_workingDate !== today){ ca_workingDate = today; const ex = ca_allSessions[today]; ca_session = ex ? ca_normalizeSession(ex, today) : ca_blankSession(today); ca_hist = null; ca_histEdit = null; }
+  ca_ensureRpWatch();
+  if(ca_rp.loaded && ca_rp.exists && !ca_allSessions[ca_workingDate]) ca_session.totalVentesErp = ca_rp.ca;
+  const attendu = ca_parseNum(ca_session.debutCaisse), raw = String(ca_lim.debut).trim(), m = ca_parseNum(raw), ecart = raw === '' ? null : Math.round((m - attendu) * 100) / 100;
+  const mine = (ca_session.debutValidations || []).filter(v=>v.par === currentUser);
+  const needNote = ecart !== null && Math.abs(ecart) > 0.004;
+  return `
+    <div class="ticket" style="padding:10px 12px;"><div class="cg-t">Caisse du jour</div><b>${fmtDateShort(ca_session.date)}</b> <span class="cg-sub">· journée en cours</span></div>
+    <div class="cg-card" style="margin-bottom:10px;">
+      <div class="cg-t">💵 Début de caisse</div>
+      <div class="cg-sub">Attendu : <b style="color:var(--ink);">${ca_fmtMoney(attendu)}</b></div>
+      <input id="lim-debut" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_lim.debut)}" oninput="ca_lim.debut=this.value;ca_render()">
+      ${ecart !== null ? `<div style="font-size:13px;">Écart : <b style="color:var(${Math.abs(ecart) < 0.005 ? '--moss' : '--rust'});">${ecart > 0 ? '+' : ''}${ca_fmtMoney(ecart)}</b></div>` : ''}
+      ${needNote ? `<input id="lim-note" class="cg-in" type="text" style="border-color:var(--rust);font-family:'Inter',sans-serif;" placeholder="Note obligatoire : explique l’écart" value="${esc(ca_lim.note)}" oninput="ca_lim.note=this.value"><div class="cg-sub" style="color:var(--rust);">La note est obligatoire car le montant diffère de l’attendu.</div>` : ''}
+      <button class="btn t-save" style="width:100%;height:44px;" onclick="ca_limValidateDebut()">✓ Valider mon début de caisse</button>
+      ${mine.length ? mine.map(v=>`<div class="cg-sub" style="color:var(--moss);">✓ Validé à ${esc(v.heure || '')} : ${ca_fmtMoney(v.montant)}${Math.abs(Number(v.ecart) || 0) > 0.004 ? ' (écart ' + (v.ecart > 0 ? '+' : '') + ca_fmtMoney(v.ecart) + ')' : ''}</div>`).join('') : ''}
+    </div>
+    <div class="cg-card" style="margin-bottom:10px;">
+      <div class="cg-t">↗ Sorties de caisse</div>
+      <input id="lim-sortie" class="cg-in" type="text" inputmode="decimal" placeholder="Montant" value="${esc(ca_lim.sortie)}" oninput="ca_lim.sortie=this.value" onkeydown="if(event.key==='Enter')ca_limAddSortie()">
+      <div style="border:1px solid var(--service);background:var(--service-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--service);">ℹ️ Ce montant doit être remis à Sidahmed.</div>
+      <div class="cg-act"><span class="cg-sub">Ajout uniquement</span><button class="cg-plus" title="Ajouter" onclick="ca_limAddSortie()">+</button></div>
+    </div>
+    <div class="cg-card">
+      <div class="cg-t">📌 Retenu pour demain</div>
+      <div class="cg-val" style="font-size:22px;font-weight:800;">${ca_fmtMoney(ca_montantPourLendemain(ca_session))}</div>
+      <div class="cg-sub">calculé automatiquement</div>
+    </div>`;
 }
 
 async function ca_saveSession(){
@@ -1417,7 +1515,8 @@ function ca_render(){
   const scrollY = window.scrollY;
   ca_renderTabs();
   const main = document.getElementById('caisse-main');
-  if(ca_currentTab==='caisse') main.innerHTML = ca_renderCaisseTab();
+  if(ca_isLimited()) main.innerHTML = ca_renderLimited();
+  else if(ca_currentTab==='caisse') main.innerHTML = ca_renderCaisseTab();
   else main.innerHTML = ca_renderHistoriqueTab();
   if(activeId){
     const el = document.getElementById(activeId);
@@ -1437,6 +1536,7 @@ function ca_renderTabs(){
     {id:'caisse', label:'Caisse du jour'},
     {id:'historique', label:'Historique'},
   ];
+  if(ca_isLimited()){ document.getElementById('caisse-tabs').innerHTML = ''; return; }
   document.getElementById('caisse-tabs').innerHTML = tabs.map(t=>`
     <button class="${ca_currentTab===t.id?'active':''}" onclick="ca_setTab('${t.id}')">${esc(t.label)}</button>
   `).join('');
@@ -1482,9 +1582,13 @@ function ca_addEntry(k){
   ca_render();
   const el = document.getElementById('cg-' + k + '-m'); if(el) el.focus();
 }
-function ca_openHist(k){ ca_hist = k; ca_histEdit = null; ca_render(); }
+let ca_histDate = null, ca_histQ = '', ca_histMenu = null;
+function ca_openHist(k){ ca_hist = k; ca_histEdit = null; ca_histDate = null; ca_histQ = ''; ca_histMenu = null; ca_render(); }
+function ca_histNav(d){ const cur = ca_histDate || ca_session.date, dt = new Date(cur + 'T12:00:00'); dt.setDate(dt.getDate() + d); ca_histDate = toLocalISO(dt); ca_histEdit = null; ca_histMenu = null; ca_render(); }
+function ca_histSearch(v){ ca_histQ = v; ca_render(); }
+function ca_histMenuToggle(id){ ca_histMenu = (ca_histMenu === id) ? null : id; ca_render(); }
 function ca_closeHist(){ ca_hist = null; ca_histEdit = null; ca_render(); }
-function ca_editHist(id){ ca_histEdit = (ca_histEdit === id) ? null : id; ca_render(); }
+function ca_editHist(id){ ca_histEdit = (ca_histEdit === id) ? null : id; ca_histMenu = null; ca_render(); }
 function ca_delHist(id){
   if(ca_lineLocked(ca_hist, id)) return;
   if(!confirm('Supprimer cette ligne ?')) return;
@@ -1507,13 +1611,18 @@ function ca_updateLine(key, id, field, value){
 }
 function ca_renderHistModal(){
   if(!ca_hist) return '';
-  const k = ca_hist, lines = ca_session[k] || [];
+  const k = ca_hist, vd = ca_histDate || ca_session.date, isWork = (vd === ca_session.date);
+  const srcSess = isWork ? ca_session : (ca_allSessions[vd] ? ca_normalizeSession(ca_allSessions[vd], vd) : null);
+  const lines = srcSess ? (srcSess[k] || []) : [];
   const title = k === 'sorties' ? '↗ Historique — Sorties de caisse' : '➕ Historique — Entrées diverses';
   const noteField = k === 'sorties' ? 'note' : 'libelle';
-  const rows = lines.length ? lines.map(l=>{
-    const type = k === 'sorties' ? ((CA_SORTIE_MOTIFS.find(m=>m.value===l.motif) || {}).label || 'Sortie') : 'Entrée';
+  const typeOf = (l)=> k === 'sorties' ? ((CA_SORTIE_MOTIFS.find(m=>m.value===l.motif) || {}).label || 'Sortie') : 'Entrée diverse';
+  const q = ca_histQ.trim().toLowerCase();
+  const total = lines.reduce((t, l)=>t + ca_parseNum(l.montant), 0);
+  const shown = lines.filter(l=>!q || (typeOf(l) + ' ' + (l[noteField] || '') + ' ' + (l.par || '') + ' ' + (l.heure || '') + ' ' + l.montant).toLowerCase().includes(q));
+  const rowHtml = (l)=>{
     const note = (l[noteField] || '').trim();
-    if(ca_histEdit === l.id){
+    if(isWork && ca_histEdit === l.id){
       return `<div class="cg-hrow edit">
         <input id="hm-${l.id}" class="cg-in" type="text" inputmode="decimal" value="${esc(l.montant)}" placeholder="Montant" oninput="ca_updateLine('${k}','${l.id}','montant',this.value)">
         ${k === 'sorties' ? `<select id="ht-${l.id}" class="cg-in" onchange="ca_updateLine('sorties','${l.id}','motif',this.value)">${CA_SORTIE_MOTIFS.map(m=>`<option value="${m.value}" ${l.motif===m.value?'selected':''}>${esc(m.label)}</option>`).join('')}</select>` : ''}
@@ -1522,15 +1631,28 @@ function ca_renderHistModal(){
       </div>`;
     }
     return `<div class="cg-hrow">
-      <div class="cg-hmain"><div>${esc(type)}</div><small>${note ? esc(note) : '—'}${l.heure ? ' · ' + esc(l.heure) : ''}</small></div>
+      <div class="cg-hmain"><div>${esc(typeOf(l))}</div><small>${note ? esc(note) : '—'}${l.heure ? ' · ' + esc(l.heure) : ''}${l.par ? ' · par ' + esc(l.par) : ''}</small></div>
       <b>${ca_fmtMoney(ca_parseNum(l.montant))}</b>
-      <button class="cg-mini" title="Modifier" onclick="ca_editHist('${l.id}')">✎</button>
-      <button class="cg-mini del" title="Supprimer" onclick="ca_delHist('${l.id}')">✕</button>
+      ${isWork ? (ca_histMenu === l.id
+        ? `<button class="cg-mini" title="Modifier" onclick="ca_editHist('${l.id}')">✎</button><button class="cg-mini del" title="Supprimer" onclick="ca_delHist('${l.id}')">✕</button>`
+        : `<button class="cg-mini" title="Actions" onclick="ca_histMenuToggle('${l.id}')">⋯</button>`) : ''}
     </div>`;
-  }).join('') : `<p style="font-size:12.5px;color:var(--ink-muted);margin:10px 0;">Aucun enregistrement pour cette date.</p>`;
+  };
+  let rows = '';
+  if(!shown.length){
+    rows = `<p style="font-size:12.5px;color:var(--ink-muted);margin:10px 0;">${lines.length ? 'Aucun résultat pour cette recherche.' : 'Aucun enregistrement pour cette date.'}</p>`;
+  } else if(k === 'sorties'){
+    const groups = {}; shown.forEach(l=>{ const t = typeOf(l); (groups[t] = groups[t] || []).push(l); });
+    rows = Object.keys(groups).map(t=>`<div class="cg-gh"><span>${esc(t)} (${groups[t].length})</span><b>${ca_fmtMoney(ca_sumLines(groups[t]))}</b></div>${groups[t].map(rowHtml).join('')}`).join('');
+  } else {
+    rows = `<div class="cg-gh"><span>Entrées (${shown.length})</span><b>${ca_fmtMoney(ca_sumLines(shown))}</b></div>${shown.map(rowHtml).join('')}`;
+  }
   return `<div class="cg-overlay" onclick="ca_closeHist()"><div class="cg-sheet" onclick="event.stopPropagation()">
     <div style="display:flex;justify-content:space-between;align-items:center;font-weight:700;margin-bottom:6px;"><span>${title}</span><button class="cg-mini" onclick="ca_closeHist()">✕</button></div>
-    <div style="font-size:11px;color:var(--ink-muted);margin-bottom:6px;">${fmtDateShort(ca_session.date)}</div>
+    <div class="cg-nav"><button class="cg-mini" title="Jour précédent" onclick="ca_histNav(-1)">‹</button><b>${fmtDateShort(vd)}</b><button class="cg-mini" title="Jour suivant" onclick="ca_histNav(1)">›</button></div>
+    ${isWork ? '' : `<div style="font-size:11px;color:var(--ink-muted);text-align:center;margin-bottom:4px;">Consultation seule : ouvre ce jour dans « Caisse du jour » pour le modifier.</div>`}
+    <div class="cg-card" style="flex-direction:row;justify-content:space-between;align-items:center;margin:8px 0;"><div><div class="cg-t">Total du jour</div><div class="cg-big" style="color:var(--amber);">${ca_fmtMoney(total)}</div></div><div class="cg-sub">${lines.length} ligne${lines.length > 1 ? 's' : ''}</div></div>
+    <input id="hist-q" class="cg-in" type="text" placeholder="🔍 Rechercher (motif, type, montant…)" value="${esc(ca_histQ)}" oninput="ca_histSearch(this.value)" style="margin-bottom:4px;font-family:'Inter',sans-serif;">
     ${rows}
   </div></div>`;
 }
@@ -1561,6 +1683,7 @@ function ca_refreshErp(){
   if(typeof rp_requestSync === 'function'){ try{ rp_requestSync(true); }catch(e){} }
   ca_render();
 }
+function ca_cgCard(t, body, foot){ return `<div class="cg-card"><div class="cg-t">${t}</div><div class="cg-body">${body}</div><div class="cg-foot">${foot || ''}</div></div>`; }
 function ca_erpCard(existing){
   const r = ca_rp;
   const live = !existing || ca_erpLive;
@@ -1571,16 +1694,15 @@ function ca_erpCard(existing){
     body = `<div class="cg-val" style="color:var(--ink-muted);">…</div><div class="cg-sub">Lecture de Resto Pro</div>`;
   } else if(r.exists){
     const diff = (!live) ? Math.abs(r.ca - ca_parseNum(ca_session.totalVentesErp)) : 0;
-    body = `<div class="cg-val">${ca_fmtMoney(ca_parseNum(ca_session.totalVentesErp))}</div>
+    body = `<div class="cg-big">${ca_fmtMoney(ca_parseNum(ca_session.totalVentesErp))}</div>
       <div class="cg-sub" style="color:#93C5FD;">Resto Pro · ${r.nClosed} ticket${r.nClosed>1?'s':''} fermé${r.nClosed>1?'s':''}</div>
       ${r.nOpen ? `<div class="cg-sub" style="color:var(--amber);">⚠ ${r.nOpen} ticket${r.nOpen>1?'s':''} non fermé${r.nOpen>1?'s':''}</div>` : ''}
-      ${diff > 0.5 ? `<div class="cg-sub" style="color:var(--amber);">⚠ Resto Pro indique maintenant ${ca_fmtMoney(r.ca)}</div>` : ''}
-      ${refreshBtn}`;
+      ${diff > 0.5 ? `<div class="cg-sub" style="color:var(--amber);">⚠ Resto Pro indique maintenant ${ca_fmtMoney(r.ca)}</div>` : ''}`;
   } else {
     body = `<input id="erp-input" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_session.totalVentesErp)}" placeholder="Montant" oninput="ca_session.totalVentesErp=this.value;ca_render()">
-      <div class="cg-sub" style="color:var(--amber);">Pas de données Resto Pro pour ce jour</div>${refreshBtn}`;
+      <div class="cg-sub" style="color:var(--amber);">Pas de données Resto Pro pour ce jour</div>`;
   }
-  return `<div class="cg-card"><div class="cg-t">🧾 Total ventes ERP</div>${body}</div>`;
+  return ca_cgCard('🧾 Total ventes ERP', body, r.loaded ? refreshBtn : '');
 }
 
 function ca_renderCaisseTab(){
@@ -1589,9 +1711,12 @@ function ca_renderCaisseTab(){
   const ecart = ca_ecart(ca_session);
   const hasPrev = !!ca_allSessions[prevDateStr(ca_workingDate)];
   const dS = ca_draft.sorties, dE = ca_draft.entrees;
-  const debutCard = hasPrev
-    ? `<div class="cg-val">${ca_fmtMoney(ca_parseNum(ca_session.debutCaisse))}</div><div class="cg-sub">↺ repris de la veille · <a href="#" style="color:var(--forest-light);" onclick="ca_refreshDebut();return false;">↻ Actualiser</a></div>`
-    : `<input id="debut-input" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_session.debutCaisse)}" placeholder="0" oninput="ca_session.debutCaisse=this.value;ca_session.debutCaisseAuto=false;ca_session.debutCaisseManuel=true;ca_render()"><div class="cg-sub" style="color:var(--amber);">Aucune clôture la veille : à saisir · <a href="#" style="color:var(--forest-light);" onclick="ca_refreshDebut();return false;">↻ Actualiser</a></div>`;
+  const dv = (ca_session.debutValidations || []).map(v=>`<div class="cg-sub" style="color:var(--moss);">✓ ${esc(v.par || '')} · ${esc(v.heure || '')} : ${ca_fmtMoney(v.montant)}${Math.abs(Number(v.ecart) || 0) > 0.004 ? ' <span style="color:var(--rust);">(écart ' + (v.ecart > 0 ? '+' : '') + ca_fmtMoney(v.ecart) + (v.note ? ' — ' + esc(v.note) : '') + ')</span>' : ''}</div>`).join('');
+  const debutBody = hasPrev
+    ? `<div class="cg-big">${ca_fmtMoney(ca_parseNum(ca_session.debutCaisse))}</div><div class="cg-sub">↺ repris de la veille</div>${dv}`
+    : `<input id="debut-input" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_session.debutCaisse)}" placeholder="0" oninput="ca_session.debutCaisse=this.value;ca_session.debutCaisseAuto=false;ca_session.debutCaisseManuel=true;ca_render()"><div class="cg-sub" style="color:var(--amber);">Aucune clôture la veille : à saisir</div>${dv}`;
+  const debutFoot = `<div class="cg-sub"><a href="#" style="color:var(--forest-light);" onclick="ca_refreshDebut();return false;">↻ Actualiser</a></div>`;
+  const staticSel = (t)=>`<select class="cg-in" disabled style="font-family:'Inter',sans-serif;font-size:13.5px;opacity:.7;"><option>${t}</option></select>`;
   return `
     <div class="ticket">
       <div class="field">
@@ -1606,31 +1731,25 @@ function ca_renderCaisseTab(){
     ${ca_renderStatusBanner(existing, ecart)}
 
     <div class="cg-grid">
-      <div class="cg-card"><div class="cg-t">💵 Début de caisse</div>${debutCard}</div>
+      ${ca_cgCard('💵 Début de caisse', debutBody, debutFoot)}
 
-      <div class="cg-card"><div class="cg-t">✓ Montant compté</div>
-        <input id="compte-input" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_session.montantCompte)}" placeholder="Comptage réel" oninput="ca_session.montantCompte=this.value;ca_render()">
-      </div>
+      ${ca_cgCard('✓ Montant compté', `<input id="compte-input" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_session.montantCompte)}" placeholder="Comptage réel" oninput="ca_session.montantCompte=this.value;ca_render()">` + (ecart !== null ? `<div class="cg-sub">écart : <b style="color:var(${Math.abs(ecart) < 0.01 ? '--moss' : '--rust'});">${ecart > 0 ? '+' : ''}${ca_fmtMoney(ecart)}</b></div>` : ''), `<div class="cg-sub">saisie du comptage réel</div>`)}
 
-      <div class="cg-card"><div class="cg-t">↗ Sorties de caisse</div>
+      ${ca_cgCard('↗ Sorties de caisse', `
         <input id="cg-sorties-m" class="cg-in" type="text" inputmode="decimal" value="${esc(dS.montant)}" placeholder="Montant" oninput="ca_draftSet('sorties','montant',this.value)">
         <select id="cg-sorties-t" class="cg-in" style="font-family:'Inter',sans-serif;font-size:13.5px;" onchange="ca_draftSet('sorties','motif',this.value)">${CA_SORTIE_MOTIFS.map(m=>`<option value="${m.value}" ${dS.motif===m.value?'selected':''}>${esc(CA_SORTIE_COURT[m.value] || m.label)}</option>`).join('')}</select>
-        <input id="cg-sorties-n" class="cg-in" type="text" value="${esc(dS.note)}" placeholder="Motif" oninput="ca_draftSet('sorties','note',this.value)" onkeydown="if(event.key==='Enter')ca_addEntry('sorties')">
-        <div class="cg-act"><button class="cg-mod" onclick="ca_openHist('sorties')">Modifier</button><button class="cg-plus" title="Ajouter" onclick="ca_addEntry('sorties')">+</button></div>
-      </div>
+        <input id="cg-sorties-n" class="cg-in" type="text" value="${esc(dS.note)}" placeholder="Motif" oninput="ca_draftSet('sorties','note',this.value)" onkeydown="if(event.key==='Enter')ca_addEntry('sorties')">`,
+        `<div class="cg-act"><button class="cg-mod" onclick="ca_openHist('sorties')">Historique</button><button class="cg-plus" title="Ajouter" onclick="ca_addEntry('sorties')">+</button></div>`)}
 
-      <div class="cg-card"><div class="cg-t">➕ Entrées diverses</div>
+      ${ca_cgCard('➕ Entrées diverses', `
         <input id="cg-entrees-m" class="cg-in" type="text" inputmode="decimal" value="${esc(dE.montant)}" placeholder="Montant" oninput="ca_draftSet('entrees','montant',this.value)">
-        <input id="cg-entrees-n" class="cg-in" type="text" value="${esc(dE.note)}" placeholder="Motif" oninput="ca_draftSet('entrees','note',this.value)" onkeydown="if(event.key==='Enter')ca_addEntry('entrees')">
-        <div class="cg-act"><button class="cg-mod" onclick="ca_openHist('entrees')">Modifier</button><button class="cg-plus" title="Ajouter" onclick="ca_addEntry('entrees')">+</button></div>
-      </div>
+        ${staticSel('Entrée diverse')}
+        <input id="cg-entrees-n" class="cg-in" type="text" value="${esc(dE.note)}" placeholder="Motif" oninput="ca_draftSet('entrees','note',this.value)" onkeydown="if(event.key==='Enter')ca_addEntry('entrees')">`,
+        `<div class="cg-act"><button class="cg-mod" onclick="ca_openHist('entrees')">Historique</button><button class="cg-plus" title="Ajouter" onclick="ca_addEntry('entrees')">+</button></div>`)}
 
       ${ca_erpCard(existing)}
 
-      <div class="cg-card"><div class="cg-t">📌 Retenu pour demain</div>
-        <div class="cg-val">${ca_fmtMoney(ca_montantPourLendemain(ca_session))}</div>
-        <div class="cg-sub">calculé automatiquement</div>
-      </div>
+      ${ca_cgCard('📌 Retenu pour demain', `<div class="cg-big">${ca_fmtMoney(ca_montantPourLendemain(ca_session))}</div><div class="cg-sub">montant compté, sinon montant théorique</div>`, `<div class="cg-sub">calculé automatiquement</div>`)}
     </div>
 
     <div class="ticket" style="padding:10px 12px;">
@@ -5194,7 +5313,7 @@ function dp_pendingBox(){
     const val = dp_pendVals[p.id] !== undefined ? dp_pendVals[p.id] : String(p.montantCaisse != null ? p.montantCaisse : p.montant);
     return `<div class="movement-row" style="align-items:flex-end;gap:10px;flex-wrap:wrap;">
       <div style="flex:1;min-width:160px;">
-        <div style="font-weight:500;"><span class="chip" style="color:var(--moss);background:var(--moss-bg);margin-right:5px;">Caisse</span>Retrait du ${fmtDateShort(p.date)}</div>
+        <div style="font-weight:500;"><span class="chip" style="color:var(--moss);background:var(--moss-bg);margin-right:5px;">Caisse</span>${p.remisPar ? 'Retrait à remettre par ' + esc(p.remisPar) : 'Retrait du ' + fmtDateShort(p.date)}${p.remisPar ? ' <span class="sub">· ' + fmtDateShort(p.date) + '</span>' : ''}</div>
         <div class="sub">Sorti de la caisse : <b>${dp_fmtMoney(p.montantCaisse != null ? p.montantCaisse : p.montant)}</b>${p.creePar ? ' · par ' + esc(p.creePar) : ''}</div>
       </div>
       <div style="display:flex;gap:8px;align-items:flex-end;">
