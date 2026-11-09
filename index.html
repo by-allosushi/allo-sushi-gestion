@@ -1141,6 +1141,7 @@ function uu_mepRows(u, perms){
   return `<div style="padding:2px 0 0 10px;font-size:12px;color:var(--ink-muted);">Sections visibles (aucune cochée = toutes)</div>${secs.map(sw).join('')}` + (on && noEmp ? `<div style="padding:4px 0 6px 10px;font-size:12px;color:var(--rust);">⚠ Aucun employé relié : il ne pourra pas valider d’inventaire (choisis l’employé ci-dessous).</div>` : '');
 }
 function uu_depPermRows(u, perms){
+  if(!u.isAdmin && !perms.depenses) return '';   // sous-réglages sans effet tant que « Dépenses » n’est pas coché
   const row = (ic, lab, key, on, dis)=>`<div class="perm-row"><span>${ic} ${lab}</span><label class="switch"><input type="checkbox" ${on?'checked':''} ${dis?'disabled':''} onchange="uu_togglePerm('${u.id}','${key}',this.checked)"><span class="slider"></span></label></div>`;
   return row('💵','Dépenses : saisie du solde réel','soldeReel',perms.soldeReel!==false,u.isAdmin) + row('🔎','Dépenses : vérification / écart','verification',perms.verification!==false,u.isAdmin);
 }
