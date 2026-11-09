@@ -610,12 +610,14 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
   .cg-mini.del{color:var(--rust);}.cg-mini.xclose{color:var(--rust);background:var(--rust-bg);border-color:var(--rust);font-weight:700;}
   .x-btn,.line-row .x-btn{color:var(--rust) !important;}.cg-mini.ok{color:var(--moss);}
 .v2-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;}
-.v2-ct{font-weight:800;font-size:16px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:2px;}
+.v2-ct{font-weight:800;font-size:17px;padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:2px;}
 .v2-ar{color:#9aa39d;font-size:13px;font-weight:500;}
 .mep-seg button .v2-ar{display:block;font-size:12px;}
 .v2-f{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);}.v2-ct + .v2-f{border-top:0;}
 .v2-fl{flex:1;min-width:0;}.v2-fn{font-weight:600;font-size:15px;}.v2-fl .v2-ar{display:block;margin-top:1px;}
 .v2-in{display:flex;align-items:center;gap:6px;flex:none;}.v2-in input{width:96px;text-align:center;font-weight:700;}.v2-u{font-size:13px;color:var(--ink-muted,#9aa39d);width:26px;}
+.v2-ct .v2-ar{text-align:left;}
+.v2-ro{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:12px;color:#9aa39d;font-size:13px;}
 .v2-pref{font-size:12px;color:#FBBF24;margin-top:3px;}
 .v2-line{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 0;border-top:1px solid var(--line);}
 .v2-chip{display:inline-block;border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:0 6px 6px 0;font-size:13px;}
@@ -1171,7 +1173,9 @@ function uu_mepRows(u, perms){
   const sw = (x)=>`<div class="perm-row"><span>↳ ${esc(x.n)}</span><label class="switch"><input type="checkbox" ${perms['mepSec_' + x.id] ? 'checked' : ''} onchange="uu_togglePerm('${u.id}','mepSec_${esc(x.id)}',this.checked)"><span class="slider"></span></label></div>`;
   const noEmp = (u.empCode === undefined || u.empCode === null || u.empCode === '');
   const ar = `<div class="perm-row"><span>🌐 Afficher l’arabe (version en test)</span><label class="switch"><input type="checkbox" ${perms.arabe ? 'checked' : ''} onchange="uu_togglePerm('${u.id}','arabe',this.checked)"><span class="slider"></span></label></div>`;
-  return ar + `<div style="padding:2px 0 0 10px;font-size:12px;color:var(--ink-muted);">Sections visibles (aucune cochée = toutes)</div>${secs.map(sw).join('')}` + (on && noEmp ? `<div style="padding:4px 0 6px 10px;font-size:12px;color:var(--rust);">⚠ Aucun employé relié : il ne pourra pas valider d’inventaire (choisis l’employé ci-dessous).</div>` : '');
+  const lvlSel = (x)=>{ const cur = perms['v2Lvl_' + x.id] || 'aucun'; return `<div class="perm-row"><span>↳ ${esc(x.n)}</span><select onchange="uu_togglePerm('${u.id}','v2Lvl_${esc(x.id)}',this.value)" style="min-height:36px;">${[['aucun', 'Aucun'], ['lire', 'Consulter'], ['saisir', 'Saisir et modifier']].map(o=>`<option value="${o[0]}" ${cur === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select></div>`; };
+  const v2rows = `<div style="padding:8px 0 0 10px;font-size:12px;color:#FBBF24;">Nouvelle version (test) : droit par rubrique</div>${secs.map(lvlSel).join('')}`;
+  return ar + v2rows + `<div style="padding:2px 0 0 10px;font-size:12px;color:var(--ink-muted);">Sections visibles (aucune cochée = toutes)</div>${secs.map(sw).join('')}` + (on && noEmp ? `<div style="padding:4px 0 6px 10px;font-size:12px;color:var(--rust);">⚠ Aucun employé relié : il ne pourra pas valider d’inventaire (choisis l’employé ci-dessous).</div>` : '');
 }
 function uu_depPermRows(u, perms){
   if(!u.isAdmin && !perms.depenses) return '';   // sous-réglages sans effet tant que « Dépenses » n’est pas coché
@@ -7401,47 +7405,41 @@ async function dt_deleteAvoir(id){
 }
 
 /* ==================== CUISINE & MISE EN PLACE — NOUVELLE VERSION (admin seulement, en test) ====================
-   Écrans repris des captures validées : en-tête (nom + sections), onglets avec ✓, bandeau de pesée, cartes à bordure de couleur,
-   boutons « Valider l'inventaire » / « Corriger ma saisie ». Les champs sont ajoutés à la main dans Réglages.
-   Données dans la collection existante « mise_en_place » : doc « v2cfg » (réglages) et docs « v2_<date>_<section> » (saisies).
-   Rien ne touche aux saisies actuelles : les cuisiniers continuent comme avant. */
+   • Onglet « Cuisine » (admin) : une carte par ingrédient de la liste Dépenses ; chaque champ est attribué à une rubrique (Sushi, Chaud, Bar).
+   • Cuisiniers : chacun voit, dans sa rubrique, les champs qui lui sont attribués (droit « Aucun / Consulter / Saisir et modifier » dans Utilisateurs).
+   Données dans la collection existante « mise_en_place » : doc « v2cfg » (réglages) et docs « v2_<date>_<rubrique> » (saisies).
+   Rien ne touche aux saisies actuelles : les cuisiniers continuent comme avant tant que NEW_RUBRIQUES_ADMIN_ONLY est à true. */
 const v2_cfgRef = db.collection('mise_en_place').doc('v2cfg');
-const V2_COL = { red:'#f87171', yellow:'#fbbf24', green:'#4ade80', teal:'#2dd4bf', purple:'#a78bfa' };
-const V2_COLN = { red:'Rouge', yellow:'Jaune', green:'Vert', teal:'Turquoise', purple:'Violet' };
-const V2_AR = { cuisine:'المطبخ', sushi:'سوشي', chaud:'الطهي', bar:'البار' };
-let v2_cfg = {}, v2_cfgReady = false, v2_started = false, v2_tab = 'saisie', v2_sec = 'cuisine', v2_rsec = 'cuisine', v2_date = '';
+const V2_AR = { sushi:'سوشي', chaud:'الطهي', bar:'البار' };
+let v2_cfg = {}, v2_cfgReady = false, v2_started = false, v2_tab = 'saisie', v2_sec = '', v2_date = '';
 let v2_docs = {}, v2_unsub = null, v2_form = {}, v2_edit = {}, v2_msg = {}, v2_noteOpen = {}, v2_ar = true, v2_saveT = null, v2_busy = false;
-function v2_seed(){
-  const f = (id, n, ar)=>({ id, n, ar, pref:'' });
-  const rest = ()=>f('rest', 'Reste fin de service', 'المتبقي في نهاية الخدمة'), loss = ()=>f('loss', 'Perte (à jeter)', 'الخسارة (للرمي)');
-  const c = (id, t, ar, ic, col, ing, fields, note)=>({ id, t, ar, ic, col, ing, note:!!note, fields });
-  return {
-    cuisine:[
-      c('c_raw', 'Escalope — non découpée', 'الإسكالوب غير المقطّع', '🥩', 'red', 'Escalope', [f('stock', 'Stock fin de service', 'المخزون في نهاية الخدمة')]),
-      c('c_dec', 'Découpe du jour', 'تقطيع اليوم', '🔪', 'yellow', 'Escalope', [f('dec_out', 'Poids mis en découpe (pesée)', 'الوزن المُقدَّم للتقطيع (وزن)'), f('dec_ps', 'Part Sushi (pesée)', 'حصة السوشي (وزن)'), f('dec_pc', 'Part Chaud (pesée)', 'حصة الساخن (وزن)'), f('dec_waste', 'Déchet (pesé)', 'الفضلات (موزونة)')]),
-      c('c_waste', 'Déchet de découpe', 'فضلات التقطيع', '♻️', 'green', 'Poulet haché', [f('hache', 'Poulet haché récupéré', 'الدجاج المفروم المسترجَع'), f('trash', 'À jeter', 'للرمي')])],
-    sushi:[
-      c('s_esc', 'Escalope', 'الإسكالوب', '🥩', 'teal', 'Escalope', [f('rest_cru', 'Reste fin de service (cru)', 'المتبقي في نهاية الخدمة (نيئ)'), f('rest_cuit', 'Reste cuit (crispy)', 'المتبقي مطبوخاً (كريسبي)'), loss()], true),
-      c('s_riz', 'Riz à sushi', 'أرز السوشي', '🍚', 'teal', 'Riz', [rest(), loss()]),
-      c('s_sau', 'Saumon', 'السلمون', '🐟', 'teal', 'Saumon', [f('sau_brut', 'Quantité brute disponible', 'الكمية الخام المتاحة'), f('sau_clean', 'Quantité à nettoyer', 'الكمية المراد تنظيفها'), f('sau_net', 'Net utilisable', 'الصافي القابل للاستعمال'), f('sau_loss', 'Perte à jeter', 'الخسارة للرمي'), f('sau_restnet', 'Reste net fin de service', 'الصافي المتبقي نهاية الخدمة'), f('sau_rest', 'Reste brut', 'المتبقي الخام')])],
-    chaud:[
-      c('h_esc', 'Escalope', 'الإسكالوب', '🥩', 'red', 'Escalope', [rest(), loss()]),
-      c('h_pou', 'Poulet haché', 'الدجاج المفروم', '🐔', 'purple', 'Poulet haché', [rest(), loss()])],
-    bar:[
-      c('b_cit', 'Citrons', 'الليمون', '🍋', 'purple', 'Citron', [rest(), loss()]),
-      c('b_men', 'Menthe', 'النعناع', '🌿', 'purple', '', [rest(), loss()]),
-      c('b_sir', 'Sirop gingembre', 'شراب الزنجبيل', '🫚', 'purple', 'Gingembre', [rest(), loss()])]
-  };
+const v2_rubs = ()=>mep_secList();
+const v2_rubName = (id)=>(v2_rubs().find(r=>r.id === id) || { n:id }).n;
+function v2_level(sec){ if(session && session.isAdmin) return 'saisir'; const p = (session && session.permissions) || {}; return p['v2Lvl_' + sec] || 'aucun'; }
+const v2_visRubs = ()=>v2_rubs().filter(r=>v2_level(r.id) !== 'aucun');
+function v2_seedFor(it){
+  const n = String(it.n || '').toLowerCase(), first = (v2_rubs()[0] || { id:'sushi' }).id;
+  const rub = (id)=>v2_rubs().some(r=>r.id === id) ? id : first;
+  const f = (id, nm, ar, sec, extra)=>Object.assign({ id, n:nm, ar, sec:rub(sec) }, extra || {});
+  if(n.includes('escalope')) return { ar:'الإسكالوب', fields:[
+    f('stock', 'Stock fin de service', 'المخزون في نهاية الخدمة', 'sushi'), f('dec_out', 'Poids mis en découpe (pesée)', 'الوزن المُقدَّم للتقطيع (وزن)', 'sushi'),
+    f('dec_ps', 'Part Sushi (pesée)', 'حصة السوشي (وزن)', 'sushi'), f('dec_pc', 'Part Chaud (pesée)', 'حصة الساخن (وزن)', 'chaud'),
+    f('hache', 'Poulet haché récupéré', 'الدجاج المفروم المسترجَع', 'sushi'), f('trash', 'À jeter', 'للرمي', 'sushi'),
+    f('waste', 'Déchet total (calculé)', 'إجمالي الفضلات (محسوب)', 'sushi', { calc:['hache', 'trash'] })] };
+  if(n.includes('poulet')) return { ar:'الدجاج المفروم', fields:[ f('rest', 'Reste fin de service', 'المتبقي في نهاية الخدمة', 'chaud'), f('loss', 'Perte (à jeter)', 'الخسارة (للرمي)', 'chaud') ] };
+  if(n.includes('saumon')) return { ar:'السلمون', fields:[
+    f('sau_brut', 'Quantité brute disponible', 'الكمية الخام المتاحة', 'sushi'), f('sau_clean', 'Quantité à nettoyer', 'الكمية المراد تنظيفها', 'sushi'),
+    f('sau_net', 'Net utilisable', 'الصافي القابل للاستعمال', 'sushi'), f('sau_loss', 'Perte à jeter', 'الخسارة للرمي', 'sushi'),
+    f('sau_restnet', 'Reste net fin de service', 'الصافي المتبقي نهاية الخدمة', 'sushi'), f('sau_rest', 'Reste brut', 'المتبقي الخام', 'sushi')] };
+  return { ar:'', fields:[] };
 }
-const v2_postes = ()=>(Array.isArray(v2_cfg.postes) && v2_cfg.postes.length ? v2_cfg.postes : ['Sushiman', 'Wokist', 'Aide cuisinier']);
-const v2_cards = (sec)=>{ if(!v2_cfg.cards) v2_cfg.cards = v2_seed(); if(!Array.isArray(v2_cfg.cards[sec])) v2_cfg.cards[sec] = []; return v2_cfg.cards[sec]; };
+const v2_ings = ()=>(dp_cfg.ingredients || []).filter(i=>!i.off);
+function v2_ing(it){ if(!v2_cfg.ings) v2_cfg.ings = {}; if(!v2_cfg.ings[it.id]) v2_cfg.ings[it.id] = v2_seedFor(it); const c = v2_cfg.ings[it.id]; if(!Array.isArray(c.fields)) c.fields = []; return c; }
+const v2_unitOf = (it)=>it.u || 'kg';
 const v2_num = (v)=>{ const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? null : n; };
 const v2_fmt = (n)=>n == null ? '—' : (Math.round(n * 1000) / 1000).toString().replace('.', ',');
 const v2_ymd = ()=>mep_ymd();
-const v2_secs = ()=>[{ id:'cuisine', n:'Cuisine' }].concat(mep_secList());
-const v2_arOf = (id)=>V2_AR[id] || '';
-const v2_ardiv = (t, cls)=>v2_ar && t ? `<span class="v2-ar ${cls || ''}" dir="rtl">${esc(t)}</span>` : '';
-function v2_unitOf(card){ const n = String(card.ing || '').trim().toLowerCase(); if(n){ const it = (dp_cfg.ingredients || []).find(i=>String(i.n).trim().toLowerCase() === n); if(it && it.u) return it.u; } return 'kg'; }
+const v2_arTxt = (t, extra)=>v2_ar && t ? `<span class="v2-ar" dir="rtl"${extra ? ' style="' + extra + '"' : ''}>${esc(t)}</span>` : '';
 function v2_start(){
   if(v2_started) return; v2_started = true; v2_date = v2_ymd();
   v2_cfgRef.onSnapshot((doc)=>{ v2_cfg = doc.exists ? (doc.data() || {}) : {}; v2_cfgReady = true; if(!v2_typing()) v2_render(); }, (e)=>{ console.error(e); v2_cfgReady = true; v2_render(); });
@@ -7458,70 +7456,56 @@ function v2_typing(){ try{ const a = document.activeElement, b = document.getEle
 function v2_saveCfg(){ clearTimeout(v2_saveT); v2_saveT = setTimeout(async ()=>{ try{ await v2_cfgRef.set(v2_cfg); }catch(e){ console.error(e); alert('Réglage non enregistré : ' + (e.message || e) + '\nVérifie que les règles Firestore autorisent la collection « mise_en_place ».'); } }, 400); }
 const v2_setTab = (t)=>{ v2_tab = t; v2_render(); };
 const v2_setSec = (s)=>{ v2_sec = s; v2_render(); };
-const v2_setRsec = (s)=>{ v2_rsec = s; v2_render(); };
 const v2_setDate = (d)=>{ v2_date = d || v2_ymd(); v2_form = {}; v2_edit = {}; v2_msg = {}; v2_watchDay(); v2_render(); };
 const v2_toggleAr = (on)=>{ v2_ar = !!on; v2_render(); };
 
-/* ---------- Réglages ---------- */
-function v2_findCard(sec, id){ return v2_cards(sec).find(c=>c.id === id); }
-function v2_cCardAdd(sec){ v2_cards(sec).push({ id:'c' + mep_newId(), t:'Nouvelle carte', ar:'', ic:'📦', col:'teal', ing:'', note:false, fields:[] }); v2_saveCfg(); v2_render(); }
-function v2_cCardDel(sec, id){ if(!confirm('Supprimer cette carte et ses champs ?')) return; const l = v2_cards(sec), i = l.findIndex(c=>c.id === id); if(i >= 0) l.splice(i, 1); v2_saveCfg(); v2_render(); }
-function v2_cCard(sec, id, k, v){ const c = v2_findCard(sec, id); if(!c) return; c[k] = v; v2_saveCfg(); if(k === 'col' || k === 'note') v2_render(); }
-function v2_cFieldAdd(sec, id){ const c = v2_findCard(sec, id); if(!c) return; c.fields.push({ id:'f' + mep_newId(), n:'', ar:'', pref:'' }); v2_saveCfg(); v2_render(); }
-function v2_cFieldDel(sec, id, i){ const c = v2_findCard(sec, id); if(!c) return; c.fields.splice(i, 1); v2_saveCfg(); v2_render(); }
-function v2_cField(sec, id, i, k, v){ const c = v2_findCard(sec, id); if(!c || !c.fields[i]) return; c.fields[i][k] = v; v2_saveCfg(); }
-function v2_cPosteAdd(){ const n = prompt('Nom du nouveau poste (ex. Plongeur) :'); if(!n || !n.trim()) return; const l = v2_postes().slice(); if(!l.includes(n.trim())) l.push(n.trim()); v2_cfg.postes = l; v2_saveCfg(); v2_render(); }
-function v2_cPosteDel(i){ const l = v2_postes().slice(); if(!confirm('Retirer le poste « ' + l[i] + ' » de la liste ?')) return; l.splice(i, 1); v2_cfg.postes = l; v2_saveCfg(); v2_render(); }
-function v2_cBanner(v){ v2_cfg.bannerPref = v; v2_saveCfg(); }
-const v2_posteSel = (cur, fn)=>`<select onchange="${fn}" style="min-height:38px;"><option value="">— poste —</option>${v2_postes().map(p=>`<option value="${esc(p)}" ${p === cur ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select>`;
+/* ---------- Onglet Cuisine : réglage par ingrédient (admin) ---------- */
+const v2_byId = (id)=>v2_ings().find(i=>i.id === id);
+function v2_cfAdd(id){ const it = v2_byId(id); if(!it) return; v2_ing(it).fields.push({ id:'f' + mep_newId(), n:'', ar:'', sec:(v2_rubs()[0] || { id:'sushi' }).id }); v2_saveCfg(); v2_render(); }
+function v2_cfDel(id, i){ const it = v2_byId(id); if(!it) return; if(!confirm('Supprimer ce champ ?')) return; v2_ing(it).fields.splice(i, 1); v2_saveCfg(); v2_render(); }
+function v2_cfSet(id, i, k, v){ const it = v2_byId(id); if(!it) return; const f = v2_ing(it).fields[i]; if(!f) return; f[k] = v; v2_saveCfg(); if(k === 'sec') v2_render(); }
+function v2_cfMove(id, i, d){ const it = v2_byId(id); if(!it) return; const l = v2_ing(it).fields, j = i + d; if(j < 0 || j >= l.length) return; const t = l[i]; l[i] = l[j]; l[j] = t; v2_saveCfg(); v2_render(); }
+function v2_cfIngAr(id, v){ const it = v2_byId(id); if(!it) return; v2_ing(it).ar = v; v2_saveCfg(); }
 function v2_cfgView(){
-  const secs = v2_secs(), cur = secs.some(s=>s.id === v2_rsec) ? v2_rsec : 'cuisine';
-  const tabs = `<div class="mep-seg">${secs.map(s=>`<button class="${s.id === cur ? 'on' : ''}" onclick="v2_setRsec('${esc(s.id)}')">${esc(s.n)}</button>`).join('')}</div>`;
-  const ings = (dp_cfg.ingredients || []).filter(i=>!i.off);
-  const card = (c)=>`<div class="v2-card" style="border-left:4px solid ${V2_COL[c.col] || V2_COL.teal};">
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-      <input class="ft-in" style="width:46px;text-align:center;" value="${esc(c.ic || '')}" oninput="v2_cCard('${cur}','${c.id}','ic',this.value)">
-      <input class="ft-in" style="flex:1 1 150px;text-align:left;width:auto;font-weight:700;" value="${esc(c.t || '')}" placeholder="Titre de la carte" oninput="v2_cCard('${cur}','${c.id}','t',this.value)">
-      <button class="btn ghost small" style="color:#F87171" onclick="v2_cCardDel('${cur}','${c.id}')">✕</button></div>
-    <input class="ft-in" dir="rtl" style="width:100%;text-align:right;margin-top:6px;" value="${esc(c.ar || '')}" placeholder="Titre en arabe (facultatif)" oninput="v2_cCard('${cur}','${c.id}','ar',this.value)">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;">
-      <select onchange="v2_cCard('${cur}','${c.id}','col',this.value)" style="min-height:38px;">${Object.keys(V2_COL).map(k=>`<option value="${k}" ${k === c.col ? 'selected' : ''}>Bordure ${V2_COLN[k].toLowerCase()}</option>`).join('')}</select>
-      <select onchange="v2_cCard('${cur}','${c.id}','ing',this.value);v2_render()" style="min-height:38px;"><option value="">Unité : kg (par défaut)</option>${ings.map(i=>`<option value="${esc(i.n)}" ${String(i.n).toLowerCase() === String(c.ing || '').toLowerCase() ? 'selected' : ''}>Unité de Dépenses : ${esc(i.n)} (${esc(i.u || 'kg')})</option>`).join('')}</select>
-      <label style="font-size:13px;display:flex;gap:6px;align-items:center;"><input type="checkbox" ${c.note ? 'checked' : ''} onchange="v2_cCard('${cur}','${c.id}','note',this.checked)"> Note facultative</label></div>
-    <div class="m" style="font-size:12px;color:var(--ink-muted);margin-top:10px;">Champs de saisie (ajoutés à la main)</div>
-    ${c.fields.map((f, i)=>`<div class="v2-line"><input class="ft-in" style="flex:1 1 170px;text-align:left;width:auto;" placeholder="Nom du champ" value="${esc(f.n || '')}" oninput="v2_cField('${cur}','${c.id}',${i},'n',this.value)">
-      <input class="ft-in" dir="rtl" style="flex:1 1 150px;text-align:right;width:auto;" placeholder="Arabe (facultatif)" value="${esc(f.ar || '')}" oninput="v2_cField('${cur}','${c.id}',${i},'ar',this.value)">
-      ${v2_posteSel(f.pref || '', `v2_cField('${cur}','${c.id}',${i},'pref',this.value)`)}<button class="btn ghost small" style="color:#F87171" onclick="v2_cFieldDel('${cur}','${c.id}',${i})">✕</button></div>`).join('')}
-    <button class="btn ghost small" style="margin-top:8px;" onclick="v2_cFieldAdd('${cur}','${c.id}')">+ Ajouter un champ</button></div>`;
-  const banner = cur === 'cuisine' ? `<div class="v2-card"><div style="font-weight:700;">Bandeau de pesée (Cuisine)</div><div style="font-size:13px;color:var(--ink-muted);margin:4px 0 6px;">La pesée peut être faite par n’importe qui, de préférence par :</div>${v2_posteSel(v2_cfg.bannerPref || '', 'v2_cBanner(this.value)')}</div>` : '';
-  const postes = `<div class="v2-card"><div style="font-weight:700;margin-bottom:6px;">Postes de pesée</div>${v2_postes().map((p, i)=>`<span class="v2-chip">${esc(p)} <a onclick="v2_cPosteDel(${i})" style="color:#F87171;cursor:pointer;">✕</a></span>`).join('')}<div style="margin-top:6px;"><button class="btn ghost small" onclick="v2_cPosteAdd()">+ Ajouter un poste</button></div></div>`;
-  return tabs + banner + v2_cards(cur).map(card).join('') + `<button class="btn ghost small" onclick="v2_cCardAdd('${cur}')">+ Ajouter une carte</button><div style="height:10px"></div>` + postes;
+  const ings = v2_ings(); if(!ings.length) return '<div class="empty-state">Aucun ingrédient dans Dépenses.</div>';
+  const rubSel = (cur, fn)=>`<select onchange="${fn}" style="min-height:38px;">${v2_rubs().map(r=>`<option value="${esc(r.id)}" ${r.id === cur ? 'selected' : ''}>${esc(r.n)}</option>`).join('')}</select>`;
+  const card = (it)=>{
+    const c = v2_ing(it);
+    return `<div class="v2-card"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;"><b style="font-size:16px;">${esc(it.n)}</b><span style="font-size:12px;color:var(--ink-muted)">unité : ${esc(v2_unitOf(it))} (Dépenses)</span></div>
+      <input class="ft-in" dir="rtl" style="width:100%;text-align:right;margin-top:6px;" placeholder="Nom en arabe (facultatif)" value="${esc(c.ar || '')}" oninput="v2_cfIngAr('${it.id}',this.value)">
+      ${c.fields.map((f, i)=>`<div class="v2-line">
+        <input class="ft-in" style="flex:1 1 170px;text-align:left;width:auto;" placeholder="Nom du champ" value="${esc(f.n || '')}" ${f.calc ? 'disabled' : ''} oninput="v2_cfSet('${it.id}',${i},'n',this.value)">
+        <input class="ft-in" dir="rtl" style="flex:1 1 150px;text-align:right;width:auto;" placeholder="Arabe (facultatif)" value="${esc(f.ar || '')}" oninput="v2_cfSet('${it.id}',${i},'ar',this.value)">
+        ${rubSel(f.sec, `v2_cfSet('${it.id}',${i},'sec',this.value)`)}
+        <button class="btn ghost small" onclick="v2_cfMove('${it.id}',${i},-1)">↑</button><button class="btn ghost small" onclick="v2_cfMove('${it.id}',${i},1)">↓</button><button class="btn ghost small" style="color:#F87171" onclick="v2_cfDel('${it.id}',${i})">✕</button>
+        ${f.calc ? '<div style="flex:1 1 100%;font-size:12px;color:var(--ink-muted)">Calculé automatiquement : somme de ' + esc(f.calc.map(x=>((c.fields.find(g=>g.id === x) || {}).n) || x).join(' + ')) + '</div>' : ''}</div>`).join('')}
+      <button class="btn ghost small" style="margin-top:8px;" onclick="v2_cfAdd('${it.id}')">+ Ajouter un champ</button></div>`;
+  };
+  return `<div style="font-size:13px;color:var(--ink-muted);margin-bottom:10px;">Liste synchronisée avec les ingrédients de Dépenses. Chaque champ est attribué à une rubrique : le cuisinier ne le voit que dans sa rubrique.</div>` + ings.map(card).join('');
 }
 
 /* ---------- Saisie (écran du cuisinier) ---------- */
-const v2_key = (c, f)=>c.id + '.' + f.id;
+const v2_key = (it, f)=>it.id + '.' + f.id;
 function v2_fv(sec, key){ if(v2_form[sec] && v2_form[sec][key] !== undefined) return v2_form[sec][key]; const d = v2_docs[sec]; return d && d.vals && d.vals[key] !== undefined ? d.vals[key] : ''; }
-function v2_set(sec, key, v){ (v2_form[sec] = v2_form[sec] || {})[key] = v; }
-const v2_locked = (sec)=>!!v2_docs[sec] && !v2_edit[sec];
-function v2_fieldRow(sec, c, f){
-  const k = v2_key(c, f), lock = v2_locked(sec);
-  return `<div class="v2-f"><div class="v2-fl"><div class="v2-fn">${esc(f.n || '—')}</div>${v2_ardiv(f.ar)}${f.pref ? `<div class="v2-pref">De préférence par ${esc(f.pref)}</div>` : ''}</div>
-    <div class="v2-in"><input class="ft-in" inputmode="decimal" placeholder="0,0" ${lock ? 'disabled' : ''} value="${esc(String(v2_fv(sec, k)))}" oninput="v2_set('${sec}','${k}',this.value)"><span class="v2-u">${esc(v2_unitOf(c))}</span></div></div>`;
+function v2_val(it, f){ return v2_num(v2_fv(f.sec, v2_key(it, f))); }
+function v2_calc(it, f){ const c = v2_ing(it); let any = false, s = 0; (f.calc || []).forEach(id=>{ const g = c.fields.find(x=>x.id === id); if(!g) return; const v = v2_val(it, g); if(v !== null){ any = true; s += v; } }); return any ? s : null; }
+function v2_set(sec, key, v){ (v2_form[sec] = v2_form[sec] || {})[key] = v; v2_recalc(sec); }
+function v2_recalc(sec){ v2_ings().forEach(it=>{ v2_ing(it).fields.forEach(f=>{ if(!f.calc || f.sec !== sec) return; const el = document.getElementById('v2c-' + it.id + '-' + f.id); if(el) el.value = v2_fmt(v2_calc(it, f)).replace('—', ''); }); }); }
+const v2_locked = (sec)=>v2_level(sec) === 'lire' || (!!v2_docs[sec] && !v2_edit[sec]);
+function v2_fieldRow(sec, it, f){
+  const k = v2_key(it, f), lock = v2_locked(sec);
+  const inp = f.calc ? `<input class="ft-in" id="v2c-${it.id}-${f.id}" disabled value="${esc(v2_fmt(v2_calc(it, f)).replace('—', ''))}" placeholder="0,0">`
+    : `<input class="ft-in" inputmode="decimal" placeholder="0,0" ${lock ? 'disabled' : ''} value="${esc(String(v2_fv(sec, k)))}" oninput="v2_set('${sec}','${k}',this.value)">`;
+  return `<div class="v2-f"><div class="v2-fl"><div class="v2-fn">${esc(f.n || '—')}</div>${v2_arTxt(f.ar, 'display:block;margin-top:1px;')}</div><div class="v2-in">${inp}<span class="v2-u">${esc(v2_unitOf(it))}</span></div></div>`;
 }
-function v2_cardView(sec, c){
-  const lock = v2_locked(sec), nk = c.id + '.note', hasNote = String(v2_fv(sec, nk)) !== '';
-  return `<div class="v2-card" style="border-left:4px solid ${V2_COL[c.col] || V2_COL.teal};"><div class="v2-ct"><span>${esc(c.ic || '')} ${esc(c.t || '')}</span>${v2_ardiv(c.ar)}</div>
-    ${c.fields.map(f=>v2_fieldRow(sec, c, f)).join('')}
-    ${c.note && !lock ? (hasNote || v2_noteOpen[nk] ? `<input class="ft-in" style="width:100%;text-align:left;margin-top:8px;" placeholder="Note (facultatif)" value="${esc(String(v2_fv(sec, nk)))}" oninput="v2_set('${sec}','${nk}',this.value)">` : `<a class="v2-note" onclick="v2_noteOpen['${nk}']=true;v2_render()">＋ Ajouter une note (facultatif)${v2_ar ? '<span class="v2-ar" dir="rtl">إضافة ملاحظة (اختياري)</span>' : ''}</a>`) : (c.note && hasNote ? `<div class="v2-pref" style="color:var(--ink-muted)">${esc(String(v2_fv(sec, nk)))}</div>` : '')}</div>`;
+function v2_cardView(sec, it){
+  const c = v2_ing(it);
+  return `<div class="v2-card"><div class="v2-ct"><div>${esc(it.n)}</div>${v2_arTxt(c.ar, 'display:block;')}</div>${c.fields.filter(f=>f.sec === sec).map(f=>v2_fieldRow(sec, it, f)).join('')}</div>`;
 }
-function v2_who(){ return (session && session.displayName) || (session && session.username) || ''; }
-function v2_banner(){
-  const p = v2_cfg.bannerPref;
-  return `<div class="v2-banner">ℹ️ La pesée de la découpe peut être faite par n’importe qui${p ? ', de préférence par le <b>' + esc(p) + '</b>' : ''}.${v2_ar ? `<div dir="rtl" style="margin-top:4px;color:#9aa39d;">يمكن لأي شخص القيام بوزن التقطيع${p ? '، والأفضل أن يقوم به: ' + esc(p) : ''}.</div>` : ''}</div>`;
-}
-function v2_expectedKeys(sec){ const out = []; v2_cards(sec).forEach(c=>c.fields.forEach(f=>out.push(v2_key(c, f)))); return out; }
+const v2_who = ()=>(session && session.displayName) || (session && session.username) || '';
+function v2_expectedKeys(sec){ const out = []; v2_ings().forEach(it=>v2_ing(it).fields.forEach(f=>{ if(f.sec === sec && !f.calc) out.push(v2_key(it, f)); })); return out; }
 async function v2_submit(sec){
-  if(v2_busy) return;
+  if(v2_busy || v2_level(sec) !== 'saisir') return;
   const vals = Object.assign({}, (v2_docs[sec] || {}).vals || {}, v2_form[sec] || {});
   const miss = v2_expectedKeys(sec).filter(k=>v2_num(vals[k]) === null).length;
   if(miss && !confirm(miss + ' champ(s) vide(s). Valider quand même ?')) return;
@@ -7532,34 +7516,39 @@ async function v2_submit(sec){
   }catch(e){ console.error(e); v2_msg[sec] = 'err:' + (e.message || e); }
   v2_busy = false; v2_render();
 }
-function v2_correct(sec){ if(!v2_docs[sec]) return; v2_edit[sec] = true; v2_msg[sec] = ''; v2_render(); }
+function v2_correct(sec){ if(!v2_docs[sec] || v2_level(sec) !== 'saisir') return; v2_edit[sec] = true; v2_msg[sec] = ''; v2_render(); }
 function v2_saisieView(){
-  const secs = v2_secs(), cur = secs.some(s=>s.id === v2_sec) ? v2_sec : 'cuisine', saved = secs.filter(s=>v2_docs[s.id]).length;
-  const head = `<div class="v2-who"><span>🔒 ${esc(v2_who())}</span><span style="text-align:right">${saved} / ${secs.length} sections${v2_ar ? `<span class="v2-ar" dir="rtl">${saved} / ${secs.length} أقسام</span>` : ''}</span></div>`;
-  const tabs = `<div class="mep-seg">${secs.map(s=>`<button class="${s.id === cur ? 'on' : ''}" onclick="v2_setSec('${esc(s.id)}')">${v2_docs[s.id] ? '✓ ' : ''}${esc(s.n)}${v2_ar && v2_arOf(s.id) ? `<span class="v2-ar" style="display:block">${v2_arOf(s.id)}</span>` : ''}</button>`).join('')}</div>`;
-  const cards = v2_cards(cur);
-  const body = cards.length ? cards.map(c=>v2_cardView(cur, c)).join('') : '<div class="empty-state">Rien à saisir dans cette section.</div>';
-  const m = v2_msg[cur], lock = v2_locked(cur), has = !!v2_docs[cur];
-  const btns = `<div style="display:flex;gap:10px;margin-top:6px;"><button class="v2-b ok" style="flex:1;" ${lock ? 'disabled' : ''} onclick="v2_submit('${esc(cur)}')">Valider l’inventaire${v2_ar ? '<span class="v2-ar" dir="rtl" style="display:block">اعتماد الجرد</span>' : ''}</button>
-    <button class="v2-b ed" style="flex:1;" ${has && lock ? '' : 'disabled'} onclick="v2_correct('${esc(cur)}')">✎ Corriger ma saisie${v2_ar ? '<span class="v2-ar" dir="rtl" style="display:block">تصحيح إدخالي</span>' : ''}</button></div>`;
-  const msg = m === 'ok' ? `<div class="v2-saved">✓ Enregistré sur le serveur.${v2_ar ? '<span class="v2-ar" dir="rtl">تم الحفظ على الخادم.</span>' : ''}</div>` : (m ? `<div class="v2-saved" style="color:#F87171;border-color:#F87171">Enregistrement impossible : ${esc(m.slice(4))}</div>` : '');
-  return head + tabs + (cur === 'cuisine' ? v2_banner() : '') + body + btns + msg;
+  const rubs = v2_visRubs(); if(!rubs.length) return '<div class="empty-state">Aucune rubrique n’est attribuée à ce compte.</div>';
+  const cur = rubs.some(r=>r.id === v2_sec) ? v2_sec : rubs[0].id, saved = rubs.filter(r=>v2_docs[r.id]).length;
+  const head = `<div class="v2-who"><div>🔒 ${esc(v2_who())}</div><div style="text-align:right">${saved} / ${rubs.length} sections${v2_ar ? `<span class="v2-ar" dir="rtl" style="display:block">${saved} / ${rubs.length} أقسام</span>` : ''}</div></div>`;
+  const tabs = `<div class="mep-seg">${rubs.map(r=>`<button class="${r.id === cur ? 'on' : ''}" onclick="v2_setSec('${esc(r.id)}')">${v2_docs[r.id] ? '✓ ' : ''}${esc(r.n)}${v2_ar && V2_AR[r.id] ? `<span class="v2-ar" style="display:block">${V2_AR[r.id]}</span>` : ''}</button>`).join('')}</div>`;
+  const its = v2_ings().filter(it=>v2_ing(it).fields.some(f=>f.sec === cur));
+  const body = its.length ? its.map(it=>v2_cardView(cur, it)).join('') : '<div class="empty-state">Rien à saisir dans cette rubrique.</div>';
+  const lvl = v2_level(cur), m = v2_msg[cur], lock = v2_locked(cur), has = !!v2_docs[cur];
+  const ro = lvl === 'lire' ? `<div class="v2-ro">👁 Consultation seulement${v2_ar ? '<span class="v2-ar" dir="rtl" style="display:block">للاطلاع فقط</span>' : ''}</div>` : '';
+  const btns = lvl === 'saisir' ? `<div style="display:flex;gap:10px;margin-top:6px;"><button class="v2-b ok" style="flex:1;" ${lock ? 'disabled' : ''} onclick="v2_submit('${esc(cur)}')">Valider l’inventaire${v2_ar ? '<span class="v2-ar" dir="rtl" style="display:block">اعتماد الجرد</span>' : ''}</button>
+    <button class="v2-b ed" style="flex:1;" ${has && lock ? '' : 'disabled'} onclick="v2_correct('${esc(cur)}')">✎ Corriger ma saisie${v2_ar ? '<span class="v2-ar" dir="rtl" style="display:block">تصحيح إدخالي</span>' : ''}</button></div>` : '';
+  const msg = m === 'ok' ? `<div class="v2-saved"><div>✓ Enregistré sur le serveur.${v2_ar ? '<span class="v2-ar" dir="rtl" style="display:block">تم الحفظ على الخادم.</span>' : ''}</div></div>` : (m ? `<div class="v2-saved" style="color:#F87171;border-color:#F87171">Enregistrement impossible : ${esc(m.slice(4))}</div>` : '');
+  return head + tabs + ro + body + btns + msg;
 }
 
 /* ---------- Écarts (administrateur) ---------- */
-function v2_val(sec, cardId, fid){ const d = (v2_docs[sec] || {}).vals || {}; return v2_num(d[cardId + '.' + fid]); }
+function v2_achat(it){ const n = String(it.n || '').trim().toLowerCase(); let s = 0, any = false; (typeof dp_mouvements !== 'undefined' ? dp_mouvements : []).forEach(m=>{ if(m.type === 'Achat' && m.date === v2_date && String(m.articleNom || '').trim().toLowerCase() === n){ s += Number(m.quantite) || 0; any = true; } }); return any ? s : null; }
+function v2_fieldBy(it, fid){ const f = v2_ing(it).fields.find(x=>x.id === fid); return f ? (f.calc ? v2_calc(it, f) : v2_val(it, f)) : null; }
 function v2_ecartsView(){
-  const secs = v2_secs();
-  const av = secs.map(s=>{ const ex = v2_expectedKeys(s.id), d = (v2_docs[s.id] || {}).vals || {}, dn = ex.filter(k=>v2_num(d[k]) !== null).length; return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);"><span>${v2_docs[s.id] ? '✓ ' : ''}${esc(s.n)}</span><b>${v2_docs[s.id] ? dn + ' / ' + ex.length + ' champs' : 'pas encore saisi'}</b></div>`; }).join('');
-  const chk = (title, lines, gap, u)=>`<div class="v2-card"><b>${title}</b><div style="margin-top:6px;font-size:14px;">${lines.map(l=>`<div style="display:flex;justify-content:space-between;"><span>${l[0]}</span><b>${v2_fmt(l[1])} ${l[1] == null ? '' : esc(u)}</b></div>`).join('')}</div><div style="margin-top:8px;font-weight:700;color:${gap === null ? 'var(--ink-muted)' : Math.abs(gap) < 0.0005 ? '#4ADE80' : '#F87171'}">${gap === null ? 'Écart : en attente de saisie' : 'Écart : ' + (gap >= 0 ? '+' : '') + v2_fmt(gap) + ' ' + esc(u)}</div></div>`;
-  let h = `<div class="v2-card"><div style="font-weight:800;margin-bottom:4px;">Avancement du jour</div>${av}</div>`;
-  const dc = v2_findCard('cuisine', 'c_dec');
-  if(dc){ const o = v2_val('cuisine', 'c_dec', 'dec_out'), a = v2_val('cuisine', 'c_dec', 'dec_ps'), b = v2_val('cuisine', 'c_dec', 'dec_pc'), w = v2_val('cuisine', 'c_dec', 'dec_waste'), u = v2_unitOf(dc);
-    h += chk('Découpe : poids mis en découpe − (parts + déchet)', [['Poids mis en découpe', o], ['Part Sushi', a], ['Part Chaud', b], ['Déchet', w]], (o === null || a === null || b === null || w === null) ? null : o - (a + b + w), u); }
-  const sc = v2_findCard('sushi', 's_sau');
-  if(sc){ const g = (id)=>v2_val('sushi', 's_sau', id), br = g('sau_brut'), cl = g('sau_clean'), ne = g('sau_net'), lo = g('sau_loss'), re = g('sau_rest'), u = v2_unitOf(sc);
-    h += chk('Saumon : à nettoyer − (net utilisable + perte)', [['Quantité à nettoyer', cl], ['Net utilisable', ne], ['Perte à jeter', lo]], (cl === null || ne === null || lo === null) ? null : cl - (ne + lo), u);
-    h += chk('Saumon : brute disponible − à nettoyer − reste brut', [['Quantité brute disponible', br], ['Quantité à nettoyer', cl], ['Reste brut', re]], (br === null || cl === null || re === null) ? null : br - cl - re, u); }
+  const rubs = v2_rubs();
+  const av = rubs.map(r=>{ const ex = v2_expectedKeys(r.id), d = (v2_docs[r.id] || {}).vals || {}, dn = ex.filter(k=>v2_num(d[k]) !== null).length; return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);"><span>${v2_docs[r.id] ? '✓ ' : ''}${esc(r.n)}</span><b>${v2_docs[r.id] ? dn + ' / ' + ex.length + ' champs' : 'pas encore saisi'}</b></div>`; }).join('');
+  const chk = (title, lines, gap, u)=>`<div class="v2-card"><b>${title}</b><div style="margin-top:6px;font-size:14px;">${lines.map(l=>`<div style="display:flex;justify-content:space-between;"><span>${l[0]}</span><b>${v2_fmt(l[1])} ${l[1] == null ? '' : esc(u)}</b></div>`).join('')}</div>${gap === undefined ? '' : `<div style="margin-top:8px;font-weight:700;color:${gap === null ? 'var(--ink-muted)' : Math.abs(gap) < 0.0005 ? '#4ADE80' : '#F87171'}">${gap === null ? 'Écart : en attente de saisie' : 'Écart : ' + (gap >= 0 ? '+' : '') + v2_fmt(gap) + ' ' + esc(u)}</div>`}</div>`;
+  let h = `<div class="v2-card"><div style="font-weight:800;margin-bottom:4px;">Avancement du jour</div>${av}</div>`, hache = null;
+  v2_ings().forEach(it=>{
+    const c = v2_ing(it), u = v2_unitOf(it), has = (id)=>c.fields.some(f=>f.id === id), g = (id)=>v2_fieldBy(it, id), ach = v2_achat(it);
+    if(has('dec_ps') && has('dec_pc')){ const a = g('dec_ps'), b = g('dec_pc'), w = g('waste'), ha = g('hache'); hache = ha;
+      h += chk(esc(it.n) + ' : bilan de la découpe', [['Achat (Dépenses)', ach], ['Part Sushi', a], ['Part Chaud', b], ['Déchet total (récupéré + à jeter)', w]], (ach === null || a === null || b === null || w === null) ? null : ach - (a + b + w), u); }
+    if(has('sau_clean')){ const br = g('sau_brut'), cl = g('sau_clean'), ne = g('sau_net'), lo = g('sau_loss'), re = g('sau_rest');
+      h += chk(esc(it.n) + ' : à nettoyer − (net utilisable + perte)', [['Quantité à nettoyer', cl], ['Net utilisable', ne], ['Perte à jeter', lo]], (cl === null || ne === null || lo === null) ? null : cl - (ne + lo), u);
+      h += chk(esc(it.n) + ' : brute − à nettoyer − reste brut', [['Achat (Dépenses)', ach], ['Quantité brute disponible', br], ['Quantité à nettoyer', cl], ['Reste brut', re]], (br === null || cl === null || re === null) ? null : br - cl - re, u); }
+  });
+  v2_ings().forEach(it=>{ if(!/poulet/i.test(it.n) || !/hach/i.test(it.n)) return; const ach = v2_achat(it), u = v2_unitOf(it); h += chk(esc(it.n) + ' : stock du jour', [['Achat (Dépenses)', ach], ['Récupéré de la découpe', hache], ['Stock total', (ach === null && hache === null) ? null : (ach || 0) + (hache || 0)]], undefined, u); });
   return h;
 }
 
@@ -7567,12 +7556,12 @@ function v2_render(){
   const body = document.getElementById('v2-body'); if(!body) return;
   if(!v2_on()){ body.innerHTML = ''; return; }
   if(!v2_cfgReady){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
-  const tabs = [['saisie', 'Mise en place'], ['ecarts', 'Écarts'], ['cfg', 'Réglages']];
-  const head = `<div style="font-weight:700;font-size:20px;display:flex;justify-content:space-between;gap:8px;"><span>Mise en place</span>${v2_ar ? '<span class="v2-ar" dir="rtl" style="font-size:16px">التجهيز المسبق</span>' : ''}</div>
+  const admin = !!(session && session.isAdmin), tabs = [['saisie', 'Mise en place']].concat(admin ? [['ecarts', 'Écarts'], ['cfg', 'Cuisine']] : []);
+  const head = `<div style="font-weight:700;font-size:20px;">Mise en place${v2_ar ? '<span class="v2-ar" dir="rtl" style="display:block;font-size:15px;text-align:left">التجهيز المسبق</span>' : ''}</div>
     <div style="font-size:12px;font-weight:600;color:#FBBF24;margin-top:2px;">Version en test — visible par l’administrateur seulement</div>
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 12px;"><input type="date" value="${esc(v2_date)}" onchange="v2_setDate(this.value)" style="min-height:40px;"><label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_ar ? 'checked' : ''} onchange="v2_toggleAr(this.checked)"> Aperçu avec l’arabe</label></div>
-    <div class="mep-seg">${tabs.map(t=>`<button class="${v2_tab === t[0] ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
-  body.innerHTML = head + (v2_tab === 'cfg' ? v2_cfgView() : v2_tab === 'ecarts' ? v2_ecartsView() : v2_saisieView());
+    ${tabs.length > 1 ? `<div class="mep-seg">${tabs.map(t=>`<button class="${v2_tab === t[0] ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${t[1]}</button>`).join('')}</div>` : ''}`;
+  body.innerHTML = head + (v2_tab === 'cfg' && admin ? v2_cfgView() : v2_tab === 'ecarts' && admin ? v2_ecartsView() : v2_saisieView());
 }
 
 initAuth();
