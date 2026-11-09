@@ -1302,13 +1302,14 @@ function ca_normalizeSession(s, date){
     montantCompte: s.montantCompte!==undefined ? s.montantCompte : '',
     noteValidation: s.noteValidation!==undefined ? s.noteValidation : '',
     debutValidations: Array.isArray(s.debutValidations) ? s.debutValidations : [],
+    restant: s.restant || null,
     enregistreParEn: s.enregistreParEn,
     enregistreLe: s.enregistreLe,
   };
 }
 function ca_blankSession(date){
   const prev = ca_allSessions[prevDateStr(date)];
-  const base = { date, entrees: [], totalVentesErp: '', sorties: [], montantCompte: '', noteValidation: '', debutValidations: [] };
+  const base = { date, entrees: [], totalVentesErp: '', sorties: [], montantCompte: '', noteValidation: '', debutValidations: [], restant: null };
   if(prev){
     return { ...base, debutCaisse: ca_montantPourLendemain(prev), debutCaisseAuto: true };
   }
@@ -1347,6 +1348,8 @@ ca_caisseCol.onSnapshot((snap)=>{
     if(srv && ca_session && ca_session.date === ca_workingDate){
       (Array.isArray(srv.sorties) ? srv.sorties : []).forEach(l=>{ if(l && l.par && !(ca_session.sorties || []).some(x=>x.id === l.id)){ if(!Array.isArray(ca_session.sorties)) ca_session.sorties = []; ca_session.sorties.push(l); } });
       if(Array.isArray(srv.debutValidations)) ca_session.debutValidations = srv.debutValidations;
+      { const a = JSON.stringify(ca_session.restant || null), b = JSON.stringify(srv.restant || null);   // montant restant saisi / validé par un employé ou par l'admin
+        if(a !== b){ ca_session.restant = srv.restant || null; if(srv.restant && srv.restant.statut === 'valide') ca_session.montantCompte = srv.montantCompte !== undefined ? srv.montantCompte : ''; } }
     } }
   if(!ca_allSessions[ca_workingDate] && !ca_session.debutCaisseManuel){
     const prev = ca_allSessions[prevDateStr(ca_workingDate)];
@@ -1411,12 +1414,12 @@ async function ca_syncRetraits(sess){
 
 /* ---------------- Accès limité « saisie du soir » : début de caisse, sorties (ajout seulement), retenu pour demain ---------------- */
 function ca_isLimited(){ return !!(session && !session.isAdmin && session.permissions && session.permissions.caisseLim && !session.permissions.caisse); }
-let ca_lim = { debut:'', note:'', sortie:'', busy:false };
+let ca_lim = { debut:'', note:'', sortie:'', rest:'', rnote:'', busy:false };
 async function ca_limTx(mutate){
   const date = ca_session.date, ref = ca_caisseCol.doc(date);
   return db.runTransaction(async (tx)=>{
     const snap = await tx.get(ref);
-    const cur = snap.exists ? snap.data() : { date, debutCaisse:ca_session.debutCaisse, entrees:[], totalVentesErp:ca_session.totalVentesErp || '', sorties:[], montantCompte:'', noteValidation:'', debutValidations:[] };
+    const cur = snap.exists ? snap.data() : { date, debutCaisse:ca_session.debutCaisse, entrees:[], totalVentesErp:ca_session.totalVentesErp || '', sorties:[], montantCompte:'', noteValidation:'', debutValidations:[], restant:null };
     const out = mutate({ ...cur });
     tx.set(ref, out); return out;
   });
@@ -1435,6 +1438,50 @@ async function ca_limValidateDebut(){
     alert('Début de caisse validé : ' + ca_fmtMoney(m) + (Math.abs(ecart) > 0.004 ? ' (écart ' + (ecart > 0 ? '+' : '') + ca_fmtMoney(ecart) + ')' : '') + '.');
   }catch(e){ console.error(e); alert('Erreur : validation non enregistrée (' + (e.message || e) + '). Réessaie.'); }
   ca_lim.busy = false; ca_render();
+}
+function ca_restantAttendu(){ return Math.round(ca_montantTheorique(ca_session) * 100) / 100; }
+async function ca_limSubmitRestant(){
+  if(ca_lim.busy) return;
+  if(!currentUser){ askUserName(false); if(!currentUser) return; }
+  const raw = String(ca_lim.rest).trim(); if(raw === ''){ alert('Saisis le montant qui reste dans la caisse.'); return; }
+  const m = ca_parseNum(raw), attendu = ca_restantAttendu(), ecart = Math.round((m - attendu) * 100) / 100, note = String(ca_lim.rnote || '').trim(), diff = Math.abs(ecart) > 0.004;
+  if(diff && !note){ alert('Le montant diffère de l’attendu (' + ca_fmtMoney(attendu) + ') : la note d’explication est obligatoire.'); return; }
+  const r = { par:currentUser, heure:ca_nowHM(), at:new Date().toISOString(), montant:m, attendu, ecart, note:diff ? note : '', statut:diff ? 'attente' : 'valide' };
+  ca_lim.busy = true;
+  try{
+    const out = await ca_limTx(c=>({ ...c, restant:r, ...(diff ? {} : { montantCompte:String(m) }) }));
+    ca_session.restant = out.restant; if(!diff) ca_session.montantCompte = String(m);
+    ca_lim.rest = ''; ca_lim.rnote = '';
+    alert(diff ? 'Écart de ' + (ecart > 0 ? '+' : '') + ca_fmtMoney(ecart) + ' : envoyé à l’admin pour validation.' : 'Montant restant validé : ' + ca_fmtMoney(m) + '.');
+  }catch(e){ console.error(e); alert('Erreur : montant non enregistré (' + (e.message || e) + '). Réessaie.'); }
+  ca_lim.busy = false; ca_render();
+}
+async function ca_restantDecide(ok){
+  const r = ca_session.restant; if(!r || r.statut !== 'attente') return;
+  if(!ok && !confirm('Refuser ce montant ? L’employé devra recompter et renvoyer.')) return;
+  const nr = { ...r, statut:ok ? 'valide' : 'refuse', decidePar:currentUser || '', decideLe:ca_nowHM() };
+  try{
+    const out = await ca_limTx(c=>({ ...c, restant:nr, ...(ok ? { montantCompte:String(r.montant) } : {}) }));
+    ca_session.restant = out.restant; if(ok) ca_session.montantCompte = String(r.montant);
+  }catch(e){ console.error(e); alert('Erreur : décision non enregistrée (' + (e.message || e) + ').'); }
+  ca_render();
+}
+function ca_restantStatusHtml(r){
+  if(!r) return '';
+  const ec = Number(r.ecart) || 0, ecs = Math.abs(ec) > 0.004 ? ' (écart ' + (ec > 0 ? '+' : '') + ca_fmtMoney(ec) + ')' : '';
+  if(r.statut === 'valide') return `<div class="cg-sub" style="color:var(--moss);">✓ Validé${r.decidePar ? ' par ' + esc(r.decidePar) : ''} à ${esc(r.decideLe || r.heure || '')} : ${ca_fmtMoney(r.montant)}${ecs}</div>`;
+  if(r.statut === 'refuse') return `<div class="cg-sub" style="color:var(--rust);">✕ Refusé par ${esc(r.decidePar || 'l’admin')} : ${ca_fmtMoney(r.montant)}${ecs}. Recompte et renvoie.</div>`;
+  return `<div class="cg-sub" style="color:var(--amber);">⏳ En attente de validation de l’admin : ${ca_fmtMoney(r.montant)}${ecs}</div>`;
+}
+function ca_restantAdminCard(){
+  const r = ca_session.restant; if(!r) return '';
+  const ec = Number(r.ecart) || 0, diff = Math.abs(ec) > 0.004;
+  return `<div class="cg-card" style="margin-bottom:10px;${r.statut === 'attente' ? 'border-color:var(--rust);' : ''}">
+    <div class="cg-t">🧮 Montant restant${r.statut === 'attente' ? ' — à valider' : ''}</div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;"><div><div class="cg-sub">Compté par ${esc(r.par || '')} à ${esc(r.heure || '')}</div><div class="cg-big" style="font-size:24px;">${ca_fmtMoney(r.montant)}</div></div><div style="text-align:right;"><div class="cg-sub">Attendu ${ca_fmtMoney(r.attendu)}</div><b style="color:var(${diff ? '--rust' : '--moss'});">${diff ? 'Écart ' + (ec > 0 ? '+' : '') + ca_fmtMoney(ec) : 'Aucun écart'}</b></div></div>
+    ${r.note ? `<div style="border:1px solid var(--rust);background:var(--rust-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--rust);">Note : ${esc(r.note)}</div>` : ''}
+    ${r.statut === 'attente' ? `<div style="display:flex;gap:8px;"><button class="btn t-save" style="flex:1;height:42px;" onclick="ca_restantDecide(true)">✓ Valider</button><button class="btn" style="flex:1;height:42px;background:var(--rust-bg);border:1px solid var(--rust);color:var(--rust);font-weight:700;" onclick="ca_restantDecide(false)">✕ Refuser (recompter)</button></div><div class="cg-sub">Une fois validé, ce montant devient le Retenu pour demain.</div>` : ca_restantStatusHtml(r)}
+  </div>`;
 }
 async function ca_limAddSortie(){
   if(ca_lim.busy) return;
@@ -1475,6 +1522,19 @@ function ca_renderLimited(){
       <div style="border:1px solid var(--service);background:var(--service-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--service);">ℹ️ Ce montant doit être remis à Sidahmed.</div>
       <div class="cg-act"><span class="cg-sub">Ajout uniquement</span><button class="cg-plus" title="Ajouter" onclick="ca_limAddSortie()">+</button></div>
     </div>
+    ${(()=>{
+      const att = ca_restantAttendu(), rr = String(ca_lim.rest).trim(), rm = ca_parseNum(rr), rec = rr === '' ? null : Math.round((rm - att) * 100) / 100, rdiff = rec !== null && Math.abs(rec) > 0.004;
+      return `<div class="cg-card" style="margin-bottom:10px;">
+      <div class="cg-t">🧮 Montant restant en caisse</div>
+      <div class="cg-sub">Attendu : <b style="color:var(--ink);">${ca_fmtMoney(att)}</b></div>
+      <input id="lim-rest" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_lim.rest)}" oninput="ca_lim.rest=this.value;ca_render()">
+      ${rec !== null ? `<div style="font-size:13px;">Écart : <b style="color:var(${rdiff ? '--rust' : '--moss'});">${rdiff ? (rec > 0 ? '+' : '') + ca_fmtMoney(rec) : 'Aucun écart'}</b></div>` : ''}
+      ${rdiff ? `<input id="lim-rnote" class="cg-in" type="text" style="border-color:var(--rust);font-family:'Inter',sans-serif;" placeholder="Note obligatoire : explique l’écart" value="${esc(ca_lim.rnote)}" oninput="ca_lim.rnote=this.value"><div class="cg-sub" style="color:var(--rust);">Un écart ne peut pas être validé seul : il sera envoyé à l’admin.</div>` : ''}
+      ${rdiff
+        ? `<button class="btn" style="width:100%;height:44px;background:var(--rust-bg);border:1px solid var(--rust);color:var(--rust);font-weight:700;" onclick="ca_limSubmitRestant()">📨 Envoyer à l’admin pour validation</button>`
+        : `<button class="btn t-save" style="width:100%;height:44px;" onclick="ca_limSubmitRestant()">✓ Valider le montant restant</button>`}
+      ${ca_restantStatusHtml(ca_session.restant)}
+    </div>`; })()}
     <div class="cg-card">
       <div class="cg-t">📌 Retenu pour demain</div>
       <div class="cg-val" style="font-size:22px;font-weight:800;">${ca_fmtMoney(ca_montantPourLendemain(ca_session))}</div>
@@ -1730,6 +1790,8 @@ function ca_renderCaisseTab(){
     </div>
 
     ${ca_renderStatusBanner(existing, ecart)}
+
+    ${ca_restantAdminCard()}
 
     <div class="cg-grid">
       ${ca_cgCard('💵 Début de caisse', debutBody, debutFoot)}
