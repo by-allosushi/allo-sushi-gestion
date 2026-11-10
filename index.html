@@ -4184,8 +4184,9 @@ function rp_dateInput(){
 /* Demande au PC du restaurant de synchroniser maintenant (le PC surveille ce document environ toutes les 45 s).
    Appelée à l'ouverture de l'application, à l'ouverture de l'onglet et au clic sur « Actualiser ». */
 function rp_requestSync(force){
+  /* Le PC envoie tout seul toutes les minutes (10h-23h59) : plus de demande automatique à l'ouverture, seulement sur clic « Actualiser ». */
+  if(!force) return;
   const now = Date.now();
-  if(!force && now - rp_lastReq < 90000) return;
   rp_lastReq = now; rp_reqAt = now; rp_pending = true; rp_noReply = false;
   rp_demandeRef.set({ at: new Date().toISOString(), by: (typeof currentUser !== 'undefined' && currentUser) ? currentUser : '' })
     .catch(e=>{ rp_pending = false; console.warn('Demande de synchro Resto Pro impossible :', e); if(document.getElementById('rp-sync')) rp_render(); });
@@ -4322,10 +4323,11 @@ function rp_syncHtml(){
       ago = mins < 1 ? 'à l’instant' : mins < 60 ? `il y a ${mins} min` : mins < 1440 ? `il y a ${Math.floor(mins/60)} h ${rp_pad(mins%60)}` : `le ${rp_fmtDate(String(m.syncedAt).slice(0,10))}`;
     }
   }
-  let txt, col = 'var(--ink-muted)';
-  if(rp_noReply){
+  let txt, col = 'var(--ink-muted)', stale = false;
+  if(m && m.syncedAt){ const t0 = new Date(m.syncedAt).getTime(), hr = new Date().getHours(); if(!isNaN(t0) && hr >= 10 && (Date.now() - t0) > 180000) stale = true; }
+  if(rp_noReply || stale){
     col = 'var(--rust)';
-    txt = '⚠ Le PC du restaurant n’a pas répondu (éteint, sans internet ou écoute arrêtée ?).' + (ago ? ' Chiffres de la dernière synchro : ' + ago + '.' : '');
+    txt = (rp_noReply ? '⚠ Le PC du restaurant n’a pas répondu' : '⚠ Le PC du restaurant n’envoie plus ses chiffres') + ' (éteint, sans internet ou programme arrêté ?).' + (ago ? ' Chiffres de la dernière synchro : ' + ago + '.' : '');
   } else if(!ago){
     col = 'var(--amber)'; txt = 'Aucune synchronisation reçue du PC du restaurant pour l’instant.';
   } else {
