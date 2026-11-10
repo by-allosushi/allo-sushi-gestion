@@ -7718,7 +7718,7 @@ function v2_start(){
 function v2_watchDay(){
   if(v2_unsub){ try{ v2_unsub(); }catch(e){} v2_unsub = null; }
   v2_unsub = db.collection('mise_en_place').where('v2date', '==', v2_date).onSnapshot((snap)=>{
-    const m = {}; snap.forEach(d=>{ const x = d.data() || {}; m[x.sec + (x.zone === 'stock' ? '@s' : '')] = x; }); v2_docs = m; if(!v2_typing()) v2_render();
+    const m = {}; snap.forEach(d=>{ const x = d.data() || {}; m[x.sec + (x.zone === 'stock' ? '@s' : '')] = x; }); Object.keys(v2_ob).forEach(id=>{ const d = (v2_ob[id] || {}).data; if(!d || d.v2date !== v2_date) return; const dk = d.sec + (d.zone === 'stock' ? '@s' : ''); m[dk] = v2_deepMerge(m[dk] || { sec:d.sec, zone:d.zone }, d); }); v2_docs = m; if(!v2_typing()) v2_render();
   }, (e)=>console.error(e));
 }
 function v2_typing(){ try{ const a = document.activeElement, b = document.getElementById('v2-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
@@ -7907,9 +7907,32 @@ function v2_cardMep(sec, it){
   return h + '</div>';
 }
 const v2_who = ()=>(session && session.displayName) || (session && session.username) || '';
+/* ---- file d'attente d'envoi : toute saisie Cuisine est d'abord gardée sur l'appareil, puis envoyée dès que la connexion le permet ---- */
+const V2_OBK = 'v2_outbox_v1';
+let v2_ob = (()=>{ try{ return JSON.parse(localStorage.getItem(V2_OBK) || '{}') || {}; }catch(e){ return {}; } })(), v2_obBusy = false, v2_obCnt = -1;
+function v2_obSave(){ try{ localStorage.setItem(V2_OBK, JSON.stringify(v2_ob)); }catch(e){} }
+function v2_deepMerge(a, b){ const o = Object.assign({}, a || {}); Object.keys(b || {}).forEach(k=>{ const v = b[k]; o[k] = (v && typeof v === 'object' && !Array.isArray(v)) ? v2_deepMerge(o[k] && typeof o[k] === 'object' ? o[k] : {}, v) : v; }); return o; }
+function v2_obCount(){ let n = 0; Object.keys(v2_ob).forEach(id=>{ const d = (v2_ob[id] || {}).data || {}; n += Math.max(1, Object.keys(d.vals || {}).length + Object.keys(d.valid || {}).length); }); return n; }
+function v2_obHtml(){ const n = v2_obCount(); return n ? `<div class="v2-saved" style="color:#FBBF24;border-color:#FBBF24;margin:8px 0;"><div>⏳ ${n} saisie${n > 1 ? 's' : ''} en attente de connexion — elle${n > 1 ? 's seront envoyées' : ' sera envoyée'} automatiquement. Ne vide pas l’application.</div>${v2_arSpan('إدخالات في انتظار الاتصال — سيتم إرسالها تلقائياً')}</div>` : ''; }
+function v2_obBanner(){ const el = document.getElementById('v2-ob'); if(el) el.innerHTML = v2_obHtml(); v2_stRefreshAll(); const c = v2_obCount(); if(v2_obCnt > 0 && c === 0 && !v2_typing()) v2_render(); v2_obCnt = c; }
+async function v2_obFlush(){
+  if(v2_obBusy || !Object.keys(v2_ob).length) return; v2_obBusy = true;
+  try{
+    for(const id of Object.keys(v2_ob)){
+      const e = v2_ob[id]; if(!e) continue;
+      try{ await Promise.race([db.collection('mise_en_place').doc(id).set(e.data, { merge:true }), new Promise((_, rj)=>setTimeout(()=>rj(new Error('timeout')), 8000))]); }catch(err){ break; }
+      if(v2_ob[id] && v2_ob[id].seq === e.seq){ delete v2_ob[id]; v2_obSave(); }
+    }
+  }finally{ v2_obBusy = false; v2_obBanner(); }
+}
+setInterval(()=>{ if(Object.keys(v2_ob).length) v2_obFlush(); }, 5000);
+window.addEventListener('online', ()=>v2_obFlush());
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) v2_obFlush(); });
+setTimeout(()=>v2_obFlush(), 1500);
 async function v2_write(dk, sec, zone, patch){
   const id = 'v2_' + v2_date + '_' + sec + (zone === 'stock' ? '_s' : '');
-  await db.collection('mise_en_place').doc(id).set(Object.assign({ v2date:v2_date, sec, zone }, patch), { merge:true });
+  const data = Object.assign({ v2date:v2_date, sec, zone }, patch), e = v2_ob[id];
+  v2_ob[id] = { data:e ? v2_deepMerge(e.data, data) : data, seq:(e ? e.seq : 0) + 1 }; v2_obSave(); v2_obBanner(); v2_obFlush();
 }
 function v2_mergeLocal(dk, sec, zone, patch){
   const d0 = v2_docs[dk] || { sec, zone }; const d = Object.assign({}, d0);
@@ -7976,36 +7999,46 @@ async function v2_loadHist(sec){
   if(!v2_typing()) v2_render();
 }
 function v2_hdEvents(sec, key){
-  return (v2_hd[sec] || []).filter(x=>x.vals && x.vals[key] !== undefined && v2_num(x.vals[key]) !== null)
+  const td = v2_docs[sec + '@s'];
+  return (v2_hd[sec] || []).filter(x=>x.v2date !== v2_date).concat(td ? [Object.assign({ v2date:v2_date }, td)] : []).filter(x=>x.vals && x.vals[key] !== undefined && v2_num(x.vals[key]) !== null)
     .sort((a, b)=>(a.v2date + (a.at || '')).localeCompare(b.v2date + (b.at || '')))
     .map(x=>({ q:v2_num(x.vals[key]), by:(x.byKeys && x.byKeys[key] && x.byKeys[key].w) || x.by || '', at:(x.atKeys && x.atKeys[key]) || x.at || (x.v2date + 'T00:00:00') }));
 }
 function v2_fdt(iso){ const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }); }
+function v2_stPending(sec, key){ const e = v2_ob['v2_' + v2_date + '_' + sec + '_s']; return !!(e && e.data && e.data.vals && e.data.vals[key] !== undefined); }
+function v2_stInfo(sec, key){
+  const e = v2_hdEvents(sec, key), last = e[e.length - 1];
+  if(v2_stPending(sec, key)) return '<span style="color:#FBBF24;">⏳ en attente d’envoi</span>';
+  return last ? `${last.at && String(last.at).slice(0, 10) === v2_date ? '<span style="color:#4ADE80;">✓</span> ' : ''}${esc(last.by)} · ${esc(v2_fdt(last.at))}` : '';
+}
+function v2_stRefreshAll(){ document.querySelectorAll('.st-info[data-stk]').forEach(el=>{ el.innerHTML = v2_stInfo(el.dataset.stsec, el.dataset.stk); }); }
+async function v2_stockSet(sec, key, raw){
+  if(v2_level(sec) !== 'saisir') return; raw = String(raw == null ? '' : raw).trim(); if(raw === '') return;
+  const n = v2_num(raw); if(n === null || !/^-?\d+([.,]\d+)?$/.test(raw)){ alert('Nombre non valide : « ' + raw + ' ».'); v2_render(); return; }
+  const dk = sec + '@s', ev = v2_hdEvents(sec, key), last = ev[ev.length - 1], td = ((v2_docs[dk] || {}).vals || {})[key];
+  if(td === undefined && last && last.q === n) return;      // inchangé par rapport au dernier inventaire
+  if(td !== undefined && v2_num(td) === n && !v2_stPending(sec, key)) return;
+  const by = v2_who(), at = new Date().toISOString(), patch = { v2date:v2_date, vals:{ [key]:raw }, byKeys:{ [key]:{ w:by, r:sec } }, atKeys:{ [key]:at }, by, at, stockOk:true };
+  v2_mergeLocal(dk, sec, 'stock', patch);
+  await v2_write(dk, sec, 'stock', patch);
+  v2_stRefreshAll();
+}
 function v2_histBox(sec){
   if(v2_hd[sec] === undefined){ v2_hd[sec] = null; v2_loadHist(sec); }
   const rows = [];
   v2_ings().forEach(it=>v2_ing(it).fields.forEach(f=>{ if(f.sec === sec && f.zone === 'stock' && !v2_isIn(f) && v2_visible(f)) rows.push({ n:it.n + ' · ' + (f.n || '—'), u:v2_unitOf(it), key:v2_key(it, f, 1) }); }));
   v2_artRows(sec).forEach(a=>rows.push({ n:a.n, u:a.u || '', key:'art.' + a.id }));
   const cell = (x, u, d)=>x ? `<div class="mep-q">${esc(v2_fmt(x.q))}<span class="pt-muted"> ${esc(u)}</span>${d ? ' <span class="mep-d ' + (d > 0 ? 'up' : 'dn') + '">' + (d > 0 ? '▲ +' : '▼ ') + esc(v2_fmt(d)) + '</span>' : ''}</div><div class="mep-w">${esc(x.by)} · ${esc(v2_fdt(x.at))}</div>` : '<span class="pt-muted">—</span>';
-  let body;
-  if(v2_hd[sec] === null) body = '<div class="pt-muted">Chargement…</div>';
-  else if(!rows.length) return '';
-  else {
-    const any = rows.some(r=>v2_hdEvents(sec, r.key).length);
-    body = !any ? '<div class="pt-muted">Aucun inventaire enregistré pour cette rubrique.</div>'
-      : `<div style="overflow-x:auto;"><table class="mep-g"><tr><th>Article</th><th>Dernier inventaire</th><th>Avant</th></tr>${rows.map((r, k)=>{ const e = v2_hdEvents(sec, r.key), last = e[e.length - 1], prev = e[e.length - 2]; return `<tr><td><span class="mep-num s">${k + 1}</span>${esc(r.n)}</td><td>${cell(last, r.u, last && prev ? last.q - prev.q : 0)}</td><td>${cell(prev, r.u, 0)}</td></tr>`; }).join('')}</table></div>`;
-  }
+  const lock = v2_level(sec) !== 'saisir';
+  const body = !rows.length ? '' : `<div style="overflow-x:auto;"><table class="mep-g"><tr><th>Article</th><th>Dernier inventaire</th><th>Avant</th></tr>${rows.map((r, k)=>{ const e = v2_hdEvents(sec, r.key), last = e[e.length - 1], prev = e[e.length - 2], tv = ((v2_docs[sec + '@s'] || {}).vals || {})[r.key], val = tv !== undefined ? String(tv) : (last ? v2_fmt(last.q) : '');
+    const inp = lock ? (last ? `<div class="mep-q">${esc(v2_fmt(last.q))}<span class="pt-muted"> ${esc(r.u)}</span></div>` : '<span class="pt-muted">—</span>') : `<div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;"><input class="ft-in" style="width:92px;text-align:right;" inputmode="decimal" placeholder="0,0" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}" value="${esc(val)}" onchange="v2_stockSet('${esc(sec)}','${esc(r.key)}',this.value)" onkeydown="if(event.key==='Enter')this.blur()"><span class="pt-muted">${esc(r.u)}</span></div>`;
+    return `<tr><td><span class="mep-num s">${k + 1}</span>${esc(r.n)}</td><td>${inp}<div class="mep-w st-info" style="text-align:right;" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}">${v2_stInfo(sec, r.key)}</div></td><td>${cell(prev, r.u, 0)}</td></tr>`; }).join('')}</table></div>`;
   return `<div class="v2-card" style="border-left-color:#6b756e;"><div class="v2-ct"><div>${esc(v2_rubName(sec))} — situation actuelle</div>${v2_arSpan('الوضع الحالي')}</div>${body}</div>`;
 }
 function v2_stockView(sec){
-  const lock = v2_stockLocked(sec), dk = sec + '@s', its = v2_ings().map(it=>v2_cardStock(sec, it)).filter(Boolean), arts = v2_artRows(sec);
-  let h = v2_histBox(sec) + its.join('');
-  if(arts.length) h += `<div class="v2-card" style="border-left-color:#6b756e;"><div class="v2-ct"><div>${esc(v2_fr('title.others'))}</div>${v2_arSpan(v2_arOf('title.others'))}</div>${arts.map(a=>v2_rowHtml(a.n, '', v2_input(dk, 'art.' + a.id, v2_fv(dk, 'art.' + a.id), lock), a.u || '')).join('')}</div>`;
-  if(!h) h = `<div class="empty-state">${esc(v2_fr('msg.empty'))}</div>`;
-  const has = !!(v2_docs[dk] && v2_docs[dk].stockOk), m = v2_msg[sec];
-  if(v2_level(sec) === 'saisir') h += `<div class="v2-pb" style="border:0"><button class="v2-pv big" ${lock ? 'disabled' : ''} onclick="v2_validateStock('${esc(sec)}')">${esc(v2_fr('btn.valInv'))}${v2_arSpan(v2_arOf('btn.valInv'))}</button><a class="v2-lk" ${has && lock ? '' : 'style="opacity:.4;pointer-events:none"'} onclick="v2_correctStock('${esc(sec)}')">${esc(v2_fr('btn.fixInv'))}${v2_arSpan(v2_arOf('btn.fixInv'), 'ctr')}</a></div>`;
-  if(m === 'ok') h += `<div class="v2-saved"><div>✓ ${esc(v2_fr('msg.saved'))}${v2_arSpan(v2_arOf('msg.saved'))}</div></div>`; else if(m) h += `<div class="v2-saved" style="color:#F87171;border-color:#F87171">Enregistrement impossible : ${esc(m.slice(4))}</div>`;
-  return h;
+  const h = v2_histBox(sec);
+  if(!h) return `<div class="empty-state">${esc(v2_fr('msg.empty'))}</div>`;
+  return h + (v2_level(sec) === 'saisir' ? `<div class="pt-muted" style="margin:8px 4px;">✏️ Tape la quantité dans la case : elle est enregistrée automatiquement quand tu quittes la case.${v2_arSpan('اكتب الكمية في الخانة، تُحفظ تلقائياً عند مغادرتها.')}</div>` : '');
 }
 function v2_saisieView(zone){
   const rubs = v2_visRubs(); if(!rubs.length) return '<div class="empty-state">Aucune rubrique n’est attribuée à ce compte.</div>';
@@ -8055,7 +8088,7 @@ function v2_render(){
   const admin = v2_adminView(), tabs = [['saisie', 'mep'], ['stock', 'stock']].map(t=>[t[0], v2_fr('title.' + t[1]), v2_arOf('title.' + t[1])]).concat(admin ? [['ecarts', 'Écarts', ''], ['cfg', 'Cuisine', ''], ['listes', 'Listes', ''], ['textes', 'Textes', '']] : []);
   if(!admin && !['saisie', 'stock'].includes(v2_tab)){ v2_tab = 'saisie'; if(window.v2_lmode){ window.v2_lmode = false; mep_draft = null; } }
   const zone = v2_tab === 'stock' ? 'stock' : 'mep';
-  const head = `<div style="font-weight:700;font-size:22px;">${esc(v2_fr(zone === 'stock' ? 'title.stock' : 'title.mep'))}${v2_arSpan(v2_arOf(zone === 'stock' ? 'title.stock' : 'title.mep'))}</div>
+  const head = `<div id="v2-ob">${v2_obHtml()}</div><div style="font-weight:700;font-size:22px;">${esc(v2_fr(zone === 'stock' ? 'title.stock' : 'title.mep'))}${v2_arSpan(v2_arOf(zone === 'stock' ? 'title.stock' : 'title.mep'))}</div>
     <div style="font-size:12px;font-weight:600;color:#FBBF24;margin-top:2px;">Version en test — visible par l’administrateur seulement</div>
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 12px;"><input type="date" value="${esc(v2_date)}" onchange="v2_setDate(this.value)" style="min-height:40px;"><label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_ar ? 'checked' : ''} onchange="v2_toggleAr(this.checked)"> Arabe</label>${(session && session.isAdmin) ? `<label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_asCook ? 'checked' : ''} onchange="v2_toggleCook(this.checked)"> Voir comme un cuisinier</label>` : ''}</div>
     ${tabs.length > 1 ? `<div class="mep-seg">${tabs.map(t=>`<button class="${v2_tab === t[0] ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${esc(t[1])}${v2_ar && t[2] ? `<span class="v2-ar" style="text-align:center">${esc(t[2])}</span>` : ''}</button>`).join('')}</div>` : ''}`;
