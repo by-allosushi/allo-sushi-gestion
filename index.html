@@ -4912,7 +4912,7 @@ let dp_pendVals = {};
 let dp_purge = null, dp_purgeFile = null, dp_purgeBusy = false;
 const DP_REPORT_ID = 'report_solde';
 const DP_PURGE_MAIL = 'allo.sushi.27@gmail.com';
-const DP_PURGE_PROTECT_DAYS = 30;
+const DP_PURGE_PROTECT_DAYS = 0;
 let dp_pointages = [];
 let dp_currentTab = 'mouvements';
 let dp_typeFilter = 'Tous';
@@ -5253,7 +5253,7 @@ function dp_renderJournalMouvements(){
 
 async function dp_deleteMouvement(id){
   const m = dp_mouvements.find(x=>x.id===id);
-  if(m && m.type==='Report'){ alert('Le « Report de solde » ne peut pas être supprimé : il remplace les périodes déjà supprimées.'); return; }
+  if(m && m.type==='Report'){ alert('Pour supprimer le « Report de solde », utilise le bouton « Supprimer le report » sur sa ligne (administratrice).'); return; }
   if(m && m.source==='caisse' && !(session && session.isAdmin)){ alert('Cette entrée vient de la Caisse (retrait confirmé) : seule l’administratrice peut la supprimer.'); return; }
   if(m && dp_tooOld(m)){ alert(DP_TOOOLD_MSG); return; }
   if(m){
@@ -5506,7 +5506,7 @@ function dp_purgeCheck(){
   const du = dates[0], au = p.au, lim = dp_purgeLimit();
   if(!au) return { err:'Choisis la date « Au ».' };
   if(au < du) return { err:'La date « Au » doit être après la date « Du ».' };
-  if(au > lim) return { err:`Protection : les ${DP_PURGE_PROTECT_DAYS} derniers jours ne peuvent pas être supprimés (date maximale : ${fmtDateShort(lim)}).` };
+  if(au > lim) return { err: DP_PURGE_PROTECT_DAYS > 0 ? `Protection : les ${DP_PURGE_PROTECT_DAYS} derniers jours ne peuvent pas être supprimés (date maximale : ${fmtDateShort(lim)}).` : 'La date « Au » ne peut pas dépasser aujourd’hui.' };
   const rows = all.filter(m=>(m.date||'') <= au);
   const dels = rows.filter(m=>m.id !== DP_REPORT_ID);
   if(!dels.length) return { err:'Aucun mouvement à supprimer sur cette période.' };
@@ -5519,6 +5519,22 @@ function dp_purgeBox(){
   const dates = dp_mouvements.map(m=>m.date).filter(Boolean).sort();
   const du = dates[0] || '';
   if(p.step === 'confirm'){
+    if(p.kind === 'report'){
+      const how0 = p.how === 'share' ? 'La feuille de partage a été ouverte.' : p.how === 'download' ? 'Le fichier a été téléchargé (le partage direct n’est pas disponible sur cet appareil).' : 'Le partage a été annulé.';
+      return `<div class="ticket" style="padding:14px 16px;border-color:var(--rust);">
+      <div style="font-size:13px;font-weight:700;color:var(--rust);margin-bottom:6px;">🗑️ Supprimer le Report de solde</div>
+      <div style="font-size:13px;line-height:1.5;">${how0}<br>
+      ${p.copied ? '✓ L’adresse <b>' + DP_PURGE_MAIL + '</b> est copiée : choisis Gmail, colle-la et envoie.' : 'Envoie le fichier à <b>' + DP_PURGE_MAIL + '</b>.'}<br>
+      <span style="color:var(--rust);font-weight:600;">Attention : le solde théorique ${p.net >= 0 ? 'baissera' : 'augmentera'} de ${dp_fmtMoney(Math.abs(p.net))}.</span><br>
+      <span style="color:var(--ink-muted);">Rien n’est supprimé tant que tu ne confirmes pas ci-dessous.</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <button class="btn ghost small" onclick="dp_purgeShare()">📤 Partager à nouveau</button>
+        <button class="btn ghost small" onclick="dp_purgeDownload()">⬇️ Télécharger le fichier</button>
+        <button class="btn small" style="background:var(--rust);border-color:var(--rust);" onclick="dp_reportApply()" ${dp_purgeBusy ? 'disabled' : ''}>✓ Mail envoyé — supprimer le report</button>
+        <button class="btn ghost small" onclick="dp_purgeClose()">Annuler</button>
+      </div>
+    </div>`;
+    }
     const how = p.how === 'share' ? 'La feuille de partage a été ouverte.' : p.how === 'download' ? 'Le fichier a été téléchargé (le partage direct n’est pas disponible sur cet appareil).' : 'Le partage a été annulé.';
     return `<div class="ticket" style="padding:14px 16px;border-color:var(--rust);">
       <div style="font-size:13px;font-weight:700;color:var(--rust);margin-bottom:6px;">🗑️ Supprimer du ${fmtDateShort(p.du)} au ${fmtDateShort(p.au)}</div>
@@ -5590,6 +5606,32 @@ async function dp_purgeGo(){
   try{ dp_purgeFile = dp_purgeBuildFile(chk); }catch(e){ alert(e.message); return; }
   dp_purge.step = 'confirm'; dp_purge.du = chk.du; dp_purge.au = chk.au; dp_purge.nb = chk.nb; dp_purge.net = chk.net;
   await dp_purgeShare();
+}
+async function dp_reportOpen(){
+  if(!(session && session.isAdmin)){ alert('Réservé à l’administratrice.'); return; }
+  const r = dp_mouvements.find(m=>m.id === DP_REPORT_ID); if(!r){ alert('Aucun Report de solde à supprimer.'); return; }
+  const net = Math.round(dp_typeMeta('Report').sign * (Number(r.montant)||0) * 100) / 100;
+  try{ dp_purgeFile = dp_purgeBuildFile({ rows:[r], du:r.date || '', au:r.date || '' }); }catch(e){ alert(e.message); return; }
+  dp_purge = { step:'confirm', kind:'report', du:r.date || '', au:r.date || '', nb:1, net };
+  await dp_purgeShare();
+}
+async function dp_reportApply(){
+  if(dp_purgeBusy || !dp_purge || dp_purge.kind !== 'report') return;
+  if(!(session && session.isAdmin)) return;
+  if(!currentUser){ askUserName(false); if(!currentUser) return; }
+  const r = dp_mouvements.find(m=>m.id === DP_REPORT_ID);
+  if(!r){ alert('Le Report de solde n’existe plus.'); dp_purgeClose(); return; }
+  const net = Math.round(dp_typeMeta('Report').sign * (Number(r.montant)||0) * 100) / 100;
+  if(Math.abs(net - dp_purge.net) > 0.005){ alert('Le Report a changé depuis l’export. Recommence pour générer un fichier à jour.'); dp_purgeClose(); return; }
+  if(!confirm(`Tu confirmes que le mail avec le fichier est bien envoyé ?\n\nLe Report de solde (${dp_fmtMoney(r.montant)}) sera supprimé : le solde théorique ${net >= 0 ? 'baissera' : 'augmentera'} de ${dp_fmtMoney(Math.abs(net))}.`)) return;
+  dp_purgeBusy = true; dp_render();
+  try{
+    await dp_mouvCol.doc(DP_REPORT_ID).delete();
+    await dp_logJournal('suppression', DP_REPORT_ID, r, null);
+    dp_purge = null; dp_purgeFile = null;
+    alert('Report de solde supprimé.');
+  }catch(e){ console.error(e); alert('Erreur pendant la suppression : ' + e.message); }
+  finally{ dp_purgeBusy = false; dp_render(); }
 }
 async function dp_purgeApply(){
   if(dp_purgeBusy || !dp_purge) return;
@@ -5737,7 +5779,7 @@ function dp_renderMouvementsTab(){
         <div style="display:flex;align-items:center;gap:8px;">
           <div class="mono" style="font-weight:600;color:${meta.color};">${dp_signedAmt(m)}</div>
           ${m.type!=='Report' && !dp_tooOld(m) && !(m.source==='caisse' && !(session && session.isAdmin)) ? `<button class="x-btn" style="color:var(--forest);font-size:13px;" onclick="dp_openEditMouv('${m.id}')">✏️</button>` : ''}
-          ${m.type!=='Report' && !dp_tooOld(m) ? `<button class="x-btn" onclick="dp_deleteMouvement('${m.id}')">✕</button>` : (dp_tooOld(m) ? '<span title="Modification impossible après 3 jours" style="font-size:13px;opacity:.6;">🔒</span>' : '')}
+          ${m.type==='Report' ? ((session && session.isAdmin) ? `<button class="btn ghost small" style="color:var(--rust);white-space:nowrap;" onclick="dp_reportOpen()">🗑️ Supprimer le report</button>` : '') : ''}${m.type!=='Report' && !dp_tooOld(m) ? `<button class="x-btn" onclick="dp_deleteMouvement('${m.id}')">✕</button>` : (dp_tooOld(m) ? '<span title="Modification impossible après 3 jours" style="font-size:13px;opacity:.6;">🔒</span>' : '')}
         </div>
       </div>`;
     }).join('');
