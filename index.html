@@ -609,25 +609,34 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
   .cg-mini{border:1px solid var(--line);background:none;color:var(--ink);border-radius:8px;padding:5px 9px;font-size:12px;cursor:pointer;}
   .cg-mini.del{color:var(--rust);}.cg-mini.xclose{color:var(--rust);background:var(--rust-bg);border-color:var(--rust);font-weight:700;}
   .x-btn,.line-row .x-btn{color:var(--rust) !important;}.cg-mini.ok{color:var(--moss);}
-.v2-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;}
+.v2-card{background:var(--surface);border:1px solid var(--line);border-left-width:5px;border-radius:12px;padding:12px;margin-bottom:12px;}
 .v2-ct{font-weight:800;font-size:17px;padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:2px;}
-.v2-ar{color:#9aa39d;font-size:13px;font-weight:500;}
-.mep-seg button .v2-ar{display:block;font-size:12px;}
-.v2-f{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);}.v2-ct + .v2-f{border-top:0;}
-.v2-fl{flex:1;min-width:0;}.v2-fn{font-weight:600;font-size:15px;}.v2-fl .v2-ar{display:block;margin-top:1px;}
+.v2-ar{display:block;color:#9aa39d;font-size:13px;font-weight:500;text-align:left;margin-top:1px;}
+.v2-ar.ctr{text-align:center;}
+.mep-seg button .v2-ar{font-size:12px;}
+.v2-sub{font-size:12px;font-weight:800;letter-spacing:.3px;color:#cbd2cd;margin:10px 0 0;padding:6px 8px;background:rgba(255,255,255,.06);border-radius:6px;}.v2-sub .v2-ar{font-size:12px;}
+.v2-f{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);}.v2-ct + .v2-f,.v2-sub + .v2-f{border-top:0;}
+.v2-fl{flex:1;min-width:0;}.v2-fn{font-weight:600;font-size:15px;}
 .v2-in{display:flex;align-items:center;gap:6px;flex:none;}.v2-in input{width:96px;text-align:center;font-weight:700;}.v2-u{font-size:13px;color:var(--ink-muted,#9aa39d);width:26px;}
-.v2-ct .v2-ar{text-align:left;}
-.v2-ro{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:12px;color:#9aa39d;font-size:13px;}
+.v2-dis input{opacity:.6;border-style:dashed;}
+.v2-tag{font-size:11px;color:#FBBF24;font-weight:600;}
 .v2-pref{font-size:12px;color:#FBBF24;margin-top:3px;}
+.v2-wait{font-size:12px;color:#FBBF24;margin:0 0 4px;}.v2-wait .v2-ar{color:#FBBF24;opacity:.8;}
+.v2-btn{border:1px solid #FBBF24;color:#FCD34D;background:rgba(251,191,36,.1);border-radius:10px;padding:10px;font-weight:700;text-align:center;margin:6px 0;cursor:pointer;}
+.v2-add{border:1px dashed var(--line);color:#cbd2cd;border-radius:10px;padding:10px;font-weight:700;text-align:center;margin-top:10px;cursor:pointer;}
 .v2-line{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 0;border-top:1px solid var(--line);}
-.v2-chip{display:inline-block;border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:0 6px 6px 0;font-size:13px;}
-.v2-banner{border:1px solid #2dd4bf;background:color-mix(in srgb,#2dd4bf 10%,transparent);color:#5eead4;border-radius:12px;padding:12px;margin-bottom:12px;font-size:14px;}
-.v2-who{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px;margin-bottom:12px;}.v2-who .v2-ar{display:block;}
+.v2-pb{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);}
+.v2-pv{flex:1;border:1px solid rgba(34,197,94,.55);background:rgba(34,197,94,.12);color:#86efac;border-radius:10px;padding:8px 12px;font-weight:700;font-size:14px;text-align:left;cursor:pointer;}.v2-pv.big{padding:12px;font-size:15px;}
+.v2-pv:disabled{opacity:.4;cursor:not-allowed;}.v2-pv .v2-ar{color:inherit;opacity:.7;font-size:11px;}
+.v2-lk{font-size:13px;color:#FCD34D;text-decoration:underline;text-underline-offset:3px;cursor:pointer;display:inline-block;margin:4px 0;white-space:nowrap;}.v2-lk .v2-ar{text-decoration:none;font-size:11px;}.v2-lk .v2-ar.ctr{text-align:center;}
+.v2-chips{display:flex;gap:8px;margin:2px 0 6px;flex-wrap:wrap;}.v2-chip{border:1px solid;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;}.v2-chip.cg{color:#86efac;border-color:rgba(34,197,94,.5);}.v2-chip.cy{color:#FCD34D;border-color:rgba(251,191,36,.5);}
+.v2-hist{display:block;font-size:12px;color:var(--ink-muted,#9aa39d);text-decoration:underline;text-underline-offset:3px;margin:8px 0 0;cursor:pointer;}
+.v2-who{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px;margin-bottom:12px;}
+.v2-ro{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:12px;color:#9aa39d;font-size:13px;}
 .v2-b{min-height:54px;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;border:1px solid;padding:8px 10px;text-align:left;}
 .v2-b.ok{background:color-mix(in srgb,#22c55e 18%,#0c100e);border-color:#22c55e;color:#86efac;}.v2-b.ed{background:color-mix(in srgb,#fbbf24 16%,#0c100e);border-color:#fbbf24;color:#fcd34d;}
 .v2-b:disabled{opacity:.4;cursor:not-allowed;}.v2-b .v2-ar{color:inherit;opacity:.75;}
-.v2-saved{margin-top:12px;border:1px solid #22c55e;color:#86efac;border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;gap:8px;}
-.v2-note{display:block;color:#FBBF24;font-size:14px;margin-top:10px;cursor:pointer;}.v2-note .v2-ar{display:block;text-align:right;}
+.v2-saved{margin-top:12px;border:1px solid #22c55e;color:#86efac;border-radius:12px;padding:10px 12px;}.v2-saved .v2-ar{color:inherit;opacity:.75;}
 </style>
 </head>
 <body>
@@ -7405,41 +7414,83 @@ async function dt_deleteAvoir(id){
 }
 
 /* ==================== CUISINE & MISE EN PLACE — NOUVELLE VERSION (admin seulement, en test) ====================
-   • Onglet « Cuisine » (admin) : une carte par ingrédient de la liste Dépenses ; chaque champ est attribué à une rubrique (Sushi, Chaud, Bar).
-   • Cuisiniers : chacun voit, dans sa rubrique, les champs qui lui sont attribués (droit « Aucun / Consulter / Saisir et modifier » dans Utilisateurs).
-   Données dans la collection existante « mise_en_place » : doc « v2cfg » (réglages) et docs « v2_<date>_<rubrique> » (saisies).
+   Dépenses > Ingrédients → pour chaque cuisinier : « Mise en place » (opérations en cours) et « Stock » (fins de service en premier, puis autres articles).
+   • Un champ appartient à une rubrique (Sushi / Wok / Bar) et à une zone (Mise en place / Stock) ; « par opération » (se répète) ou « une fois par service ».
+   • Seule l'opération en cours est visible ; la valider ouvre la suivante automatiquement. Un bouton de validation par ingrédient.
+   • Le Wok peut « travailler à la place du Sushi » (traçable) et valide ou corrige le « Reçu du Sushi » (l'écart compte dans les pertes de fin de service).
+   • Tous les titres et traductions se modifient dans l'onglet « Textes » (admin).
+   Données dans la collection existante « mise_en_place » : « v2cfg » (réglages), « v2_<date>_<rubrique> » (Mise en place), « v2_<date>_<rubrique>_s » (Stock).
    Rien ne touche aux saisies actuelles : les cuisiniers continuent comme avant tant que NEW_RUBRIQUES_ADMIN_ONLY est à true. */
 const v2_cfgRef = db.collection('mise_en_place').doc('v2cfg');
-const V2_AR = { sushi:'سوشي', chaud:'الطهي', bar:'البار' };
+const V2_COLORS = { blanc:'#e9ece9', bleu:'#60a5fa', rouge:'#f87171', rose:'#f472b6', vert:'#4ade80', jaune:'#fbbf24', violet:'#a78bfa' };
+const V2_TXT = {
+  'title.mep':['Mise en place', 'التجهيز المسبق'], 'title.stock':['Stock', 'المخزون'],
+  'btn.valOp':['Valider {noun} {n}', 'اعتماد {noun} {n}'], 'btn.val':['Valider', 'اعتماد'], 'btn.fix':['✎ Corriger', 'تصحيح'],
+  'btn.valInv':['✓ Valider l’inventaire', 'اعتماد الجرد'], 'btn.fixInv':['✎ Corriger ma saisie', 'تصحيح إدخالي'],
+  'btn.sub':['Travailler à la place du {rub}', 'العمل بدل {rub}'], 'btn.recuOk':['✓ Valider', 'تأكيد'], 'btn.recuFix':['✎ Corriger', 'تصحيح'],
+  'msg.wait':['En attente de la saisie du {rub}', 'في انتظار إدخال {rub}'], 'msg.recu':['À valider ou à corriger', 'للتأكيد أو التصحيح'],
+  'msg.recuOk':['✓ Reçu validé', '✓ تم تأكيد المستلم'], 'msg.by':['Saisi par {who}', 'أُدخل بواسطة {who}'], 'msg.saved':['Enregistré sur le serveur.', 'تم الحفظ على الخادم.'],
+  'link.hist':['Découpes précédentes ({n})', 'التقطيعات السابقة ({n})'], 'title.others':['Autres articles', 'مواد أخرى'],
+  'msg.empty':['Rien à saisir ici.', 'لا شيء للإدخال هنا.'], 'lbl.ro':['Consultation seulement', 'للاطلاع فقط'],
+  'rub.sushi':['Sushi', 'سوشي'], 'rub.chaud':['Wok', 'الووك'], 'rub.bar':['Bar', 'البار']
+};
+const V2_TXT_LBL = { 'title.mep':'Titre : Mise en place', 'title.stock':'Titre : Stock', 'btn.valOp':'Bouton valider une opération ({noun}, {n} automatiques)', 'btn.val':'Bouton valider (sans opération)', 'btn.fix':'Lien corriger', 'btn.valInv':'Bouton valider l’inventaire (Stock)', 'btn.fixInv':'Lien corriger la saisie (Stock)', 'btn.sub':'Lien travailler à la place de… ({rub})', 'btn.recuOk':'Puce valider « Reçu »', 'btn.recuFix':'Puce corriger « Reçu »', 'msg.wait':'Message d’attente ({rub})', 'msg.recu':'Message « Reçu à valider »', 'msg.recuOk':'Message « Reçu validé »', 'msg.by':'Message saisi par ({who})', 'msg.saved':'Message enregistré', 'link.hist':'Lien opérations précédentes ({n})', 'title.others':'Titre : autres articles', 'msg.empty':'Message rubrique vide', 'lbl.ro':'Mention consultation seulement' };
 let v2_cfg = {}, v2_cfgReady = false, v2_started = false, v2_tab = 'saisie', v2_sec = '', v2_date = '';
-let v2_docs = {}, v2_unsub = null, v2_form = {}, v2_edit = {}, v2_msg = {}, v2_noteOpen = {}, v2_ar = true, v2_saveT = null, v2_busy = false;
-const v2_rubs = ()=>mep_secList();
+let v2_docs = {}, v2_unsub = null, v2_form = {}, v2_editS = {}, v2_msg = {}, v2_ops = {}, v2_times = {}, v2_subOpen = {}, v2_hist = {}, v2_recuEdit = {}, v2_ar = true, v2_asCook = false, v2_saveT = null, v2_busy = false;
+function v2_tx(key){ const o = (v2_cfg.texts && v2_cfg.texts[key]) || {}, d = V2_TXT[key] || ['', '']; return { fr:(o.fr !== undefined && o.fr !== '' ? o.fr : d[0]), ar:(o.ar !== undefined && o.ar !== '' ? o.ar : d[1]) }; }
+const v2_fill = (s, vars)=>String(s).replace(/\{(\w+)\}/g, (m, k)=>vars && vars[k] !== undefined ? vars[k] : m);
+const v2_fr = (key, vars)=>v2_fill(v2_tx(key).fr, vars);
+const v2_arOf = (key, vars)=>v2_fill(v2_tx(key).ar, vars);
+const v2_arSpan = (t, cls)=>v2_ar && t ? `<span class="v2-ar ${cls || ''}" dir="rtl">${esc(t)}</span>` : '';
+const v2_both = (key, vars, varsAr)=>esc(v2_fr(key, vars)) + v2_arSpan(v2_arOf(key, varsAr || vars));
+const v2_rubs = ()=>mep_secList().map(r=>({ id:r.id, n:(v2_tx('rub.' + r.id).fr && V2_TXT['rub.' + r.id] ? v2_fr('rub.' + r.id) : r.n) }));
 const v2_rubName = (id)=>(v2_rubs().find(r=>r.id === id) || { n:id }).n;
+const v2_rubAr = (id)=>V2_TXT['rub.' + id] ? v2_arOf('rub.' + id) : '';
 function v2_level(sec){ if(session && session.isAdmin) return 'saisir'; const p = (session && session.permissions) || {}; return p['v2Lvl_' + sec] || 'aucun'; }
 const v2_visRubs = ()=>v2_rubs().filter(r=>v2_level(r.id) !== 'aucun');
+const v2_nrm = (s)=>String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const v2_adminView = ()=>!!(session && session.isAdmin) && !v2_asCook;
 function v2_seedFor(it){
-  const n = String(it.n || '').toLowerCase(), first = (v2_rubs()[0] || { id:'sushi' }).id;
-  const rub = (id)=>v2_rubs().some(r=>r.id === id) ? id : first;
-  const f = (id, nm, ar, sec, extra)=>Object.assign({ id, n:nm, ar, sec:rub(sec) }, extra || {});
-  if(n.includes('escalope')) return { ar:'الإسكالوب', fields:[
-    f('stock', 'Stock fin de service', 'المخزون في نهاية الخدمة', 'sushi'), f('dec_out', 'Poids mis en découpe (pesée)', 'الوزن المُقدَّم للتقطيع (وزن)', 'sushi'),
-    f('dec_ps', 'Part Sushi (pesée)', 'حصة السوشي (وزن)', 'sushi'), f('dec_pc', 'Part Chaud (pesée)', 'حصة الساخن (وزن)', 'chaud'),
-    f('hache', 'Poulet haché récupéré', 'الدجاج المفروم المسترجَع', 'sushi'), f('trash', 'À jeter', 'للرمي', 'sushi'),
-    f('waste', 'Déchet total (calculé)', 'إجمالي الفضلات (محسوب)', 'sushi', { calc:['hache', 'trash'] })] };
-  if(n.includes('poulet')) return { ar:'الدجاج المفروم', fields:[ f('rest', 'Reste fin de service', 'المتبقي في نهاية الخدمة', 'chaud'), f('loss', 'Perte (à jeter)', 'الخسارة (للرمي)', 'chaud') ] };
-  if(n.includes('saumon')) return { ar:'السلمون', fields:[
-    f('sau_brut', 'Quantité brute disponible', 'الكمية الخام المتاحة', 'sushi'), f('sau_clean', 'Quantité à nettoyer', 'الكمية المراد تنظيفها', 'sushi'),
-    f('sau_net', 'Net utilisable', 'الصافي القابل للاستعمال', 'sushi'), f('sau_loss', 'Perte à jeter', 'الخسارة للرمي', 'sushi'),
-    f('sau_restnet', 'Reste net fin de service', 'الصافي المتبقي نهاية الخدمة', 'sushi'), f('sau_rest', 'Reste brut', 'المتبقي الخام', 'sushi')] };
-  return { ar:'', fields:[] };
+  const n = v2_nrm(it.n), ids = v2_rubs().map(r=>r.id), rub = (id)=>ids.includes(id) ? id : (ids[0] || 'sushi');
+  const f = (id, nm, ar, sec, x)=>Object.assign({ id, n:nm, ar, sec:rub(sec), per:'service', zone:'mep' }, x || {});
+  const ACH = (sec)=>f('achat', 'Total acheté (Dépenses)', 'إجمالي المشتريات', sec, { src:'achat', vis:'admin' });
+  const LOSS = (id, sec, x)=>f(id, 'À jeter (perte qualité)', 'للرمي (خسارة الجودة)', sec, x);
+  const FIN = (id, nm, ar, sec)=>f(id, nm, ar, sec, { zone:'stock' });
+  const FRI = (id, w, sec)=>FIN(id, 'Fin de service brut (Frigo)', 'نهاية الخدمة خام (الثلاجة)', sec);
+  if(n.includes('escalope')) return { ar:'الإسكالوب', col:'blanc', opLabel:'DÉCOUPE', opAr:'تقطيع', opNoun:'la découpe', opNounAr:'التقطيع', fields:[
+    ACH('sushi'), f('dec_out', 'Mis en découpe', 'المُخصّص للتقطيع', 'sushi', { per:'op' }), f('dec_extra', 'Quantité supplémentaire (Frigo)', 'كمية إضافية (الثلاجة)', 'sushi', { per:'op' }),
+    f('dec_total', 'Total mis en découpe (calculé)', 'إجمالي المُخصّص للتقطيع (محسوب)', 'sushi', { per:'op', calc:{ p:['dec_out'], o:['dec_extra'] } }),
+    f('dec_ps', 'Part Sushi découpé', 'حصة السوشي المقطّعة', 'sushi', { per:'op' }),
+    f('reste', 'Reste pour le Wok (calculé)', 'المتبقي للووك (محسوب)', 'sushi', { per:'op', vis:'admin', calc:{ p:['dec_total'], m:['dec_ps'] } }), LOSS('loss', 'sushi', { per:'op' }),
+    f('recu', 'Reçu du Sushi', 'المستلم من السوشي', 'chaud', { per:'op', calc:{ p:['reste'] }, confirm:true, bg:'Répartition Wok', bil:'in' }),
+    f('part_w', 'Part Wok découpé', 'حصة الووك المقطّعة', 'chaud', { per:'op', bg:'Répartition Wok', bil:'out' }), f('hache', 'Poulet haché récupéré', 'الدجاج المفروم المسترجَع', 'chaud', { per:'op', bg:'Répartition Wok', bil:'out' }),
+    LOSS('loss_w', 'chaud', { per:'op', bg:'Répartition Wok', bil:'out' }),
+    FIN('fin_dec', 'Fin de service découpé', 'نهاية الخدمة مقطّع', 'sushi'), FRI('fin_raw', 0, 'sushi'), FIN('fin_cr', 'Fin de service crispy', 'نهاية الخدمة كريسبي', 'sushi'), FIN('fin_w', 'Fin de service découpé', 'نهاية الخدمة مقطّع', 'chaud')] };
+  if(n.includes('saumon')) return { ar:'السلمون', col:'bleu', opLabel:'NETTOYAGE ET DÉCOUPE', opAr:'تنظيف وتقطيع', opNoun:'le nettoyage et la découpe', opNounAr:'التنظيف والتقطيع', fields:[
+    ACH('sushi'), f('mis', 'Mis en nettoyage et découpe', 'المُخصّص للتنظيف والتقطيع', 'sushi', { per:'op', bg:'Nettoyage', bil:'in' }), f('net', 'Net découpé', 'الصافي المقطّع', 'sushi', { per:'op', bg:'Nettoyage', bil:'out' }),
+    LOSS('loss', 'sushi', { per:'op', bg:'Nettoyage', bil:'out' }), FIN('fin_net', 'Fin de service découpé', 'نهاية الخدمة مقطّع', 'sushi'), FRI('fin_raw', 0, 'sushi')] };
+  if(n.includes('l2')) return { ar:'الجمبري L2', col:'rose', opLabel:'NETTOYAGE', opAr:'تنظيف', opNoun:'le nettoyage', opNounAr:'التنظيف', fields:[
+    ACH('sushi'), f('mis', 'Mis en nettoyage', 'المُخصّص للتنظيف', 'sushi', { per:'op', bg:'Nettoyage', bil:'in' }), f('net_n', 'Net nettoyé', 'الصافي المنظّف', 'sushi', { per:'op', bg:'Nettoyage', bil:'out' }), f('net_c', 'Net crispy', 'الصافي كريسبي', 'sushi', { per:'op' }),
+    LOSS('loss', 'sushi', { per:'op', bg:'Nettoyage', bil:'out' }), FIN('fin_c', 'Fin de service crispy', 'نهاية الخدمة كريسبي', 'sushi'), FIN('fin_raw', 'Fin de service brut (Frigo)', 'نهاية الخدمة خام (الثلاجة)', 'sushi')] };
+  if(n.includes('gamba')) return { ar:'الجمبري غامبا', col:'rose', opLabel:'NETTOYAGE', opAr:'تنظيف', opNoun:'le nettoyage', opNounAr:'التنظيف', fields:[
+    ACH('chaud'), f('mis', 'Mis en nettoyage', 'المُخصّص للتنظيف', 'chaud', { per:'op', bg:'Nettoyage', bil:'in' }), f('net_n', 'Net nettoyé', 'الصافي المنظّف', 'chaud', { per:'op', bg:'Nettoyage', bil:'out' }), f('net_nem', 'Net nem', 'الصافي للنيم', 'chaud', { per:'op' }),
+    LOSS('loss', 'chaud', { per:'op', bg:'Nettoyage', bil:'out' }), FIN('fin_raw', 'Fin de service brut (Frigo)', 'نهاية الخدمة خام (الثلاجة)', 'chaud')] };
+  if(n.includes('poulet')) return { ar:'الدجاج المفروم', col:'blanc', fields:[ ACH('chaud'), f('hache_in', 'Poulet haché récupéré (de l’escalope)', 'الدجاج المفروم المسترجَع (من الإسكالوب)', 'chaud', { srcIng:{ n:'escalope', f:'hache' } }), LOSS('loss', 'chaud'), FIN('fin_farce', 'Fin de service farce', 'نهاية الخدمة حشوة', 'chaud') ] };
+  if(n.includes('viande') && n.includes('hach')) return { ar:'اللحم المفروم', col:'rouge', fields:[ ACH('chaud'), LOSS('loss', 'chaud'), FIN('fin_farce', 'Fin de service farce', 'نهاية الخدمة حشوة', 'chaud') ] };
+  if(n.includes('viande') && n.includes('rouge')) return { ar:'اللحم الأحمر', col:'rouge', fields:[ ACH('chaud'), LOSS('loss', 'chaud'), FIN('fin', 'Fin de service', 'نهاية الخدمة', 'chaud') ] };
+  if(n.includes('avocat')) return { ar:'الأفوكادو', col:'vert', fields:[ ACH('sushi'), LOSS('loss', 'sushi'), FIN('fin', 'Fin de service', 'نهاية الخدمة', 'sushi') ] };
+  return { ar:'', col:'blanc', fields:[] };
 }
 const v2_ings = ()=>(dp_cfg.ingredients || []).filter(i=>!i.off);
-function v2_ing(it){ if(!v2_cfg.ings) v2_cfg.ings = {}; if(!v2_cfg.ings[it.id]) v2_cfg.ings[it.id] = v2_seedFor(it); const c = v2_cfg.ings[it.id]; if(!Array.isArray(c.fields)) c.fields = []; return c; }
+function v2_ing(it){ if(!v2_cfg.ings3) v2_cfg.ings3 = {}; if(!v2_cfg.ings3[it.id]) v2_cfg.ings3[it.id] = v2_seedFor(it); const c = v2_cfg.ings3[it.id]; if(!Array.isArray(c.fields)) c.fields = []; return c; }
+const v2_byId = (id)=>v2_ings().find(i=>i.id === id);
 const v2_unitOf = (it)=>it.u || 'kg';
 const v2_num = (v)=>{ const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? null : n; };
 const v2_fmt = (n)=>n == null ? '—' : (Math.round(n * 1000) / 1000).toString().replace('.', ',');
 const v2_ymd = ()=>mep_ymd();
-const v2_arTxt = (t, extra)=>v2_ar && t ? `<span class="v2-ar" dir="rtl"${extra ? ' style="' + extra + '"' : ''}>${esc(t)}</span>` : '';
+const v2_hm = ()=>new Date().toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' });
+const v2_dk = (f)=>f.sec + (f.zone === 'stock' ? '@s' : '');
+const v2_isIn = (f)=>!!(f.calc || f.src || f.srcIng);
 function v2_start(){
   if(v2_started) return; v2_started = true; v2_date = v2_ymd();
   v2_cfgRef.onSnapshot((doc)=>{ v2_cfg = doc.exists ? (doc.data() || {}) : {}; v2_cfgReady = true; if(!v2_typing()) v2_render(); }, (e)=>{ console.error(e); v2_cfgReady = true; v2_render(); });
@@ -7449,106 +7500,265 @@ function v2_start(){
 function v2_watchDay(){
   if(v2_unsub){ try{ v2_unsub(); }catch(e){} v2_unsub = null; }
   v2_unsub = db.collection('mise_en_place').where('v2date', '==', v2_date).onSnapshot((snap)=>{
-    const m = {}; snap.forEach(d=>{ const x = d.data() || {}; m[x.sec] = x; }); v2_docs = m; if(!v2_typing()) v2_render();
+    const m = {}; snap.forEach(d=>{ const x = d.data() || {}; m[x.sec + (x.zone === 'stock' ? '@s' : '')] = x; }); v2_docs = m; if(!v2_typing()) v2_render();
   }, (e)=>console.error(e));
 }
 function v2_typing(){ try{ const a = document.activeElement, b = document.getElementById('v2-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
 function v2_saveCfg(){ clearTimeout(v2_saveT); v2_saveT = setTimeout(async ()=>{ try{ await v2_cfgRef.set(v2_cfg); }catch(e){ console.error(e); alert('Réglage non enregistré : ' + (e.message || e) + '\nVérifie que les règles Firestore autorisent la collection « mise_en_place ».'); } }, 400); }
 const v2_setTab = (t)=>{ v2_tab = t; v2_render(); };
 const v2_setSec = (s)=>{ v2_sec = s; v2_render(); };
-const v2_setDate = (d)=>{ v2_date = d || v2_ymd(); v2_form = {}; v2_edit = {}; v2_msg = {}; v2_watchDay(); v2_render(); };
+const v2_setDate = (d)=>{ v2_date = d || v2_ymd(); v2_form = {}; v2_editS = {}; v2_msg = {}; v2_ops = {}; v2_times = {}; v2_subOpen = {}; v2_hist = {}; v2_recuEdit = {}; v2_watchDay(); v2_render(); };
 const v2_toggleAr = (on)=>{ v2_ar = !!on; v2_render(); };
+const v2_toggleCook = (on)=>{ v2_asCook = !!on; v2_render(); };
+
+/* ---------- Valeurs, opérations, calculs ---------- */
+const v2_key = (it, f, n)=>it.id + '.' + f.id + (f.per === 'op' ? '#' + n : '');
+function v2_fv(dk, key){ if(v2_form[dk] && v2_form[dk][key] !== undefined) return v2_form[dk][key]; const d = v2_docs[dk]; return d && d.vals && d.vals[key] !== undefined ? d.vals[key] : ''; }
+const v2_getv = (it, f, n)=>v2_num(v2_fv(v2_dk(f), v2_key(it, f, n)));
+function v2_opN(it){ let m = Math.max(1, v2_ops[it.id] || 1); Object.values(v2_docs).forEach(d=>{ const k = d && d.ops && d.ops[it.id]; if(k > m) m = k; }); return m; }
+function v2_opTime(it, n){ const k = it.id + '#' + n; if(v2_times[k]) return v2_times[k]; let t = ''; Object.values(v2_docs).forEach(d=>{ if(!t && d && d.times && d.times[k]) t = d.times[k]; }); return t; }
+function v2_achat(it){ const n = String(it.n || '').trim().toLowerCase(); let s = 0, any = false; (typeof dp_mouvements !== 'undefined' ? dp_mouvements : []).forEach(m=>{ if(m.type === 'Achat' && m.date === v2_date && String(m.articleNom || '').trim().toLowerCase() === n){ s += Number(m.quantite) || 0; any = true; } }); return any ? s : null; }
+function v2_sumF(it, fid){ const f = v2_ing(it).fields.find(x=>x.id === fid); if(!f) return null; if(f.per !== 'op') return v2_valOf(it, f, 1); let s = 0, any = false; for(let n = 1; n <= v2_opN(it); n++){ const v = v2_valOf(it, f, n); if(v !== null){ s += v; any = true; } } return any ? s : null; }
+function v2_calcOnly(it, f, n){
+  const c = v2_ing(it); let s = 0;
+  for(const id of (f.calc.p || [])){ const g = c.fields.find(x=>x.id === id); const v = g ? v2_valOf(it, g, n) : null; if(v === null) return null; s += v; }
+  for(const id of (f.calc.o || [])){ const g = c.fields.find(x=>x.id === id); const v = g ? v2_valOf(it, g, n) : null; if(v !== null) s += v; }
+  for(const id of (f.calc.m || [])){ const g = c.fields.find(x=>x.id === id); const v = g ? v2_valOf(it, g, n) : null; if(v === null) return null; s -= v; }
+  return s;
+}
+function v2_valOf(it, f, n){
+  if(f.src === 'achat') return v2_achat(it);
+  if(f.srcIng){ const o = v2_ings().find(i=>v2_nrm(i.n).includes(f.srcIng.n)); return o ? v2_sumF(o, f.srcIng.f) : null; }
+  if(f.calc){ if(f.confirm){ const own = v2_getv(it, f, n); if(own !== null) return own; } return v2_calcOnly(it, f, n); }
+  return v2_getv(it, f, n);
+}
+function v2_missing(it, f, n){ if(!f.calc) return []; const c = v2_ing(it), out = []; (f.calc.p || []).concat(f.calc.m || []).forEach(id=>{ const g = c.fields.find(x=>x.id === id); if(!g) return; if(g.calc) v2_missing(it, g, n).forEach(x=>out.push(x)); else if(!v2_isIn(g) && v2_valOf(it, g, n) === null) out.push(g); }); return out; }
+function v2_set(dk, key, v){ (v2_form[dk] = v2_form[dk] || {})[key] = v; v2_refreshCalc(); }
+function v2_refreshCalc(){
+  document.querySelectorAll('[data-calc]').forEach(el=>{ const it = v2_byId(el.dataset.i), f = it && v2_ing(it).fields.find(x=>x.id === el.dataset.f); if(!f) return; const v = v2_valOf(it, f, +el.dataset.n); el.value = v === null ? '' : v2_fmt(v); });
+  document.querySelectorAll('[data-wait]').forEach(el=>{ const it = v2_byId(el.dataset.i), f = it && v2_ing(it).fields.find(x=>x.id === el.dataset.f); if(!f) return; el.style.display = v2_calcOnly(it, f, +el.dataset.n) === null ? '' : 'none'; });
+}
+/* opération validée par une rubrique : doc.valid['ing#n'] */
+const v2_isValid = (sec, id, n)=>!!(v2_docs[sec] && v2_docs[sec].valid && v2_docs[sec].valid[id + '#' + n]);
+function v2_curOp(it, sec){ let n = 1; while(v2_isValid(sec, it.id, n)) n++; return n; }
+function v2_opFields(it, sec, n){ return v2_ing(it).fields.filter(f=>f.sec === sec && f.zone !== 'stock' && f.per === 'op' && !v2_isIn(f)).filter(f=>f).map(f=>v2_key(it, f, n)); }
+function v2_opHasValue(it, sec, n){ return v2_opFields(it, sec, n).some(k=>String(v2_fv(sec, k)).trim() !== ''); }
+function v2_visible(f){ return !(f.vis === 'admin' && !v2_adminView()); }
 
 /* ---------- Onglet Cuisine : réglage par ingrédient (admin) ---------- */
-const v2_byId = (id)=>v2_ings().find(i=>i.id === id);
-function v2_cfAdd(id){ const it = v2_byId(id); if(!it) return; v2_ing(it).fields.push({ id:'f' + mep_newId(), n:'', ar:'', sec:(v2_rubs()[0] || { id:'sushi' }).id }); v2_saveCfg(); v2_render(); }
+function v2_cfAdd(id){ const it = v2_byId(id); if(!it) return; v2_ing(it).fields.push({ id:'f' + mep_newId(), n:'', ar:'', sec:(v2_rubs()[0] || { id:'sushi' }).id, per:'service', zone:'mep' }); v2_saveCfg(); v2_render(); }
 function v2_cfDel(id, i){ const it = v2_byId(id); if(!it) return; if(!confirm('Supprimer ce champ ?')) return; v2_ing(it).fields.splice(i, 1); v2_saveCfg(); v2_render(); }
-function v2_cfSet(id, i, k, v){ const it = v2_byId(id); if(!it) return; const f = v2_ing(it).fields[i]; if(!f) return; f[k] = v; v2_saveCfg(); if(k === 'sec') v2_render(); }
+function v2_cfSet(id, i, k, v){ const it = v2_byId(id); if(!it) return; const f = v2_ing(it).fields[i]; if(!f) return; f[k] = v; v2_saveCfg(); if(k === 'sec' || k === 'per' || k === 'zone' || k === 'vis') v2_render(); }
 function v2_cfMove(id, i, d){ const it = v2_byId(id); if(!it) return; const l = v2_ing(it).fields, j = i + d; if(j < 0 || j >= l.length) return; const t = l[i]; l[i] = l[j]; l[j] = t; v2_saveCfg(); v2_render(); }
-function v2_cfIngAr(id, v){ const it = v2_byId(id); if(!it) return; v2_ing(it).ar = v; v2_saveCfg(); }
+function v2_cfIng(id, k, v){ const it = v2_byId(id); if(!it) return; v2_ing(it)[k] = v; v2_saveCfg(); if(k === 'col') v2_render(); }
 function v2_cfgView(){
   const ings = v2_ings(); if(!ings.length) return '<div class="empty-state">Aucun ingrédient dans Dépenses.</div>';
-  const rubSel = (cur, fn)=>`<select onchange="${fn}" style="min-height:38px;">${v2_rubs().map(r=>`<option value="${esc(r.id)}" ${r.id === cur ? 'selected' : ''}>${esc(r.n)}</option>`).join('')}</select>`;
+  const sel = (opts, cur, fn, dis)=>`<select ${dis ? 'disabled' : ''} onchange="${fn}" style="min-height:38px;">${opts.map(o=>`<option value="${esc(o[0])}" ${o[0] === cur ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select>`;
+  const rubOpts = v2_rubs().map(r=>[r.id, r.n]), perOpts = [['service', 'Une fois par service'], ['op', 'Par opération']], zoneOpts = [['mep', 'Mise en place'], ['stock', 'Stock']], visOpts = [['', 'Visible cuisiniers'], ['admin', 'Admin seulement']];
   const card = (it)=>{
     const c = v2_ing(it);
-    return `<div class="v2-card"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;"><b style="font-size:16px;">${esc(it.n)}</b><span style="font-size:12px;color:var(--ink-muted)">unité : ${esc(v2_unitOf(it))} (Dépenses)</span></div>
-      <input class="ft-in" dir="rtl" style="width:100%;text-align:right;margin-top:6px;" placeholder="Nom en arabe (facultatif)" value="${esc(c.ar || '')}" oninput="v2_cfIngAr('${it.id}',this.value)">
-      ${c.fields.map((f, i)=>`<div class="v2-line">
-        <input class="ft-in" style="flex:1 1 170px;text-align:left;width:auto;" placeholder="Nom du champ" value="${esc(f.n || '')}" ${f.calc ? 'disabled' : ''} oninput="v2_cfSet('${it.id}',${i},'n',this.value)">
+    return `<div class="v2-card" style="border-left-color:${V2_COLORS[c.col] || V2_COLORS.blanc};"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;"><b style="font-size:17px;">${esc(it.n)}</b><span style="font-size:12px;color:var(--ink-muted)">unité : ${esc(v2_unitOf(it))} (Dépenses)</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">${sel(Object.keys(V2_COLORS).map(k=>[k, 'Ligne ' + k]), c.col || 'blanc', `v2_cfIng('${it.id}','col',this.value)`)}
+        <input class="ft-in" dir="rtl" style="flex:1 1 140px;text-align:right;width:auto;" placeholder="Nom en arabe" value="${esc(c.ar || '')}" oninput="v2_cfIng('${it.id}','ar',this.value)"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"><input class="ft-in" style="flex:1 1 150px;text-align:left;width:auto;" placeholder="Titre des opérations (ex. DÉCOUPE)" value="${esc(c.opLabel || '')}" oninput="v2_cfIng('${it.id}','opLabel',this.value)">
+        <input class="ft-in" dir="rtl" style="flex:1 1 110px;text-align:right;width:auto;" placeholder="Opération (arabe)" value="${esc(c.opAr || '')}" oninput="v2_cfIng('${it.id}','opAr',this.value)">
+        <input class="ft-in" style="flex:1 1 150px;text-align:left;width:auto;" placeholder="« la découpe » (pour Valider…)" value="${esc(c.opNoun || '')}" oninput="v2_cfIng('${it.id}','opNoun',this.value)">
+        <input class="ft-in" dir="rtl" style="flex:1 1 110px;text-align:right;width:auto;" placeholder="« التقطيع »" value="${esc(c.opNounAr || '')}" oninput="v2_cfIng('${it.id}','opNounAr',this.value)"></div>
+      ${c.fields.map((f, i)=>{ const tag = f.src ? 'Repris de Dépenses' : f.srcIng ? 'Repris de l’escalope' : f.calc ? 'Calculé automatiquement' + (f.confirm ? ' · le Wok valide ou corrige' : '') : '';
+        return `<div class="v2-line"><input class="ft-in" style="flex:1 1 170px;text-align:left;width:auto;" placeholder="Nom du champ" value="${esc(f.n || '')}" oninput="v2_cfSet('${it.id}',${i},'n',this.value)">
         <input class="ft-in" dir="rtl" style="flex:1 1 150px;text-align:right;width:auto;" placeholder="Arabe (facultatif)" value="${esc(f.ar || '')}" oninput="v2_cfSet('${it.id}',${i},'ar',this.value)">
-        ${rubSel(f.sec, `v2_cfSet('${it.id}',${i},'sec',this.value)`)}
+        ${sel(rubOpts, f.sec, `v2_cfSet('${it.id}',${i},'sec',this.value)`)}${sel(zoneOpts, f.zone === 'stock' ? 'stock' : 'mep', `v2_cfSet('${it.id}',${i},'zone',this.value)`)}${sel(perOpts, f.per === 'op' ? 'op' : 'service', `v2_cfSet('${it.id}',${i},'per',this.value)`, v2_isIn(f) && !f.calc)}${sel(visOpts, f.vis || '', `v2_cfSet('${it.id}',${i},'vis',this.value)`)}
         <button class="btn ghost small" onclick="v2_cfMove('${it.id}',${i},-1)">↑</button><button class="btn ghost small" onclick="v2_cfMove('${it.id}',${i},1)">↓</button><button class="btn ghost small" style="color:#F87171" onclick="v2_cfDel('${it.id}',${i})">✕</button>
-        ${f.calc ? '<div style="flex:1 1 100%;font-size:12px;color:var(--ink-muted)">Calculé automatiquement : somme de ' + esc(f.calc.map(x=>((c.fields.find(g=>g.id === x) || {}).n) || x).join(' + ')) + '</div>' : ''}</div>`).join('')}
+        ${tag ? `<div style="flex:1 1 100%;font-size:12px;color:var(--ink-muted)">${tag}</div>` : ''}</div>`; }).join('')}
       <button class="btn ghost small" style="margin-top:8px;" onclick="v2_cfAdd('${it.id}')">+ Ajouter un champ</button></div>`;
   };
-  return `<div style="font-size:13px;color:var(--ink-muted);margin-bottom:10px;">Liste synchronisée avec les ingrédients de Dépenses. Chaque champ est attribué à une rubrique : le cuisinier ne le voit que dans sa rubrique.</div>` + ings.map(card).join('');
+  return `<div style="font-size:13px;color:var(--ink-muted);margin-bottom:10px;">Liste synchronisée avec les ingrédients de Dépenses. Chaque champ a une rubrique (Sushi, Wok, Bar), une zone (Mise en place ou Stock) et se répète « par opération » ou se saisit « une fois par service ». Les titres et leurs traductions se modifient ici.</div>` + ings.map(card).join('');
 }
 
-/* ---------- Saisie (écran du cuisinier) ---------- */
-const v2_key = (it, f)=>it.id + '.' + f.id;
-function v2_fv(sec, key){ if(v2_form[sec] && v2_form[sec][key] !== undefined) return v2_form[sec][key]; const d = v2_docs[sec]; return d && d.vals && d.vals[key] !== undefined ? d.vals[key] : ''; }
-function v2_val(it, f){ return v2_num(v2_fv(f.sec, v2_key(it, f))); }
-function v2_calc(it, f){ const c = v2_ing(it); let any = false, s = 0; (f.calc || []).forEach(id=>{ const g = c.fields.find(x=>x.id === id); if(!g) return; const v = v2_val(it, g); if(v !== null){ any = true; s += v; } }); return any ? s : null; }
-function v2_set(sec, key, v){ (v2_form[sec] = v2_form[sec] || {})[key] = v; v2_recalc(sec); }
-function v2_recalc(sec){ v2_ings().forEach(it=>{ v2_ing(it).fields.forEach(f=>{ if(!f.calc || f.sec !== sec) return; const el = document.getElementById('v2c-' + it.id + '-' + f.id); if(el) el.value = v2_fmt(v2_calc(it, f)).replace('—', ''); }); }); }
-const v2_locked = (sec)=>v2_level(sec) === 'lire' || (!!v2_docs[sec] && !v2_edit[sec]);
-function v2_fieldRow(sec, it, f){
-  const k = v2_key(it, f), lock = v2_locked(sec);
-  const inp = f.calc ? `<input class="ft-in" id="v2c-${it.id}-${f.id}" disabled value="${esc(v2_fmt(v2_calc(it, f)).replace('—', ''))}" placeholder="0,0">`
-    : `<input class="ft-in" inputmode="decimal" placeholder="0,0" ${lock ? 'disabled' : ''} value="${esc(String(v2_fv(sec, k)))}" oninput="v2_set('${sec}','${k}',this.value)">`;
-  return `<div class="v2-f"><div class="v2-fl"><div class="v2-fn">${esc(f.n || '—')}</div>${v2_arTxt(f.ar, 'display:block;margin-top:1px;')}</div><div class="v2-in">${inp}<span class="v2-u">${esc(v2_unitOf(it))}</span></div></div>`;
+/* ---------- Onglet Textes : titres et traductions (admin) ---------- */
+function v2_txSet(key, k, v){ if(!v2_cfg.texts) v2_cfg.texts = {}; if(!v2_cfg.texts[key]) v2_cfg.texts[key] = {}; v2_cfg.texts[key][k] = v; v2_saveCfg(); }
+function v2_txReset(key){ if(v2_cfg.texts) delete v2_cfg.texts[key]; v2_saveCfg(); v2_render(); }
+function v2_textsView(){
+  const rows = Object.keys(V2_TXT).map(k=>{ const t = v2_tx(k), d = V2_TXT[k], mod = !!(v2_cfg.texts && v2_cfg.texts[k]);
+    return `<div class="v2-line"><div style="flex:1 1 100%;font-size:12px;color:var(--ink-muted)">${esc(V2_TXT_LBL[k] || k)}</div>
+      <input class="ft-in" style="flex:1 1 170px;text-align:left;width:auto;" value="${esc(t.fr)}" oninput="v2_txSet('${k}','fr',this.value)">
+      <input class="ft-in" dir="rtl" style="flex:1 1 150px;text-align:right;width:auto;" value="${esc(t.ar)}" oninput="v2_txSet('${k}','ar',this.value)">
+      <button class="btn ghost small" ${mod ? '' : 'disabled'} onclick="v2_txReset('${k}')">Rétablir</button></div>`; }).join('');
+  return `<div class="v2-card"><div style="font-weight:800;margin-bottom:4px;">Textes et traductions</div><div style="font-size:13px;color:var(--ink-muted);margin-bottom:6px;">Modifie le français et l’arabe de chaque texte. Les parties entre accolades ({n}, {noun}, {rub}, {who}) sont automatiques : garde-les. Les noms de rubriques modifiés ici ne changent pas la Mise en place actuelle des cuisiniers.</div>${rows}</div>`;
 }
-function v2_cardView(sec, it){
-  const c = v2_ing(it);
-  return `<div class="v2-card"><div class="v2-ct"><div>${esc(it.n)}</div>${v2_arTxt(c.ar, 'display:block;')}</div>${c.fields.filter(f=>f.sec === sec).map(f=>v2_fieldRow(sec, it, f)).join('')}</div>`;
+
+/* ---------- Saisie ---------- */
+function v2_by(dk, key){ const d = v2_docs[dk]; return d && d.byKeys && d.byKeys[key] ? d.byKeys[key] : null; }
+function v2_input(dk, key, val, lock, cls){ return `<input class="ft-in ${cls || ''}" inputmode="decimal" placeholder="0,0" ${lock ? 'disabled' : ''} value="${esc(String(val))}" oninput="v2_set('${dk}','${key}',this.value)">`; }
+function v2_rowHtml(name, ar, inner, unit, extra, dis){ return `<div class="v2-f ${dis ? 'v2-dis' : ''}"><div class="v2-fl"><div class="v2-fn">${esc(name)}</div>${v2_arSpan(ar)}${extra || ''}</div><div class="v2-in">${inner}<span class="v2-u">${esc(unit)}</span></div></div>`; }
+function v2_inputRow(sec, it, f, n, opLock, subFor){
+  const dk = v2_dk(f), k = v2_key(it, f, n), by = v2_by(dk, k);
+  const byOther = by && by.r !== sec && !subFor, lock = v2_level(sec) === 'lire' || opLock || byOther;
+  const tag = subFor ? ` <span class="v2-tag">à la place de ${esc(v2_rubName(f.sec))}</span>` : '';
+  const byHtml = by ? `<div class="v2-pref">${esc(v2_fr('msg.by', { who:by.w + ' (' + v2_rubName(by.r) + ')' }))}${v2_ar ? ' · ' + esc(v2_arOf('msg.by', { who:by.w + ' (' + (v2_rubAr(by.r) || v2_rubName(by.r)) + ')' })) : ''}</div>` : '';
+  return `<div class="v2-f ${byOther ? 'v2-dis' : ''}"><div class="v2-fl"><div class="v2-fn">${esc(f.n || '—')}${tag}</div>${v2_arSpan(f.ar)}${byHtml}</div><div class="v2-in">${v2_input(dk, k, v2_fv(dk, k), lock)}<span class="v2-u">${esc(v2_unitOf(it))}</span></div></div>`;
+}
+function v2_fieldRow(sec, it, f, n, opLock){
+  const unit = v2_unitOf(it);
+  if(f.confirm) return v2_recuRow(sec, it, f, n, opLock);
+  if(v2_isIn(f)){
+    const v = v2_valOf(it, f, n);
+    let h = v2_rowHtml(f.n || '—', f.ar, `<input class="ft-in" disabled placeholder="—" ${f.calc ? `data-calc="1" data-i="${it.id}" data-f="${f.id}" data-n="${n}"` : ''} value="${v === null ? '' : esc(v2_fmt(v))}">`, unit, '', true);
+    return h;
+  }
+  return v2_inputRow(sec, it, f, n, opLock, false);
+}
+function v2_recuRow(sec, it, f, n, opLock){
+  const dk = v2_dk(f), k = v2_key(it, f, n), unit = v2_unitOf(it), calc = v2_calcOnly(it, f, n), own = v2_getv(it, f, n), uk = k, lockAll = v2_level(sec) === 'lire' || opLock;
+  const rubFrom = (v2_ing(it).fields.find(x=>x.id === (f.calc.p || [])[0]) || {}).sec || 'sushi';
+  if(calc === null){
+    const miss = v2_missing(it, f, n).filter(g=>g.sec !== sec);
+    let h = v2_rowHtml(f.n, f.ar, `<input class="ft-in" disabled placeholder="—" data-calc="1" data-i="${it.id}" data-f="${f.id}" data-n="${n}" value="">`, unit, '', true);
+    h += `<div data-wait="1" data-i="${it.id}" data-f="${f.id}" data-n="${n}"><div class="v2-wait">${esc(v2_fr('msg.wait', { rub:v2_rubName(rubFrom) }))}${v2_arSpan(v2_arOf('msg.wait', { rub:v2_rubAr(rubFrom) || v2_rubName(rubFrom) }))}</div>
+      ${lockAll ? '' : `<a class="v2-lk" onclick="v2_togSub('${uk}')">${v2_subOpen[uk] ? 'Masquer' : esc(v2_fr('btn.sub', { rub:v2_rubName(rubFrom) }))}${v2_subOpen[uk] ? '' : v2_arSpan(v2_arOf('btn.sub', { rub:v2_rubAr(rubFrom) || v2_rubName(rubFrom) }))}</a>`}
+      ${v2_subOpen[uk] && !lockAll ? miss.map(g=>v2_inputRow(sec, it, g, n, false, true)).join('') : ''}</div>`;
+    return h;
+  }
+  if(v2_recuEdit[uk] && !lockAll) return v2_rowHtml(f.n, f.ar, v2_input(dk, k, own !== null ? own : v2_fmt(calc).replace(',', '.'), false), unit, `<div class="v2-wait">Valeur du Sushi : ${esc(v2_fmt(calc))} ${esc(unit)}</div>`, false);
+  const shown = own !== null ? own : calc, ecart = own !== null ? calc - own : 0;
+  let h = v2_rowHtml(f.n, f.ar, `<input class="ft-in" disabled data-calc="1" data-i="${it.id}" data-f="${f.id}" data-n="${n}" value="${esc(v2_fmt(shown))}">`, unit, '', true);
+  if(own === null && !lockAll) h += `<div class="v2-wait">${esc(v2_fr('msg.recu'))}${v2_arSpan(v2_arOf('msg.recu'))}</div><div class="v2-chips"><a class="v2-chip cg" onclick="v2_recuOk('${f.sec === 'x' ? '' : sec}','${it.id}','${f.id}',${n})">${esc(v2_fr('btn.recuOk'))}${v2_ar ? ' · ' + esc(v2_arOf('btn.recuOk')) : ''}</a><a class="v2-chip cy" onclick="v2_recuFix('${uk}')">${esc(v2_fr('btn.recuFix'))}${v2_ar ? ' · ' + esc(v2_arOf('btn.recuFix')) : ''}</a></div>`;
+  else if(own !== null) h += `<div class="v2-pref" style="color:${Math.abs(ecart) < 0.0005 ? '#86efac' : '#FBBF24'}">${Math.abs(ecart) < 0.0005 ? esc(v2_fr('msg.recuOk')) : 'Corrigé : écart ' + v2_fmt(-ecart) + ' ' + esc(unit) + ' (compté en perte)'}</div>` + (lockAll ? '' : `<a class="v2-lk" onclick="v2_recuFix('${uk}')">${esc(v2_fr('btn.recuFix'))}</a>`);
+  return h;
+}
+function v2_recuOk(sec, id, fid, n){ const it = v2_byId(id), f = it && v2_ing(it).fields.find(x=>x.id === fid); if(!f) return; const c = v2_calcOnly(it, f, n); if(c === null) return; v2_set(v2_dk(f), v2_key(it, f, n), String(c)); v2_render(); }
+function v2_recuFix(k){ v2_recuEdit[k] = !v2_recuEdit[k]; v2_render(); }
+function v2_togSub(k){ v2_subOpen[k] = !v2_subOpen[k]; v2_render(); }
+function v2_togHist(k){ v2_hist[k] = !v2_hist[k]; v2_render(); }
+function v2_subHead(t, ar){ return `<div class="v2-sub">${esc(t)}${v2_arSpan(ar)}</div>`; }
+function v2_cardBtns(sec, it, n, hasOp, cur){
+  if(v2_level(sec) !== 'saisir') return '';
+  const c = v2_ing(it), validated = hasOp ? v2_isValid(sec, it.id, n) : v2_isValid(sec, it.id, 0), anyPrev = hasOp ? n > 1 : validated;
+  const vars = { noun:c.opNoun || 'l’opération', n }, varsAr = { noun:c.opNounAr || c.opAr || '', n };
+  const label = hasOp ? esc(v2_fr('btn.valOp', vars)) + v2_arSpan(v2_arOf('btn.valOp', varsAr)) : esc(v2_fr('btn.val')) + v2_arSpan(v2_arOf('btn.val'));
+  const empty = hasOp ? !v2_opHasValue(it, sec, n) : false;
+  return `<div class="v2-pb"><button class="v2-pv" ${validated ? 'disabled' : ''} onclick="v2_validate('${esc(sec)}','${it.id}',${hasOp ? n : 0})">✓ ${label}</button>${anyPrev || validated ? `<a class="v2-lk" onclick="v2_reopen('${esc(sec)}','${it.id}',${hasOp ? 1 : 0})">${esc(v2_fr('btn.fix'))}${v2_arSpan(v2_arOf('btn.fix'), 'ctr')}</a>` : ''}</div>`;
+}
+function v2_cardMep(sec, it){
+  const c = v2_ing(it), fs = c.fields.filter(f=>f.sec === sec && f.zone !== 'stock' && v2_visible(f)); if(!fs.length) return '';
+  const top = fs.filter(f=>f.src || f.srcIng), ops = fs.filter(f=>f.per === 'op' && !f.src && !f.srcIng), svc = fs.filter(f=>f.per !== 'op' && !f.src && !f.srcIng), lvlLock = v2_level(sec) === 'lire';
+  let h = `<div class="v2-card" style="border-left-color:${V2_COLORS[c.col] || V2_COLORS.blanc};"><div class="v2-ct"><div>${esc(it.n)}</div>${v2_arSpan(c.ar)}</div>`;
+  h += top.map(f=>v2_fieldRow(sec, it, f, 1, true)).join('');
+  if(ops.length){
+    const cur = v2_curOp(it, sec), lab = c.opLabel || 'OPÉRATION', t = v2_opTime(it, cur);
+    if(cur > 1){ const hk = it.id + '@' + sec; h += `<a class="v2-hist" onclick="v2_togHist('${hk}')">${esc(v2_fr('link.hist', { n:cur - 1 }))}${v2_arSpan(v2_arOf('link.hist', { n:cur - 1 }))}</a>`;
+      if(v2_hist[hk]) for(let n = 1; n < cur; n++) h += v2_subHead(lab + ' ' + n + (v2_opTime(it, n) ? ' · ' + v2_opTime(it, n) : ''), c.opAr ? c.opAr + ' ' + n : '') + ops.map(f=>v2_fieldRow(sec, it, f, n, true)).join(''); }
+    h += v2_subHead(lab + ' ' + cur + (t ? ' · ' + t : ''), c.opAr ? c.opAr + ' ' + cur : '') + ops.map(f=>v2_fieldRow(sec, it, f, cur, lvlLock)).join('');
+  }
+  h += svc.map(f=>v2_fieldRow(sec, it, f, 1, v2_isValid(sec, it.id, 0) || lvlLock)).join('');
+  h += v2_cardBtns(sec, it, ops.length ? v2_curOp(it, sec) : 1, ops.length > 0);
+  return h + '</div>';
 }
 const v2_who = ()=>(session && session.displayName) || (session && session.username) || '';
-function v2_expectedKeys(sec){ const out = []; v2_ings().forEach(it=>v2_ing(it).fields.forEach(f=>{ if(f.sec === sec && !f.calc) out.push(v2_key(it, f)); })); return out; }
-async function v2_submit(sec){
-  if(v2_busy || v2_level(sec) !== 'saisir') return;
-  const vals = Object.assign({}, (v2_docs[sec] || {}).vals || {}, v2_form[sec] || {});
-  const miss = v2_expectedKeys(sec).filter(k=>v2_num(vals[k]) === null).length;
+async function v2_write(dk, sec, zone, patch){
+  const id = 'v2_' + v2_date + '_' + sec + (zone === 'stock' ? '_s' : '');
+  await db.collection('mise_en_place').doc(id).set(Object.assign({ v2date:v2_date, sec, zone }, patch), { merge:true });
+}
+function v2_mergeLocal(dk, sec, zone, patch){
+  const d0 = v2_docs[dk] || { sec, zone }; const d = Object.assign({}, d0);
+  Object.keys(patch).forEach(k=>{ const v = patch[k]; d[k] = (v && typeof v === 'object' && !Array.isArray(v)) ? Object.assign({}, d0[k] || {}, v) : v; }); v2_docs[dk] = d;
+}
+async function v2_flushForeign(sec, by){
+  for(const dk of Object.keys(v2_form)){
+    if(dk === sec || dk === sec + '@s') continue; const os = dk.replace('@s', ''), zone = dk.endsWith('@s') ? 'stock' : 'mep', nv = {}, bk = {};
+    Object.keys(v2_form[dk] || {}).forEach(k=>{ if(String(v2_form[dk][k]).trim() !== ''){ nv[k] = v2_form[dk][k]; bk[k] = { w:by, r:sec }; } }); if(!Object.keys(nv).length) continue;
+    const patch = { vals:nv, byKeys:bk }; if(!v2_docs[dk]) patch.subOnly = true;
+    await v2_write(dk, os, zone, patch); v2_mergeLocal(dk, os, zone, patch); v2_form[dk] = {};
+  }
+}
+async function v2_validate(sec, id, n){
+  if(v2_busy || v2_level(sec) !== 'saisir') return; const it = v2_byId(id); if(!it) return;
+  const dk = sec, keys = n ? v2_opFields(it, sec, n) : v2_ing(it).fields.filter(f=>f.sec === sec && f.zone !== 'stock' && !v2_isIn(f)).map(f=>v2_key(it, f, 1));
+  if(n && !keys.some(k=>String(v2_fv(dk, k)).trim() !== '')){ alert('Saisis au moins une valeur avant de valider.'); return; }
+  const miss = keys.filter(k=>v2_num(v2_fv(dk, k)) === null).length;
   if(miss && !confirm(miss + ' champ(s) vide(s). Valider quand même ?')) return;
   v2_busy = true;
   try{
-    await db.collection('mise_en_place').doc('v2_' + v2_date + '_' + sec).set({ v2date:v2_date, sec, vals, by:v2_who(), at:new Date().toISOString() });
-    v2_form[sec] = {}; v2_edit[sec] = false; v2_msg[sec] = 'ok'; v2_docs[sec] = { sec, vals, by:v2_who(), at:new Date().toISOString() };
-  }catch(e){ console.error(e); v2_msg[sec] = 'err:' + (e.message || e); }
+    const by = v2_who(), vals = Object.assign({}, v2_form[dk] || {}), patch = { vals, valid:{ [id + '#' + n]:true }, by, at:new Date().toISOString(), subOnly:false };
+    if(n){ patch.ops = { [id]:Math.max(v2_opN(it), n + 1) }; const times = {}; times[id + '#' + n] = v2_opTime(it, n) || v2_hm(); times[id + '#' + (n + 1)] = v2_hm(); patch.times = times; }
+    await v2_write(dk, sec, 'mep', patch); v2_mergeLocal(dk, sec, 'mep', patch); v2_form[dk] = {};
+    if(n){ v2_ops[id] = Math.max(v2_opN(it), n + 1); v2_times[id + '#' + (n + 1)] = v2_hm(); }
+    await v2_flushForeign(sec, by); v2_msg[sec] = '';
+  }catch(e){ console.error(e); alert('Enregistrement impossible : ' + (e.message || e)); }
   v2_busy = false; v2_render();
 }
-function v2_correct(sec){ if(!v2_docs[sec] || v2_level(sec) !== 'saisir') return; v2_edit[sec] = true; v2_msg[sec] = ''; v2_render(); }
-function v2_saisieView(){
+async function v2_reopen(sec, id, hasOp){
+  const it = v2_byId(id); if(!it || v2_busy) return; let n = 0;
+  if(hasOp){ n = v2_curOp(it, sec) - 1; if(n < 1) return; } else if(!v2_isValid(sec, id, 0)) return;
+  v2_busy = true;
+  try{ const patch = { valid:{ [id + '#' + n]:false } }; await v2_write(sec, sec, 'mep', patch); v2_mergeLocal(sec, sec, 'mep', patch); }catch(e){ console.error(e); alert('Impossible : ' + (e.message || e)); }
+  v2_busy = false; v2_render();
+}
+
+/* ---------- Stock ---------- */
+function v2_stockLocked(sec){ const d = v2_docs[sec + '@s']; return v2_level(sec) === 'lire' || (!!d && d.stockOk && !v2_editS[sec]); }
+function v2_cardStock(sec, it){
+  const c = v2_ing(it), fs = c.fields.filter(f=>f.sec === sec && f.zone === 'stock' && v2_visible(f)); if(!fs.length) return '';
+  const lock = v2_stockLocked(sec);
+  return `<div class="v2-card" style="border-left-color:${V2_COLORS[c.col] || V2_COLORS.blanc};"><div class="v2-ct"><div>${esc(it.n)}</div>${v2_arSpan(c.ar)}</div>${fs.map(f=>v2_inputRow(sec, it, f, 1, lock, false)).join('')}</div>`;
+}
+function v2_artRows(sec){ const lst = (typeof mep_lists !== 'undefined' && Array.isArray(mep_lists[sec])) ? mep_lists[sec] : []; return lst; }
+function v2_stockExpected(sec){ const out = []; v2_ings().forEach(it=>v2_ing(it).fields.forEach(f=>{ if(f.sec === sec && f.zone === 'stock' && !v2_isIn(f)) out.push(v2_key(it, f, 1)); })); v2_artRows(sec).forEach(a=>out.push('art.' + a.id)); return out; }
+async function v2_validateStock(sec){
+  if(v2_busy || v2_level(sec) !== 'saisir') return; const dk = sec + '@s', vals = Object.assign({}, (v2_docs[dk] || {}).vals || {}, v2_form[dk] || {});
+  const miss = v2_stockExpected(sec).filter(k=>v2_num(vals[k]) === null).length; if(miss && !confirm(miss + ' champ(s) vide(s). Valider quand même ?')) return;
+  v2_busy = true;
+  try{ const by = v2_who(), patch = { vals, by, at:new Date().toISOString(), stockOk:true }; await v2_write(dk, sec, 'stock', patch); v2_mergeLocal(dk, sec, 'stock', patch); v2_form[dk] = {}; v2_editS[sec] = false; v2_msg[sec] = 'ok'; await v2_flushForeign(sec, by); }
+  catch(e){ console.error(e); v2_msg[sec] = 'err:' + (e.message || e); }
+  v2_busy = false; v2_render();
+}
+function v2_correctStock(sec){ const d = v2_docs[sec + '@s']; if(!d || v2_level(sec) !== 'saisir') return; v2_editS[sec] = true; v2_msg[sec] = ''; v2_render(); }
+function v2_stockView(sec){
+  const lock = v2_stockLocked(sec), dk = sec + '@s', its = v2_ings().map(it=>v2_cardStock(sec, it)).filter(Boolean), arts = v2_artRows(sec);
+  let h = its.join('');
+  if(arts.length) h += `<div class="v2-card" style="border-left-color:#6b756e;"><div class="v2-ct"><div>${esc(v2_fr('title.others'))}</div>${v2_arSpan(v2_arOf('title.others'))}</div>${arts.map(a=>v2_rowHtml(a.n, '', v2_input(dk, 'art.' + a.id, v2_fv(dk, 'art.' + a.id), lock), a.u || '')).join('')}</div>`;
+  if(!h) h = `<div class="empty-state">${esc(v2_fr('msg.empty'))}</div>`;
+  const has = !!(v2_docs[dk] && v2_docs[dk].stockOk), m = v2_msg[sec];
+  if(v2_level(sec) === 'saisir') h += `<div class="v2-pb" style="border:0"><button class="v2-pv big" ${lock ? 'disabled' : ''} onclick="v2_validateStock('${esc(sec)}')">${esc(v2_fr('btn.valInv'))}${v2_arSpan(v2_arOf('btn.valInv'))}</button><a class="v2-lk" ${has && lock ? '' : 'style="opacity:.4;pointer-events:none"'} onclick="v2_correctStock('${esc(sec)}')">${esc(v2_fr('btn.fixInv'))}${v2_arSpan(v2_arOf('btn.fixInv'), 'ctr')}</a></div>`;
+  if(m === 'ok') h += `<div class="v2-saved"><div>✓ ${esc(v2_fr('msg.saved'))}${v2_arSpan(v2_arOf('msg.saved'))}</div></div>`; else if(m) h += `<div class="v2-saved" style="color:#F87171;border-color:#F87171">Enregistrement impossible : ${esc(m.slice(4))}</div>`;
+  return h;
+}
+function v2_saisieView(zone){
   const rubs = v2_visRubs(); if(!rubs.length) return '<div class="empty-state">Aucune rubrique n’est attribuée à ce compte.</div>';
-  const cur = rubs.some(r=>r.id === v2_sec) ? v2_sec : rubs[0].id, saved = rubs.filter(r=>v2_docs[r.id]).length;
-  const head = `<div class="v2-who"><div>🔒 ${esc(v2_who())}</div><div style="text-align:right">${saved} / ${rubs.length} sections${v2_ar ? `<span class="v2-ar" dir="rtl" style="display:block">${saved} / ${rubs.length} أقسام</span>` : ''}</div></div>`;
-  const tabs = `<div class="mep-seg">${rubs.map(r=>`<button class="${r.id === cur ? 'on' : ''}" onclick="v2_setSec('${esc(r.id)}')">${v2_docs[r.id] ? '✓ ' : ''}${esc(r.n)}${v2_ar && V2_AR[r.id] ? `<span class="v2-ar" style="display:block">${V2_AR[r.id]}</span>` : ''}</button>`).join('')}</div>`;
-  const its = v2_ings().filter(it=>v2_ing(it).fields.some(f=>f.sec === cur));
-  const body = its.length ? its.map(it=>v2_cardView(cur, it)).join('') : '<div class="empty-state">Rien à saisir dans cette rubrique.</div>';
-  const lvl = v2_level(cur), m = v2_msg[cur], lock = v2_locked(cur), has = !!v2_docs[cur];
-  const ro = lvl === 'lire' ? `<div class="v2-ro">👁 Consultation seulement${v2_ar ? '<span class="v2-ar" dir="rtl" style="display:block">للاطلاع فقط</span>' : ''}</div>` : '';
-  const btns = lvl === 'saisir' ? `<div style="display:flex;gap:10px;margin-top:6px;"><button class="v2-b ok" style="flex:1;" ${lock ? 'disabled' : ''} onclick="v2_submit('${esc(cur)}')">Valider l’inventaire${v2_ar ? '<span class="v2-ar" dir="rtl" style="display:block">اعتماد الجرد</span>' : ''}</button>
-    <button class="v2-b ed" style="flex:1;" ${has && lock ? '' : 'disabled'} onclick="v2_correct('${esc(cur)}')">✎ Corriger ma saisie${v2_ar ? '<span class="v2-ar" dir="rtl" style="display:block">تصحيح إدخالي</span>' : ''}</button></div>` : '';
-  const msg = m === 'ok' ? `<div class="v2-saved"><div>✓ Enregistré sur le serveur.${v2_ar ? '<span class="v2-ar" dir="rtl" style="display:block">تم الحفظ على الخادم.</span>' : ''}</div></div>` : (m ? `<div class="v2-saved" style="color:#F87171;border-color:#F87171">Enregistrement impossible : ${esc(m.slice(4))}</div>` : '');
-  return head + tabs + ro + body + btns + msg;
+  const cur = rubs.some(r=>r.id === v2_sec) ? v2_sec : rubs[0].id;
+  const ings = v2_ings(), cardsMep = zone === 'mep' ? ings.map(it=>({ it, h:v2_cardMep(cur, it) })).filter(x=>x.h) : [];
+  const done = cardsMep.filter(x=>{ const it = x.it, hasOp = v2_ing(it).fields.some(f=>f.sec === cur && f.per === 'op' && f.zone !== 'stock' && !v2_isIn(f)); return hasOp ? (v2_curOp(it, cur) > 1 && !v2_opHasValue(it, cur, v2_curOp(it, cur))) : v2_isValid(cur, it.id, 0); }).length;
+  const counter = zone === 'mep' ? `${done} / ${cardsMep.length}` : ((v2_docs[cur + '@s'] || {}).stockOk ? '✓' : '—');
+  const head = `<div class="v2-who"><div>🔒 ${esc(v2_who())} · ${esc(v2_rubName(cur))}${v2_arSpan(v2_rubAr(cur))}</div><div style="text-align:right">${esc(counter)}</div></div>`;
+  const rubTabs = rubs.length > 1 ? `<div class="mep-seg">${rubs.map(r=>`<button class="${r.id === cur ? 'on' : ''}" onclick="v2_setSec('${esc(r.id)}')">${esc(r.n)}${v2_ar && v2_rubAr(r.id) ? `<span class="v2-ar" style="text-align:center">${esc(v2_rubAr(r.id))}</span>` : ''}</button>`).join('')}</div>` : '';
+  const ro = v2_level(cur) === 'lire' ? `<div class="v2-ro">👁 ${esc(v2_fr('lbl.ro'))}${v2_arSpan(v2_arOf('lbl.ro'))}</div>` : '';
+  let body;
+  if(zone === 'mep') body = cardsMep.length ? cardsMep.map(x=>x.h).join('') : `<div class="empty-state">${esc(v2_fr('msg.empty'))}</div>`; else body = v2_stockView(cur);
+  return head + rubTabs + ro + body;
 }
 
 /* ---------- Écarts (administrateur) ---------- */
-function v2_achat(it){ const n = String(it.n || '').trim().toLowerCase(); let s = 0, any = false; (typeof dp_mouvements !== 'undefined' ? dp_mouvements : []).forEach(m=>{ if(m.type === 'Achat' && m.date === v2_date && String(m.articleNom || '').trim().toLowerCase() === n){ s += Number(m.quantite) || 0; any = true; } }); return any ? s : null; }
-function v2_fieldBy(it, fid){ const f = v2_ing(it).fields.find(x=>x.id === fid); return f ? (f.calc ? v2_calc(it, f) : v2_val(it, f)) : null; }
 function v2_ecartsView(){
   const rubs = v2_rubs();
-  const av = rubs.map(r=>{ const ex = v2_expectedKeys(r.id), d = (v2_docs[r.id] || {}).vals || {}, dn = ex.filter(k=>v2_num(d[k]) !== null).length; return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);"><span>${v2_docs[r.id] ? '✓ ' : ''}${esc(r.n)}</span><b>${v2_docs[r.id] ? dn + ' / ' + ex.length + ' champs' : 'pas encore saisi'}</b></div>`; }).join('');
-  const chk = (title, lines, gap, u)=>`<div class="v2-card"><b>${title}</b><div style="margin-top:6px;font-size:14px;">${lines.map(l=>`<div style="display:flex;justify-content:space-between;"><span>${l[0]}</span><b>${v2_fmt(l[1])} ${l[1] == null ? '' : esc(u)}</b></div>`).join('')}</div>${gap === undefined ? '' : `<div style="margin-top:8px;font-weight:700;color:${gap === null ? 'var(--ink-muted)' : Math.abs(gap) < 0.0005 ? '#4ADE80' : '#F87171'}">${gap === null ? 'Écart : en attente de saisie' : 'Écart : ' + (gap >= 0 ? '+' : '') + v2_fmt(gap) + ' ' + esc(u)}</div>`}</div>`;
+  const av = rubs.map(r=>{ const m = v2_docs[r.id], s = v2_docs[r.id + '@s'], vm = m && m.valid ? Object.keys(m.valid).filter(k=>m.valid[k]).length : 0, ex = v2_stockExpected(r.id), dn = ex.filter(k=>v2_num(((s || {}).vals || {})[k]) !== null).length;
+    return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);"><span>${esc(r.n)}</span><span style="text-align:right"><b>${vm} opération(s) validée(s)</b><br><span style="font-size:12px;color:var(--ink-muted)">Stock : ${s && s.stockOk ? '✓ ' : ''}${s ? dn + ' / ' + ex.length : 'pas encore saisi'}</span></span></div>`; }).join('');
   let h = `<div class="v2-card"><div style="font-weight:800;margin-bottom:4px;">Avancement du jour</div>${av}</div>`, hache = null;
+  const line = (a, b, u)=>`<div style="display:flex;justify-content:space-between;"><span>${a}</span><b>${v2_fmt(b)} ${b == null ? '' : esc(u)}</b></div>`;
   v2_ings().forEach(it=>{
-    const c = v2_ing(it), u = v2_unitOf(it), has = (id)=>c.fields.some(f=>f.id === id), g = (id)=>v2_fieldBy(it, id), ach = v2_achat(it);
-    if(has('dec_ps') && has('dec_pc')){ const a = g('dec_ps'), b = g('dec_pc'), w = g('waste'), ha = g('hache'); hache = ha;
-      h += chk(esc(it.n) + ' : bilan de la découpe', [['Achat (Dépenses)', ach], ['Part Sushi', a], ['Part Chaud', b], ['Déchet total (récupéré + à jeter)', w]], (ach === null || a === null || b === null || w === null) ? null : ach - (a + b + w), u); }
-    if(has('sau_clean')){ const br = g('sau_brut'), cl = g('sau_clean'), ne = g('sau_net'), lo = g('sau_loss'), re = g('sau_rest');
-      h += chk(esc(it.n) + ' : à nettoyer − (net utilisable + perte)', [['Quantité à nettoyer', cl], ['Net utilisable', ne], ['Perte à jeter', lo]], (cl === null || ne === null || lo === null) ? null : cl - (ne + lo), u);
-      h += chk(esc(it.n) + ' : brute − à nettoyer − reste brut', [['Achat (Dépenses)', ach], ['Quantité brute disponible', br], ['Quantité à nettoyer', cl], ['Reste brut', re]], (br === null || cl === null || re === null) ? null : br - cl - re, u); }
+    const c = v2_ing(it), u = v2_unitOf(it), ach = v2_achat(it), groups = {};
+    c.fields.forEach(f=>{ if(f.bg && f.bil) (groups[f.bg] = groups[f.bg] || []).push(f); });
+    Object.keys(groups).forEach(g=>{
+      const fs = groups[g], ins = fs.filter(f=>f.bil === 'in'), outs = fs.filter(f=>f.bil === 'out'); let si = 0, so = 0, miss = false, transfer = 0, hasT = false;
+      ins.forEach(f=>{ const v = v2_sumF(it, f.id); if(v === null) miss = true; else si += v; if(f.confirm){ for(let n = 1; n <= v2_opN(it); n++){ const own = v2_getv(it, f, n), cv = v2_calcOnly(it, f, n); if(own !== null && cv !== null){ transfer += cv - own; hasT = true; } } } });
+      outs.forEach(f=>{ const v = v2_sumF(it, f.id); if(v === null) miss = true; else so += v; });
+      const gap = miss ? null : si - so;
+      h += `<div class="v2-card" style="border-left-color:${V2_COLORS[c.col] || V2_COLORS.blanc};"><b>${esc(it.n)} · ${esc(g)}</b><div style="margin-top:6px;font-size:14px;">${ach !== null ? line('Achat (Dépenses)', ach, u) : ''}${ins.map(f=>line(esc(f.n), v2_sumF(it, f.id), u)).join('')}${outs.map(f=>line(esc(f.n), v2_sumF(it, f.id), u)).join('')}${hasT ? line('Écart de transfert Sushi → Wok (compté dans les pertes de fin de service)', transfer, u) : ''}</div>
+        <div style="margin-top:8px;font-weight:700;color:${gap === null ? 'var(--ink-muted)' : Math.abs(gap) < 0.0005 ? '#4ADE80' : '#F87171'}">${gap === null ? 'Écart : en attente de saisie' : 'Écart : ' + (gap >= 0 ? '+' : '') + v2_fmt(gap) + ' ' + esc(u)}</div></div>`;
+    });
+    if(c.fields.some(f=>f.id === 'hache' && f.per === 'op')) hache = v2_sumF(it, 'hache');
   });
-  v2_ings().forEach(it=>{ if(!/poulet/i.test(it.n) || !/hach/i.test(it.n)) return; const ach = v2_achat(it), u = v2_unitOf(it); h += chk(esc(it.n) + ' : stock du jour', [['Achat (Dépenses)', ach], ['Récupéré de la découpe', hache], ['Stock total', (ach === null && hache === null) ? null : (ach || 0) + (hache || 0)]], undefined, u); });
+  v2_ings().forEach(it=>{ const n = v2_nrm(it.n); if(!(n.includes('poulet') && n.includes('hach'))) return; const ach = v2_achat(it), u = v2_unitOf(it);
+    h += `<div class="v2-card" style="border-left-color:${V2_COLORS[v2_ing(it).col] || V2_COLORS.blanc};"><b>${esc(it.n)} · stock du jour</b><div style="margin-top:6px;font-size:14px;">${line('Achat (Dépenses)', ach, u)}${line('Récupéré de la découpe', hache, u)}${line('Stock total', (ach === null && hache === null) ? null : (ach || 0) + (hache || 0), u)}</div></div>`; });
   return h;
 }
 
@@ -7556,12 +7766,13 @@ function v2_render(){
   const body = document.getElementById('v2-body'); if(!body) return;
   if(!v2_on()){ body.innerHTML = ''; return; }
   if(!v2_cfgReady){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
-  const admin = !!(session && session.isAdmin), tabs = [['saisie', 'Mise en place']].concat(admin ? [['ecarts', 'Écarts'], ['cfg', 'Cuisine']] : []);
-  const head = `<div style="font-weight:700;font-size:20px;">Mise en place${v2_ar ? '<span class="v2-ar" dir="rtl" style="display:block;font-size:15px;text-align:left">التجهيز المسبق</span>' : ''}</div>
+  const admin = !!(session && session.isAdmin), tabs = [['saisie', 'mep'], ['stock', 'stock']].map(t=>[t[0], v2_fr('title.' + t[1]), v2_arOf('title.' + t[1])]).concat(admin ? [['ecarts', 'Écarts', ''], ['cfg', 'Cuisine', ''], ['textes', 'Textes', '']] : []);
+  const zone = v2_tab === 'stock' ? 'stock' : 'mep';
+  const head = `<div style="font-weight:700;font-size:22px;">${esc(v2_fr(zone === 'stock' ? 'title.stock' : 'title.mep'))}${v2_arSpan(v2_arOf(zone === 'stock' ? 'title.stock' : 'title.mep'))}</div>
     <div style="font-size:12px;font-weight:600;color:#FBBF24;margin-top:2px;">Version en test — visible par l’administrateur seulement</div>
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 12px;"><input type="date" value="${esc(v2_date)}" onchange="v2_setDate(this.value)" style="min-height:40px;"><label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_ar ? 'checked' : ''} onchange="v2_toggleAr(this.checked)"> Aperçu avec l’arabe</label></div>
-    ${tabs.length > 1 ? `<div class="mep-seg">${tabs.map(t=>`<button class="${v2_tab === t[0] ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${t[1]}</button>`).join('')}</div>` : ''}`;
-  body.innerHTML = head + (v2_tab === 'cfg' && admin ? v2_cfgView() : v2_tab === 'ecarts' && admin ? v2_ecartsView() : v2_saisieView());
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 12px;"><input type="date" value="${esc(v2_date)}" onchange="v2_setDate(this.value)" style="min-height:40px;"><label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_ar ? 'checked' : ''} onchange="v2_toggleAr(this.checked)"> Arabe</label>${admin ? `<label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_asCook ? 'checked' : ''} onchange="v2_toggleCook(this.checked)"> Voir comme un cuisinier</label>` : ''}</div>
+    ${tabs.length > 1 ? `<div class="mep-seg">${tabs.map(t=>`<button class="${v2_tab === t[0] ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${esc(t[1])}${v2_ar && t[2] ? `<span class="v2-ar" style="text-align:center">${esc(t[2])}</span>` : ''}</button>`).join('')}</div>` : ''}`;
+  body.innerHTML = head + (v2_tab === 'cfg' && admin ? v2_cfgView() : v2_tab === 'ecarts' && admin ? v2_ecartsView() : v2_tab === 'textes' && admin ? v2_textsView() : v2_saisieView(zone));
 }
 
 initAuth();
