@@ -7766,11 +7766,12 @@ function v2_render(){
   const body = document.getElementById('v2-body'); if(!body) return;
   if(!v2_on()){ body.innerHTML = ''; return; }
   if(!v2_cfgReady){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
-  const admin = !!(session && session.isAdmin), tabs = [['saisie', 'mep'], ['stock', 'stock']].map(t=>[t[0], v2_fr('title.' + t[1]), v2_arOf('title.' + t[1])]).concat(admin ? [['ecarts', 'Écarts', ''], ['cfg', 'Cuisine', ''], ['textes', 'Textes', '']] : []);
+  const admin = v2_adminView(), tabs = [['saisie', 'mep'], ['stock', 'stock']].map(t=>[t[0], v2_fr('title.' + t[1]), v2_arOf('title.' + t[1])]).concat(admin ? [['ecarts', 'Écarts', ''], ['cfg', 'Cuisine', ''], ['textes', 'Textes', '']] : []);
+  if(!admin && !['saisie', 'stock'].includes(v2_tab)) v2_tab = 'saisie';
   const zone = v2_tab === 'stock' ? 'stock' : 'mep';
   const head = `<div style="font-weight:700;font-size:22px;">${esc(v2_fr(zone === 'stock' ? 'title.stock' : 'title.mep'))}${v2_arSpan(v2_arOf(zone === 'stock' ? 'title.stock' : 'title.mep'))}</div>
     <div style="font-size:12px;font-weight:600;color:#FBBF24;margin-top:2px;">Version en test — visible par l’administrateur seulement</div>
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 12px;"><input type="date" value="${esc(v2_date)}" onchange="v2_setDate(this.value)" style="min-height:40px;"><label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_ar ? 'checked' : ''} onchange="v2_toggleAr(this.checked)"> Arabe</label>${admin ? `<label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_asCook ? 'checked' : ''} onchange="v2_toggleCook(this.checked)"> Voir comme un cuisinier</label>` : ''}</div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 12px;"><input type="date" value="${esc(v2_date)}" onchange="v2_setDate(this.value)" style="min-height:40px;"><label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_ar ? 'checked' : ''} onchange="v2_toggleAr(this.checked)"> Arabe</label>${(session && session.isAdmin) ? `<label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_asCook ? 'checked' : ''} onchange="v2_toggleCook(this.checked)"> Voir comme un cuisinier</label>` : ''}</div>
     ${tabs.length > 1 ? `<div class="mep-seg">${tabs.map(t=>`<button class="${v2_tab === t[0] ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${esc(t[1])}${v2_ar && t[2] ? `<span class="v2-ar" style="text-align:center">${esc(t[2])}</span>` : ''}</button>`).join('')}</div>` : ''}`;
   body.innerHTML = head + (v2_tab === 'cfg' && admin ? v2_cfgView() : v2_tab === 'ecarts' && admin ? v2_ecartsView() : v2_tab === 'textes' && admin ? v2_textsView() : v2_saisieView(zone));
 }
