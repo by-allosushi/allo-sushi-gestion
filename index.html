@@ -5190,6 +5190,76 @@ function dp_buildJournalItems(){
   items.sort((a,b)=> (a.at<b.at?1:-1));
   return items;
 }
+let dp_jp = null, dp_jpFile = null, dp_jpBusy = false;
+const dp_jpDeletable = (items)=>items.filter(i=>(i.kind === 'modification' || i.kind === 'suppression') && i.j && i.j.id);
+function dp_jpBuildFile(entries, du, au){
+  if(typeof XLSX === 'undefined') throw new Error('Le module Excel n’est pas disponible. Vérifie ta connexion puis réessaie.');
+  const lab = { modification:'Modification', suppression:'Suppression' };
+  const rows = entries.slice().sort((a,b)=>(a.le||'').localeCompare(b.le||'')).map(j=>{
+    const av = j.avant || {}, ap = j.apres || {}, ref = ap.type ? ap : av;
+    return { 'Date/heure': j.le || '', 'Action': lab[j.action] || j.action || '', 'Par': j.par || '', 'Date du mouvement': j.dateMouvement || ref.date || '', 'Type': ref.type || '',
+      'Désignation / Motif': ref.articleNom || ref.libelle || '', 'Quantité': ref.quantite ?? '', 'Unité': ref.unite || '', 'Montant avant (DA)': av.montant ?? '', 'Montant après (DA)': ap.montant ?? '',
+      'Avant (JSON)': JSON.stringify(av), 'Après (JSON)': JSON.stringify(ap), 'ID journal': j.id || '', 'ID mouvement': j.mouvId || '' };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ 'Information':'Aucune entrée.' }]);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Historique');
+  const buf = XLSX.write(wb, { type:'array', bookType:'xlsx' });
+  return new File([buf], `historique_depenses_du_${du}_au_${au}.xlsx`, { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+function dp_jpRange(entries){ const d = entries.map(j=>dp_dayOf(j.le)).filter(Boolean).sort(); return { du:d[0] || '', au:d[d.length - 1] || '' }; }
+function dp_jpDownload(){ if(!dp_jpFile) return; const url = URL.createObjectURL(dp_jpFile), a = document.createElement('a'); a.href = url; a.download = dp_jpFile.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 5000); }
+async function dp_jpShare(){
+  if(!dp_jpFile || !dp_jp) return;
+  try{ if(navigator.clipboard) await navigator.clipboard.writeText(DP_PURGE_MAIL); dp_jp.copied = true; }catch(e){ dp_jp.copied = false; }
+  if(navigator.canShare && navigator.canShare({ files:[dp_jpFile] })){
+    try{ await navigator.share({ files:[dp_jpFile], title:'Allo Sushi — historique des dépenses du ' + dp_jp.du + ' au ' + dp_jp.au, text:'Historique des mouvements (sauvegarde avant suppression).' }); dp_jp.how = 'share'; }
+    catch(e){ if(!e || e.name !== 'AbortError') console.warn(e); dp_jp.how = 'cancel'; }
+  }else{ dp_jpDownload(); dp_jp.how = 'download'; }
+  dp_render();
+}
+async function dp_jpOpen(){
+  if(!(session && session.isAdmin)){ alert('Réservé à l’administratrice.'); return; }
+  const ids = (dp_jpIds || []).slice(); if(!ids.length){ alert('Aucune entrée à supprimer sur cette période.'); return; }
+  const entries = dp_journal.filter(j=>ids.includes(j.id)), r = dp_jpRange(entries);
+  try{ dp_jpFile = dp_jpBuildFile(entries, r.du, r.au); }catch(e){ alert(e.message); return; }
+  dp_jp = { ids:entries.map(j=>j.id), nb:entries.length, du:r.du, au:r.au };
+  await dp_jpShare();
+}
+function dp_jpClose(){ dp_jp = null; dp_jpFile = null; dp_render(); }
+async function dp_jpApply(){
+  if(dp_jpBusy || !dp_jp || !(session && session.isAdmin)) return;
+  if(!currentUser){ askUserName(false); if(!currentUser) return; }
+  const still = dp_journal.filter(j=>dp_jp.ids.includes(j.id));
+  if(still.length !== dp_jp.nb){ alert('L’historique a changé depuis l’export. Recommence pour générer un fichier à jour.'); dp_jpClose(); return; }
+  if(!confirm(`Tu confirmes que le mail avec le fichier est bien envoyé ?\n\n${dp_jp.nb} entrée(s) de l’historique (du ${fmtDateShort(dp_jp.du)} au ${fmtDateShort(dp_jp.au)}) seront supprimées.`)) return;
+  dp_jpBusy = true; dp_render();
+  try{
+    for(let i = 0; i < dp_jp.ids.length; i += 400){ const b = db.batch(); dp_jp.ids.slice(i, i + 400).forEach(id=>b.delete(dp_journalCol.doc(id))); await b.commit(); }
+    const ref = dp_journalCol.doc(), now = new Date().toISOString();
+    await ref.set({ id:ref.id, action:'purge_journal', mouvId:'', par:currentUser, le:now, nb:dp_jp.nb, du:dp_jp.du, au:dp_jp.au, dateMouvement:'', avant:null, apres:null });
+    dp_jp = null; dp_jpFile = null; alert('Historique supprimé.');
+  }catch(e){ console.error(e); alert('Erreur pendant la suppression : ' + e.message); }
+  finally{ dp_jpBusy = false; dp_render(); }
+}
+let dp_jpIds = [];
+function dp_jpBox(items){
+  if(!(session && session.isAdmin)) return '';
+  if(dp_jp){
+    const how = dp_jp.how === 'share' ? 'La feuille de partage a été ouverte.' : dp_jp.how === 'download' ? 'Le fichier a été téléchargé (le partage direct n’est pas disponible sur cet appareil).' : 'Le partage a été annulé.';
+    return `<div class="ticket" style="padding:14px 16px;border-color:var(--rust);">
+      <div style="font-size:13px;font-weight:700;color:var(--rust);margin-bottom:6px;">🗑️ Supprimer l’historique du ${fmtDateShort(dp_jp.du)} au ${fmtDateShort(dp_jp.au)}</div>
+      <div style="font-size:13px;line-height:1.5;">${how}<br>${dp_jp.copied ? '✓ L’adresse <b>' + DP_PURGE_MAIL + '</b> est copiée : choisis Gmail, colle-la et envoie.' : 'Envoie le fichier à <b>' + DP_PURGE_MAIL + '</b>.'}<br>
+      <span style="color:var(--ink-muted);">Rien n’est supprimé tant que tu ne confirmes pas ci-dessous. ${dp_jp.nb} entrée(s) seront supprimées ; une ligne « Historique supprimé » gardera la trace.</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <button class="btn ghost small" onclick="dp_jpShare()">📤 Partager à nouveau</button>
+        <button class="btn ghost small" onclick="dp_jpDownload()">⬇️ Télécharger le fichier</button>
+        <button class="btn small" style="background:var(--rust);border-color:var(--rust);" onclick="dp_jpApply()" ${dp_jpBusy ? 'disabled' : ''}>✓ Mail envoyé — supprimer l’historique</button>
+        <button class="btn ghost small" onclick="dp_jpClose()">Annuler</button>
+      </div></div>`;
+  }
+  const n = dp_jpDeletable(items).length;
+  return `<div style="margin:0 0 10px;"><button class="btn ghost small" style="color:var(--rust);" ${n ? '' : 'disabled'} onclick="dp_jpOpen()">🗑️ Supprimer l’historique de la période (${n})</button></div>`;
+}
 function dp_renderJournalMouvements(){
   const all = dp_buildJournalItems();
   const counts = {
@@ -5217,6 +5287,7 @@ function dp_renderJournalMouvements(){
     ${(dp_journalStart||dp_journalEnd) ? '' : `<div class="filter-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0 0;">${[['jour','Aujourd’hui'],['hier','Hier'],['semaine','Semaine']].map(([id,l])=>`<button class="filter-chip ${dp_jPeriod===id?'active':''}" style="${dp_jPeriod===id?'background:var(--forest);border-color:var(--forest);color:#fff;':''}" onclick="dp_jPeriod='${id}';dp_render()">${l}</button>`).join('')}</div>`}
   </div>`;
 
+  dp_jpIds = dp_jpDeletable(items).map(i=>i.j.id);
   const rows = items.map(i=>{
     const quand = `${dp_fmtDateTime(i.at)}`;
     const par = i.par ? ` · par ${esc(i.par)}` : '';
@@ -5229,6 +5300,12 @@ function dp_renderJournalMouvements(){
       </div>`;
     }
     const j = i.j;
+    if(i.kind==='purge_journal'){
+      return `<div class="ticket" style="padding:12px 14px;border-left:4px solid var(--ink-muted);">
+        <div style="font-size:12.5px;font-weight:700;color:var(--ink-muted);">🧹 Historique supprimé</div>
+        <div class="sub" style="font-size:11.5px;color:var(--ink-muted);margin:2px 0 0;">${quand}${par} · ${j.nb||0} entrée(s) du ${j.du ? fmtDateShort(j.du) : '—'} au ${j.au ? fmtDateShort(j.au) : '—'}</div>
+      </div>`;
+    }
     if(i.kind==='modification'){
       const keys = Object.keys(DP_SNAP_FIELDS).filter(k=> JSON.stringify((j.avant||{})[k]) !== JSON.stringify((j.apres||{})[k]));
       const diff = keys.length
@@ -5248,7 +5325,7 @@ function dp_renderJournalMouvements(){
     </div>`;
   }).join('');
 
-  return header + (rows || `<p style="font-size:12.5px;color:var(--ink-muted);">Aucune activité${(dp_journalStart||dp_journalEnd) ? ' sur cette période' : ' ' + ({jour:'aujourd’hui',hier:'hier',semaine:'cette semaine'})[dp_jPeriod]}.</p>`);
+  return header + dp_jpBox(items) + (rows || `<p style="font-size:12.5px;color:var(--ink-muted);">Aucune activité${(dp_journalStart||dp_journalEnd) ? ' sur cette période' : ' ' + ({jour:'aujourd’hui',hier:'hier',semaine:'cette semaine'})[dp_jPeriod]}.</p>`);
 }
 
 async function dp_deleteMouvement(id){
