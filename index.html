@@ -7482,7 +7482,9 @@ function v2_seedFor(it){
   return { ar:'', col:'blanc', fields:[] };
 }
 const v2_ings = ()=>(dp_cfg.ingredients || []).filter(i=>!i.off);
-function v2_ing(it){ if(!v2_cfg.ings3) v2_cfg.ings3 = {}; if(!v2_cfg.ings3[it.id]) v2_cfg.ings3[it.id] = v2_seedFor(it); const c = v2_cfg.ings3[it.id]; if(!Array.isArray(c.fields)) c.fields = []; return c; }
+function v2_ing(it){ if(!v2_cfg.ings3) v2_cfg.ings3 = {}; if(!v2_cfg.ings3[it.id]) v2_cfg.ings3[it.id] = v2_seedFor(it); const c = v2_cfg.ings3[it.id]; if(!Array.isArray(c.fields)) c.fields = [];
+  if(!c.perimeOk){ c.perimeOk = true; if(c.fields.length && !c.fields.some(f=>f.id === 'perime')){ const ref = c.fields.find(f=>f.zone === 'stock') || c.fields[0]; c.fields.push({ id:'perime', n:'À jeter (périmé)', ar:'للرمي (منتهي الصلاحية)', sec:ref.sec, per:'service', zone:'stock' }); } }
+  return c; }
 const v2_byId = (id)=>v2_ings().find(i=>i.id === id);
 const v2_unitOf = (it)=>it.u || 'kg';
 const v2_num = (v)=>{ const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? null : n; };
@@ -7755,6 +7757,8 @@ function v2_ecartsView(){
       h += `<div class="v2-card" style="border-left-color:${V2_COLORS[c.col] || V2_COLORS.blanc};"><b>${esc(it.n)} · ${esc(g)}</b><div style="margin-top:6px;font-size:14px;">${ach !== null ? line('Achat (Dépenses)', ach, u) : ''}${ins.map(f=>line(esc(f.n), v2_sumF(it, f.id), u)).join('')}${outs.map(f=>line(esc(f.n), v2_sumF(it, f.id), u)).join('')}${hasT ? line('Écart de transfert Sushi → Wok (compté dans les pertes de fin de service)', transfer, u) : ''}</div>
         <div style="margin-top:8px;font-weight:700;color:${gap === null ? 'var(--ink-muted)' : Math.abs(gap) < 0.0005 ? '#4ADE80' : '#F87171'}">${gap === null ? 'Écart : en attente de saisie' : 'Écart : ' + (gap >= 0 ? '+' : '') + v2_fmt(gap) + ' ' + esc(u)}</div></div>`;
     });
+    const pf = c.fields.find(f=>f.id === 'perime'), pv = pf ? v2_sumF(it, 'perime') : null;
+    if(pv !== null) h += `<div class="v2-card" style="border-left-color:${V2_COLORS[c.col] || V2_COLORS.blanc};"><b>${esc(it.n)} · pertes de fin de service</b><div style="margin-top:6px;font-size:14px;">${line('À jeter (périmé)', pv, u)}</div></div>`;
     if(c.fields.some(f=>f.id === 'hache' && f.per === 'op')) hache = v2_sumF(it, 'hache');
   });
   v2_ings().forEach(it=>{ const n = v2_nrm(it.n); if(!(n.includes('poulet') && n.includes('hach'))) return; const ach = v2_achat(it), u = v2_unitOf(it);
