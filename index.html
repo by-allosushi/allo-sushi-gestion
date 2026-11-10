@@ -1183,7 +1183,7 @@ function uu_mepRows(u, perms){
   const noEmp = (u.empCode === undefined || u.empCode === null || u.empCode === '');
   const ar = `<div class="perm-row"><span>🌐 Afficher l’arabe (version en test)</span><label class="switch"><input type="checkbox" ${perms.arabe ? 'checked' : ''} onchange="uu_togglePerm('${u.id}','arabe',this.checked)"><span class="slider"></span></label></div>`;
   const lvlSel = (x)=>{ const cur = perms['v2Lvl_' + x.id] || 'aucun'; return `<div class="perm-row"><span>↳ ${esc(x.n)}</span><select onchange="uu_togglePerm('${u.id}','v2Lvl_${esc(x.id)}',this.value)" style="min-height:36px;">${[['aucun', 'Aucun'], ['lire', 'Consulter'], ['saisir', 'Saisir et modifier']].map(o=>`<option value="${o[0]}" ${cur === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select></div>`; };
-  const v2rows = `<div style="padding:8px 0 0 10px;font-size:12px;color:#FBBF24;">Nouvelle version (test) : droit par rubrique</div>${secs.map(lvlSel).join('')}`;
+  const v2rows = `<div style="padding:8px 0 0 10px;font-size:12px;color:#FBBF24;">Nouvelle version (test) : droit par rubrique</div>${((typeof v2_rubs === 'function' && v2_rubs().length) ? v2_rubs() : secs).map(lvlSel).join('')}`;
   return ar + v2rows + `<div style="padding:2px 0 0 10px;font-size:12px;color:var(--ink-muted);">Sections visibles (aucune cochée = toutes)</div>${secs.map(sw).join('')}` + (on && noEmp ? `<div style="padding:4px 0 6px 10px;font-size:12px;color:var(--rust);">⚠ Aucun employé relié : il ne pourra pas valider d’inventaire (choisis l’employé ci-dessous).</div>` : '');
 }
 function uu_depPermRows(u, perms){
@@ -4817,6 +4817,7 @@ function mep_listsView(){
     <div class="actions-row"><button class="btn t-save" onclick="mep_saveLists()">Enregistrer les listes</button><button class="btn ghost t-cancel" onclick="mep_setTab('hist')">Annuler</button></div>`;
 }
 function mep_render(){
+  if(window.v2_lmode){ if(typeof v2_typing === 'function' && !v2_typing()) v2_render(); return; }
   const body = document.getElementById('mep-body'); if(!body) return;
   mep_secOk();
   if(!mep_listsReady){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
@@ -7562,7 +7563,13 @@ const v2_fr = (key, vars)=>v2_fill(v2_tx(key).fr, vars);
 const v2_arOf = (key, vars)=>v2_fill(v2_tx(key).ar, vars);
 const v2_arSpan = (t, cls)=>v2_ar && t ? `<span class="v2-ar ${cls || ''}" dir="rtl">${esc(t)}</span>` : '';
 const v2_both = (key, vars, varsAr)=>esc(v2_fr(key, vars)) + v2_arSpan(v2_arOf(key, varsAr || vars));
-const v2_rubs = ()=>mep_secList().map(r=>({ id:r.id, n:(v2_tx('rub.' + r.id).fr && V2_TXT['rub.' + r.id] ? v2_fr('rub.' + r.id) : r.n) }));
+function v2_lists(){
+  if(v2_cfg.lists && Array.isArray(v2_cfg.lists.sections) && v2_cfg.lists.sections.length) return v2_cfg.lists;
+  const out = { sections:mep_secList().map(x=>({ id:x.id, n:x.n })) };
+  out.sections.forEach(x=>{ out[x.id] = ((typeof mep_lists !== 'undefined' && mep_lists[x.id]) || []).map(i=>({ id:i.id, n:i.n, u:i.u || '', rp:i.rp || '', rpn:i.rpn || '' })); });
+  return out;
+}
+const v2_rubs = ()=>v2_lists().sections.map(r=>({ id:r.id, n:(v2_tx('rub.' + r.id).fr && V2_TXT['rub.' + r.id] ? v2_fr('rub.' + r.id) : r.n) }));
 const v2_rubName = (id)=>(v2_rubs().find(r=>r.id === id) || { n:id }).n;
 const v2_rubAr = (id)=>V2_TXT['rub.' + id] ? v2_arOf('rub.' + id) : '';
 function v2_level(sec){ if(session && session.isAdmin) return 'saisir'; const p = (session && session.permissions) || {}; return p['v2Lvl_' + sec] || 'aucun'; }
@@ -7626,7 +7633,41 @@ function v2_watchDay(){
 }
 function v2_typing(){ try{ const a = document.activeElement, b = document.getElementById('v2-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
 function v2_saveCfg(){ clearTimeout(v2_saveT); v2_saveT = setTimeout(async ()=>{ try{ await v2_cfgRef.set(v2_cfg); }catch(e){ console.error(e); alert('Réglage non enregistré : ' + (e.message || e) + '\nVérifie que les règles Firestore autorisent la collection « mise_en_place ».'); } }, 400); }
-const v2_setTab = (t)=>{ v2_tab = t; v2_render(); };
+const v2_setTab = (t)=>{ v2_tab = t; if(t === 'listes'){ if(!window.v2_lmode){ mep_draft = JSON.parse(JSON.stringify(Object.assign({ cooks:[] }, v2_lists()))); window.v2_lmode = true; } } else if(window.v2_lmode){ window.v2_lmode = false; mep_draft = null; } v2_render(); };
+function v2_listsView(){
+  const d = mep_draft; if(!d) return '';
+  return `<div class="pt-muted" style="margin-bottom:8px;">Listes propres à Cuisine (test) : elles démarrent comme une copie de la Mise en place actuelle et n’y touchent pas. Ce sont les « Autres articles » de Stock.</div>
+    <div class="ticket"><div class="section-label">Rubriques</div><div class="pt-muted" style="margin-bottom:8px;">Une rubrique qui a déjà des saisies dans l’ancienne Mise en place peut être renommée mais pas supprimée (🔒).</div>${(d.sections || []).map((x, n)=>`<div class="ft-edrow"><input type="text" class="ft-in mep-name-secs" style="flex:1 1 calc(100% - 56px);min-width:0;" placeholder="Nom de la rubrique" value="${mep_e(x.n)}" oninput="mep_sName(${n},this.value)">${mep_hasSaisies(x.id) ? '<button class="btn ghost small" disabled title="Historique conservé">🔒</button>' : `<button class="btn ghost small t-del" onclick="mep_sDel(${n})" aria-label="Retirer">✕</button>`}
+      <div class="ft-mv" style="flex:1 1 100%;"><button class="btn ghost small" onclick="mep_sMove(${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_sMove(${n},1)" aria-label="Descendre">↓</button></div></div>`).join('')}<div class="actions-row"><button class="btn small t-add" onclick="mep_sAdd()">＋ Rubrique</button></div></div>
+    ${(d.sections || []).map(sc=>{ const k = sc.id; return `<div class="ticket"><div class="section-label">Articles — ${mep_e(sc.n || 'Nouvelle rubrique')}</div>${mep_rpBar()}${(d[k] || []).map((i, n)=>mep_ingCard(k, n, i)).join('') || '<div class="pt-muted">Aucun article.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_dAdd('${k}')">＋ Article</button></div></div>`; }).join('')}
+    <div class="actions-row"><button class="btn t-save" onclick="v2_saveLists()">Enregistrer les listes</button><button class="btn ghost t-cancel" onclick="v2_setTab('saisie')">Annuler</button></div>
+    <div class="ticket" style="margin-top:12px;"><div class="section-label">Reprendre les inventaires de l’ancienne Mise en place</div><div class="pt-muted" style="margin-bottom:8px;">Copie, pour chaque article, les deux derniers inventaires (« Dernier inventaire » et « Avant ») dans Stock. Les anciennes saisies ne sont pas modifiées. Pense à enregistrer les listes avant.</div><div class="actions-row"><button class="btn ghost small" onclick="v2_importInv()">📥 Copier les derniers inventaires</button></div></div>`;
+}
+async function v2_saveLists(){
+  if(!(session && session.isAdmin) || !mep_draft) return;
+  const secs = (mep_draft.sections || []).map(x=>({ id:x.id, n:String(x.n || '').trim() }));
+  if(!secs.length){ alert('Garde au moins une rubrique.'); return; }
+  if(secs.some(x=>!x.n)){ alert('Donne un nom à chaque rubrique.'); return; }
+  if(new Set(secs.map(x=>x.n.toLowerCase())).size !== secs.length){ alert('Deux rubriques portent le même nom.'); return; }
+  const out = { sections:secs };
+  secs.forEach(x=>{ out[x.id] = (mep_draft[x.id] || []).map(i=>({ id:i.id, n:String(i.n || '').trim(), u:String(i.u || '').trim(), rp:String(i.rp || ''), rpn:i.rp ? String(i.rpn || '') : '' })).filter(i=>i.n); });
+  v2_cfg.lists = out;
+  try{ await v2_cfgRef.set(v2_cfg); window.v2_lmode = false; mep_draft = null; v2_tab = 'saisie'; v2_render(); if(typeof pt_toast === 'function') pt_toast('Listes enregistrées.'); }
+  catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+async function v2_importInv(){
+  if(!(session && session.isAdmin)) return;
+  if(!confirm('Copier les deux derniers inventaires de chaque article de l’ancienne Mise en place vers Stock (Cuisine test) ?')) return;
+  try{
+    let nd = 0, na = 0;
+    for(const sc of v2_lists().sections){
+      const ev = mep_events(sc.id), byDate = {}, ids = new Set((v2_lists()[sc.id] || []).map(a=>a.id));
+      Object.keys(ev).forEach(id=>{ if(!ids.has(id)) return; ev[id].slice(-2).forEach(e=>{ const d = mep_ymd(new Date(e.at)); if(!d || d >= v2_date) return; const o = byDate[d] = byDate[d] || { vals:{}, byKeys:{}, atKeys:{} }; o.vals['art.' + id] = String(e.q); o.byKeys['art.' + id] = { w:e.by, r:sc.id }; o.atKeys['art.' + id] = new Date(e.at).toISOString(); na++; }); });
+      for(const d of Object.keys(byDate)){ await db.collection('mise_en_place').doc('v2_' + d + '_' + sc.id + '_s').set(Object.assign({ v2date:d, sec:sc.id, zone:'stock', imported:true }, byDate[d]), { merge:true }); nd++; }
+    }
+    v2_hd = {}; alert(na ? na + ' valeur(s) copiée(s) (' + nd + ' jour(s)). Elles apparaissent dans « Dernier inventaire / Avant » de Stock.' : 'Aucun inventaire antérieur à copier.'); v2_render();
+  }catch(e){ console.error(e); alert('Copie impossible : ' + (e.message || e)); }
+}
 const v2_setSec = (s)=>{ v2_sec = s; v2_render(); };
 const v2_setDate = (d)=>{ v2_date = d || v2_ymd(); v2_form = {}; v2_editS = {}; v2_msg = {}; v2_ops = {}; v2_times = {}; v2_subOpen = {}; v2_hist = {}; v2_recuEdit = {}; v2_hd = {}; v2_watchDay(); v2_render(); };
 const v2_toggleAr = (on)=>{ v2_ar = !!on; v2_render(); };
@@ -7823,7 +7864,7 @@ function v2_cardStock(sec, it){
   const lock = v2_stockLocked(sec);
   return `<div class="v2-card" style="border-left-color:${V2_COLORS[c.col] || V2_COLORS.blanc};"><div class="v2-ct"><div>${esc(it.n)}</div>${v2_arSpan(c.ar)}</div>${fs.map(f=>v2_inputRow(sec, it, f, 1, lock, false)).join('')}</div>`;
 }
-function v2_artRows(sec){ const lst = (typeof mep_lists !== 'undefined' && Array.isArray(mep_lists[sec])) ? mep_lists[sec] : []; return lst; }
+function v2_artRows(sec){ const l = v2_lists()[sec]; return Array.isArray(l) ? l : []; }
 function v2_stockExpected(sec){ const out = []; v2_ings().forEach(it=>v2_ing(it).fields.forEach(f=>{ if(f.sec === sec && f.zone === 'stock' && !v2_isIn(f)) out.push(v2_key(it, f, 1)); })); v2_artRows(sec).forEach(a=>out.push('art.' + a.id)); return out; }
 async function v2_validateStock(sec){
   if(v2_busy || v2_level(sec) !== 'saisir') return; const dk = sec + '@s', vals = Object.assign({}, (v2_docs[dk] || {}).vals || {}, v2_form[dk] || {});
@@ -7847,7 +7888,7 @@ async function v2_loadHist(sec){
 function v2_hdEvents(sec, key){
   return (v2_hd[sec] || []).filter(x=>x.vals && x.vals[key] !== undefined && v2_num(x.vals[key]) !== null)
     .sort((a, b)=>(a.v2date + (a.at || '')).localeCompare(b.v2date + (b.at || '')))
-    .map(x=>({ q:v2_num(x.vals[key]), by:(x.byKeys && x.byKeys[key] && x.byKeys[key].w) || x.by || '', at:x.at || (x.v2date + 'T00:00:00') }));
+    .map(x=>({ q:v2_num(x.vals[key]), by:(x.byKeys && x.byKeys[key] && x.byKeys[key].w) || x.by || '', at:(x.atKeys && x.atKeys[key]) || x.at || (x.v2date + 'T00:00:00') }));
 }
 function v2_fdt(iso){ const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }); }
 function v2_histBox(sec){
@@ -7921,14 +7962,14 @@ function v2_render(){
   const body = document.getElementById('v2-body'); if(!body) return;
   if(!v2_on()){ body.innerHTML = ''; return; }
   if(!v2_cfgReady){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
-  const admin = v2_adminView(), tabs = [['saisie', 'mep'], ['stock', 'stock']].map(t=>[t[0], v2_fr('title.' + t[1]), v2_arOf('title.' + t[1])]).concat(admin ? [['ecarts', 'Écarts', ''], ['cfg', 'Cuisine', ''], ['textes', 'Textes', '']] : []);
-  if(!admin && !['saisie', 'stock'].includes(v2_tab)) v2_tab = 'saisie';
+  const admin = v2_adminView(), tabs = [['saisie', 'mep'], ['stock', 'stock']].map(t=>[t[0], v2_fr('title.' + t[1]), v2_arOf('title.' + t[1])]).concat(admin ? [['ecarts', 'Écarts', ''], ['cfg', 'Cuisine', ''], ['listes', 'Listes', ''], ['textes', 'Textes', '']] : []);
+  if(!admin && !['saisie', 'stock'].includes(v2_tab)){ v2_tab = 'saisie'; if(window.v2_lmode){ window.v2_lmode = false; mep_draft = null; } }
   const zone = v2_tab === 'stock' ? 'stock' : 'mep';
   const head = `<div style="font-weight:700;font-size:22px;">${esc(v2_fr(zone === 'stock' ? 'title.stock' : 'title.mep'))}${v2_arSpan(v2_arOf(zone === 'stock' ? 'title.stock' : 'title.mep'))}</div>
     <div style="font-size:12px;font-weight:600;color:#FBBF24;margin-top:2px;">Version en test — visible par l’administrateur seulement</div>
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 12px;"><input type="date" value="${esc(v2_date)}" onchange="v2_setDate(this.value)" style="min-height:40px;"><label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_ar ? 'checked' : ''} onchange="v2_toggleAr(this.checked)"> Arabe</label>${(session && session.isAdmin) ? `<label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_asCook ? 'checked' : ''} onchange="v2_toggleCook(this.checked)"> Voir comme un cuisinier</label>` : ''}</div>
     ${tabs.length > 1 ? `<div class="mep-seg">${tabs.map(t=>`<button class="${v2_tab === t[0] ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${esc(t[1])}${v2_ar && t[2] ? `<span class="v2-ar" style="text-align:center">${esc(t[2])}</span>` : ''}</button>`).join('')}</div>` : ''}`;
-  body.innerHTML = head + (v2_tab === 'cfg' && admin ? v2_cfgView() : v2_tab === 'ecarts' && admin ? v2_ecartsView() : v2_tab === 'textes' && admin ? v2_textsView() : v2_saisieView(zone));
+  body.innerHTML = head + (v2_tab === 'listes' && admin ? v2_listsView() : v2_tab === 'cfg' && admin ? v2_cfgView() : v2_tab === 'ecarts' && admin ? v2_ecartsView() : v2_tab === 'textes' && admin ? v2_textsView() : v2_saisieView(zone));
 }
 
 initAuth();
