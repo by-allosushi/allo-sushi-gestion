@@ -8048,7 +8048,7 @@ const v2_back = ()=>`<button class="btn ghost small" style="margin-bottom:8px;" 
 function v2_corrList(d){ return Object.keys((d && d.corr) || {}).map(k=>Object.assign({ id:k }, d.corr[k])).sort((a, b)=>String(a.at).localeCompare(String(b.at))); }
 function v2_corrOf(d, key){ const l = v2_corrList(d).filter(c=>c.key === key); return l.length ? l[l.length - 1] : null; }
 function v2_keyLabel(key){
-  if(key.indexOf('art.') === 0){ return key.slice(4); }
+  if(key.indexOf('art.') === 0){ const aid = key.slice(4); let nm = ''; v2_lists().sections.forEach((sc)=>{ const a = v2_artRows(sc.id).find(x=>x.id === aid); if(a && !nm) nm = a.n; }); return nm || aid; }
   const id = key.split('.')[0], fid = (key.split('.')[1] || '').split('#')[0], it = v2_byId(id); if(!it) return key;
   const f = v2_ing(it).fields.find(x=>x.id === fid); return it.n + ' · ' + (f ? f.n : fid) + (key.indexOf('#') > 0 ? ' (op. ' + key.split('#')[1] + ')' : '');
 }
@@ -8108,14 +8108,81 @@ function v2_orderMove(zone, sec, key, d){
 let v2_regOrd = { zone:'stock', sec:'' };
 let v2_regTab = 'ing';
 function v2_tplOf(it){ const c = v2_ing(it); return c.fields.some(f=>f.confirm) ? 'Multi-états' : c.fields.some(f=>f.bg) ? 'Transformation' : 'Simple'; }
+/* ---------- données de test : sauvegarde, suppression par dates, réinitialisation des réglages ---------- */
+let v2_test = { a:'', b:'', word:'', busy:false, msg:'', relearn:true, chk:{} };
+const V2_RESET = [['plats', 'Quantités par plat (et leur historique)'], ['taux', 'Taux d’achat, taux de cuisson, portion Wok'], ['champs', 'Champs de Mise en place et de Stock des ingrédients'], ['ordre', 'Ordre d’affichage'], ['textes', 'Textes affichés aux cuisiniers'], ['seuils', 'Seuils, précision de la balance et phase d’apprentissage'], ['listes', 'Listes d’articles (Bar, etc.)']];
+function v2_testView(){
+  if(!v2_test.a) v2_test.a = v2_test.b = todayISO();
+  const T = v2_test, chk = V2_RESET.map(r=>`<label style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:14px;"><input type="checkbox" ${T.chk[r[0]] ? 'checked' : ''} onchange="v2_test.chk['${r[0]}']=this.checked"> ${esc(r[1])}</label>`).join('');
+  return `<div class="u-card"><div class="u-pad"><b>1 · Sauvegarde</b><div class="u-s" style="margin:4px 0 8px;">Télécharge un fichier avec les réglages et toutes les saisies, avant de supprimer quoi que ce soit.</div><button class="u-btn" ${T.busy ? 'disabled' : ''} onclick="v2_testBackup()">Télécharger une sauvegarde</button></div></div>
+  <div class="u-card"><div class="u-pad"><b>2 · Supprimer les saisies d’une période</b><div class="u-s" style="margin:4px 0 8px;">Efface les saisies des cuisiniers (Mise en place, Stock), les corrections, les « Merci », les points et les validations du Contrôle sur ces dates. Les achats (Dépenses) et la caisse ne sont pas touchés. Action définitive.</div>
+    <div class="u-g2"><div><label class="u-s">Du</label><input type="date" class="ft-in" value="${esc(T.a)}" onchange="v2_test.a=this.value"></div><div><label class="u-s">Au</label><input type="date" class="ft-in" value="${esc(T.b)}" onchange="v2_test.b=this.value"></div></div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:14px;"><input type="checkbox" ${T.relearn ? 'checked' : ''} onchange="v2_test.relearn=this.checked"> Recommencer la phase d’apprentissage à aujourd’hui</label>
+    <div style="margin-top:8px;"><input class="ft-in" placeholder="Écris SUPPRIMER pour confirmer" value="${esc(T.word)}" oninput="v2_test.word=this.value"></div>
+    <div style="margin-top:8px;"><button class="u-btn" style="color:#F87171;" ${T.busy ? 'disabled' : ''} onclick="v2_testDelete()">Supprimer les saisies</button></div></div></div>
+  <div class="u-card"><div class="u-pad"><b>3 · Réinitialiser des réglages</b><div class="u-s" style="margin:4px 0 6px;">Coche ce qui doit repartir de zéro. Les comptes, les autorisations et le suivi des ingrédients dans Dépenses ne sont pas touchés.</div>${chk}
+    <div style="margin-top:8px;"><button class="u-btn" style="color:#F87171;" ${T.busy ? 'disabled' : ''} onclick="v2_testReset()">Réinitialiser les réglages cochés</button></div><div class="u-s" style="margin-top:6px;">Utilise le même mot de confirmation que ci-dessus.</div></div></div>${T.msg ? `<div class="u-ban">${esc(T.msg)}</div>` : ''}`;
+}
+async function v2_testBackup(){
+  v2_test.busy = true; v2_test.msg = ''; v2_render();
+  try{
+    const out = { at:new Date().toISOString(), v2cfg:v2_cfg, controle2:{ ing:cx_cfg.ing, plats:cx_cfg.plats, snapFrom:cx_cfg.snapFrom }, docs:{}, events:{}, jours:{} };
+    (await db.collection('mise_en_place').get()).forEach((d)=>{ const x = d.data() || {}; if(x.v2date) out.docs[d.id] = x; });
+    (await cx_evCol.get()).forEach((d)=>{ out.events[d.id] = d.data(); }); (await cx_jourCol.get()).forEach((d)=>{ out.jours[d.id] = d.data(); });
+    const blob = new Blob([JSON.stringify(out)], { type:'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sauvegarde-cuisine-' + todayISO() + '.json'; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    v2_test.msg = 'Sauvegarde téléchargée.';
+  }catch(e){ console.error(e); v2_test.msg = 'Erreur : ' + (e.message || e); }
+  v2_test.busy = false; v2_render();
+}
+async function v2_delRefs(refs){ for(let i = 0; i < refs.length; i += 400){ const b = db.batch(); refs.slice(i, i + 400).forEach(r=>b.delete(r)); await b.commit(); } }
+async function v2_testDelete(){
+  const T = v2_test; if(T.word.trim() !== 'SUPPRIMER'){ alert('Écris SUPPRIMER pour confirmer.'); return; }
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(T.a) || !/^\d{4}-\d{2}-\d{2}$/.test(T.b) || T.b < T.a){ alert('Dates non valides : « Du » doit être avant « Au ».'); return; }
+  T.busy = true; T.msg = ''; v2_render();
+  try{
+    const FP = firebase.firestore.FieldPath.documentId(), t0 = new Date(T.a + 'T00:00:00').toISOString(), t1 = new Date(T.b + 'T23:59:59.999').toISOString();
+    const [d1, d2, d3] = await Promise.all([db.collection('mise_en_place').where('v2date', '>=', T.a).where('v2date', '<=', T.b).get(), cx_evCol.where('at', '>=', t0).where('at', '<=', t1).get(), cx_jourCol.where(FP, '>=', T.a).where(FP, '<=', T.b).get()]);
+    const refs = []; d1.forEach(d=>refs.push(d.ref)); d2.forEach(d=>refs.push(d.ref)); d3.forEach(d=>refs.push(d.ref));
+    if(!confirm('Supprimer définitivement ' + d1.size + ' saisie(s) de cuisine, ' + d2.size + ' événement(s) et ' + d3.size + ' bilan(s) de contrôle du ' + T.a + ' au ' + T.b + ' ?')){ T.busy = false; v2_render(); return; }
+    await v2_delRefs(refs);
+    if(T.relearn){ v2_cfg.learn = { start:todayISO(), days:(v2_cfg.learn && v2_cfg.learn.days) || 14 }; await v2_cfgRef.set({ learn:v2_cfg.learn }, { merge:true }); }
+    T.word = ''; T.msg = 'Supprimé : ' + d1.size + ' saisie(s), ' + d2.size + ' événement(s), ' + d3.size + ' bilan(s).'; cx_reload();
+  }catch(e){ console.error(e); T.msg = 'Erreur : ' + (e.message || e); }
+  T.busy = false; v2_render();
+}
+async function v2_testReset(){
+  const T = v2_test, sel = V2_RESET.filter(r=>T.chk[r[0]]).map(r=>r[0]);
+  if(!sel.length){ alert('Coche au moins un réglage.'); return; }
+  if(T.word.trim() !== 'SUPPRIMER'){ alert('Écris SUPPRIMER pour confirmer.'); return; }
+  if(!confirm('Réinitialiser définitivement : ' + V2_RESET.filter(r=>sel.includes(r[0])).map(r=>r[1]).join(' ; ') + ' ?')) return;
+  T.busy = true; T.msg = ''; v2_render();
+  try{
+    const c2 = {}, v2 = {};
+    if(sel.includes('plats')) c2.plats = PT_DEL();
+    if(sel.includes('taux')) c2.ing = PT_DEL();
+    if(sel.includes('champs')) v2.ings3 = PT_DEL();
+    if(sel.includes('ordre')) v2.order = PT_DEL();
+    if(sel.includes('textes')) v2.texts = PT_DEL();
+    if(sel.includes('seuils')){ v2.thr = PT_DEL(); v2.learn = PT_DEL(); }
+    if(sel.includes('listes')) v2.lists = PT_DEL();
+    if(Object.keys(c2).length) await cx_cfgRef.set(c2, { merge:true });
+    if(Object.keys(v2).length) await v2_cfgRef.set(v2, { merge:true });
+    if(sel.includes('plats')) cx_cfg.plats = {}; if(sel.includes('taux')) cx_cfg.ing = {};
+    ['ings3', 'order', 'texts', 'thr', 'learn', 'lists'].forEach(k=>{ if(v2[k] !== undefined) delete v2_cfg[k]; });
+    T.word = ''; T.chk = {}; T.msg = 'Réglages réinitialisés.'; cx_reload();
+  }catch(e){ console.error(e); T.msg = 'Erreur : ' + (e.message || e); }
+  T.busy = false; v2_render();
+}
 function v2_regView(){
   const th = v2_thr(), L = v2_learn(), rubs = v2_rubs(); if(!v2_regOrd.sec || !rubs.some(r=>r.id === v2_regOrd.sec)) v2_regOrd.sec = (rubs[0] || { id:'' }).id;
-  const tabs = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">${[['ing', 'Ingrédients'], ['ord', 'Ordre d’affichage'], ['bal', 'Balance et seuils']].map(o=>`<button class="u-btn ${v2_regTab === o[0] ? 'on' : ''}" onclick="v2_regTab='${o[0]}';v2_render()">${o[1]}</button>`).join('')}</div>`;
+  const tabs = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">${[['ing', 'Ingrédients'], ['ord', 'Ordre d’affichage'], ['bal', 'Balance et seuils'], ['test', 'Données de test']].map(o=>`<button class="u-btn ${v2_regTab === o[0] ? 'on' : ''}" onclick="v2_regTab='${o[0]}';v2_render()">${o[1]}</button>`).join('')}</div>`;
   const num = (lbl, k, val, unit)=>`<div class="u-row"><div style="flex:1;">${lbl}</div><input class="ft-in" inputmode="decimal" style="width:90px;text-align:right;" value="${esc(String(val).replace('.', ','))}" onchange="v2_thrSet('${k}',this.value)"><span class="u-s">${unit}</span></div>`;
   let body = '';
   if(v2_regTab === 'ing'){
     const ings = v2_ings().filter(i=>i.track).length ? v2_ings().filter(i=>i.track) : v2_ings();
     body = `<div class="u-card"><div class="u-pad u-s">${ings.length} ingrédients suivis</div>${ings.map(it=>{ const secs = Array.from(new Set(v2_ing(it).fields.map(f=>f.sec))).map(v2_rubName).join(' + '); return `<div class="u-row"><div style="flex:1;"><b>${esc(it.n)}</b> <span class="u-pill">${v2_tplOf(it)}</span></div><span class="u-s">${esc(secs)}</span></div>`; }).join('')}<div class="u-pad" style="display:flex;gap:8px;flex-wrap:wrap;"><button class="u-btn" onclick="v2_setTab('cfg')">Ajouter un ingrédient</button><button class="u-btn sm" onclick="v2_setTab('cfg')">Champs</button><button class="u-btn sm" onclick="v2_setTab('listes')">Listes et cuisiniers</button><button class="u-btn sm" onclick="v2_setTab('textes')">Textes</button><button class="u-btn sm" onclick="v2_setTab('ecarts')">Bilan simple (ancien)</button><button class="u-btn sm" onclick="cx_tab='reg';showModule('controle')">Réglages du contrôle</button></div></div>`;
+  } else if(v2_regTab === 'test'){
+    body = v2_testView();
   } else if(v2_regTab === 'bal'){
     body = `<div class="u-card"><div class="u-row" style="border-top:0;"><div style="flex:1;">Précision de la balance</div><select onchange="v2_thrSet('prec',this.value)" style="min-height:38px;">${[1, 5, 10].map(n=>`<option value="${n}" ${th.prec === n ? 'selected' : ''}>${n} g</option>`).join('')}</select></div>${num('Seuil orange (écart ≥)', 'a', th.a, '%')}${num('Seuil rouge (écart ≥)', 'b', th.b, '%')}${num('Données minimales pour afficher la couleur', 'cov', th.cov, '%')}<div class="u-pad u-s">Conseil : un test de calibrage de la balance (poids connu) une fois par mois.</div></div>
       <div class="u-card"><div class="u-pad"><b>Phase d’apprentissage</b></div><div class="u-row" style="border-top:0;"><div style="flex:1;">Début</div><input type="date" class="ft-in" value="${esc((v2_cfg.learn || {}).start || todayISO())}" onchange="v2_learnSet('start',this.value)"></div><div class="u-row"><div style="flex:1;">Durée</div><input class="ft-in" inputmode="numeric" style="width:70px;text-align:right;" value="${L.days}" onchange="v2_learnSet('days',this.value)"><span class="u-s">jours</span></div></div>`;
