@@ -528,7 +528,7 @@ td.mep-chg{color:#FBBF24;font-weight:800;}
 input.ft-in.chg{border-color:#FBBF24;border-left-color:#FBBF24;background:color-mix(in srgb,#FBBF24 16%,#151A17);color:#FDE68A;}
 .btn[disabled]{opacity:.4;pointer-events:none;}
 table.mep-sticky td:first-child,table.mep-sticky th:first-child{position:sticky;left:0;background:var(--surface);z-index:1;min-width:130px;}
-.mep-seg{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}.mep-seg button{flex:1 1 90px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:15px;font-family:'Inter',sans-serif;cursor:pointer;}
+.mep-seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;margin-bottom:12px;}.mep-seg button{min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:15px;font-family:'Inter',sans-serif;cursor:pointer;}
 .mep-seg button.on{background:color-mix(in srgb,#E7E5E4 18%,#151A17);border-color:#E7E5E4;}
 .mep-ing{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);}.mep-ing .n{flex:1;font-size:16px;font-weight:600;}.mep-ing input{width:92px;text-align:center;}.mep-ing .u{width:58px;color:var(--ink-muted,#9aa39d);font-size:14px;}
 table.mep-g{width:100%;border-collapse:collapse;font-size:14px;}table.mep-g th,table.mep-g td{padding:9px 6px;border-top:1px solid var(--line);text-align:right;white-space:nowrap;}table.mep-g th:first-child,table.mep-g td:first-child{text-align:left;white-space:normal;}
@@ -647,6 +647,7 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
 .u-pill{border-radius:999px;padding:3px 10px;font-size:12px;background:rgba(255,255,255,.07);white-space:nowrap;}
 .u-ok{background:rgba(34,197,94,.14);color:#4ADE80;}.u-wa{background:rgba(251,191,36,.14);color:#FBBF24;}.u-bad{background:rgba(248,113,113,.14);color:#F87171;}
 .u-btn{border:1px solid var(--line);border-radius:12px;background:none;color:var(--ink);padding:10px 14px;font-size:15px;cursor:pointer;font-family:inherit;}
+input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;height:22px;min-height:22px !important;flex:none;padding:0;margin:0;accent-color:#60A5FA;}
 .u-act{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px;margin-bottom:10px;}
 .u-act .u-btn{min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.25;padding:8px 10px;}
 .u-act .u-tm{gap:2px;}.u-act .u-tm input{background:none;border:0;color:inherit;font:inherit;font-weight:700;width:100%;text-align:center;font-size:16px;}
@@ -655,7 +656,7 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
 .u-kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}.u-kp button{height:52px;font-size:20px;font-weight:600;border:1px solid var(--line);border-radius:12px;background:none;color:var(--ink);cursor:pointer;}
 .u-disp{background:rgba(0,0,0,.28);border-radius:12px;height:68px;display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:700;margin:10px 0;}
 .u-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--line);}.u-row.sel{background:rgba(59,130,246,.18);}
-.u-bn{display:flex;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--surface);margin-top:14px;}.u-bn button{flex:1;padding:12px 0;background:none;border:0;color:var(--ink-muted);font-size:13px;cursor:pointer;}.u-bn button.on{color:#60A5FA;font-weight:700;}
+.u-bn{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;position:sticky;top:0;z-index:20;background:var(--paper);padding:8px 0;margin:0 0 10px;}.u-bn button{min-height:44px;padding:8px 4px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink-muted);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;}.u-bn button.on{color:#60A5FA;border-color:#60A5FA;font-weight:700;}
 .u-dot{width:14px;height:14px;border-radius:50%;flex:none;}
 .u-ih{display:flex;align-items:center;gap:10px;padding:11px 16px;border-left:5px solid var(--c);background:color-mix(in srgb,var(--c) 16%,transparent);}
 .u-ih b{font-weight:600;font-size:16px;color:var(--c);}
@@ -8338,7 +8339,7 @@ async function v2_testReset(){
 }
 function v2_regView(){
   const th = v2_thr(), L = v2_learn(), rubs = v2_rubs(); if(!v2_regOrd.sec || !rubs.some(r=>r.id === v2_regOrd.sec)) v2_regOrd.sec = (rubs[0] || { id:'' }).id;
-  const tabs = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">${[['ing', 'Ingrédients'], ['ord', 'Ordre d’affichage'], ['bal', 'Balance et seuils'], ['test', 'Données de test']].map(o=>`<button class="u-btn ${v2_regTab === o[0] ? 'on' : ''}" onclick="v2_regTab='${o[0]}';v2_render()">${o[1]}</button>`).join('')}</div>`;
+  const tabs = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">${[['ing', 'Ingrédients'], ['ord', 'Ordre d’affichage'], ['bal', 'Balance et seuils'], ['test', 'Données de test']].map(o=>`<button class="u-btn ${v2_regTab === o[0] ? 'on' : ''}" style="min-height:48px;" onclick="v2_regTab='${o[0]}';v2_render()">${o[1]}</button>`).join('')}</div>`;
   const num = (lbl, k, val, unit)=>`<div class="u-row"><div style="flex:1;">${lbl}</div><input class="ft-in" inputmode="decimal" style="width:90px;text-align:right;" value="${esc(String(val).replace('.', ','))}" onchange="v2_thrSet('${k}',this.value)"><span class="u-s">${unit}</span></div>`;
   let body = '';
   if(v2_regTab === 'ing'){
@@ -8382,7 +8383,7 @@ function v2_render(){
     top = (realAdmin && v2_asCook ? `<div class="u-ban" style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>Mode cuisinier (aperçu)</span><button class="u-btn sm on" onclick="v2_toggleCook(false);v2_setTab('today')">Revenir à l’admin</button></div>` : '') + (admin ? `<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:4px 0 10px;">${dateIn}<label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_asCook ? 'checked' : ''} onchange="v2_toggleCook(this.checked)"> Voir comme un cuisinier</label></div>` : '') + seg;
     content = v2_saisieView(zone);
   }
-  body.innerHTML = `<div id="v2-ob">${v2_obHtml()}</div><div class="u-wrap">${top}${content}${nav}</div>`;
+  body.innerHTML = `<div id="v2-ob">${v2_obHtml()}</div><div class="u-wrap">${nav}${top}${content}</div>`;
 }
 
 initAuth();
