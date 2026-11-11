@@ -6433,6 +6433,18 @@ function cx_v2loss(ing, f, t){
       const at = (d.atKeys && d.atKeys[k]) || d.at || (d.v2date + 'T12:00:00'), g = q * fam.f; out.push({ l:{ id:'v2loss:' + k, sec:d.sec, secName:v2_rubName(d.sec), n:'À jeter déclaré', f:fam.f, u:ing.u }, w:{ ms:new Date(at).getTime() || day, q, who:(d.byKeys && d.byKeys[k] && d.byKeys[k].w) || d.by || '' }, raw:g, v:g }); }); });
   return out;
 }
+/* transfert entre ingrédients (ex. poulet haché extrait de l'escalope) : sortie de l'ingrédient source, entrée de l'ingrédient cible, en équivalent net */
+function cx_v2xfer(ing, D, lo, hi){
+  const r = { xin:0, xout:0, inK:{}, outK:{}, inL:[], outL:[] };
+  if(typeof v2_byId !== 'function' || typeof v2_ings !== 'function') return r; const it = v2_byId(ing.id); if(!it) return r;
+  const fam = cx_fam(ing.u), d0 = cx_dayStart(lo).getTime(), nm = v2_nrm(it.n), docs = (D && D.v2) || [];
+  const sumVals = (srcIt, fid)=>{ let tot = 0, sec = ''; docs.forEach((d)=>{ const day = new Date(d.v2date + 'T00:00').getTime(); if(isNaN(day) || day < d0 || day > hi || d.zone === 'stock') return;
+      Object.keys(d.vals || {}).forEach((k)=>{ if(k.indexOf(srcIt.id + '.') !== 0) return; if(k.slice(srcIt.id.length + 1).split('#')[0] !== fid) return; const q = v2_num(d.vals[k]); if(q !== null && q > 0){ tot += q; sec = d.sec; } }); }); return { tot, sec }; };
+  v2_ings().forEach((o)=>{ if(o.id === it.id) return;
+    v2_ing(o).fields.forEach((f)=>{ if(!f.srcIng || !nm.includes(f.srcIng.n)) return; const x = sumVals(it, f.srcIng.f); if(x.tot > 0){ const g = x.tot * fam.f; r.xout += g; r.outK[x.sec] = (r.outK[x.sec] || 0) + g; r.outL.push({ to:o.n, q:x.tot }); } }); });
+  v2_ing(it).fields.forEach((f)=>{ if(!f.srcIng) return; const o = v2_ings().find(i=>v2_nrm(i.n).includes(f.srcIng.n)); if(!o) return; const x = sumVals(o, f.srcIng.f); if(x.tot > 0){ const g = x.tot * fam.f; r.xin += g; r.inK[f.sec] = (r.inK[f.sec] || 0) + g; r.inL.push({ from:o.n, q:x.tot }); } });
+  return r;
+}
 function cx_lines(ing){
   const v2l = cx_v2lines(ing); if(v2l.length) return v2l;
   const m = (cx_cfg.ing[ing.id] || {}).map || {}, out = [], fb = cx_fam(ing.u).b;
@@ -6497,7 +6509,8 @@ function cx_seg(ing, D, lo, hi){
   D.sales.forEach((s)=>{ if(!(s.ms > lo && s.ms <= hi)) return; const gq = cx_gram(s.key, ing.id, s.ms); if(gq === null){ miss += s.q; missPl[s.key] = s.name; return; }
     const u = s.q * gq * cuis / 100; used += u; const pl = cx_cfg.plats[s.key], k = (pl && pl.k) || ''; usedK[k] = (usedK[k] || 0) + u; });
   adjL.sort((a, b)=>cx_ms(a.at) - cx_ms(b.at)); achL.sort((a, b)=>a.ms - b.ms);
-  return { adj, ach, used, usedK, bad, miss, missPl, adjL, achL, ydc };
+  const xf = cx_v2xfer(ing, D, lo, hi);
+  return { adj, ach, used, usedK, bad, miss, missPl, adjL, achL, ydc, xin:xf.xin, xout:xf.xout, xinK:xf.inK, xoutK:xf.outK, xinL:xf.inL, xoutL:xf.outL };
 }
 /* perte cuite : dernière pesée de chaque ligne « perte » pour chaque jour de contrôle de la fenêtre */
 function cx_perteRows(lines, lo, hi, cuis){
@@ -6525,14 +6538,14 @@ function cx_calc(ing, f, t, mode, D){
     if(stockL.length && miss.length === stockL.length) flags.push('aucune pesée récente avant le début (compté 0)');
     else if(miss.length) flags.push('pas de pesée de départ : ' + miss.map(p=>p.l.secName).join(', ') + ' (compté 0)');
     if(TwMax && f - TwMax > 36e5 * 14) flags.push('la dernière pesée de départ date du ' + cx_fmtD(TwMax));
-    if(k === 'theo' && TwMax){ const sp = cx_seg(ing, D, TwMax, f); start = startW + sp.adj + sp.ach - sp.used; startNote = 'théorique reporté depuis la pesée du ' + cx_fmtD(TwMax) + ' (écart passé conservé)'; }
+    if(k === 'theo' && TwMax){ const sp = cx_seg(ing, D, TwMax, f); start = startW + sp.adj + sp.ach + sp.xin - sp.xout - sp.used; startNote = 'théorique reporté depuis la pesée du ' + cx_fmtD(TwMax) + ' (écart passé conservé)'; }
     else startNote = TwMax ? 'pesée du ' + cx_fmtD(TwMax) : '';
   }
   const startCalc = start;
   const startEv = D.ev.find(e=>e.type === 'start' && e.ing === ing.id && cx_ms(e.at) === f) || null, startState = !startEv ? 'none' : (startEv.corrected ? 'corrige' : 'valide');
   if(startEv) start = Number(startEv.q) || 0;
   const seg = cx_seg(ing, D, f, t), PR = cx_perteRows(perteL, f, t, cuis).concat(cx_v2loss(ing, f, t)), perte = PR.reduce((s, x)=>s + x.v, 0);
-  const theo = start + seg.adj + seg.ach - seg.used - perte;
+  const theo = start + seg.adj + seg.ach + seg.xin - seg.xout - seg.used - perte;
   const R = W.map((p)=>({ l:p.l, w:cx_lastW(p.ws, f, t) })), have = R.filter(p=>p.w), real = have.length ? sumW(R) : null, missR = R.filter(p=>!p.w);
   if(missR.length && have.length) flags.push('pesée de fin manquante : ' + missR.map(p=>p.l.secName + ' · ' + p.l.n).join(', '));
   const ecart = (real !== null && !missR.length) ? real - theo : null, den = seg.used > 0 ? seg.used : (Math.abs(theo) || 1);
@@ -6555,7 +6568,7 @@ function cx_calc(ing, f, t, mode, D){
   });
   const K = kits.map((kt)=>{
     const sl = S.filter(p=>p.l.sec === kt.id), rl = R.filter(p=>p.l.sec === kt.id), sw = sumW(sl), sc = startW > 0 ? start / startW : null;
-    const sK = sc !== null ? sw * sc : (kits.length ? start / kits.length : 0), uK = seg.usedK[kt.id] || 0, pK = perteK[kt.id] || 0, th = sK + achK[kt.id] - uK - pK;
+    const sK = sc !== null ? sw * sc : (kits.length ? start / kits.length : 0), uK = seg.usedK[kt.id] || 0, pK = perteK[kt.id] || 0, th = sK + achK[kt.id] + (seg.xinK[kt.id] || 0) - (seg.xoutK[kt.id] || 0) - uK - pK;
     const rK = rl.length && rl.every(p=>p.w) ? sumW(rl) : null;
     return { id:kt.id, n:kt.n, start:sK, ach:achK[kt.id], used:uK, perte:pK, theo:th, real:rK, ecart:rK === null ? null : rK - th, est:achRows.some(a=>a.est) };
   });
@@ -6613,6 +6626,13 @@ async function cx_rend(id, v){
   const n = ft_parseQ(v); if(n === null || !(n > 0) || n > 100){ alert('Taux d’achat : un nombre entre 1 et 100 (%).'); cx_render(); return; }
   await cx_ingPatch(id, { rend:n }); cx_reload(); cx_render();
 }
+/* portion standard du Wok (g par plat) : escalope, 120 g par défaut, modifiable */
+function cx_wokPortion(ing){ if(!ing || !/escalope/.test(String(ing.n || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase())) return null; const w = Number((cx_cfg.ing[ing.id] || {}).wokG); return w > 0 ? w : 120; }
+async function cx_wokG(id, v){
+  const n = ft_parseQ(v); if(n === null || !(n > 0) || n > 2000){ alert('Portion Wok : un nombre en grammes, par exemple 120.'); cx_render(); return; }
+  await cx_ingPatch(id, { wokG:n }); cx_render();
+}
+function cx_wokFill(key, id, w){ const el = document.getElementById('cx-g-' + key + '-' + id); if(el) el.value = String(w).replace('.', ','); }
 async function cx_cuis(id, v){
   const n = ft_parseQ(v); if(n === null || !(n >= 50) || n > 500){ alert('Taux de cuisson : un nombre entre 50 et 500 (%), par exemple 130.'); cx_render(); return; }
   await cx_ingPatch(id, { cuis:n }); cx_reload(); cx_render();
@@ -6715,7 +6735,7 @@ function cx_salesTotals(){
 }
 function cx_inputRow(key, i, val){
   return `<div class="g2" style="margin-top:8px;align-items:end;"><div><label>${cx_e(i.n)} — ${cx_e(cx_baseLbl(i))} servi (cuit) par plat</label><input type="text" inputmode="decimal" class="ft-in" id="cx-g-${key}-${i.id}" placeholder="${cx_e(cx_baseLbl(i))}" value="${cx_e(val === undefined ? '' : val)}"></div>
-    <div><button type="button" class="btn ghost small t-cancel" onclick="cx_zero('${key}','${i.id}')">∅ n’en contient pas</button></div></div>`;
+    <div style="display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="btn ghost small t-cancel" onclick="cx_zero('${key}','${i.id}')">∅ n’en contient pas</button>${cx_wokPortion(i) ? `<button type="button" class="btn ghost small" onclick="cx_wokFill('${key}','${i.id}',${cx_wokPortion(i)})">Portion Wok · ${cx_e(cx_n(cx_wokPortion(i)))} g</button>` : ''}</div></div>`;
 }
 function cx_settingsHtml(){
   const all = (dp_cfg.ingredients || []).filter(i=>!i.off);
@@ -6726,7 +6746,7 @@ function cx_settingsHtml(){
     if(on && open){
       const linkedIds = new Set(lines.map(l=>l.id)), free = [];
       mep_secList().forEach((sc)=>(mep_lists[sc.id] || []).forEach((l)=>{ if(!linkedIds.has(l.id)) free.push({ l, sc }); }));
-      det = `<div style="margin-top:8px;"><div class="g2"><div><label>Taux d’achat (%) — ex. 1 kg acheté → 950 g utilisables = 95</label><input type="text" inputmode="decimal" class="ft-in" placeholder="100" value="${cx_e(c.rend || '')}" onchange="cx_rend('${ing.id}',this.value)"></div><div><label>Taux de cuisson (%) — ex. 230 g cuits = 300 g crus = 130</label><input type="text" inputmode="decimal" class="ft-in" placeholder="100" value="${cx_e(c.cuis || '')}" onchange="cx_cuis('${ing.id}',this.value)"></div></div></div>
+      det = `<div style="margin-top:8px;"><div class="g2"><div><label>Taux d’achat (%) — ex. 1 kg acheté → 950 g utilisables = 95</label><input type="text" inputmode="decimal" class="ft-in" placeholder="100" value="${cx_e(c.rend || '')}" onchange="cx_rend('${ing.id}',this.value)"></div><div><label>Taux de cuisson (%) — ex. 230 g cuits = 300 g crus = 130</label><input type="text" inputmode="decimal" class="ft-in" placeholder="100" value="${cx_e(c.cuis || '')}" onchange="cx_cuis('${ing.id}',this.value)"></div></div>${cx_wokPortion(ing) ? `<div class="g2" style="margin-top:8px;"><div><label>Portion Wok standard (g par plat)</label><input type="text" inputmode="decimal" class="ft-in" value="${cx_e(cx_wokPortion(ing))}" onchange="cx_wokG('${ing.id}',this.value)"></div><div class="pt-muted" style="align-self:end;">Proposée en un clic dans la saisie des plats ; chaque plat peut avoir une autre quantité.</div></div>` : ''}</div>
         <div class="pt-muted" style="margin-top:10px;">Lignes de Mise en place : « Stock cru » (pesée de fin de service, cru ou mariné) ou « Perte cuite » (cuit jeté en fin de service) :</div>
         ${lines.map(l=>`<div class="g2" style="margin-top:6px;align-items:end;"><div><label>${cx_e(l.secName)} · ${cx_e(l.n)} (${cx_e(l.u || 'unité')})</label>${l.auto && l.f ? '' : `<input type="text" inputmode="decimal" class="ft-in" placeholder="1 ${cx_e(l.u || 'unité')} = … ${cx_e(cx_baseLbl(ing))}" value="${l.auto ? '' : cx_e(l.f)}" onchange="cx_lineF('${ing.id}','${l.id}',this.value)">`}</div><div><select class="ft-in" style="padding:6px;" onchange="cx_lineRole('${ing.id}','${l.id}',this.value)"><option value="stock" ${l.role === 'stock' ? 'selected' : ''}>Stock cru</option><option value="perte" ${l.role === 'perte' ? 'selected' : ''}>Perte cuite</option></select><button class="btn ghost small t-del" style="margin-top:4px;" onclick="cx_unlink('${ing.id}','${l.id}')">Délier</button></div></div>`).join('') || '<div class="pt-muted">Aucune ligne liée.</div>'}
         <select class="ft-in" style="margin-top:8px;" onchange="cx_link('${ing.id}',this.value)"><option value="">＋ Lier une ligne de Mise en place…</option>${free.map(x=>`<option value="${x.l.id}">${cx_e(x.sc.n)} · ${cx_e(x.l.n)} (${cx_e(x.l.u || 'unité')})</option>`).join('')}</select>
@@ -6893,7 +6913,8 @@ function cx_detailHtml(r){
     + (x.changed ? `<div class="rp2-bad" style="margin:2px 0 6px;">⚠ Modifié dans Dépenses depuis : ${cx_e(mep_fq(x.origQ))} ${cx_e(x.u)} <span class="actions-row" style="display:inline-flex;margin:0 0 0 6px;"><button class="btn small t-save" onclick="cx_achKeep('${id}','${x.id}')">Garder ma valeur</button><button class="btn ghost small" onclick="cx_achRevert('${id}','${x.id}')">Prendre celle de Dépenses</button></span></div>` : '')
     + (x.fixed && !x.changed ? `<div style="margin:0 0 4px;"><button class="btn ghost small" onclick="cx_achRevert('${id}','${x.id}')">↺ Revenir à la valeur de Dépenses</button></div>` : '')).join('');
   const adjRow = r.seg.adjL.length ? cx_zr({ byK, l:'Ajustements (anciens)', sub:r.seg.adjL.map(e=>cx_e(e.note)).join(' · '), v:byK ? Kv(()=>'').concat([FS(r.seg.adj, true)]) : [FS(r.seg.adj, true)] }) + r.seg.adjL.map(e=>`<div style="text-align:right;"><button class="btn ghost small t-del" onclick="cx_adjDel('${e.id}')">✕ ${cx_e(cx_fmtD(cx_ms(e.at)))}</button></div>`).join('') : '';
-  const z2 = `<div class="cxz"><h4>② Entrées</h4>${hdr}${achRows || cx_zr({ byK, l:'Achats du gérant', sub:'aucun achat dans la période', p:'', v:byK ? Kv(()=>'0').concat(['0']) : ['0']})}${adjRow}</div>`;
+  const xinRow = r.seg.xin > 0 ? cx_zr({ byK, l:'Récupéré d’un autre ingrédient', sub:r.seg.xinL.map(x=>cx_e(x.from + ' : ' + mep_fq(x.q))).join(' · ') + ' (pesé par le Wok)', p:'', v:byK ? Kv(k=>cx_e('＋ ' + cx_fmt(r.seg.xinK[k.id] || 0, ing))).concat([cx_e('＋ ' + cx_fmt(r.seg.xin, ing))]) : [cx_e('＋ ' + cx_fmt(r.seg.xin, ing))] }) : '';
+  const z2 = `<div class="cxz"><h4>② Entrées</h4>${hdr}${achRows || cx_zr({ byK, l:'Achats du gérant', sub:'aucun achat dans la période', p:'', v:byK ? Kv(()=>'0').concat(['0']) : ['0']})}${xinRow}${adjRow}</div>`;
   const ryDays = Object.keys(r.seg.ydc || {}).sort();
   const ryHtml = ryDays.map((dk)=>{ const y = r.seg.ydc[dk], lab = dk.slice(8) + '/' + dk.slice(5, 7), sel = (m)=>y.ev && y.ev.mode === m ? 'font-weight:800;outline:2px solid var(--moss);' : '';
     if(y.src === 'decl') return `<div class="cxz"><h4>Rendement du jour · ${cx_e(lab)}</h4><div class="pt-muted">Réel déclaré par le gérant : <b>${cx_e(cx_n(Math.round(y.pct * 10) / 10))} %</b> (moyenne pondérée des achats renseignés), appliqué aussi aux achats non renseignés du jour.</div></div>`;
@@ -6901,7 +6922,8 @@ function cx_detailHtml(r){
     return `<div class="cxz"><h4>Rendement du jour · ${cx_e(lab)}</h4><div class="pt-muted" style="margin-bottom:6px;">${y.valid ? '✓ validé : ' + cx_e(cx_n(y.pct)) + ' %' + (y.ev && y.ev.by ? ' · ' + cx_e(y.ev.by) : '') : '<span class="rp2-bad">Rendement à choisir</span> — 95 % provisoire, calcul non définitif'}</div>
       <div class="g2" style="align-items:end;"><div><label>Taux fixe (%)</label><input type="text" inputmode="decimal" class="ft-in" id="cx-ry-${id}-${dk}" value="${cx_e(cx_n(cur95))}"></div><div><button class="btn small t-save" style="${sel('95')}" onclick="cx_ryPick('${id}','${dk}','95')">✓ Valider ce taux</button></div></div>
       <div style="margin-top:6px;"><button class="btn ghost small" style="${sel('moy')}" ${mov === null ? 'disabled' : ''} onclick="cx_ryPick('${id}','${dk}','moy')">Moyenne des derniers jours renseignés : ${mov === null ? 'aucun achat renseigné' : cx_e(cx_n(mov)) + ' %'}</button></div></div>`; }).join('');
-  const z3 = `<div class="cxz"><h4>③ Sorties</h4>${hdr}${cx_zr({ byK, l:'Utilisé (ventes)', sub:'quantité servie × cuisson', p:cx_e(cx_n(r.cuis)) + ' %', v:byK ? Kv(k=>cx_e('− ' + cx_fmt(k.used, ing))).concat([cx_e('− ' + cx_fmt(r.seg.used, ing))]) : [cx_e('− ' + cx_fmt(r.seg.used, ing))], btn:`cx_usedOpen('${id}')` })}
+  const xoutRow = r.seg.xout > 0 ? cx_zr({ byK, l:'Transféré vers un autre ingrédient', sub:r.seg.xoutL.map(x=>cx_e(x.to + ' : ' + mep_fq(x.q))).join(' · ') + ' (haché pesé par le Wok)', p:'', v:byK ? Kv(k=>cx_e('− ' + cx_fmt(r.seg.xoutK[k.id] || 0, ing))).concat([cx_e('− ' + cx_fmt(r.seg.xout, ing))]) : [cx_e('− ' + cx_fmt(r.seg.xout, ing))] }) : '';
+  const z3 = `<div class="cxz"><h4>③ Sorties</h4>${hdr}${xoutRow}${cx_zr({ byK, l:'Utilisé (ventes)', sub:'quantité servie × cuisson', p:cx_e(cx_n(r.cuis)) + ' %', v:byK ? Kv(k=>cx_e('− ' + cx_fmt(k.used, ing))).concat([cx_e('− ' + cx_fmt(r.seg.used, ing))]) : [cx_e('− ' + cx_fmt(r.seg.used, ing))], btn:`cx_usedOpen('${id}')` })}
     ${cx_zr({ byK, l:'Perte cuite', sub:'fin de service · saisie par le cuisinier', p:cx_e(cx_n(r.cuis)) + ' %', v:byK ? Kv(k=>cx_e('− ' + cx_fmt(k.perte, ing))).concat([cx_e('− ' + cx_fmt(r.perte, ing))]) : [cx_e('− ' + cx_fmt(r.perte, ing))], btn:`cx_wOpen('${id}','perte')` })}</div>`;
   const pct = r.ecart !== null && r.pct !== null ? (r.pct < 0 ? '−' : '+') + cx_n(Math.abs(r.pct)) + ' %' : '', da = r.da !== null && r.price > 0 ? ' · ' + (r.da < 0 ? '−' : '+') + cx_n(Math.abs(r.da)) + ' DA' : '';
   const ecK = (k)=>k.ecart === null ? '—' : cx_e(cx_fmt(k.ecart, ing, true));
@@ -7369,14 +7391,11 @@ function v2_seedFor(it){
   const LOSS = (id, sec, x)=>f(id, 'À jeter (perte qualité)', 'للرمي (خسارة الجودة)', sec, x);
   const FIN = (id, nm, ar, sec)=>f(id, nm, ar, sec, { zone:'stock' });
   const FRI = (id, w, sec)=>FIN(id, 'Fin de service brut (Frigo)', 'نهاية الخدمة خام (الثلاجة)', sec);
-  if(n.includes('escalope')) return { ar:'الإسكالوب', col:'blanc', opLabel:'DÉCOUPE', opAr:'تقطيع', opNoun:'la découpe', opNounAr:'التقطيع', fields:[
-    ACH('sushi'), f('dec_out', 'Mis en découpe', 'المُخصّص للتقطيع', 'sushi', { per:'op' }), f('dec_extra', 'Quantité supplémentaire (Frigo)', 'كمية إضافية (الثلاجة)', 'sushi', { per:'op' }),
-    f('dec_total', 'Total mis en découpe (calculé)', 'إجمالي المُخصّص للتقطيع (محسوب)', 'sushi', { per:'op', calc:{ p:['dec_out'], o:['dec_extra'] } }),
-    f('dec_ps', 'Part Sushi découpé', 'حصة السوشي المقطّعة', 'sushi', { per:'op' }),
-    f('reste', 'Reste pour le Wok (calculé)', 'المتبقي للووك (محسوب)', 'sushi', { per:'op', vis:'admin', calc:{ p:['dec_total'], m:['dec_ps'] } }), LOSS('loss', 'sushi', { per:'op' }),
-    f('recu', 'Reçu du Sushi', 'المستلم من السوشي', 'chaud', { per:'op', calc:{ p:['reste'] }, confirm:true, bg:'Répartition Wok', bil:'in' }),
-    f('part_w', 'Part Wok découpé', 'حصة الووك المقطّعة', 'chaud', { per:'op', bg:'Répartition Wok', bil:'out' }), f('hache', 'Poulet haché récupéré', 'الدجاج المفروم المسترجَع', 'chaud', { per:'op', bg:'Répartition Wok', bil:'out' }),
-    LOSS('loss_w', 'chaud', { per:'op', bg:'Répartition Wok', bil:'out' }),
+  if(n.includes('escalope')) return { ar:'الإسكالوب', col:'blanc', seedV:2, opLabel:'DÉCOUPE', opAr:'تقطيع', opNoun:'la découpe', opNounAr:'التقطيع', fields:[
+    ACH('sushi'), f('dec_out', 'Sorti du frigo (cru)', 'المُخرَج من الثلاجة (خام)', 'sushi', { per:'op' }),
+    f('dec_ps', 'Part Sushi découpé (tout va en crispy)', 'حصة السوشي المقطّعة (كلها كريسبي)', 'sushi', { per:'op' }), LOSS('loss', 'sushi', { per:'op' }),
+    f('part_w', 'Part Wok découpé (pesé à la réception)', 'حصة الووك المقطّعة (تُوزن عند الاستلام)', 'chaud', { per:'op' }), f('hache', 'Poulet haché récupéré', 'الدجاج المفروم المسترجَع', 'chaud', { per:'op' }),
+    LOSS('loss_w', 'chaud', { per:'op' }),
     FIN('fin_dec', 'Fin de service découpé', 'نهاية الخدمة مقطّع', 'sushi'), FRI('fin_raw', 0, 'sushi'), FIN('fin_cr', 'Fin de service crispy', 'نهاية الخدمة كريسبي', 'sushi'), FIN('fin_w', 'Fin de service découpé', 'نهاية الخدمة مقطّع', 'chaud')] };
   if(n.includes('saumon')) return { ar:'السلمون', col:'bleu', opLabel:'NETTOYAGE ET DÉCOUPE', opAr:'تنظيف وتقطيع', opNoun:'le nettoyage et la découpe', opNounAr:'التنظيف والتقطيع', fields:[
     ACH('sushi'), f('mis', 'Mis en nettoyage et découpe', 'المُخصّص للتنظيف والتقطيع', 'sushi', { per:'op', bg:'Nettoyage', bil:'in' }), f('net', 'Net découpé', 'الصافي المقطّع', 'sushi', { per:'op', bg:'Nettoyage', bil:'out' }),
@@ -7395,6 +7414,8 @@ function v2_seedFor(it){
 }
 const v2_ings = ()=>(dp_cfg.ingredients || []).filter(i=>!i.off);
 function v2_ing(it){ if(!v2_cfg.ings3) v2_cfg.ings3 = {}; if(!v2_cfg.ings3[it.id]) v2_cfg.ings3[it.id] = v2_seedFor(it); const c = v2_cfg.ings3[it.id]; if(!Array.isArray(c.fields)) c.fields = [];
+  if(v2_nrm(it.n).includes('escalope') && c.seedV !== 2){ const nw = v2_seedFor(it), nid = new Set(nw.fields.map(x=>x.id)), gone = ['dec_extra', 'dec_total', 'reste', 'recu'];
+    const keep = c.fields.filter(x=>!nid.has(x.id) && !gone.includes(x.id) && x.id !== 'perime'); c.fields = nw.fields.concat(keep); c.seedV = 2; v2_saveCfg(); }
   if(!c.perimeOk){ c.perimeOk = true; if(c.fields.length && !c.fields.some(f=>f.id === 'perime')){ const ref = c.fields.find(f=>f.zone === 'stock') || c.fields[0]; c.fields.push({ id:'perime', n:'À jeter (périmé)', ar:'للرمي (منتهي الصلاحية)', sec:ref.sec, per:'service', zone:'stock' }); } }
   return c; }
 const v2_byId = (id)=>v2_ings().find(i=>i.id === id);
@@ -7948,6 +7969,15 @@ function v2_learn(){
 function v2_learnExtend(){ v2_learn(); v2_cfg.learn.days = (Number(v2_cfg.learn.days) || 14) + 7; v2_saveCfg(); v2_render(); }
 function v2_openDetail(id){ cx_open['ing:' + id] = true; cx_tab = 'ctrl'; showModule('controle'); }
 let v2_sort = 'val';
+/* comparaison admin (jamais montrée aux cuisiniers) : part Wok attendue par le calcul vs part Wok pesée */
+function v2_escBox(){
+  const it = v2_ings().find(i=>v2_nrm(i.n).includes('escalope')); if(!it) return '';
+  const c = v2_ing(it); if(!c.fields.some(f=>f.id === 'part_w')) return '';
+  const out = v2_sumF(it, 'dec_out'), ps = v2_sumF(it, 'dec_ps'), pw = v2_sumF(it, 'part_w'), hc = v2_sumF(it, 'hache'), u = v2_unitOf(it);
+  if(out === null || ps === null || pw === null) return '';
+  const rend = cx_cc(it).rend, exp = out * rend / 100 - ps, d = pw - exp, pc = exp > 0 ? d / exp * 100 : null, bad = pc !== null && Math.abs(pc) > 10;
+  return `<div class="u-card" style="margin-bottom:8px;"><div class="u-row" style="border-top:0;"><div style="flex:1;"><b>Escalope · part Wok (calcul vs pesée)</b><div class="u-s">Sorti ${esc(v2_fmt(out))} × ${esc(String(rend))} % − Part Sushi ${esc(v2_fmt(ps))} = ${esc(v2_fmt(exp))} ${esc(u)} attendus · pesé ${esc(v2_fmt(pw))}${hc !== null ? ' · haché ' + esc(v2_fmt(hc)) + ' · parure estimée ' + esc(v2_fmt(Math.max(0, pw - hc))) : ''}</div></div><span class="u-pill ${bad ? 'u-bad' : 'u-ok'}">${pc === null ? '—' : (d < 0 ? '−' : '+') + Math.abs(pc).toFixed(1).replace('.', ',') + ' %'}</span></div></div>`;
+}
 function v2_todayView(){
   if(!cx_ready || !cx_dpReady) return '<div class="empty-state">Chargement…</div>';
   if(!cx_ingList().length) return '<div class="u-card"><div class="u-pad"><div class="empty-state">Aucun ingrédient suivi. Coche-les dans Dépenses (« suivre ») puis reviens ici.</div></div></div>';
@@ -7970,7 +8000,7 @@ function v2_todayView(){
     return `<div class="u-row" style="cursor:pointer;" onclick="v2_openDetail('${x.ing.id}')"><span class="u-dot" style="background:${dot};"></span><div style="flex:1;min-width:0;"><b>${esc(x.ing.n)}</b><div class="u-s">${esc(sub)}</div></div><span class="u-s">${esc(x.gray ? '' : pc)}</span><b style="color:${x.surplus ? '#60A5FA' : dc};min-width:78px;text-align:right;">${da}</b><span class="u-s">›</span></div>`; }).join('');
   const todoBox = todo ? `<div class="u-card" style="cursor:pointer;" onclick="v2_setTab('plats')"><div class="u-row" style="border-top:0;"><div style="flex:1;"><b>${todo} plat${todo > 1 ? 's' : ''} vendu${todo > 1 ? 's' : ''} sans quantité</b><div class="u-s">Compléter par ingrédient, plat par plat</div></div><b>›</b></div></div>` : '';
   return learn + `<div class="u-g2"><div class="u-m"><div class="u-s">Qualité des données</div><div class="v">${qual} %</div><div class="u-s">${lw} pesées sur ${lt}</div></div><div class="u-m"><div class="u-s">Perte nette du jour</div><div class="v" style="color:${net > 0 ? '#F87171' : '#4ADE80'};">${net > 0 ? '−' : ''}${Math.round(net).toLocaleString('fr-FR').replace(/ /g, ' ')} DA</div><div class="u-s">${rows.length} ingrédients suivis</div></div></div>`
-    + `<div class="u-s" style="margin:4px 2px 6px;">Saisie des cuisiniers</div>${rubs}${todoBox}`
+    + `<div class="u-s" style="margin:4px 2px 6px;">Saisie des cuisiniers</div>${rubs}${v2_escBox()}${todoBox}`
     + `<div class="u-card"><div class="u-hd"><b style="font-size:17px;">Écarts du jour</b><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><span class="u-s">Trier par</span>${[['val', 'Valeur'], ['pct', 'Pourcentage'], ['qty', 'Quantité']].map(o=>`<button class="u-btn sm ${v2_sort === o[0] ? 'on' : ''}" onclick="v2_sort='${o[0]}';v2_render()">${o[1]}</button>`).join('')}</div></div>${list}<div class="u-pad u-s">Couleur selon le pourcentage : faible sous ${th.a} %, moyen de ${th.a} à ${th.b} %, élevé au-dessus de ${th.b} %. Gris : moins de ${th.cov} % des plats connus. ${cx_loading ? 'Mise à jour…' : ''}</div></div>`
     + `<button class="u-btn sm" onclick="cx_tab='ctrl';showModule('controle')">Détail complet du contrôle ›</button>`;
 }
@@ -7983,7 +8013,7 @@ function v2_compView(){
   const ing = cx_ingById(v2_comp.ing), sales = cx_salesTotals(), todo = sales.filter(s=>!cx_hasGram(s.key, ing.id)), cov = v2_cov(ing), isToday = cx_from === cx_dt(cx_dayStart(Date.now())) && !cx_to, multi = cx_allKits().length >= 2;
   const chips = tr.map(i=>`<button class="filter-chip ${i.id === ing.id ? 'active' : ''}" onclick="v2_comp.ing='${i.id}';v2_render()">${esc(i.n)} · ${v2_cov(i)} %</button>`).join('');
   const cards = todo.slice(0, 25).map(s=>`<div class="v2-card"><div class="row-between"><b>${esc(s.name)}</b><span class="mep-w">vendu × ${esc(cx_n(s.q))}</span></div>${multi ? cx_kChips(s.key, cx_pk[s.key] !== undefined ? cx_pk[s.key] : ((cx_cfg.plats[s.key] || {}).k || '')) : ''}
-      <div class="g2" style="margin-top:8px;align-items:end;"><div><label>${esc(ing.n)} — ${esc(cx_baseLbl(ing))} par portion (tel que mis dans le plat)</label><input type="text" inputmode="decimal" class="ft-in" id="cp-${s.key}" placeholder="${esc(cx_baseLbl(ing))}"></div><div style="display:flex;gap:6px;"><button class="btn small t-save" onclick="cx_compSave('${s.key}',false)">Valider</button><button class="btn ghost small" onclick="cx_compSave('${s.key}',true)">Sans ${esc(ing.n)}</button></div></div>
+      <div class="g2" style="margin-top:8px;align-items:end;"><div><label>${esc(ing.n)} — ${esc(cx_baseLbl(ing))} par portion (tel que mis dans le plat)</label><input type="text" inputmode="decimal" class="ft-in" id="cp-${s.key}" placeholder="${esc(cx_baseLbl(ing))}"></div><div style="display:flex;gap:6px;"><button class="btn small t-save" onclick="cx_compSave('${s.key}',false)">Valider</button><button class="btn ghost small" onclick="cx_compSave('${s.key}',true)">Sans ${esc(ing.n)}</button></div></div>${cx_wokPortion(ing) ? `<div style="margin-top:6px;"><button class="btn ghost small" onclick="document.getElementById('cp-${s.key}').value='${String(cx_wokPortion(ing)).replace('.', ',')}'">Portion Wok · ${esc(cx_n(cx_wokPortion(ing)))} g</button></div>` : ''}
       <div style="margin-top:6px;"><button class="btn ghost small" onclick="cx_compNone('${s.key}')">Aucun ingrédient suivi</button></div></div>`).join('');
   let tot = 0, kn = 0; sales.forEach(s=>{ tot += s.q; if(cx_hasGram(s.key, ing.id)) kn += s.q; });
   let rr = null; try{ const [f0, t0] = cx_setWindow(); rr = cx_calc(ing, f0, t0, { k:'reel', q:'' }, cx_data); }catch(e){}
@@ -8117,7 +8147,8 @@ function v2_render(){
     content = v2_back() + (v2_tab === 'listes' ? v2_listsView() : v2_tab === 'cfg' ? v2_cfgView() : v2_tab === 'ecarts' ? v2_ecartsView() : v2_textsView());
   } else {
     const seg = `<div class="mep-seg">${[['saisie', 'title.mep'], ['stock', 'title.stock']].map(t=>`<button class="${v2_tab === t[0] ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${esc(v2_fr(t[1]))}${v2_ar ? `<span class="v2-ar" style="text-align:center">${esc(v2_arOf(t[1]))}</span>` : ''}</button>`).join('')}</div>`;
-    top = (admin ? `<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:4px 0 10px;">${dateIn}<label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_asCook ? 'checked' : ''} onchange="v2_toggleCook(this.checked)"> Voir comme un cuisinier</label></div>` : '') + seg;
+    const realAdmin = !!(session && session.isAdmin);
+    top = (realAdmin && v2_asCook ? `<div class="u-ban" style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>Mode cuisinier (aperçu)</span><button class="u-btn sm on" onclick="v2_toggleCook(false);v2_setTab('today')">Revenir à l’admin</button></div>` : '') + (admin ? `<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:4px 0 10px;">${dateIn}<label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_asCook ? 'checked' : ''} onchange="v2_toggleCook(this.checked)"> Voir comme un cuisinier</label></div>` : '') + seg;
     content = v2_saisieView(zone);
   }
   body.innerHTML = `<div id="v2-ob">${v2_obHtml()}</div><div class="u-wrap">${top}${content}${nav}</div>`;
