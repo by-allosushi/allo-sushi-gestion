@@ -6584,9 +6584,9 @@ function cx_calc(ing, f, t, mode, D){
   });
   const K = kits.map((kt)=>{
     const sl = S.filter(p=>p.l.sec === kt.id), rl = R.filter(p=>p.l.sec === kt.id), sw = sumW(sl), sc = startW > 0 ? start / startW : null;
-    const sK = sc !== null ? sw * sc : (kits.length ? start / kits.length : 0), uK = seg.usedK[kt.id] || 0, pK = perteK[kt.id] || 0, th = sK + achK[kt.id] + (seg.xinK[kt.id] || 0) - (seg.xoutK[kt.id] || 0) - uK - pK;
+    const sK = (startEv && startEv.qK && startEv.qK[kt.id] !== undefined && startEv.qK[kt.id] !== null) ? (Number(startEv.qK[kt.id]) || 0) : sc !== null ? sw * sc : (kits.length ? start / kits.length : 0), uK = seg.usedK[kt.id] || 0, pK = perteK[kt.id] || 0, th = sK + achK[kt.id] + (seg.xinK[kt.id] || 0) - (seg.xoutK[kt.id] || 0) - uK - pK;
     const rK = rl.length && rl.every(p=>p.w) ? sumW(rl) : null;
-    return { id:kt.id, n:kt.n, start:sK, ach:achK[kt.id], used:uK, perte:pK, theo:th, real:rK, ecart:rK === null ? null : rK - th, est:achRows.some(a=>a.est) };
+    return { id:kt.id, n:kt.n, start:sK, startCalc:sw, ach:achK[kt.id], used:uK, perte:pK, theo:th, real:rK, ecart:rK === null ? null : rK - th, est:achRows.some(a=>a.est) };
   });
   return { ing, f, t, rend, cuis, lines, start, startCalc, startEv, startState, startW, startNote, seg, perte, PR, theo, real, R, S, ecart, pct, price, da, flags, k, K, achRows };
 }
@@ -6792,25 +6792,36 @@ async function cx_ryPick(ingId, dayKey, mode){
 /* ---------- ajustements, redémarrage ---------- */
 function cx_startOpen(ingId){
   const ing = cx_ingById(ingId), r = cx_res[ingId]; if(!ing || !r) return; const f = cx_fam(ing.u).f;
-  cx_adj = { ing:ingId, q:String(Math.round(r.start / f * 1000) / 1000).replace('.', ','), note:(r.startEv && r.startEv.note) || '' }; cx_open['ing:' + ingId] = true; cx_render();
+  const qK = {}; (r.K || []).forEach((k)=>{ qK[k.id] = String(Math.round(k.start / f * 1000) / 1000).replace('.', ','); });
+  cx_adj = { ing:ingId, q:String(Math.round(r.start / f * 1000) / 1000).replace('.', ','), qK:(r.K || []).length >= 2 ? qK : null, at:cx_dt(new Date(r.f)), note:(r.startEv && r.startEv.note) || '' }; cx_open['ing:' + ingId] = true; cx_render();
 }
 function cx_adjSet(f, v){ if(cx_adj) cx_adj[f] = v; }
-async function cx_startWrite(ingId, q, note, corrected){
-  const ing = cx_ingById(ingId), r = cx_res[ingId]; if(!ing || !r) return;
-  const rec = { type:'start', ing:ingId, ingN:ing.n, at:new Date(r.f).toISOString(), q, calc:r.startCalc, corrected:!!corrected, note:note || '', by:cx_who(), cr:new Date().toISOString() };
+function cx_adjK(id, v){ if(!cx_adj || !cx_adj.qK) return; cx_adj.qK[id] = v; const tot = Object.keys(cx_adj.qK).reduce((t, k)=>t + (ft_parseQ(cx_adj.qK[k]) || 0), 0); cx_adj.q = String(Math.round(tot * 1000) / 1000).replace('.', ','); const el = document.getElementById('cx-adj-tot'); if(el) el.textContent = cx_adj.q; }
+async function cx_startWrite(ingId, q, note, corrected, qK, rOv){
+  const ing = cx_ingById(ingId), r = rOv || cx_res[ingId]; if(!ing || !r) return;
+  const rec = { type:'start', ing:ingId, ingN:ing.n, at:new Date(r.f).toISOString(), q, calc:r.startCalc, corrected:!!corrected, note:note || '', by:cx_who(), cr:new Date().toISOString() }; if(qK) rec.qK = qK;
   try{ await cx_evCol.doc('st_' + ingId + '_' + r.f).set(rec); cx_adj = null; await cx_resnapFor(r.f); if(typeof pt_toast === 'function') pt_toast(corrected ? 'Départ corrigé.' : 'Départ validé.'); }
   catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
   await cx_reload(); cx_render();
 }
 function cx_startValidate(ingId){ const r = cx_res[ingId]; if(r) return cx_startWrite(ingId, r.startCalc, '', false); }
 async function cx_startSave(){
-  const a = cx_adj; if(!a) return; const ing = cx_ingById(a.ing), r = cx_res[a.ing]; if(!ing || !r) return;
-  const q = ft_parseQ(a.q), note = String(a.note || '').trim();
-  if(q === null || q < 0){ alert('Indique la quantité de départ (un nombre, 0 si rien).'); return; }
-  const base = q * cx_fam(ing.u).f;
-  if(Math.abs(base - r.startCalc) < 0.5) return cx_startWrite(a.ing, r.startCalc, '', false);
+  const a = cx_adj; if(!a) return; const ing = cx_ingById(a.ing), r0 = cx_res[a.ing]; if(!ing || !r0) return;
+  const fam = cx_fam(ing.u).f, note = String(a.note || '').trim(); let qK = null, base;
+  if(a.qK){ qK = {}; base = 0; for(const k of Object.keys(a.qK)){ const v = ft_parseQ(a.qK[k]); if(v === null || v < 0){ alert('Indique la quantité de départ de chaque cuisine (un nombre, 0 si rien).'); return; } qK[k] = v * fam; base += v * fam; } }
+  else { const q = ft_parseQ(a.q); if(q === null || q < 0){ alert('Indique la quantité de départ (un nombre, 0 si rien).'); return; } base = q * fam; }
+  const ms = cx_ms(a.at || cx_dt(new Date(r0.f)));
+  if(isNaN(ms)){ alert('Indique le jour et l’heure du départ.'); return; }
+  if(ms > Date.now() + 6e4){ alert('Le départ ne peut pas être dans le futur.'); return; }
+  let r = r0;
+  if(ms !== r0.f){
+    cx_from = cx_dt(new Date(ms)); cx_perDraft = null; cx_mode = {}; const w = { from:cx_from, to:cx_to, day:mep_ymd(new Date()) }; cx_cfg.win = w; cx_winSave(w);
+    await cx_reload(); const [f, t] = cx_setWindow(); r = cx_calc(ing, f, t, { k:'reel', q:'' }, cx_data);
+  }
+  const kitChanged = qK ? r.K.some(k=>Math.abs((qK[k.id] || 0) - (k.startCalc || 0)) >= 0.5) : false;
+  if(Math.abs(base - r.startCalc) < 0.5 && !kitChanged) return cx_startWrite(a.ing, r.startCalc, '', false, null, r);
   if(!note){ alert('La note explicative est obligatoire quand tu corriges la quantité.'); return; }
-  return cx_startWrite(a.ing, base, note, true);
+  return cx_startWrite(a.ing, base, note, true, qK, r);
 }
 async function cx_startUndo(ingId){
   const r = cx_res[ingId]; if(!r || !confirm('Revenir à la quantité calculée (annule la validation ou la correction) ?')) return;
@@ -6953,9 +6964,10 @@ function cx_detailHtml(r){
   /* formulaires */
   let form = '';
   if(a) form = `<div class="rp2-ing" style="margin:6px 0;"><div class="section-label">Corriger le stock de départ — ${cx_e(ing.n)}</div>
-      <div><label>Quantité de départ (${cx_e(ing.u)})</label><input type="text" inputmode="decimal" class="ft-in" value="${cx_e(a.q)}" oninput="cx_adjSet('q',this.value)"></div>
+      <div><label>Heure du départ (début de la période)</label><input type="datetime-local" class="ft-in" value="${cx_e(a.at || '')}" onchange="cx_adjSet('at',this.value)"></div>
+      ${a.qK ? r.K.map(k=>`<div style="margin-top:8px;"><label>${cx_e(k.n)} (${cx_e(ing.u)})</label><input type="text" inputmode="decimal" class="ft-in" value="${cx_e(a.qK[k.id] !== undefined ? a.qK[k.id] : '')}" oninput="cx_adjK('${k.id}',this.value)"></div>`).join('') + `<div style="margin-top:8px;"><b>Total : <span id="cx-adj-tot">${cx_e(a.q)}</span> ${cx_e(ing.u)}</b></div>` : `<div style="margin-top:8px;"><label>Quantité de départ (${cx_e(ing.u)})</label><input type="text" inputmode="decimal" class="ft-in" value="${cx_e(a.q)}" oninput="cx_adjSet('q',this.value)"></div>`}
       <div style="margin-top:8px;"><label>Note explicative (obligatoire si la quantité change)</label><input type="text" class="ft-in" placeholder="Ex. perte, don, erreur de pesée…" value="${cx_e(a.note)}" oninput="cx_adjSet('note',this.value)"></div>
-      <div class="pt-muted" style="margin-top:6px;">Calculé : ${cx_e(cx_fmt(r.startCalc, ing))}. Enregistré uniquement dans le Contrôle, avec ton nom et l’heure.</div>
+      <div class="pt-muted" style="margin-top:6px;">Calculé : ${cx_e(cx_fmt(r.startCalc, ing))}${a.qK ? ' (' + r.K.map(k=>cx_e(k.n + ' ' + cx_fmt(k.startCalc || 0, ing))).join(' · ') + ')' : ''}. Si tu changes l’heure, la période commence à cette heure. Enregistré uniquement dans le Contrôle, avec ton nom et l’heure.</div>
       <div class="actions-row"><button class="btn small t-save" onclick="cx_startSave()">Enregistrer</button><button class="btn ghost small" onclick="cx_fClose()">Annuler</button></div></div>`;
   else if(fm && fm.t === 'taux') form = `<div class="rp2-ing" style="margin:6px 0;"><div class="section-label">Taux — ${cx_e(ing.n)}</div>
       <div class="g2"><div><label>Taux d’achat (%)</label><input type="text" inputmode="decimal" class="ft-in" value="${cx_e(fm.rend)}" oninput="cx_fSet('rend',this.value)"></div><div><label>Taux de cuisson (%)</label><input type="text" inputmode="decimal" class="ft-in" value="${cx_e(fm.cuis)}" oninput="cx_fSet('cuis',this.value)"></div></div>
