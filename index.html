@@ -664,6 +664,20 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
 .u-m{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;}.u-m .v{font-size:28px;font-weight:700;}
 .u-g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
 .u-pad{padding:14px 16px;}
+.u-split{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line);}
+.u-split>.u-lf{padding:14px 12px 14px 16px;min-width:0;}
+.u-split>.u-rt{padding:14px 10px;border-left:1px solid var(--line);background:rgba(255,255,255,.02);text-align:center;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;}
+.u-rg{position:relative;width:132px;height:132px;margin:2px auto 0;}.u-rg svg{width:100%;height:100%;display:block;}
+.u-rg .arc{stroke-dashoffset:var(--full);animation:u-draw .9s ease-out forwards;}
+@keyframes u-draw{to{stroke-dashoffset:var(--off);}}
+.u-rg b{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:32px;font-weight:800;line-height:1;}.u-rg b small{font-size:11px;font-weight:400;color:var(--ink-muted);margin-top:4px;}
+.u-rh{font-size:17px;font-weight:800;margin:10px 0 2px;line-height:1.25;}.u-rs{font-size:12px;color:var(--ink-muted);}.u-ra{font-size:13px;margin-top:4px;direction:rtl;opacity:.9;}
+.u-rc{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:10px;}.u-rc span{font-size:11px;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.08);}
+.u-rt .u-rm{margin-top:90px;font-size:13px;color:var(--ink-muted);}
+.u-cf{position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:2px;opacity:0;animation:u-conf 1.2s ease-out forwards;}
+@keyframes u-conf{0%{opacity:1;transform:translate(0,0) rotate(0);}100%{opacity:0;transform:translate(var(--x),var(--y)) rotate(300deg);}}
+@media (max-width:359px){.u-split{grid-template-columns:1fr;}.u-split>.u-rt{order:-1;border-left:0;border-bottom:1px solid var(--line);}}
+
 </style>
 </head>
 <body>
@@ -7397,6 +7411,8 @@ async function dt_deleteAvoir(id){
    Données dans la collection existante « mise_en_place » : « v2cfg » (réglages), « v2_<date>_<rubrique> » (Mise en place), « v2_<date>_<rubrique>_s » (Stock).
    Rien ne touche aux saisies actuelles : les cuisiniers continuent comme avant tant que NEW_RUBRIQUES_ADMIN_ONLY est à true. */
 const v2_cfgRef = db.collection('mise_en_place').doc('v2cfg');
+const v2_bestRef = db.collection('mise_en_place').doc('v2best');
+let v2_best = {}, v2_bestReady = false, v2_bestBusy = false;
 const V2_HEX = { saumon:'#F28B6E', escalope:'#E8B93A', l2:'#E879A6', gamba:'#F0765F', poulet:'#D9C9A3', 'viande hach':'#C0504D', 'viande rouge':'#B5485A', avocat:'#6FBF73' };
 function v2_hexName(name, colKey){ const n = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(), k = Object.keys(V2_HEX).find(x=>n.includes(x)); return k ? V2_HEX[k] : (V2_COLORS[colKey] || '#9aa39e'); }
 const v2_hex = (it)=>v2_hexName(it.n, (v2_ing(it) || {}).col);
@@ -7479,6 +7495,7 @@ const v2_isIn = (f)=>!!(f.calc || f.src || f.srcIng);
 function v2_start(){
   if(v2_started) return; v2_started = true; v2_date = v2_ymd();
   v2_cfgRef.onSnapshot((doc)=>{ v2_cfg = doc.exists ? (doc.data() || {}) : {}; v2_cfgReady = true; if(!v2_typing()) v2_render(); }, (e)=>{ console.error(e); v2_cfgReady = true; v2_render(); });
+  v2_bestRef.onSnapshot((doc)=>{ v2_best = doc.exists ? (doc.data() || {}) : {}; v2_bestReady = true; if(!doc.exists && session && session.isAdmin && !v2_bestBusy) setTimeout(()=>v2_bestRebuild(true), 1500); if(!v2_typing()) v2_render(); }, (e)=>{ console.error(e); v2_bestReady = true; });
   v2_watchDay();
   if(typeof dp_start === 'function') dp_start();
 }
@@ -7658,7 +7675,79 @@ function v2_cardBtns(sec, it, n, hasOp, cur){
   const empty = hasOp ? !v2_opHasValue(it, sec, n) : false;
   return `<div class="v2-pb"><button class="v2-pv" ${validated ? 'disabled' : ''} onclick="v2_validate('${esc(sec)}','${it.id}',${hasOp ? n : 0})">✓ ${label}</button>${anyPrev || validated ? `<a class="v2-lk" onclick="v2_reopen('${esc(sec)}','${it.id}',${hasOp ? 1 : 0})">${esc(v2_fr('btn.fix'))}${v2_arSpan(v2_arOf('btn.fix'), 'ctr')}</a>` : ''}</div>`;
 }
-function v2_rendHtml(sec, it){
+/* ---------- rendement par opération et comparaison avec les 3 meilleures opérations de tout l'historique ---------- */
+function v2_opGroups(it){ const c = v2_ing(it), gs = {}; c.fields.forEach(f=>{ if(f.bg && f.bil && f.per === 'op') (gs[f.bg] = gs[f.bg] || []).push(f); }); return gs; }
+function v2_opRend(it, n){
+  const gs = v2_opGroups(it), g = Object.keys(gs)[0]; if(!g) return null;
+  let si = 0, so = 0, a = false, b = false;
+  gs[g].filter(f=>f.bil === 'in').forEach(f=>{ const v = v2_valOf(it, f, n); if(v !== null){ si += v; a = true; } });
+  gs[g].filter(f=>f.bil === 'out' && !/^loss/.test(f.id)).forEach(f=>{ const v = v2_valOf(it, f, n); if(v !== null){ so += v; b = true; } });
+  if(!a || !b || !(si > 0) || so > si + 0.0005) return null; return { g, si, so, pct:so / si * 100 };
+}
+const v2_bestOf = (itId)=>Array.isArray(v2_best[itId]) ? v2_best[itId] : [];
+function v2_bestAdd(list, e){ const l = (list || []).filter(x=>x.id !== e.id); l.push(e); return l.sort((a, b)=>b.pct - a.pct).slice(0, 3); }
+async function v2_bestUpdate(it, n, by, ok){
+  if(!ok) return; const r = v2_opRend(it, n); if(!r || !(r.pct > 0)) return;
+  const e = { id:v2_date + '|' + it.id + '#' + n, pct:Math.round(r.pct * 10) / 10, date:v2_date, by:by || '' };
+  const nl = v2_bestAdd(v2_bestOf(it.id), e); v2_best[it.id] = nl;
+  try{ await v2_bestRef.set({ [it.id]:nl }, { merge:true }); }catch(er){ console.error(er); }
+}
+async function v2_bestRebuild(silent){
+  if(v2_bestBusy) return; v2_bestBusy = true; if(!silent) { v2_test.msg = ''; }
+  try{
+    const snap = await db.collection('mise_en_place').where('v2date', '>=', '0').get(), out = {};
+    snap.forEach((dd)=>{ const d = dd.data() || {}; if(!d.v2date || d.zone === 'stock' || !d.vals) return;
+      v2_ings().forEach((it)=>{ const gs = v2_opGroups(it), g = Object.keys(gs)[0]; if(!g) return;
+        const ns = new Set(); Object.keys(d.vals).forEach((k)=>{ if(k.indexOf(it.id + '.') === 0 && k.indexOf('#') > 0) ns.add(parseInt(k.split('#')[1], 10)); });
+        ns.forEach((n)=>{ if(!(n > 0)) return; let si = 0, so = 0, a = false, b = false, bad = false;
+          const val = (f)=>{ const k = v2_key(it, f, n); if(d.skips && d.skips[k]) bad = true; if(d.flags && d.flags[k]) bad = true; const v = v2_num(d.vals[k]); return v; };
+          gs[g].filter(f=>f.bil === 'in').forEach(f=>{ const v = val(f); if(v !== null){ si += v; a = true; } });
+          gs[g].filter(f=>f.bil === 'out' && !/^loss/.test(f.id)).forEach(f=>{ const v = val(f); if(v !== null){ so += v; b = true; } });
+          if(bad || !a || !b || !(si > 0) || so > si + 0.0005) return;
+          out[it.id] = v2_bestAdd(out[it.id], { id:d.v2date + '|' + it.id + '#' + n, pct:Math.round(so / si * 1000) / 10, date:d.v2date, by:d.by || '' }); }); }); });
+    v2_best = out; await v2_bestRef.set(out);
+    if(!silent) v2_test.msg = 'Meilleurs rendements recalculés.';
+  }catch(e){ console.error(e); if(!silent) v2_test.msg = 'Erreur : ' + (e.message || e); }
+  v2_bestBusy = false; v2_render();
+}
+function v2_compareHtml(it, n){
+  const r = v2_opRend(it, n); if(!r) return '';
+  const list = v2_bestOf(it.id), pc = Math.round(r.pct);
+  let h = `<div class="v2-pref" style="color:#86efac;font-weight:700;margin-top:8px;font-size:17px;">Rendement ${esc(r.g)} : ${pc} % ✓${v2_arSpan('المردودية')}</div>`;
+  if(list.length < 3) return h + `<div class="u-s" style="margin-top:6px;">Pas encore assez d’opérations pour comparer (${list.length} sur 3).${v2_arSpan('لا توجد عمليات كافية للمقارنة بعد')}</div>`;
+  const bench = list.reduce((t, x)=>t + x.pct, 0) / 3, d = r.pct - bench, up = d >= 0, ok = d >= -2, col = ok ? '#86efac' : '#FBBF24', ar = up ? '↑' : '↓', dd = Math.abs(Math.round(d * 10) / 10).toString().replace('.', ',');
+  const msg = up ? 'Tu es au niveau de tes meilleures opérations' : ok ? 'Très proche de tes meilleures opérations' : 'Tu peux faire mieux : vise ton meilleur niveau';
+  const msgAr = up ? 'أنت في مستوى أفضل عملياتك' : ok ? 'قريب جداً من أفضل عملياتك' : 'يمكنك التحسّن: استهدف أفضل مستوى لك';
+  return h + `<div style="margin-top:8px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04);border-left:4px solid ${col};"><div class="u-s">Moyenne de tes 3 meilleures opérations : <b>${Math.round(bench * 10) / 10 % 1 === 0 ? Math.round(bench) : (Math.round(bench * 10) / 10).toString().replace('.', ',')} %</b></div><div style="font-size:20px;font-weight:800;color:${col};margin-top:2px;">${ar} ${up ? '+' : '−'}${dd} point${Math.abs(d) >= 2 ? 's' : ''}</div><div style="color:${col};margin-top:2px;">${esc(msg)}${v2_arSpan(msgAr)}</div></div>`;
+}
+
+/* ---------- panneau d'indicateur de rendement (à droite du clavier) ---------- */
+function v2_resSnap(it, n, hasOp, sec, by, prev){
+  const name = String(by || '').trim(); const nm = name ? name.charAt(0).toUpperCase() + name.slice(1) : '';
+  const r = hasOp ? v2_opRend(it, n) : null, c = v2_ing(it), lab = hasOp ? ' · ' + String(c.opLabel || 'Opération').charAt(0) + String(c.opLabel || 'Opération').slice(1).toLowerCase() + ' ' + n : '';
+  const base = { date:v2_date, sec, itId:it.id, nm, title:it.n + lab };
+  if(!r){ const t = v2_rendHtml(sec, it, 0); return t ? Object.assign(base, { kind:'txt', html:t }) : null; }
+  const pct = Math.round(r.pct * 10) / 10, list = (prev || []).slice(0, 3), mx = list.length ? Math.max.apply(null, list.map(x=>x.pct)) : 0;
+  const bench = list.length >= 3 ? list.reduce((t, x)=>t + x.pct, 0) / 3 : null;
+  return Object.assign(base, { kind:'ring', pct, bench, record: list.length >= 3 && pct > mx, cnt:list.length });
+}
+const v2_pf = (x)=>(Math.round(x * 10) / 10).toString().replace('.', ',');
+function v2_panelHtml(res){
+  if(!res || res.date !== v2_date) return `<div class="u-rm">Ta première opération${v2_arSpan('عمليتك الأولى')}</div>`;
+  if(res.kind === 'txt') return `<div class="u-rh" style="font-size:15px;">${esc(res.title)} ✓</div>${res.html}`;
+  const nm = res.nm ? ', ' + esc(res.nm) : '', pc = Math.round(res.pct), circ = 2 * Math.PI * 68;
+  let col = '#4ADE80', h1, h2, ar = '', chips = '';
+  if(res.bench === null){ h1 = `Bravo${nm} !`; h2 = `Pas encore assez d’opérations pour comparer (${res.cnt} sur 3)`; ar = 'أحسنت! لا توجد عمليات كافية للمقارنة بعد'; }
+  else { const d = res.pct - res.bench, dd = Math.abs(Math.round(d * 10) / 10);
+    if(res.record){ h1 = `Bravo${nm}, nouveau record !`; h2 = `Tu dépasses la moyenne de tes 3 meilleures (${v2_pf(res.bench)} %)`; ar = 'أحسنت! مستوى جديد أفضل من أعلى 3 عمليات'; }
+    else if(d >= 0){ h1 = `Bravo${nm} !`; h2 = `Tu es au niveau de tes meilleures opérations (${v2_pf(res.bench)} %)`; ar = 'أنت في مستوى أفضل عملياتك'; }
+    else { col = '#FBBF24'; h1 = `Beau travail${nm} !`; h2 = `Plus que ${v2_pf(dd)} point${dd >= 2 ? 's' : ''} pour égaler ton meilleur niveau (${v2_pf(res.bench)} %)`; ar = `عمل جميل! بقيت ${v2_pf(dd)} نقاط للوصول إلى أفضل مستوى لك`; }
+    chips = `<span>${d >= 0 ? '+' : '−'}${v2_pf(dd)} point${dd >= 2 ? 's' : ''}</span>`; }
+  const cf = res.record ? [0,1,2,3,4,5,6,7,8,9].map(i=>{ const a = i / 10 * 6.283, x = Math.round(Math.cos(a) * 80), y = Math.round(Math.sin(a) * 80); return `<i class="u-cf" style="--x:${x}px;--y:${y}px;background:${['#4ADE80','#FBBF24','#60A5FA','#F472B6'][i % 4]};animation-delay:${(i % 3) * 0.08}s;"></i>`; }).join('') : '';
+  return `<div class="u-rg"><svg viewBox="0 0 170 170"><circle cx="85" cy="85" r="68" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="14"/><circle class="arc" cx="85" cy="85" r="68" fill="none" stroke="${col}" stroke-width="14" stroke-linecap="round" stroke-dasharray="${circ.toFixed(1)}" style="--full:${circ.toFixed(1)};--off:${(circ * (1 - Math.min(res.pct, 100) / 100)).toFixed(1)};" transform="rotate(-90 85 85)"/></svg><b>${pc} %<small>rendement</small></b>${cf}</div><div class="u-rh" style="color:${col};">${h1}</div><div class="u-rs">${esc(h2)}</div><div class="u-ra">${ar}</div><div class="u-rc">${chips}<span>${esc(res.title)}</span></div>`;
+}
+function v2_rendHtml(sec, it, n){
+  if(n && v2_opRend(it, n)) return v2_compareHtml(it, n);
   const c = v2_ing(it), gs = {}; c.fields.forEach(f=>{ if(f.bg && f.bil) (gs[f.bg] = gs[f.bg] || []).push(f); }); let h = '';
   Object.keys(gs).forEach((g)=>{
     if(!gs[g].some(f=>f.sec === sec)) return;
@@ -7671,7 +7760,7 @@ function v2_rendHtml(sec, it){
 }
 
 /* ---------- Mise en place : une pesée par écran ---------- */
-let v2_wizSkips = {}, v2_wizFlags = {}, v2_wizForce = {}, v2_warnOk = {}, v2_fb = null, v2_warn = null;
+let v2_wizSkips = {}, v2_wizFlags = {}, v2_wizForce = {}, v2_warnOk = {}, v2_fb = null, v2_warn = null, v2_last = null;
 function v2_wizItems(sec){
   const mord = ((v2_cfg.order || {}).mep || {})[sec] || [], mix = (id)=>{ const i = mord.indexOf(id); return i < 0 ? 9999 : i; };
   const d = v2_docs[sec] || {}, sk = Object.assign({}, d.skips || {}, v2_wizSkips);
@@ -7699,12 +7788,10 @@ function v2_wizView(sec){
   const tot = items.reduce((t, p)=>t + p.req.length, 0), dn = items.reduce((t, p)=>t + (p.validated ? p.req.length : p.req.filter(x=>x.has).length), 0);
   const head = `<div class="u-hd"><div><div class="u-t">${esc(v2_rubName(sec))} · ${esc(v2_who())}</div><div class="u-s">Mise en place · ${dn} sur ${tot}</div></div>${v2_arBtn()}</div><div class="u-bar"><i style="width:${tot ? Math.round(dn / tot * 100) : 0}%"></i></div>`;
   const unitOf = (it)=>esc(v2_unitOf(it));
-  if(v2_fb && v2_fb.sec === sec){ const it = v2_byId(v2_fb.itId); if(it){ const c = v2_ing(it);
-    return `<div class="u-card">${head}<div class="u-pad"><div class="u-t">${esc(it.n)}${v2_fb.hasOp ? ' · ' + esc(String(c.opLabel || 'Opération').charAt(0) + String(c.opLabel || 'Opération').slice(1).toLowerCase()) + ' ' + v2_fb.n : ''} : enregistré</div>${v2_rendHtml(sec, it) || '<div class="u-s" style="margin-top:8px;">Valeurs enregistrées.</div>'}<button class="u-btn main" style="margin-top:14px;" onclick="v2_fb=null;v2_render()">Continuer</button></div></div>`; } }
   if(v2_warn && v2_warn.sec === sec){ const w = v2_warn;
     return `<div class="u-card">${head}<div class="u-pad"><div class="u-t" style="color:#F87171;">La somme dépasse le poids mis</div><div style="margin:8px 0;">${esc(w.g)} : ${esc(v2_fmt(w.so))} servis pour ${esc(v2_fmt(w.si))} mis. Vérifie ta pesée.${v2_arSpan('المجموع أكبر من الوزن المُدخل، تحقق من الوزن')}</div><div style="display:flex;gap:10px;"><button class="u-btn main" onclick="v2_warnFix()">Je corrige</button><button class="u-btn" style="flex:1;" onclick="v2_warnKeep()">Je confirme</button></div></div></div>`; }
   const p = items.find(x=>!x.validated);
-  if(!p){ return `<div class="u-card">${head}<div class="u-pad"><div class="u-t">Tout est saisi</div><div class="u-s" style="margin-top:4px;">Merci, la mise en place est terminée.${v2_arSpan('تم، شكراً')}</div>${lock ? '' : items.filter(x=>x.hasOp).map(x=>`<button class="u-btn" style="margin-top:10px;width:100%;" onclick="v2_wizNew('${x.it.id}')">Nouvelle opération : ${esc(x.it.n)}</button>`).join('')}</div></div>`; }
+  if(!p){ return `<div class="u-card">${head}<div class="u-pad"><div class="u-t">Tout est saisi</div><div class="u-s" style="margin-top:4px;">Merci, la mise en place est terminée.${v2_arSpan('تم، شكراً')}</div>${lock ? '' : items.filter(x=>x.hasOp).map(x=>`<button class="u-btn" style="margin-top:10px;width:100%;" onclick="v2_wizNew('${x.it.id}')">Nouvelle opération : ${esc(x.it.n)}</button>`).join('')}</div>${v2_last && v2_last.sec === sec && v2_last.date === v2_date ? `<div class="u-pad" style="border-top:1px solid var(--line);text-align:center;">${v2_panelHtml(v2_last)}</div>` : ''}</div>`; }
   const cur = p.req.find(x=>!x.has), title = `${esc(p.it.n)}${p.hasOp ? ' · ' + esc(String(p.c.opLabel || 'Opération').charAt(0) + String(p.c.opLabel || 'Opération').slice(1).toLowerCase()) + ' ' + p.n : ''}`;
   const rowsH = p.fields.map((x)=>{ const isCur = cur && x.key === cur.key; let val = '';
     if(x.calc){ const v = v2_valOf(p.it, x.f, p.n); val = v === null ? '—' : esc(v2_fmt(v)) + ' ' + unitOf(p.it); }
@@ -7716,8 +7803,9 @@ function v2_wizView(sec){
     action = v2_recuEdit[cur.key] ? `<div class="u-t" style="font-size:16px;">Pèse : ${esc(cur.f.n)}</div>${v2_kpHtml(v2_unitOf(p.it), `v2_wizOk('${esc(sec)}','${p.it.id}','${cur.f.id}')`)}`
       : `<div class="u-t" style="font-size:16px;">${esc(cur.f.n)} : ${esc(v2_fmt(calc))} ${unitOf(p.it)}</div><div style="display:flex;gap:10px;margin-top:10px;"><button class="u-btn main" onclick="v2_recuOk('${esc(sec)}','${p.it.id}','${cur.f.id}',${p.n});v2_wizAfterSoon('${esc(sec)}','${p.it.id}')">C’est bon</button><button class="u-btn" style="flex:1;" onclick="v2_recuFix('${cur.key}')">Corriger</button></div>`; }
   else { action = `<div class="u-t" style="font-size:16px;">Pèse : ${esc(cur.f.n)}</div>${v2_arSpan(cur.f.ar ? 'زن ' + cur.f.ar : '')}${v2_kpHtml(v2_unitOf(p.it), `v2_wizOk('${esc(sec)}','${p.it.id}','${cur.f.id}')`)}<div style="text-align:center;margin-top:10px;"><a class="v2-lk" onclick="v2_wizSkip('${esc(sec)}','${p.it.id}','${cur.f.id}')">Je n’ai pas pesé${v2_arSpan('لم أقم بالوزن')}</a></div>`; }
+  const split = !!(v2_last && v2_last.sec === sec && v2_last.date === v2_date) || (p.hasOp && Object.keys(v2_opGroups(p.it)).length > 0);
   const waits = p.fields.filter(x=>x.confirm && x.wait).map(x=>`<div class="u-s" style="margin-top:6px;">${esc(x.f.n)} : en attente de la rubrique d’origine.</div>`).join('');
-  return `<div class="u-card">${head}<div class="u-ih" style="--c:${v2_hex(p.it)};"><i class="u-dot"></i><div><b>${title}</b>${v2_arSpan(p.c.ar)}<span class="u-s">${esc(v2_rubName(sec))} · ${esc(v2_who())}</span></div></div><div class="u-pad"><div style="margin-top:2px;">${rowsH}${waits}</div></div><div class="u-pad" style="border-top:1px solid var(--line);">${action}</div></div>`;
+  return `<div class="u-card">${head}<div class="u-ih" style="--c:${v2_hex(p.it)};"><i class="u-dot"></i><div><b>${title}</b>${v2_arSpan(p.c.ar)}<span class="u-s">${esc(v2_rubName(sec))} · ${esc(v2_who())}</span></div></div><div class="u-pad"><div style="margin-top:2px;">${rowsH}${waits}</div></div>${split ? `<div class="u-split"><div class="u-lf">${action}</div><div class="u-rt">${v2_panelHtml(v2_last && v2_last.sec === sec ? v2_last : null)}</div></div>` : `<div class="u-pad" style="border-top:1px solid var(--line);">${action}</div>`}</div>`;
 }
 function v2_wizAfterSoon(sec, itId){ setTimeout(()=>v2_wizAfter(sec, itId), 400); }
 function v2_wizNew(id){ v2_wizForce[id] = true; v2_render(); }
@@ -7750,7 +7838,8 @@ async function v2_wizValidate(sec, itId){
     v2_mergeLocal(sec, sec, 'mep', patch); await v2_write(sec, sec, 'mep', patch); v2_form[sec] = {};
     Object.keys(sk).forEach(k=>delete v2_wizSkips[k]); Object.keys(fl).forEach(k=>delete v2_wizFlags[k]);
     if(p.hasOp){ v2_ops[itId] = Math.max(v2_opN(it), p.n + 1); v2_times[itId + '#' + (p.n + 1)] = v2_hm(); }
-    delete v2_wizForce[itId]; await v2_flushForeign(sec, by); v2_fb = { sec, itId, n:p.n, hasOp:p.hasOp };
+    const clean = !Object.keys(sk).length && !Object.keys(fl).length, prevBest = v2_bestOf(it.id).slice(), snap = v2_resSnap(it, p.n, p.hasOp, sec, by, prevBest); if(p.hasOp) await v2_bestUpdate(it, p.n, by, clean);
+    delete v2_wizForce[itId]; await v2_flushForeign(sec, by); if(snap) v2_last = snap;
   }catch(e){ console.error(e); alert('Enregistrement impossible : ' + (e.message || e)); }
   v2_busy = false; v2_render();
 }
@@ -8216,7 +8305,7 @@ async function v2_testDelete(){
     if(!confirm('Supprimer définitivement ' + d1.size + ' saisie(s) de cuisine, ' + d2.size + ' événement(s) et ' + d3.size + ' bilan(s) de contrôle du ' + T.a + ' au ' + T.b + ' ?')){ T.busy = false; v2_render(); return; }
     await v2_delRefs(refs);
     if(T.relearn){ v2_cfg.learn = { start:todayISO(), days:(v2_cfg.learn && v2_cfg.learn.days) || 14 }; await v2_cfgRef.set({ learn:v2_cfg.learn }, { merge:true }); }
-    T.word = ''; T.msg = 'Supprimé : ' + d1.size + ' saisie(s), ' + d2.size + ' événement(s), ' + d3.size + ' bilan(s).'; cx_reload();
+    T.word = ''; T.msg = 'Supprimé : ' + d1.size + ' saisie(s), ' + d2.size + ' événement(s), ' + d3.size + ' bilan(s).'; cx_reload(); v2_bestBusy = false; await v2_bestRebuild(true);
   }catch(e){ console.error(e); T.msg = 'Erreur : ' + (e.message || e); }
   T.busy = false; v2_render();
 }
@@ -8255,6 +8344,7 @@ function v2_regView(){
     body = v2_testView();
   } else if(v2_regTab === 'bal'){
     body = `<div class="u-card"><div class="u-row" style="border-top:0;"><div style="flex:1;">Précision de la balance</div><select onchange="v2_thrSet('prec',this.value)" style="min-height:38px;">${[1, 5, 10].map(n=>`<option value="${n}" ${th.prec === n ? 'selected' : ''}>${n} g</option>`).join('')}</select></div>${num('Seuil orange (écart ≥)', 'a', th.a, '%')}${num('Seuil rouge (écart ≥)', 'b', th.b, '%')}${num('Données minimales pour afficher la couleur', 'cov', th.cov, '%')}<div class="u-pad u-s">Conseil : un test de calibrage de la balance (poids connu) une fois par mois.</div></div>
+      <div class="u-card"><div class="u-pad"><b>Meilleurs rendements (3 meilleures opérations)</b><div class="u-s" style="margin:4px 0 8px;">Référence montrée aux cuisiniers après chaque opération. Calculée sur tout l’historique.</div>${v2_ings().filter(it=>Object.keys(v2_opGroups(it)).length).map(it=>{ const l = v2_bestOf(it.id); return `<div class="u-row"><div style="flex:1;"><b>${esc(it.n)}</b><div class="u-s">${l.length ? l.map(x=>x.pct.toString().replace('.', ',') + ' % (' + esc(x.date.slice(8) + '/' + x.date.slice(5, 7)) + ')').join(' · ') : 'aucune opération'}</div></div></div>`; }).join('')}<div style="margin-top:8px;"><button class="u-btn sm" ${v2_bestBusy ? 'disabled' : ''} onclick="v2_bestRebuild()">Recalculer les meilleurs rendements</button></div></div></div>
       <div class="u-card"><div class="u-pad"><b>Phase d’apprentissage</b></div><div class="u-row" style="border-top:0;"><div style="flex:1;">Début</div><input type="date" class="ft-in" value="${esc((v2_cfg.learn || {}).start || todayISO())}" onchange="v2_learnSet('start',this.value)"></div><div class="u-row"><div style="flex:1;">Durée</div><input class="ft-in" inputmode="numeric" style="width:70px;text-align:right;" value="${L.days}" onchange="v2_learnSet('days',this.value)"><span class="u-s">jours</span></div></div>`;
   } else {
     const ordRows = v2_regOrd.zone === 'stock' ? v2_stockRows(v2_regOrd.sec).map(r=>({ key:r.key, n:r.n + (r.sub ? ' · ' + r.sub : '') })) : v2_ings().filter(it=>v2_cardMep(v2_regOrd.sec, it)).map(it=>({ key:it.id, n:it.n }));
