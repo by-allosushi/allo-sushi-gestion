@@ -6344,10 +6344,12 @@ async function cx_fetch(f, t, lookDays, priceDays){
   const lb = lookDays === undefined ? 3 : lookDays, pd = priceDays === undefined ? 30 : priceDays;
   const FP = firebase.firestore.FieldPath.documentId();
   const dAch0 = mep_ymd(new Date(f - Math.max(pd, lb) * 864e5)), dAch1 = mep_ymd(new Date(t)), dTk0 = mep_ymd(new Date(f - (lb + 1) * 864e5));
-  const [a, b, c] = await Promise.all([
+  const dV0 = mep_ymd(new Date(f - (lb + 1) * 864e5)), dV1 = mep_ymd(new Date(t));
+  const [a, b, c, vv] = await Promise.all([
     dp_mouvCol.where('date', '>=', dAch0).where('date', '<=', dAch1).get(),
     db.collection('restopro_jours').where(FP, '>=', dTk0).where(FP, '<=', dAch1).get(),
     cx_evCol.where('at', '>=', new Date(f - lb * 864e5).toISOString()).where('at', '<=', new Date(t + 864e5).toISOString()).get(),
+    db.collection('mise_en_place').where('v2date', '>=', dV0).where('v2date', '<=', dV1).get(),
   ]);
   const btnAch = (dp_cfg.boutons || []).find(x=>x.m === 'achat'), btnName = btnAch ? btnAch.n : 'Ingrédients';
   const ach = [], sales = [], ev = [], lo = f - lb * 864e5;
@@ -6362,7 +6364,8 @@ async function cx_fetch(f, t, lookDays, priceDays){
       sales.push({ ms, key:cx_key(nm), name:nm, q:Number(l.q) || 0 }); }); }); });
   c.forEach((d)=>{ ev.push(Object.assign({ id:d.id }, d.data())); });
   const noDetail = []; b.forEach((d)=>{ const day = d.data() || {}; if((day.tickets || []).length && !day.lignes) noDetail.push(d.id); });
-  return { f, t, ach, sales, ev, noDetail };
+  const v2 = []; vv.forEach((d)=>{ const x = d.data(); if(x && x.v2date) v2.push(x); });
+  return { f, t, ach, sales, ev, noDetail, v2 };
 }
 function cx_setWindow(){ return [cx_ms(cx_from), cx_to ? cx_ms(cx_to) : Date.now()]; }
 async function cx_reload(){
@@ -6388,7 +6391,27 @@ function cx_setRange(){
 function cx_nowTo(){ cx_to = ''; cx_reload(); cx_render(); }
 function cx_setTab(t){ cx_tab = t; cx_adj = null; cx_menu = false; if(t === 'jour' && !cx_j.from){ cx_jPreset('today', true); } if(t === 'jour' && !cx_j.data) cx_jLoad(); if(t === 'hist') cx_hLoad(); cx_render(); try{ window.scrollTo(0, 0); }catch(e){} }
 /* ---------- lignes de Mise en place liées à un ingrédient, pesées ---------- */
+let cx_v2 = [];
+/* lignes de stock lues dans Cuisine v2 : chaque champ « fin de service » est converti en équivalent net (brut × rendement, crispy × coefficient) */
+const CX_V2_LOSS = (f)=>/^(loss|perime)/.test(f.id) || /jeter/i.test(f.n || '');
+function cx_v2lines(ing){
+  if(typeof v2_byId !== 'function') return []; const it = v2_byId(ing.id); if(!it) return [];
+  const fam = cx_fam(ing.u), c = cx_cc(ing), out = [];
+  v2_ing(it).fields.forEach((f)=>{ if(f.zone !== 'stock' || v2_isIn(f) || CX_V2_LOSS(f)) return;
+    const k = v2_key(it, f, 1), crisp = /(^|_)(cr|c)$|crispy/i.test(f.id) || /crispy/i.test(f.n || ''), raw = /raw|brut/i.test(f.id) || /brut/i.test(f.n || '');
+    out.push({ id:'v2:' + k, key:k, sec:f.sec, secName:v2_rubName(f.sec), n:f.n || f.id, u:ing.u || 'kg', f:fam.f * (crisp ? c.cuis / 100 : raw ? c.rend / 100 : 1), auto:true, role:'stock', v2:true }); });
+  return out;
+}
+function cx_v2loss(ing, f, t){
+  if(typeof v2_byId !== 'function') return []; const it = v2_byId(ing.id); if(!it) return [];
+  const ids = v2_ing(it).fields.filter(CX_V2_LOSS).map(x=>x.id), fam = cx_fam(ing.u), d0 = cx_dayStart(f).getTime(), out = [];
+  cx_v2.forEach((d)=>{ const day = new Date(d.v2date + 'T00:00').getTime(); if(isNaN(day) || day < d0 || day > t) return;
+    Object.keys(d.vals || {}).forEach((k)=>{ if(k.indexOf(it.id + '.') !== 0) return; const fid = k.slice(it.id.length + 1).split('#')[0]; if(!ids.includes(fid)) return; const q = v2_num(d.vals[k]); if(q === null || q <= 0) return;
+      const at = (d.atKeys && d.atKeys[k]) || d.at || (d.v2date + 'T12:00:00'), g = q * fam.f; out.push({ l:{ id:'v2loss:' + k, sec:d.sec, secName:v2_rubName(d.sec), n:'À jeter déclaré', f:fam.f, u:ing.u }, w:{ ms:new Date(at).getTime() || day, q, who:(d.byKeys && d.byKeys[k] && d.byKeys[k].w) || d.by || '' }, raw:g, v:g }); }); });
+  return out;
+}
 function cx_lines(ing){
+  const v2l = cx_v2lines(ing); if(v2l.length) return v2l;
   const m = (cx_cfg.ing[ing.id] || {}).map || {}, out = [], fb = cx_fam(ing.u).b;
   mep_secList().forEach((sc)=>(mep_lists[sc.id] || []).forEach((l)=>{
     if(m[l.id] === undefined || m[l.id] === null) return;
@@ -6399,6 +6422,10 @@ function cx_lines(ing){
 }
 function cx_weighs(l){
   const out = [];
+  if(l.v2){ cx_v2.forEach((d)=>{ if(d.zone !== 'stock' || d.sec !== l.sec || !d.vals || d.vals[l.key] === undefined) return; const q = v2_num(d.vals[l.key]); if(q === null) return;
+      const at = (d.atKeys && d.atKeys[l.key]) || d.at || (d.v2date + 'T23:00:00'), ms = new Date(at).getTime(); if(isNaN(ms)) return;
+      out.push({ ms, q, who:(d.byKeys && d.byKeys[l.key] && d.byKeys[l.key].w) || d.by || '', corr:'', rec:String(at), sid:d.v2date + '|' + d.sec, iid:l.key }); });
+    return out.sort((a, b)=>a.ms - b.ms || a.rec.localeCompare(b.rec)); }
   mep_saisies.forEach((x)=>{ if(x.section !== l.sec) return; const it = (x.items || []).find(i=>i.id === l.id); if(!it || !mep_counts(x, l.id)) return;
     const ms = new Date(mep_shownAt(x)).getTime(); if(isNaN(ms)) return; out.push({ ms, q:Number(it.q) || 0, who:x.name || '', corr:x.correctedBy || '', rec:String(x.at || ''), sid:x.id, iid:it.id }); });
   return out.sort((a, b)=>a.ms - b.ms || a.rec.localeCompare(b.rec));
@@ -6460,9 +6487,10 @@ function cx_price(ing, D, t){
 }
 /* calcul complet d'un ingrédient sur [f, t] ; mode : {k:'reel'|'theo'|'qty', q} */
 function cx_calc(ing, f, t, mode, D){
+  cx_v2 = (D && D.v2) || [];
   const { rend, cuis } = cx_cc(ing), lines = cx_lines(ing), stockL = lines.filter(l=>l.role === 'stock'), perteL = lines.filter(l=>l.role === 'perte'), kits = cx_kits(ing), flags = [], k = (mode && mode.k) || 'reel';
   const W = stockL.map((l)=>({ l, ws:cx_weighs(l) }));
-  if(!stockL.length) flags.push('aucune ligne de Mise en place liée (⋯ › Réglages)');
+  if(!stockL.length) flags.push('aucune ligne de stock (Cuisine › Réglages)');
   if(lines.some(l=>!l.f)) flags.push('équivalence manquante pour : ' + lines.filter(l=>!l.f).map(l=>l.secName + ' · ' + l.n).join(', '));
   const S = W.map((p)=>({ l:p.l, w:cx_lastW(p.ws, f - 3 * 864e5, f) }));
   const sumW = (a)=>a.reduce((s, p)=>s + (p.w ? p.w.q * p.l.f : 0), 0);
@@ -6480,7 +6508,7 @@ function cx_calc(ing, f, t, mode, D){
   const startCalc = start;
   const startEv = D.ev.find(e=>e.type === 'start' && e.ing === ing.id && cx_ms(e.at) === f) || null, startState = !startEv ? 'none' : (startEv.corrected ? 'corrige' : 'valide');
   if(startEv) start = Number(startEv.q) || 0;
-  const seg = cx_seg(ing, D, f, t), PR = cx_perteRows(perteL, f, t, cuis), perte = PR.reduce((s, x)=>s + x.v, 0);
+  const seg = cx_seg(ing, D, f, t), PR = cx_perteRows(perteL, f, t, cuis).concat(cx_v2loss(ing, f, t)), perte = PR.reduce((s, x)=>s + x.v, 0);
   const theo = start + seg.adj + seg.ach - seg.used - perte;
   const R = W.map((p)=>({ l:p.l, w:cx_lastW(p.ws, f, t) })), have = R.filter(p=>p.w), real = have.length ? sumW(R) : null, missR = R.filter(p=>!p.w);
   if(missR.length && have.length) flags.push('pesée de fin manquante : ' + missR.map(p=>p.l.secName + ' · ' + p.l.n).join(', '));
@@ -7363,7 +7391,7 @@ function v2_start(){
 function v2_watchDay(){
   if(v2_unsub){ try{ v2_unsub(); }catch(e){} v2_unsub = null; }
   v2_unsub = db.collection('mise_en_place').where('v2date', '==', v2_date).onSnapshot((snap)=>{
-    const m = {}; snap.forEach(d=>{ const x = d.data() || {}; m[x.sec + (x.zone === 'stock' ? '@s' : '')] = x; }); Object.keys(v2_ob).forEach(id=>{ const d = (v2_ob[id] || {}).data; if(!d || d.v2date !== v2_date) return; const dk = d.sec + (d.zone === 'stock' ? '@s' : ''); m[dk] = v2_deepMerge(m[dk] || { sec:d.sec, zone:d.zone }, d); }); v2_docs = m; if(!v2_typing()) v2_render();
+    const m = {}; snap.forEach(d=>{ const x = d.data() || {}; m[x.sec + (x.zone === 'stock' ? '@s' : '')] = x; }); Object.keys(v2_ob).forEach(id=>{ const d = (v2_ob[id] || {}).data; if(!d || d.v2date !== v2_date) return; const dk = d.sec + (d.zone === 'stock' ? '@s' : ''); m[dk] = v2_deepMerge(m[dk] || { sec:d.sec, zone:d.zone }, d); }); v2_docs = m; if(typeof cx_live === 'function' && cx_live() && cx_started){ clearTimeout(window._cxT); window._cxT = setTimeout(cx_reload, 1500); } if(!v2_typing()) v2_render();
   }, (e)=>console.error(e));
 }
 function v2_typing(){ try{ const a = document.activeElement, b = document.getElementById('v2-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
@@ -7536,6 +7564,17 @@ function v2_cardBtns(sec, it, n, hasOp, cur){
   const empty = hasOp ? !v2_opHasValue(it, sec, n) : false;
   return `<div class="v2-pb"><button class="v2-pv" ${validated ? 'disabled' : ''} onclick="v2_validate('${esc(sec)}','${it.id}',${hasOp ? n : 0})">✓ ${label}</button>${anyPrev || validated ? `<a class="v2-lk" onclick="v2_reopen('${esc(sec)}','${it.id}',${hasOp ? 1 : 0})">${esc(v2_fr('btn.fix'))}${v2_arSpan(v2_arOf('btn.fix'), 'ctr')}</a>` : ''}</div>`;
 }
+function v2_rendHtml(sec, it){
+  const c = v2_ing(it), gs = {}; c.fields.forEach(f=>{ if(f.bg && f.bil) (gs[f.bg] = gs[f.bg] || []).push(f); }); let h = '';
+  Object.keys(gs).forEach((g)=>{
+    if(!gs[g].some(f=>f.sec === sec)) return;
+    const ins = gs[g].filter(f=>f.bil === 'in'), outs = gs[g].filter(f=>f.bil === 'out' && !/^loss/.test(f.id));
+    let si = 0, so = 0, okI = false, okO = false; ins.forEach(f=>{ const v = v2_sumF(it, f.id); if(v !== null){ si += v; okI = true; } }); outs.forEach(f=>{ const v = v2_sumF(it, f.id); if(v !== null){ so += v; okO = true; } });
+    if(!okI || !okO || !(si > 0)) return;
+    h += so > si + 0.0005 ? `<div class="v2-pref" style="color:#F87171;font-weight:700;margin-top:8px;">⚠ ${esc(g)} : la somme (${esc(v2_fmt(so))}) dépasse le poids mis (${esc(v2_fmt(si))}). Vérifie ta pesée.${v2_arSpan('المجموع أكبر من الوزن المُدخل، تحقق من الوزن')}</div>`
+      : `<div class="v2-pref" style="color:#86efac;font-weight:700;margin-top:8px;">Rendement ${esc(g)} : ${Math.round(so / si * 100)} % ✓${v2_arSpan('المردودية')}</div>`; });
+  return h;
+}
 function v2_cardMep(sec, it){
   const c = v2_ing(it), fs = c.fields.filter(f=>f.sec === sec && f.zone !== 'stock' && v2_visible(f)); if(!fs.length) return '';
   const top = fs.filter(f=>f.src || f.srcIng), ops = fs.filter(f=>f.per === 'op' && !f.src && !f.srcIng), svc = fs.filter(f=>f.per !== 'op' && !f.src && !f.srcIng), lvlLock = v2_level(sec) === 'lire';
@@ -7548,6 +7587,7 @@ function v2_cardMep(sec, it){
     h += v2_subHead(lab + ' ' + cur + (t ? ' · ' + t : ''), c.opAr ? c.opAr + ' ' + cur : '') + ops.map(f=>v2_fieldRow(sec, it, f, cur, lvlLock)).join('');
   }
   h += svc.map(f=>v2_fieldRow(sec, it, f, 1, v2_isValid(sec, it.id, 0) || lvlLock)).join('');
+  h += v2_rendHtml(sec, it);
   h += v2_cardBtns(sec, it, ops.length ? v2_curOp(it, sec) : 1, ops.length > 0);
   return h + '</div>';
 }
@@ -7652,43 +7692,86 @@ function v2_hdEvents(sec, key){
 function v2_fdt(iso){ const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }); }
 function v2_stPending(sec, key){ const e = v2_ob['v2_' + v2_date + '_' + sec + '_s']; return !!(e && e.data && e.data.vals && e.data.vals[key] !== undefined); }
 function v2_stInfo(sec, key){
-  const e = v2_hdEvents(sec, key), last = e[e.length - 1];
   if(v2_stPending(sec, key)) return '<span style="color:#FBBF24;">⏳ en attente d’envoi</span>';
-  return last ? `${last.at && String(last.at).slice(0, 10) === v2_date ? '<span style="color:#4ADE80;">✓</span> ' : ''}${esc(last.by)} · ${esc(v2_fdt(last.at))}` : '';
+  const d = v2_docs[sec + '@s'] || {}, by = (d.byKeys && d.byKeys[key] && d.byKeys[key].w) || d.by || '', at = (d.atKeys && d.atKeys[key]) || '';
+  if(d.skips && d.skips[key]) return '<span style="color:#FBBF24;">Pas pesé · ' + esc(by) + '</span>';
+  if(d.vals && d.vals[key] !== undefined && String(d.vals[key]).trim() !== ''){ const c = v2_corrOf(d, key); return '<span style="color:#4ADE80;">✓</span> ' + esc(by) + (at ? ' · ' + esc(v2_fdt(at)) : '') + (c ? ' <span style="color:#FBBF24;">· ✎ corrigé par ' + esc(c.by) + ' (' + esc(String(c.old)) + ' → ' + esc(String(c.neu)) + ')</span>' : ''); }
+  return '';
 }
-function v2_stRefreshAll(){ document.querySelectorAll('.st-info[data-stk]').forEach(el=>{ el.innerHTML = v2_stInfo(el.dataset.stsec, el.dataset.stk); }); }
+function v2_stState(sec, key){ const d = v2_docs[sec + '@s'] || {}; return (d.vals && v2_num(d.vals[key]) !== null) ? 'ok' : (d.skips && d.skips[key]) ? 'skip' : 'none'; }
+const V2_STCOL = { ok:'#4ADE80', skip:'#FBBF24', none:'#6b756e', miss:'#F87171' };
+function v2_stRefreshAll(){
+  document.querySelectorAll('.st-info[data-stk]').forEach(el=>{ el.innerHTML = v2_stInfo(el.dataset.stsec, el.dataset.stk); });
+  const cnt = {};
+  document.querySelectorAll('.st-card[data-stk]').forEach(el=>{ const st = v2_stState(el.dataset.stsec, el.dataset.stk); el.style.borderLeftColor = V2_STCOL[st]; el.classList.remove('miss'); cnt[el.dataset.stsec] = (cnt[el.dataset.stsec] || 0) + (st !== 'none' ? 1 : 0); });
+  Object.keys(cnt).forEach(sec=>{ const e = document.getElementById('st-count-' + sec); if(e) e.textContent = cnt[sec] + ' / ' + document.querySelectorAll('.st-card[data-stsec="' + sec + '"]').length; });
+}
 async function v2_stockSet(sec, key, raw){
   if(v2_level(sec) !== 'saisir') return; raw = String(raw == null ? '' : raw).trim(); if(raw === '') return;
   const n = v2_num(raw); if(n === null || !/^-?\d+([.,]\d+)?$/.test(raw)){ alert('Nombre non valide : « ' + raw + ' ».'); v2_render(); return; }
   const dk = sec + '@s', ev = v2_hdEvents(sec, key), last = ev[ev.length - 1], td = ((v2_docs[dk] || {}).vals || {})[key];
-  if(td === undefined && last && last.q === n) return;      // inchangé par rapport au dernier inventaire
   if(td !== undefined && v2_num(td) === n && !v2_stPending(sec, key)) return;
-  const by = v2_who(), at = new Date().toISOString(), patch = { v2date:v2_date, vals:{ [key]:raw }, byKeys:{ [key]:{ w:by, r:sec } }, atKeys:{ [key]:at }, by, at, stockOk:true };
+  const by = v2_who(), at = new Date().toISOString(), patch = { v2date:v2_date, vals:{ [key]:raw }, skips:{ [key]:'' }, byKeys:{ [key]:{ w:by, r:sec } }, atKeys:{ [key]:at }, by, at, stockOk:true };
   v2_mergeLocal(dk, sec, 'stock', patch);
   await v2_write(dk, sec, 'stock', patch);
   v2_stRefreshAll();
 }
+const V2_STMISS = {};
+function v2_stockRows(sec){
+  const rows = [];
+  v2_ings().forEach(it=>v2_ing(it).fields.forEach(f=>{ if(f.sec === sec && f.zone === 'stock' && !v2_isIn(f) && v2_visible(f)) rows.push({ n:it.n, sub:f.n || '', ar:v2_ing(it).ar || '', u:v2_unitOf(it), key:v2_key(it, f, 1), col:v2_ing(it).col }); }));
+  v2_artRows(sec).forEach(a=>rows.push({ n:a.n, sub:'', ar:'', u:a.u || '', key:'art.' + a.id, col:'blanc' }));
+  const ord = ((v2_cfg.order || {}).stock || {})[sec] || [], ix = (k)=>{ const i = ord.indexOf(k); return i < 0 ? 9999 : i; };
+  return rows.map((r, i)=>({ r, i })).sort((a, b)=>ix(a.r.key) - ix(b.r.key) || a.i - b.i).map(x=>x.r);
+}
 function v2_histBox(sec){
   if(v2_hd[sec] === undefined){ v2_hd[sec] = null; v2_loadHist(sec); }
-  const rows = [];
-  v2_ings().forEach(it=>v2_ing(it).fields.forEach(f=>{ if(f.sec === sec && f.zone === 'stock' && !v2_isIn(f) && v2_visible(f)) rows.push({ n:it.n + ' · ' + (f.n || '—'), u:v2_unitOf(it), key:v2_key(it, f, 1) }); }));
-  v2_artRows(sec).forEach(a=>rows.push({ n:a.n, u:a.u || '', key:'art.' + a.id }));
-  const cell = (x, u, d)=>x ? `<div class="mep-q">${esc(v2_fmt(x.q))}<span class="pt-muted"> ${esc(u)}</span>${d ? ' <span class="mep-d ' + (d > 0 ? 'up' : 'dn') + '">' + (d > 0 ? '▲ +' : '▼ ') + esc(v2_fmt(d)) + '</span>' : ''}</div><div class="mep-w">${esc(x.by)} · ${esc(v2_fdt(x.at))}</div>` : '<span class="pt-muted">—</span>';
-  const lock = v2_level(sec) !== 'saisir';
-  const body = !rows.length ? '' : `<div style="overflow-x:auto;"><table class="mep-g"><tr><th>Article</th><th>Dernier inventaire</th><th>Avant</th></tr>${rows.map((r, k)=>{ const e = v2_hdEvents(sec, r.key), last = e[e.length - 1], prev = e[e.length - 2], tv = ((v2_docs[sec + '@s'] || {}).vals || {})[r.key], val = tv !== undefined ? String(tv) : (last ? v2_fmt(last.q) : '');
-    const inp = lock ? (last ? `<div class="mep-q">${esc(v2_fmt(last.q))}<span class="pt-muted"> ${esc(r.u)}</span></div>` : '<span class="pt-muted">—</span>') : `<div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;"><input class="ft-in" style="width:92px;text-align:right;" inputmode="decimal" placeholder="0,0" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}" value="${esc(val)}" onchange="v2_stockSet('${esc(sec)}','${esc(r.key)}',this.value)" onkeydown="if(event.key==='Enter')this.blur()"><span class="pt-muted">${esc(r.u)}</span></div>`;
-    return `<tr><td><span class="mep-num s">${k + 1}</span>${esc(r.n)}</td><td>${inp}<div class="mep-w st-info" style="text-align:right;" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}">${v2_stInfo(sec, r.key)}</div></td><td>${cell(prev, r.u, 0)}</td></tr>`; }).join('')}</table></div>`;
-  return `<div class="v2-card" style="border-left-color:#6b756e;"><div class="v2-ct"><div>${esc(v2_rubName(sec))} — situation actuelle</div>${v2_arSpan('الوضع الحالي')}</div>${body}</div>`;
+  const rows = v2_stockRows(sec), d = v2_docs[sec + '@s'] || {}, vals = d.vals || {}, skips = d.skips || {}, level = v2_level(sec);
+  const locked = level !== 'saisir' || (!!d.stockDone && !v2_editS[sec]);
+  const doneN = rows.filter(r=>v2_stState(sec, r.key) !== 'none').length;
+  const miss = !!V2_STMISS[sec];
+  const thanks = d.stockDone ? `<div class="v2-card" style="border-left-color:#4ADE80;"><div style="font-weight:800;font-size:17px;">🎉 Merci ${esc(d.by || '')} !</div><div style="margin-top:4px;">+${Number(d.pts) || 0} points pour ce stock${v2_arSpan('شكراً! تم تسجيل المخزون')}</div>${d.ack ? `<div style="margin-top:8px;color:#86efac;font-weight:700;">🙏 ${esc(d.ack.by)} a vu ton stock : merci !${v2_arSpan('اطّلع على مخزونك، شكراً')}</div>` : ''}${level === 'saisir' ? `<a class="v2-lk" onclick="v2_correctStock('${esc(sec)}')">${esc(v2_fr('btn.fixInv'))}</a>` : ''}</div>` : '';
+  const cards = rows.map((r, k)=>{
+    const st = v2_stState(sec, r.key), val = vals[r.key] !== undefined ? String(vals[r.key]) : '', col = (miss && st === 'none') ? V2_STCOL.miss : V2_STCOL[st];
+    const inp = locked ? `<div style="font-size:22px;font-weight:800;text-align:right;">${val !== '' ? esc(v2_fmt(v2_num(val))) + ' <span class="pt-muted" style="font-size:13px;">' + esc(r.u) + '</span>' : st === 'skip' ? '<span class="pt-muted">pas pesé</span>' : '—'}</div>`
+      : `<div style="display:flex;gap:8px;align-items:center;"><input class="ft-in" style="flex:1;font-size:24px;font-weight:800;text-align:center;height:54px;" inputmode="decimal" placeholder="0,0" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}" value="${esc(val)}" onchange="v2_stockSet('${esc(sec)}','${esc(r.key)}',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();v2_stNext(this);}"><span class="pt-muted" style="min-width:28px;">${esc(r.u)}</span></div>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;"><button class="btn ghost small" onclick="v2_stockSet('${esc(sec)}','${esc(r.key)}','0')">Il n’en reste plus (0)${v2_arSpan('لم يبقَ شيء')}</button><button class="btn ghost small" onclick="v2_stockSkip('${esc(sec)}','${esc(r.key)}')">Je n’ai pas pesé${v2_arSpan('لم أقم بالوزن')}</button></div>`;
+    return `<div class="v2-card st-card ${miss && st === 'none' ? 'miss' : ''}" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}" style="border-left-color:${col};"><div class="v2-ct"><div>${esc(r.n)}${r.sub ? ' <span class="pt-muted" style="font-weight:400;font-size:13px;">· ' + esc(r.sub) + '</span>' : ''}</div>${v2_arSpan(r.ar)}</div>${inp}<div class="mep-w st-info" style="margin-top:6px;" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}">${v2_stInfo(sec, r.key)}</div></div>`;
+  }).join('');
+  const prog = `<div class="v2-card" style="border-left-color:#6b756e;"><div class="row-between"><div><b>${esc(v2_rubName(sec))} — stock de fin de service</b>${v2_arSpan('مخزون نهاية الخدمة')}</div><b id="st-count-${esc(sec)}" style="font-size:18px;">${doneN} / ${rows.length}</b></div>${miss ? '<div style="color:#F87171;margin-top:6px;font-weight:700;">Il reste des lignes sans valeur : saisis-les, ou « Pas pesé ».</div>' : ''}</div>`;
+  const fin = (!locked && rows.length) ? `<button class="v2-pv big" style="width:100%;margin:6px 0 14px;text-align:center;" onclick="v2_stockFinish('${esc(sec)}')">✓ Valider le stock${v2_arSpan('تأكيد المخزون')}</button>` : '';
+  return thanks + prog + cards + fin;
+}
+function v2_stNext(el){ const all = Array.from(document.querySelectorAll('input[data-stk]')), i = all.indexOf(el); el.blur(); const n = all[i + 1]; if(n) setTimeout(()=>n.focus(), 30); }
+async function v2_stockSkip(sec, key){
+  if(v2_level(sec) !== 'saisir') return; const dk = sec + '@s', by = v2_who(), at = new Date().toISOString();
+  const patch = { v2date:v2_date, skips:{ [key]:at }, byKeys:{ [key]:{ w:by, r:sec } }, atKeys:{ [key]:at }, by, at, stockOk:true };
+  v2_mergeLocal(dk, sec, 'stock', patch); await v2_write(dk, sec, 'stock', patch); v2_stRefreshAll();
+}
+async function v2_stockFinish(sec){
+  if(v2_busy || v2_level(sec) !== 'saisir') return; const rows = v2_stockRows(sec), dk = sec + '@s';
+  const missing = rows.filter(r=>v2_stState(sec, r.key) === 'none');
+  if(missing.length){ V2_STMISS[sec] = true; v2_render(); const el = document.querySelector('.st-card.miss'); if(el && el.scrollIntoView) el.scrollIntoView({ block:'center' }); return; }
+  V2_STMISS[sec] = false; v2_busy = true;
+  try{ const by = v2_who(), at = new Date().toISOString(), w = rows.filter(r=>v2_stState(sec, r.key) === 'ok').length, patch = { v2date:v2_date, stockDone:true, doneAt:at, pts:w * 10 + 20, by, at, stockOk:true };
+    v2_mergeLocal(dk, sec, 'stock', patch); await v2_write(dk, sec, 'stock', patch); v2_editS[sec] = false; delete v2_hd[sec]; }
+  catch(e){ console.error(e); alert('Enregistrement impossible : ' + (e.message || e)); }
+  v2_busy = false; v2_render();
+}
+async function v2_ack(sec){
+  if(!(session && session.isAdmin)) return; const dk = sec + '@s', at = new Date().toISOString(), patch = { v2date:v2_date, ack:{ by:v2_who(), at } };
+  v2_mergeLocal(dk, sec, 'stock', patch); await v2_write(dk, sec, 'stock', patch); v2_render();
 }
 function v2_stockView(sec){
   const h = v2_histBox(sec);
   if(!h) return `<div class="empty-state">${esc(v2_fr('msg.empty'))}</div>`;
-  return h + (v2_level(sec) === 'saisir' ? `<div class="pt-muted" style="margin:8px 4px;">✏️ Tape la quantité dans la case : elle est enregistrée automatiquement quand tu quittes la case.${v2_arSpan('اكتب الكمية في الخانة، تُحفظ تلقائياً عند مغادرتها.')}</div>` : '');
+  return h;
 }
 function v2_saisieView(zone){
   const rubs = v2_visRubs(); if(!rubs.length) return '<div class="empty-state">Aucune rubrique n’est attribuée à ce compte.</div>';
   const cur = rubs.some(r=>r.id === v2_sec) ? v2_sec : rubs[0].id;
-  const ings = v2_ings(), cardsMep = zone === 'mep' ? ings.map(it=>({ it, h:v2_cardMep(cur, it) })).filter(x=>x.h) : [];
+  const mord = ((v2_cfg.order || {}).mep || {})[cur] || [], mix = (id)=>{ const i = mord.indexOf(id); return i < 0 ? 9999 : i; };
+  const ings = v2_ings().map((it, i)=>({ it, i })).sort((a, b)=>mix(a.it.id) - mix(b.it.id) || a.i - b.i).map(x=>x.it), cardsMep = zone === 'mep' ? ings.map(it=>({ it, h:v2_cardMep(cur, it) })).filter(x=>x.h) : [];
   const done = cardsMep.filter(x=>{ const it = x.it, hasOp = v2_ing(it).fields.some(f=>f.sec === cur && f.per === 'op' && f.zone !== 'stock' && !v2_isIn(f)); return hasOp ? (v2_curOp(it, cur) > 1 && !v2_opHasValue(it, cur, v2_curOp(it, cur))) : v2_isValid(cur, it.id, 0); }).length;
   const counter = zone === 'mep' ? `${done} / ${cardsMep.length}` : ((v2_docs[cur + '@s'] || {}).stockOk ? '✓' : '—');
   const head = `<div class="v2-who"><div>🔒 ${esc(v2_who())} · ${esc(v2_rubName(cur))}${v2_arSpan(v2_rubAr(cur))}</div><div style="text-align:right">${esc(counter)}</div></div>`;
@@ -7758,7 +7841,7 @@ function v2_todayView(){
   const learn = L.day <= L.days ? `<div class="v2-card" style="border-left-color:#FBBF24;"><b>Phase d’apprentissage · jour ${L.day} / ${L.days}</b><div class="mep-w" style="margin-top:4px;">On mesure les rendements et on complète les quantités par plat. Les écarts sont indicatifs.</div></div>`
     : `<div class="v2-card" style="border-left-color:#4ADE80;"><div class="row-between"><b>Apprentissage terminé (${L.days} jours)</b><button class="btn ghost small" onclick="v2_learnExtend()">+ 7 jours</button></div></div>`;
   const rubs = v2_rubs().map(r=>{ const m = v2_docs[r.id], s = v2_docs[r.id + '@s'], vm = m && m.valid ? Object.keys(m.valid).filter(k=>m.valid[k]).length : 0, ex = v2_stockExpected(r.id), dn = ex.filter(k=>v2_num(((s || {}).vals || {})[k]) !== null).length, stOk = s && s.stockOk;
-    return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);"><span>${esc(r.n)}</span><span style="text-align:right;font-size:13px;">Découpes : <b>${vm}</b> · Stock : <b style="color:${stOk ? '#4ADE80' : 'var(--ink-muted)'}">${stOk ? '✓ saisi' : dn + ' / ' + ex.length}</b></span></div>`; }).join('');
+    return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);"><span>${esc(r.n)}</span><span style="text-align:right;font-size:13px;">Découpes : <b>${vm}</b> · Stock : <b style="color:${stOk ? '#4ADE80' : 'var(--ink-muted)'}">${s && s.stockDone ? '✓ validé' : stOk ? '✓ saisi' : dn + ' / ' + ex.length}</b>${s && s.stockDone ? (s.ack ? ' <span style="color:#86efac;">🙏 Merci envoyé</span>' : ` <button class="btn ghost small" onclick="v2_ack('${esc(r.id)}')">🙏 Merci</button>`) + ' · ' + (Number(s.pts) || 0) + ' pts' : ''}</span></div>`; }).join('');
   const list = rows.map((x)=>{
     const r = x.r, big = x.gray ? 'partiel' : (r.ecart < 0 ? '−' + v2_da(x.da) : x.surplus ? '⚠ surplus' : 'OK'), pc = r.pct === null ? '' : (r.pct >= 0 ? '+' : '−') + Math.abs(r.pct).toFixed(1).replace('.', ',') + ' %';
     const qty = r.ecart === null ? 'pesée de fin manquante' : cx_fmt(r.ecart, x.ing, true) + (x.margin ? ' ± ' + Math.round(x.margin) + ' g' : '');
@@ -7804,19 +7887,99 @@ function cx_compSave(key, sans){
 }
 function cx_compNone(key){ const m = {}; cx_ingList().forEach((i)=>{ if(!cx_hasGram(key, i.id)) m[i.id] = 0; }); return cx_compWrite(key, m); }
 
+/* ==================== HISTORIQUE & CORRECTIONS (admin) ==================== */
+let v2_corr = null;
+const v2_back = ()=>`<button class="btn ghost small" style="margin-bottom:8px;" onclick="v2_setTab('reg')">‹ Réglages</button>`;
+function v2_corrList(d){ return Object.keys((d && d.corr) || {}).map(k=>Object.assign({ id:k }, d.corr[k])).sort((a, b)=>String(a.at).localeCompare(String(b.at))); }
+function v2_corrOf(d, key){ const l = v2_corrList(d).filter(c=>c.key === key); return l.length ? l[l.length - 1] : null; }
+function v2_keyLabel(key){
+  if(key.indexOf('art.') === 0){ return key.slice(4); }
+  const id = key.split('.')[0], fid = (key.split('.')[1] || '').split('#')[0], it = v2_byId(id); if(!it) return key;
+  const f = v2_ing(it).fields.find(x=>x.id === fid); return it.n + ' · ' + (f ? f.n : fid) + (key.indexOf('#') > 0 ? ' (op. ' + key.split('#')[1] + ')' : '');
+}
+function v2_histRows(){
+  const out = [];
+  v2_rubs().forEach((r)=>[r.id, r.id + '@s'].forEach((dk)=>{ const d = v2_docs[dk]; if(!d) return; const zone = dk.endsWith('@s') ? 'stock' : 'mep';
+    Object.keys(d.vals || {}).forEach((k)=>{ if(String((d.vals || {})[k]).trim() === '') return; const by = (d.byKeys && d.byKeys[k] && d.byKeys[k].w) || d.by || '', at = (d.atKeys && d.atKeys[k]) || d.at || '';
+      out.push({ dk, sec:r.id, zone, key:k, val:String(d.vals[k]), by, at, corr:v2_corrOf(d, k), skip:false, rub:r.n }); });
+    Object.keys(d.skips || {}).forEach((k)=>{ if(!d.skips[k]) return; out.push({ dk, sec:r.id, zone, key:k, val:'', by:(d.byKeys && d.byKeys[k] && d.byKeys[k].w) || d.by || '', at:d.skips[k], corr:null, skip:true, rub:r.n }); }); }));
+  return out.sort((a, b)=>String(b.at).localeCompare(String(a.at)));
+}
+function v2_corrPreview(r, nv){
+  const id = r.key.split('.')[0], ing = cx_ingById(id), n = v2_num(nv); if(!ing || !cx_data || r.zone !== 'stock') return '<span class="pt-muted">Aperçu d’impact disponible pour les valeurs de stock du jour.</span>';
+  if(n === null) return '';
+  try{
+    const [f, t] = cx_setWindow(), base = cx_calc(ing, f, t, { k:'reel', q:'' }, cx_data);
+    const D2 = Object.assign({}, cx_data, { v2:(cx_data.v2 || []).map(d=>(d.v2date === v2_date && d.sec === r.sec && d.zone === 'stock') ? Object.assign({}, d, { vals:Object.assign({}, d.vals, { [r.key]:String(nv) }) }) : d) });
+    const nw = cx_calc(ing, f, t, { k:'reel', q:'' }, D2), fm = (x)=>x.ecart === null ? '—' : cx_fmt(x.ecart, ing, true) + (x.pct !== null ? ' (' + (x.pct >= 0 ? '+' : '−') + Math.abs(x.pct).toFixed(1).replace('.', ',') + ' %)' : '');
+    return `<b>Impact sur ${esc(ing.n)} :</b> écart ${esc(fm(base))} → <b>${esc(fm(nw))}</b>`;
+  }catch(e){ return ''; }
+}
+function v2_corrOpen(dk, key){ const rows = v2_histRows(), r = rows.find(x=>x.dk === dk && x.key === key); if(!r) return; v2_corr = { dk, key, val:r.val, note:'' }; v2_render(); }
+function v2_corrSet(f, v){ if(!v2_corr) return; v2_corr[f] = v; if(f === 'val'){ const el = document.getElementById('v2-corr-prev'); const r = v2_histRows().find(x=>x.dk === v2_corr.dk && x.key === v2_corr.key); if(el && r) el.innerHTML = v2_corrPreview(r, v); } }
+async function v2_corrSave(){
+  const c = v2_corr; if(!c) return; const r = v2_histRows().find(x=>x.dk === c.dk && x.key === c.key); if(!r) return; const n = v2_num(c.val);
+  if(n === null || !/^-?\d+([.,]\d+)?$/.test(String(c.val).trim())){ alert('Nombre non valide.'); return; }
+  if(v2_num(r.val) === n){ v2_corr = null; v2_render(); return; }
+  const at = new Date().toISOString(), id = c.key.replace(/[.#]/g, '_') + '_' + Date.now(), patch = { v2date:v2_date, vals:{ [c.key]:String(c.val).trim() }, skips:{ [c.key]:'' }, corr:{ [id]:{ key:c.key, old:r.val, neu:String(c.val).trim(), by:v2_who(), at, note:String(c.note || '').trim() } } };
+  v2_mergeLocal(c.dk, r.sec, r.zone, patch); await v2_write(c.dk, r.sec, r.zone, patch); v2_corr = null;
+  if(typeof cx_reload === 'function' && cx_started) cx_reload(); v2_render();
+}
+function v2_histView(){
+  const rows = v2_histRows(); if(!rows.length) return '<div class="empty-state">Aucune saisie pour cette date. (Choisis la date en haut.)</div>';
+  const nCorr = rows.filter(r=>r.corr).length;
+  return `<div class="mep-w" style="margin:6px 0;">${rows.length} saisie${rows.length > 1 ? 's' : ''} · ${nCorr} corrigée${nCorr > 1 ? 's' : ''} · ${rows.filter(r=>r.skip).length} « pas pesé »</div>` + rows.map((r)=>{
+    const editing = v2_corr && v2_corr.dk === r.dk && v2_corr.key === r.key, me = r.by === v2_who(), u = (()=>{ const it = v2_byId(r.key.split('.')[0]); return it ? v2_unitOf(it) : ''; })();
+    const badges = (r.corr ? '<span class="v2-tag" style="background:rgba(251,191,36,.18);color:#FBBF24;">Corrigé</span> ' : '') + (r.skip ? '<span class="v2-tag" style="background:rgba(251,191,36,.18);color:#FBBF24;">Pas pesé</span> ' : '') + (me ? '<span class="v2-tag">Saisi par moi</span>' : '');
+    const trace = r.corr ? `<div class="mep-w" style="color:#FBBF24;">✎ ${esc(r.corr.by)} · ${esc(v2_fdt(r.corr.at))} : ${esc(String(r.corr.old))} → ${esc(String(r.corr.neu))}${r.corr.note ? ' · « ' + esc(r.corr.note) + ' »' : ''}</div>` : '';
+    const form = editing ? `<div style="margin-top:8px;"><div class="g2"><div><label>Nouvelle valeur (${esc(u)})</label><input class="ft-in" inputmode="decimal" value="${esc(v2_corr.val)}" oninput="v2_corrSet('val',this.value)"></div><div><label>Note (facultatif)</label><input class="ft-in" value="${esc(v2_corr.note)}" oninput="v2_corrSet('note',this.value)"></div></div><div id="v2-corr-prev" class="mep-w" style="margin:8px 0;">${v2_corrPreview(r, v2_corr.val)}</div><div class="actions-row"><button class="btn small t-save" onclick="v2_corrSave()">Enregistrer la correction</button><button class="btn ghost small" onclick="v2_corr=null;v2_render()">Annuler</button></div></div>` : '';
+    return `<div class="v2-card" style="border-left-color:${r.corr ? '#FBBF24' : '#6b756e'};"><div class="row-between"><div><b>${esc(v2_keyLabel(r.key))}</b> <span class="pt-muted">· ${esc(r.rub)}${r.zone === 'stock' ? ' · stock' : ''}</span><div class="mep-w">${esc(r.by)} · ${esc(v2_fdt(r.at))}</div></div><div style="text-align:right;"><b style="font-size:18px;">${r.skip ? '—' : esc(v2_fmt(v2_num(r.val))) + ' ' + esc(u)}</b>${r.skip ? '' : `<div><a class="v2-lk" onclick="v2_corrOpen('${esc(r.dk)}','${esc(r.key)}')">✎ Corriger</a></div>`}</div></div><div style="margin-top:4px;">${badges}</div>${trace}${form}</div>`; }).join('');
+}
+
+/* ==================== RÉGLAGES (admin) ==================== */
+function v2_thrSet(k, v){ const n = v2_num(v); if(n === null || n <= 0) return; if(!v2_cfg.thr) v2_cfg.thr = {}; v2_cfg.thr[k] = n; v2_saveCfg(); }
+function v2_learnSet(k, v){ v2_learn(); if(k === 'days'){ const n = Math.round(v2_num(v)); if(n > 0) v2_cfg.learn.days = n; } else if(/^\d{4}-\d{2}-\d{2}$/.test(v)) v2_cfg.learn.start = v; v2_saveCfg(); }
+function v2_orderMove(zone, sec, key, d){
+  const base = zone === 'stock' ? v2_stockRows(sec).map(r=>r.key) : v2_ings().filter(it=>v2_cardMep(sec, it)).map(it=>it.id);
+  const ord = (((v2_cfg.order || {})[zone] || {})[sec] || []).filter(k=>base.includes(k)), list = ord.concat(base.filter(k=>!ord.includes(k))).filter((k, i, a)=>a.indexOf(k) === i);
+  const i = list.indexOf(key), j = i + d; if(i < 0 || j < 0 || j >= list.length) return; const t = list[i]; list[i] = list[j]; list[j] = t;
+  if(!v2_cfg.order) v2_cfg.order = {}; if(!v2_cfg.order[zone]) v2_cfg.order[zone] = {}; v2_cfg.order[zone][sec] = list; v2_saveCfg(); v2_render();
+}
+let v2_regOrd = { zone:'stock', sec:'' };
+function v2_regView(){
+  const th = v2_thr(), L = v2_learn(), rubs = v2_rubs(); if(!v2_regOrd.sec || !rubs.some(r=>r.id === v2_regOrd.sec)) v2_regOrd.sec = (rubs[0] || { id:'' }).id;
+  const num = (lbl, k, val, unit)=>`<div class="v2-f"><div class="v2-fl"><div class="v2-fn">${lbl}</div></div><div class="v2-in"><input class="ft-in" inputmode="decimal" style="width:90px;text-align:right;" value="${esc(String(val).replace('.', ','))}" onchange="v2_thrSet('${k}',this.value)"><span class="v2-u">${unit}</span></div></div>`;
+  const ordRows = v2_regOrd.zone === 'stock' ? v2_stockRows(v2_regOrd.sec).map(r=>({ key:r.key, n:r.n + (r.sub ? ' · ' + r.sub : '') })) : v2_ings().filter(it=>v2_cardMep(v2_regOrd.sec, it)).map(it=>({ key:it.id, n:it.n }));
+  const mepOrd = ((v2_cfg.order || {}).mep || {})[v2_regOrd.sec] || [];
+  const rowsSorted = v2_regOrd.zone === 'stock' ? ordRows : ordRows.map((r, i)=>({ r, i })).sort((a, b)=>{ const ia = mepOrd.indexOf(a.r.key), ib = mepOrd.indexOf(b.r.key); return (ia < 0 ? 9999 : ia) - (ib < 0 ? 9999 : ib) || a.i - b.i; }).map(x=>x.r);
+  return `<div class="v2-card"><div style="font-weight:800;margin-bottom:4px;">Balance & seuils</div>
+      <div class="v2-f"><div class="v2-fl"><div class="v2-fn">Précision de la balance</div></div><div class="v2-in"><select onchange="v2_thrSet('prec',this.value)" style="min-height:38px;">${[1, 5, 10].map(n=>`<option value="${n}" ${th.prec === n ? 'selected' : ''}>${n} g</option>`).join('')}</select></div></div>
+      ${num('Seuil orange (écart ≥)', 'a', th.a, '%')}${num('Seuil rouge (écart ≥)', 'b', th.b, '%')}${num('Données minimales pour afficher la couleur', 'cov', th.cov, '%')}
+      <div class="mep-w" style="margin-top:6px;">Conseil : un test de calibrage de la balance (poids connu) une fois par mois.</div></div>
+    <div class="v2-card"><div style="font-weight:800;margin-bottom:4px;">Phase d’apprentissage</div>
+      <div class="v2-f"><div class="v2-fl"><div class="v2-fn">Début</div></div><div class="v2-in"><input type="date" class="ft-in" value="${esc((v2_cfg.learn || {}).start || todayISO())}" onchange="v2_learnSet('start',this.value)"></div></div>
+      <div class="v2-f"><div class="v2-fl"><div class="v2-fn">Durée</div></div><div class="v2-in"><input class="ft-in" inputmode="numeric" style="width:70px;text-align:right;" value="${L.days}" onchange="v2_learnSet('days',this.value)"><span class="v2-u">jours</span></div></div></div>
+    <div class="v2-card"><div style="font-weight:800;margin-bottom:6px;">Ordre d’affichage (identique pour tous les cuisiniers)</div>
+      <div class="mep-seg" style="margin-bottom:8px;">${[['stock', 'Stock'], ['mep', 'Mise en place']].map(z=>`<button class="${v2_regOrd.zone === z[0] ? 'on' : ''}" onclick="v2_regOrd.zone='${z[0]}';v2_render()">${z[1]}</button>`).join('')}</div>
+      <div class="mep-seg" style="margin-bottom:8px;">${rubs.map(r=>`<button class="${v2_regOrd.sec === r.id ? 'on' : ''}" onclick="v2_regOrd.sec='${esc(r.id)}';v2_render()">${esc(r.n)}</button>`).join('')}</div>
+      ${rowsSorted.length ? rowsSorted.map(r=>`<div class="v2-f"><div class="v2-fl"><div class="v2-fn">${esc(r.n)}</div></div><div style="display:flex;gap:6px;"><button class="btn ghost small" onclick="v2_orderMove('${v2_regOrd.zone}','${esc(v2_regOrd.sec)}','${esc(r.key)}',-1)">↑</button><button class="btn ghost small" onclick="v2_orderMove('${v2_regOrd.zone}','${esc(v2_regOrd.sec)}','${esc(r.key)}',1)">↓</button></div></div>`).join('') : '<div class="pt-muted">Rien à ordonner pour cette rubrique.</div>'}</div>
+    <div class="v2-card"><div style="font-weight:800;margin-bottom:6px;">Ingrédients, champs et textes</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;"><button class="btn ghost small" onclick="v2_setTab('cfg')">Ingrédients & champs</button><button class="btn ghost small" onclick="v2_setTab('listes')">Listes & cuisiniers</button><button class="btn ghost small" onclick="v2_setTab('textes')">Textes</button><button class="btn ghost small" onclick="v2_setTab('ecarts')">Bilan simple (ancien)</button><button class="btn ghost small" onclick="cx_tab='reg';showModule('controle')">Réglages du contrôle</button></div></div>`;
+}
+
 function v2_render(){
   const body = document.getElementById('v2-body'); if(!body) return;
   if(!v2_on()){ body.innerHTML = ''; return; }
   if(!v2_cfgReady){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
   const admin = v2_adminView(); if(admin && !v2_tabInit){ v2_tabInit = true; v2_tab = 'today'; }
-  const tabs = (admin ? [['today', 'Aujourd’hui', '']] : []).concat([['saisie', 'mep'], ['stock', 'stock']].map(t=>[t[0], v2_fr('title.' + t[1]), v2_arOf('title.' + t[1])])).concat(admin ? [['ecarts', 'Écarts', ''], ['cfg', 'Cuisine', ''], ['listes', 'Listes', ''], ['textes', 'Textes', '']] : []);
+  const tabs = (admin ? [['today', 'Aujourd’hui', '']] : []).concat([['saisie', 'mep'], ['stock', 'stock']].map(t=>[t[0], v2_fr('title.' + t[1]), v2_arOf('title.' + t[1])])).concat(admin ? [['hist', 'Historique', ''], ['reg', 'Réglages', '']] : []);
   if(!admin && !['saisie', 'stock'].includes(v2_tab)){ v2_tab = 'saisie'; if(window.v2_lmode){ window.v2_lmode = false; mep_draft = null; } }
-  const zone = v2_tab === 'stock' ? 'stock' : 'mep', isToday = admin && (v2_tab === 'today' || v2_tab === 'plats');
-  const head = `<div id="v2-ob">${v2_obHtml()}</div><div style="font-weight:700;font-size:22px;">${isToday ? 'Aujourd’hui' : esc(v2_fr(zone === 'stock' ? 'title.stock' : 'title.mep')) + v2_arSpan(v2_arOf(zone === 'stock' ? 'title.stock' : 'title.mep'))}</div>
+  const zone = v2_tab === 'stock' ? 'stock' : 'mep', isToday = admin && ['today', 'plats', 'hist', 'reg'].includes(v2_tab);
+  const head = `<div id="v2-ob">${v2_obHtml()}</div><div style="font-weight:700;font-size:22px;">${isToday ? (v2_tab === 'hist' ? 'Historique' : v2_tab === 'reg' ? 'Réglages' : 'Aujourd’hui') : esc(v2_fr(zone === 'stock' ? 'title.stock' : 'title.mep')) + v2_arSpan(v2_arOf(zone === 'stock' ? 'title.stock' : 'title.mep'))}</div>
     <div style="font-size:12px;font-weight:600;color:#FBBF24;margin-top:2px;">Version en test — visible par l’administrateur seulement</div>
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 12px;"><input type="date" value="${esc(v2_date)}" onchange="v2_setDate(this.value)" style="min-height:40px;"><label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_ar ? 'checked' : ''} onchange="v2_toggleAr(this.checked)"> Arabe</label>${(session && session.isAdmin) ? `<label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_asCook ? 'checked' : ''} onchange="v2_toggleCook(this.checked)"> Voir comme un cuisinier</label>` : ''}</div>
-    ${tabs.length > 1 ? `<div class="mep-seg">${tabs.map(t=>`<button class="${(v2_tab === t[0] || (t[0] === 'today' && v2_tab === 'plats')) ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${esc(t[1])}${v2_ar && t[2] ? `<span class="v2-ar" style="text-align:center">${esc(t[2])}</span>` : ''}</button>`).join('')}</div>` : ''}`;
-  body.innerHTML = head + (isToday ? (v2_tab === 'plats' ? v2_compView() : v2_todayView()) : v2_tab === 'listes' && admin ? v2_listsView() : v2_tab === 'cfg' && admin ? v2_cfgView() : v2_tab === 'ecarts' && admin ? v2_ecartsView() : v2_tab === 'textes' && admin ? v2_textsView() : v2_saisieView(zone));
+    ${tabs.length > 1 ? `<div class="mep-seg">${tabs.map(t=>`<button class="${(v2_tab === t[0] || (t[0] === 'today' && v2_tab === 'plats') || (t[0] === 'reg' && ['cfg', 'listes', 'textes', 'ecarts'].includes(v2_tab))) ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${esc(t[1])}${v2_ar && t[2] ? `<span class="v2-ar" style="text-align:center">${esc(t[2])}</span>` : ''}</button>`).join('')}</div>` : ''}`;
+  body.innerHTML = head + (isToday ? (v2_tab === 'plats' ? v2_compView() : v2_tab === 'hist' ? v2_histView() : v2_tab === 'reg' ? v2_regView() : v2_todayView()) : v2_tab === 'listes' && admin ? v2_back() + v2_listsView() : v2_tab === 'cfg' && admin ? v2_back() + v2_cfgView() : v2_tab === 'ecarts' && admin ? v2_back() + v2_ecartsView() : v2_tab === 'textes' && admin ? v2_back() + v2_textsView() : v2_saisieView(zone));
 }
 
 initAuth();
