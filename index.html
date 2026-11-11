@@ -230,6 +230,7 @@
 .rp-rc .ln .q{color:var(--ink-muted);}
 .rp-rc .ln .nm{font-weight:600;}
 .rp-rc .ln .pu{display:block;font-size:11px;color:var(--ink-muted);font-weight:400;}
+.rp-rc .env{grid-column:2/4;font-size:11.5px;color:var(--moss);margin-top:-2px;}.rp-rc .env.none{color:var(--ink-muted);opacity:.7;}
 .rp-rc .note{grid-column:2/4;font-size:12px;color:var(--amber);margin-top:-2px;}
 .rp-rc .tot{display:flex;justify-content:space-between;border-top:2px solid var(--line);margin-top:6px;padding-top:10px;font-weight:700;font-size:15px;}
 .rp-rc .sm{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-muted);padding-top:6px;}
@@ -4074,7 +4075,7 @@ function rp_ticketView(t){
     body = main.map(l=>{
       const free = !(Number(l.m) > 0);
       const nt = (notes[l.i] || []).map(x=>`<span class="note">📝 ${esc(x.n)}</span>`).join('');
-      return `<div class="ln"><span class="q mono">${rp_qty(l.q)}</span><span class="nm">${esc(l.n)}${free ? '<span class="pu">inclus</span>' : (Number(l.q) !== 1 ? `<span class="pu">${rp_money(l.pu)} l’unité</span>` : '')}</span><span class="mono">${free ? '—' : rp_money(l.m)}</span>${nt}</div>`;
+      return `<div class="ln"><span class="q mono">${rp_qty(l.q)}</span><span class="nm">${esc(l.n)}${free ? '<span class="pu">inclus</span>' : (Number(l.q) !== 1 ? `<span class="pu">${rp_money(l.pu)} l’unité</span>` : '')}</span><span class="mono">${free ? '—' : rp_money(l.m)}</span><span class="env${l.e ? '' : ' none'}">🍳 Envoyé en cuisine : ${l.e ? esc(l.e) : '—'}</span>${nt}</div>`;
     }).join('');
   }
   return `<button class="rp-back" onclick="rp_closeTicket()">‹ Retour aux tickets</button>
