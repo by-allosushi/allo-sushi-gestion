@@ -715,12 +715,6 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
   </main>
 </div>
 
-<div id="module-fiches" class="module">
-  <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
-    <div id="ft-body"></div>
-  </main>
-</div>
-
 <div id="module-mep" class="module">
   <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
     <div id="mep-body"></div>
@@ -817,7 +811,6 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
         <div class="perm-row"><span>↳ Dépenses : saisie du solde réel</span><label class="switch"><input type="checkbox" id="nu-perm-solde-reel" checked><span class="slider"></span></label></div>
         <div class="perm-row"><span>↳ Dépenses : vérification / écart</span><label class="switch"><input type="checkbox" id="nu-perm-verification" checked><span class="slider"></span></label></div>
         <div class="perm-row"><span>Accès Pointage</span><label class="switch"><input type="checkbox" id="nu-perm-pointage"><span class="slider"></span></label></div>
-        <div class="perm-row"><span>Accès Fiches techniques</span><label class="switch"><input type="checkbox" id="nu-perm-fiches"><span class="slider"></span></label></div>
         <div class="perm-row"><span>Accès Mise en place</span><label class="switch"><input type="checkbox" id="nu-perm-mep"><span class="slider"></span></label></div>
         <div class="perm-row"><span>Accès Ma fiche de paie</span><label class="switch"><input type="checkbox" id="nu-perm-paie"><span class="slider"></span></label></div>
         <div style="padding:2px 0 8px;"><div style="font-size:12px;color:var(--ink-muted);">Employé correspondant (pointage) — nécessaire pour « Ma fiche de paie »</div><select id="nu-emp" class="pa-emp"><option value="">— Aucun employé —</option></select></div>
@@ -870,7 +863,6 @@ const MODULE_DEFS = [
   { key:'caisse',   label:'Caisse',    ic:'💰', desc:'Sessions de caisse' },
   { key:'depenses', label:'Dépenses',  ic:'🧾', desc:'Dépenses & pointage' },
   { key:'pointage', label:'Pointage',  ic:'⏱️', desc:'Heures, anomalies & paie' },
-  { key:'fiches',   label:'Fiches techniques', ic:'📋', desc:'Recettes & dressage' },
   { key:'mep',      label:'Mise en place', ic:'🧑‍🍳', desc:'Inventaire de fin de service' },
   { key:'controle', label:'Contrôle', ic:'🎯', desc:'Achats, ventes & écarts de stock' },
   { key:'restopro', label:'CA Resto Pro', ic:'📈', desc:'Chiffre d’affaires & remises' },
@@ -1021,7 +1013,7 @@ function buildModuleTabs(){
   const nav = document.getElementById('module-tabs');
   let html = `<button data-mod="home" onclick="showModule('home')">🏠 Accueil</button>`;
   MODULE_DEFS.forEach(m=>{
-    if(hasAccess(m.key)) html += `<button data-mod="${m.key}" onclick="showModule('${m.key}')">${m.ic} ${m.label}</button>`;
+    if(m.key !== 'controle' && hasAccess(m.key)) html += `<button data-mod="${m.key}" onclick="showModule('${m.key}')">${m.ic} ${m.label}</button>`;
   });
   if(v2_on()) html += `<button data-mod="cuisine" onclick="showModule('cuisine')">🍳 Cuisine <span style="font-size:10px;opacity:.7;">(test)</span></button>`;
   if(session && session.isAdmin) html += `<button data-mod="users" onclick="showModule('users')">👤 Utilisateurs</button>`;
@@ -1032,11 +1024,10 @@ function buildModuleTabs(){
 function renderHome(){
   const grid = document.getElementById('home-grid');
   if(grid && !document.getElementById('home-banner')){ const hb = document.createElement('div'); hb.id = 'home-banner'; grid.parentNode.insertBefore(hb, grid); }
-  if(session && session.isAdmin){ try{ if(typeof ft_start === 'function') ft_start(); if(typeof cx_start === 'function') cx_start(); }catch(e){ console.warn(e); } }
-  try{ ft_bannerUpdate(); }catch(e){}
+  if(session && session.isAdmin){ try{ if(typeof cx_start === 'function') cx_start(); }catch(e){ console.warn(e); } }
   let html = '';
   MODULE_DEFS.forEach(m=>{
-    if(hasAccess(m.key)){
+    if(m.key !== 'controle' && hasAccess(m.key)){
       html += `<div class="home-card" onclick="showModule('${m.key}')">
         <div class="ic">${m.ic}</div>
         <div class="lbl">${m.label}</div>
@@ -1082,7 +1073,7 @@ async function uu_createUser(){
     username: uname,
     password: pwd,
     isAdmin,
-    permissions: isAdmin ? { caisse:true, pointage:true, fiches:true, mep:true, depenses:true, soldeTheorique:true, soldeReel:true, ecart:true, verification:true, historiqueVerification:true } : {
+    permissions: isAdmin ? { caisse:true, pointage:true, mep:true, depenses:true, soldeTheorique:true, soldeReel:true, ecart:true, verification:true, historiqueVerification:true } : {
       depenses: document.getElementById('nu-perm-depenses').checked,
       soldeTheorique: false,
       soldeReel: document.getElementById('nu-perm-solde-reel').checked,
@@ -1092,7 +1083,6 @@ async function uu_createUser(){
       caisse: document.getElementById('nu-perm-caisse').checked,
       caisseLim: document.getElementById('nu-perm-caisselim').checked,
       pointage: document.getElementById('nu-perm-pointage').checked,
-      fiches: document.getElementById('nu-perm-fiches').checked,
       mep: document.getElementById('nu-perm-mep').checked,
       paie: document.getElementById('nu-perm-paie').checked
     },
@@ -1104,7 +1094,7 @@ async function uu_createUser(){
   document.getElementById('nu-username').value = '';
   document.getElementById('nu-password').value = '';
   document.getElementById('nu-admin').checked = false;
-  ['caisse', 'caisselim', 'pointage', 'fiches', 'mep', 'paie'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
+  ['caisse', 'caisselim', 'pointage', 'mep', 'paie'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
   document.getElementById('nu-emp').value = '';
   uu_toggleAdminFields();
 }
@@ -1265,12 +1255,11 @@ function showModule(name){
     b.classList.toggle('active', b.getAttribute('data-mod')===name);
   });
   if(name==='home') renderHome();
-  if(name==='cuisine' && typeof v2_start==='function'){ pt_start(); mep_start(); v2_start(); v2_render(); }
+  if(name==='cuisine' && typeof v2_start==='function'){ pt_start(); mep_start(); v2_start(); if(session && session.isAdmin){ cx_start(); cx_preset('today', true); cx_reload(); } v2_render(); }
   if(name==='users'){ if(typeof pt_start==='function') pt_start(); if(typeof mep_start==='function') mep_start(); uu_render(); uu_fillNewEmp(); }
   if(name==='caisse' && typeof ca_render==='function') ca_render();
   if(name==='depenses'){ if(typeof dp_start==='function') dp_start(); if(typeof dp_render==='function') dp_render(); }
   if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
-  if(name==='fiches'){ if(typeof ft_start==='function') ft_start(); if(typeof ft_render==='function') ft_render(); }
   if(name==='restopro'){ if(typeof rp_start==='function') rp_start(); }
   if(name==='controle'){ if(typeof cx_start==='function'){ cx_start(); cx_render(); cx_reload(); } }
   if(name==='mep'){ if(typeof pt_start==='function') pt_start(); if(typeof mep_start==='function') mep_start(); if(typeof mep_render==='function') mep_render(); }
@@ -3778,80 +3767,7 @@ setInterval(()=>{ if(activeModule === 'paie') pa_render(); }, 300000); // bascul
    - kind:'avoir_histo'         : une mise à jour d'un de ces endroits { avoirId, date, ancien, montant }
    Dette = je dois · Emprunt = on me doit · Position = disponible + emprunts − dettes (devise par devise). */
 function hasDettesAccess(){ return !!(session && session.username === 'soufyane'); }
-/* ==================== MODULE FICHES TECHNIQUES ==================== */
-/* Une fiche = { name, cat, portions, prepMin, ingredients:[{q,u,n}], steps:[texte], dressage, temp, duree, notes }.
-   Collection 'fiches_techniques'. Lecture : tous les utilisateurs autorisés ; création / modification / suppression : administrateur seulement. */
-const ft_col = db.collection('fiches_techniques');
-const FT_BASE_CAT = 'Sauces & préparations';
-const FT_CATS = ['Nigiri', 'Hoso Maki', 'Uramaki', 'Futomaki', 'Crispy', 'Temaki', 'Sashimi', 'Création', 'Gyoza', 'Nem', 'Yakitori', 'Ebi Fry', 'Wok', 'Spring Roll', 'Tartare', FT_BASE_CAT];
-/* préparations de base (fiches liées depuis les plats) */
-const FT_BASES = [['base_riz', 'Riz vinaigré'], ['base_tempura', 'Crevette tempura'], ['base_oignon', 'Oignon frit'], ['base_spicy', 'Spicy tartare de saumon'], ['base_marine', 'Saumon mariné']];
-/* menu : [famille, pièces par portion, ingrédients ajoutés d'office, [[nom, [ingrédients], description du menu]]] */
-const FT_MENU = [
- ['Nigiri', 2, [], [['Abokado', ['Avocat', 'Riz vinaigré']], ['Pickled Radish', ['Oshinko', 'Riz vinaigré']], ['Shiromizakana', ['Poisson blanc', 'Riz vinaigré']], ['Saké', ['Saumon', 'Riz vinaigré']], ['Ebi Tempura', ['Crevette tempura', 'Riz vinaigré']]]],
- ['Hoso Maki', 6, [], [['Avocado', ['Avocat', 'Riz vinaigré', 'Algue']], ['Oshinko', ['Oshinko', 'Riz vinaigré', 'Algue']], ['Kanikama', ['Surimi', 'Riz vinaigré', 'Algue']], ['White Fish', ['Poisson blanc', 'Riz vinaigré', 'Algue']], ['Salmon', ['Saumon', 'Riz vinaigré', 'Algue']], ['Shrimp Tempura', ['Crevette tempura', 'Riz vinaigré', 'Algue']]]],
- ['Uramaki', 4, ['Riz vinaigré', 'Algue'], [['Katsu', ['Poulet', 'Avocat', 'Oignon frit']], ['California', ['Surimi', 'Avocat', 'Oignon frit']], ['White Fish', ['Poisson blanc', 'Oshinko', 'Sésame']], ['Philadelphia', ['Saumon', 'Avocat', 'Fromage', 'Sésame']], ['Ebi Tempura', ['Crevette', 'Avocat', 'Sésame']]]],
- ['Futomaki', 5, ['Riz vinaigré', 'Algue'], [['Yasai Végétarien', ['Avocat', 'Oshinko', 'Carotte', 'Concombre']], ['MoriTori Tempura', ['Poulet', 'Oshinko', 'Concombre', 'Fromage']], ['Spicy Kanikama', ['Surimi', 'Oshinko', 'Concombre']], ['FutoSaké', ['Saumon', 'Avocat', 'Concombre']], ['EbiMori Tempura', ['Crevette', 'Oshinko', 'Concombre']]]],
- ['Crispy', 4, ['Riz vinaigré', 'Algue'], [['Chicken', ['Poulet', 'Avocat', 'Concombre', 'Fromage']], ['Surimi', ['Surimi', 'Oshinko', 'Concombre', 'Fromage']], ['White Fish', ['Poisson blanc', 'Oshinko', 'Concombre', 'Fromage']], ['Shrimp', ['Crevette', 'Avocat', 'Concombre', 'Fromage']], ['Salmon', ['Saumon', 'Avocat', 'Concombre', 'Fromage']]]],
- ['Temaki', 1, ['Riz vinaigré', 'Algue'], [['Chicken', ['Poulet', 'Oshinko', 'Concombre', 'Sésame']], ['Salmon', ['Saumon', 'Avocat', 'Concombre', 'Sésame']]]],
- ['Sashimi', 6, [], [['Salmon', ['Saumon mariné']]]],
- ['Création', 8, ['Riz vinaigré', 'Algue'], [['Saporo', ['Crevette', 'Oshinko', 'Avocat']], ['Sunset', ['Surimi', 'Avocat', 'Enrobage œufs de lump']], ['Turnado Salmon', ['Saumon', 'Fromage Philadelphia']], ['Dragon Roll', ['Crevette', 'Fromage', 'Enrobage avocat']], ['Las Vegas', ['Saumon', 'Avocat', 'Fromage Philadelphia', 'Enrobage saumon']], ['Spicy Sahara Roll', ['Crevette', 'Oshinko', 'Concombre', 'Spicy tartare de saumon']]]],
- ['Gyoza', 5, [], [['Chicken', ['Poulet haché tendre']], ['Beef', ['Viande hachée fraîche']]]],
- ['Nem', 3, [], [['Chicken', ['Poulet haché tendre']], ['Shrimp', ['Crevette fraîche']]]],
- ['Yakitori', 3, [], [['Beef', ['Filet de bœuf', 'Fromage fondant'], 'Brochettes de filet de bœuf au cœur de fromage fondant, accompagnées de garniture']]],
- ['Ebi Fry', 0, [], [['Shrimp', ['Crevettes royales', 'Panko japonais'], 'Crevettes royales panées au panko japonais, parfaitement croustillantes']]],
- ['Wok', 0, [], [['Chicken', ['Poulet', 'Légumes croquants', 'Sauce asiatique'], 'Poulet sauté au wok avec légumes croquants, relevé d’une sauce asiatique parfumée'], ['Beef', ['Bœuf', 'Légumes croquants', 'Sauce asiatique'], 'Bœuf sauté au wok avec légumes croquants, nappé d’une sauce asiatique savoureuse'], ['Shrimp', ['Crevettes', 'Légumes croquants', 'Sauce asiatique'], 'Crevettes sautées au wok avec légumes croquants, sublimées par une sauce asiatique délicate']]],
- ['Spring Roll', 2, [], [['Salmon', ['Saumon', 'Légumes croquants', 'Herbes fraîches'], 'Rouleaux de printemps frais au saumon, légumes croquants et herbes fraîches'], ['Shrimp', ['Crevettes', 'Légumes croquants', 'Herbes aromatiques'], 'Rouleaux de printemps frais garnis de crevettes, accompagnés de légumes croquants et d’herbes aromatiques']]],
- ['Tartare', 0, [], [['Salmon', ['Saumon', 'Avocat'], 'Saumon et avocat frais, assaisonnement délicat et saveurs fraîches']]]
-];
-function ft_slug(t){ return String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''); }
-/* fiches du menu : plats + préparations de base, avec leur identifiant stable */
-function ft_menuSeed(){
-  const baseId = {}; FT_BASES.forEach(b=>baseId[b[1].toLowerCase()] = b[0]);
-  const out = [];
-  FT_BASES.forEach(b=>out.push({ id:b[0], name:b[1], cat:FT_BASE_CAT, portions:1, pieces:'', prepMin:0, ingredients:[], steps:[], dressage:'', accomp:'', temp:'', duree:'', notes:'' }));
-  FT_MENU.forEach(fam=>{
-    const cat = fam[0], pieces = fam[1], add = fam[2];
-    fam[3].forEach(it=>{
-      const generic = cat !== 'Création', names = it[1].slice();
-      add.forEach(a=>{ if(!names.includes(a)) names.push(a); });
-      out.push({ id:'menu_' + ft_slug(cat) + '_' + ft_slug(it[0]), name:generic ? cat + ' ' + it[0] : it[0], cat, portions:1, pieces:pieces || '', prepMin:0,
-        ingredients:names.map(n=>({ n, u:'', q:null, ref:baseId[n.toLowerCase()] || '' })), steps:[], dressage:'', accomp:'', temp:'', duree:'',
-        notes:it[2] ? 'Description du menu : ' + it[2] : '' });
-    });
-  });
-  return out;
-}
-function ft_seedMissing(){ return ft_menuSeed().filter(x=>!ft_fiches.some(f=>f.id === x.id)); }
-async function ft_importMenu(){
-  if(!ft_isAdmin()) return;
-  const miss = ft_seedMissing(); if(!miss.length) return;
-  if(!confirm('Importer ' + miss.length + ' fiche(s) du menu ? Les fiches déjà présentes ne sont pas modifiées.')) return;
-  try{
-    const now = new Date().toISOString();
-    for(let i = 0; i < miss.length; i += 400){
-      const b = db.batch();
-      miss.slice(i, i + 400).forEach(x=>{ const d = { ...x, createdAt:now, updatedAt:now, updatedBy:(typeof currentUser !== 'undefined' ? currentUser : ''), seeded:true }; delete d.id; b.set(ft_col.doc(x.id), d); });
-      await b.commit();
-    }
-    if(typeof pt_toast === 'function') pt_toast(miss.length + ' fiches importées.');
-  }catch(e){ console.error(e); alert('Erreur d’import : ' + (e.message || e)); }
-}
-const FT_UNITS = ['g', 'kg', 'ml', 'cl', 'l', 'c. à café', 'c. à soupe', 'pièce(s)', 'tranche(s)', 'feuille(s)', 'pincée', 'au goût'];
-let ft_started = false, ft_ready = false, ft_fiches = [];
-let ft_openFams = {}, ft_onlyTodo = false, ft_hist = [], ft_view = 'list', ft_cur = null, ft_draft = null, ft_q = '', ft_cat = '', ft_portions = 1;
-
-const ft_e = (v)=>esc(v == null ? '' : String(v));
-const ft_isAdmin = ()=>!!(session && session.isAdmin);
-function ft_start(){
-  if(ft_started) return; ft_started = true;
-  ft_col.onSnapshot((snap)=>{
-    const list = []; snap.forEach(d=>list.push({ id:d.id, ...d.data() }));
-    ft_fiches = list; ft_ready = true; try{ ft_bannerUpdate(); }catch(e){}
-    if(ft_view === 'detail' && !ft_fiches.some(f=>f.id === ft_cur)){ ft_view = 'list'; ft_cur = null; }
-    if(ft_view !== 'edit') ft_render(); // pas de rafraîchissement pendant la saisie d'une fiche
-  }, (e)=>{ console.error(e); ft_ready = true; ft_render(); });
-}
+/* ==================== OUTILS PARTAGÉS (ex-module Fiches techniques, supprimé) ==================== */
 /* quantité saisie : « 1,5 », « 1/2 », « 1 1/2 » → nombre ; vide → null */
 function ft_parseQ(v){
   let s = String(v == null ? '' : v).trim().replace(',', '.');
@@ -3864,278 +3780,6 @@ function ft_fmtQ(n, unit){
   const d = /pièce|tranche|feuille/.test(unit || '') ? 1 : 2;
   const k = Math.pow(10, d), r = Math.round(n * k) / k;
   return r.toLocaleString('fr-FR', { maximumFractionDigits:d });
-}
-function ft_fmtMin(m){ m = Math.round(Number(m) || 0); if(!m) return ''; return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + String(m % 60).padStart(2, '0') : ''); }
-/* lien automatique avec un ingrédient de Dépenses (par le nom) + net par portion */
-function ft_diByName(n){ const k = ft_norm(n); if(!k) return ''; const x = (dp_cfg.ingredients || []).find(i=>!i.off && ft_norm(i.n) === k); return x ? x.id : ''; }
-function ft_netOf(q, u, di, portions){
-  const ing = cx_byDi(di); if(!ing) return null; const v = ft_parseQ(q); if(v === null) return null;
-  const a = cx_fam(u), b = cx_fam(ing.u); if(a.b !== b.b) return null;
-  const p = Math.max(1, Number(String(portions).replace(',', '.')) || 1);
-  return Math.round(v * a.f / p * 1000) / 1000;
-}
-/* anciennes lignes « net seul » (copiées du Contrôle) => ligne visible avec quantité */
-function ft_lineNorm(i, portions){
-  if(i.di && (i.q === null || i.q === undefined || String(i.q).trim() === '') && i.net !== null && i.net !== undefined && String(i.net).trim() !== ''){
-    const ing = cx_byDi(i.di), p = Math.max(1, Number(portions) || 1), nv = ft_parseQ(i.net);
-    if(nv !== null) return Object.assign({}, i, { q:Math.round(nv * p * 1000) / 1000, u:ing ? cx_baseLbl(ing) : (i.u || '') });
-  }
-  return i;
-}
-/* ingrédient mis à l'échelle pour N portions */
-function ft_scaled(f, n){
-  const base = Number(f.portions) > 0 ? Number(f.portions) : 1, k = n / base;
-  return (f.ingredients || []).map(i0=>{
-    const i = ft_lineNorm(i0, base), q = ft_parseQ(i.q), isTaste = i.u === 'au goût';
-    const rf = i.ref ? ft_fiches.find(x=>x.id === i.ref) : null;
-    return { skip:!!(i.di && (q === null || q === 0)), ref:rf ? rf.id : '', name:rf ? rf.name : (i.n || ''), unit:isTaste ? '' : (i.u || ''), text:isTaste ? 'au goût' : (q === null ? '' : ft_fmtQ(q * k, i.u)), q: q === null ? null : q * k };
-  }).filter(x=>!x.skip);
-}
-function ft_catsAll(){
-  const used = ft_fiches.map(f=>f.cat).filter(Boolean), out = FT_CATS.slice();
-  used.forEach(c=>{ if(!out.includes(c)) out.push(c); });
-  return out;
-}
-
-/* ---------- navigation ---------- */
-function ft_open(id, keep){ const f = ft_fiches.find(x=>x.id === id); if(!f) return; if(!keep) ft_hist = []; ft_cur = id; ft_view = 'detail'; ft_portions = Number(f.portions) > 0 ? Number(f.portions) : 1; ft_render(); window.scrollTo && window.scrollTo(0, 0); }
-function ft_openRef(id){ if(ft_fiches.some(x=>x.id === id)){ ft_hist.push(ft_cur); ft_open(id, true); } }
-function ft_back(){
-  if(ft_view === 'detail' && ft_hist.length){ ft_open(ft_hist.pop(), true); return; }
-  ft_view = 'list'; ft_cur = null; ft_draft = null; ft_hist = []; ft_render();
-}
-function ft_baseByName(v){ const t = String(v || '').trim().toLowerCase(); if(!t) return null; return ft_fiches.find(f=>f.cat === FT_BASE_CAT && String(f.name || '').trim().toLowerCase() === t) || null; }
-function ft_setQ(v){ ft_q = v; ft_renderList(); }
-function ft_setCat(c){ ft_cat = (ft_cat === c || !c) ? '' : c; ft_render(); }
-function ft_setPortions(n){ n = Math.max(1, Math.min(999, Math.round(Number(n) || 1))); ft_portions = n; ft_renderDetail(); }
-function ft_stepPortions(d){ ft_setPortions(ft_portions + d); }
-
-/* ---------- liste ---------- */
-function ft_filtered(){
-  const q = ft_q.trim().toLowerCase();
-  const order = ft_catsAll();
-  return ft_fiches.filter(f=>(!ft_cat || f.cat === ft_cat) && (!ft_onlyTodo || ft_isTodo(f)) && (!q || [f.name, f.cat].concat((f.ingredients || []).map(i=>i.n)).join(' ').toLowerCase().includes(q)))
-    .sort((a, b)=>(order.indexOf(a.cat) - order.indexOf(b.cat)) || String(a.name || '').localeCompare(String(b.name || ''), 'fr'));
-}
-const ft_isTodo = (f)=>!(f.steps || []).length;
-function ft_shortName(f){ const c = String(f.cat || ''); return c && String(f.name || '').startsWith(c + ' ') ? String(f.name).slice(c.length + 1) : (f.name || ''); }
-function ft_toggleFam(c){ ft_openFams[c] = !ft_openFams[c]; ft_renderList(); }
-function ft_toggleTodo(){ ft_onlyTodo = !ft_onlyTodo; ft_render(); }
-function ft_listHtml(){
-  const list = ft_filtered();
-  if(!ft_fiches.length) return `<div class="empty-state">${ft_isAdmin() ? 'Aucune fiche pour l’instant. Crée la première avec « Nouvelle fiche », ou importe ton menu.' : 'Aucune fiche technique pour l’instant.'}</div>`;
-  if(!list.length) return '<div class="empty-state">Aucune fiche ne correspond.</div>';
-  const auto = !!(ft_q.trim() || ft_cat); // recherche ou famille choisie : tout est déplié
-  const groups = [], map = {};
-  list.forEach(f=>{ const c = f.cat || 'Sans catégorie'; if(!map[c]){ map[c] = { cat:c, items:[] }; groups.push(map[c]); } map[c].items.push(f); });
-  return groups.map(g=>{
-    const open = auto || !!ft_openFams[g.cat];
-    const pcs = Array.from(new Set(g.items.map(f=>Number(f.pieces) > 0 ? Number(f.pieces) : 0))), pc = pcs.length === 1 && pcs[0] ? pcs[0] : 0;
-    const sub = g.items.length + ' plat' + (g.items.length > 1 ? 's' : '') + (pc ? ' · ' + pc + ' pièce' + (pc > 1 ? 's' : '') : '');
-    const todo = g.items.some(ft_isTodo);
-    const head = `<div class="ft-fam ${open ? 'open' : ''}" onclick="ft_toggleFam(${ft_e(JSON.stringify(g.cat))})"><div>${ft_e(g.cat)}<span class="s">${ft_e(sub)}</span></div><div class="r">${todo ? '<span class="ft-dot"></span>' : ''}<span>${open ? '▾' : '▸'}</span></div></div>`;
-    const rows = open ? '<div class="ft-rows">' + g.items.map(f=>`<div class="ft-row" onclick="ft_open('${f.id}')"><span>${ft_e(ft_shortName(f))}${Number(f.pieces) > 0 && !pc ? `<span class="pt-muted"> · ${f.pieces} pièce${f.pieces > 1 ? 's' : ''}</span>` : ''}</span>${ft_isTodo(f) ? '<span class="ft-dot"></span>' : ''}</div>`).join('') + '</div>' : '';
-    return head + rows;
-  }).join('');
-}
-function ft_renderList(){ const el = document.getElementById('ft-list'); if(el) el.innerHTML = ft_listHtml(); }
-function ft_listView(){
-  const cats = ft_catsAll().filter(c=>ft_fiches.some(f=>f.cat === c));
-  const nTodo = ft_fiches.filter(ft_isTodo).length;
-  return `<div class="ft-top"><div class="row-between" style="margin-bottom:8px;"><div style="font-weight:700;font-size:18px;">Fiches techniques</div>${ft_isAdmin() ? '<button class="btn small t-add" onclick="ft_new()">＋ Nouvelle fiche</button>' : ''}</div>
-    <div class="field" style="margin-bottom:8px;"><input type="search" id="ft-search" class="ft-in" placeholder="Rechercher un plat ou un ingrédient" value="${ft_e(ft_q)}" oninput="ft_setQ(this.value)"></div>
-    ${cats.length ? `<div class="ft-chips ft-scroll"><button class="ft-chip ${ft_cat ? '' : 'on'}" onclick="ft_setCat('')">Tout</button>${cats.map(c=>`<button class="ft-chip ${ft_cat === c ? 'on' : ''}" onclick="ft_setCat(${ft_e(JSON.stringify(c))})">${ft_e(c)}</button>`).join('')}</div>` : ''}
-    ${nTodo ? `<div class="ft-todobar"><span><span class="ft-dot"></span>&nbsp; ${nTodo} fiche${nTodo > 1 ? 's' : ''} à compléter</span><a class="ft-link" style="font-weight:600;" onclick="ft_toggleTodo()">${ft_onlyTodo ? 'Tout afficher ›' : 'Afficher ›'}</a></div>` : ''}</div>
-    ${ft_isAdmin() && ft_seedMissing().length ? `<div class="ticket" style="margin:8px 0;"><div style="font-size:14px;margin-bottom:8px;">Ton menu peut être importé : ${ft_seedMissing().length} fiches (plats et préparations de base), sans quantités ni étapes.</div><button class="btn small t-io" onclick="ft_importMenu()">Importer le menu</button></div>` : ''}
-    ${ft_isAdmin() && cx_ingList().length ? `<div class="ticket" style="margin:8px 0;"><div class="row-between" style="gap:8px;flex-wrap:wrap;"><button class="btn ghost small" onclick="ft_copyFromCx()">📥 Copier les plats de Contrôle</button><button class="btn ghost small" onclick="ft_openSold()">⚠️ Plats vendus à finaliser</button></div></div>` : ''}
-    <div id="ft-list">${ft_listHtml()}</div>`;
-}
-
-/* ---------- fiche ---------- */
-function ft_detailInner(f){
-  const items = ft_scaled(f, ft_portions), changed = ft_portions !== (Number(f.portions) > 0 ? Number(f.portions) : 1);
-  const ing = items.length ? items.map(i=>`<li class="ft-ing"><span class="q">${ft_e((i.text + ' ' + i.unit).trim())}</span>${i.ref ? `<a class="ft-link" onclick="ft_openRef('${i.ref}')">${ft_e(i.name)} ▸</a>` : `<span>${ft_e(i.name)}</span>`}</li>`).join('') : '<li class="pt-muted">Aucun ingrédient.</li>';
-  const steps = (f.steps || []).length ? f.steps.map((s, i)=>`<div class="ft-step"><div class="num">${i + 1}</div><div class="txt">${ft_e(s).replace(/\n/g, '<br>')}</div></div>`).join('') : '<div class="pt-muted">Aucune étape.</div>';
-  const usedIn = ft_fiches.filter(x=>x.id !== f.id && (x.ingredients || []).some(i=>i.ref === f.id)).sort((a, b)=>String(a.name).localeCompare(String(b.name), 'fr'));
-  const usedHtml = usedIn.length ? `<div class="ticket"><div class="section-label">Utilisée dans (${usedIn.length})</div><div class="ft-chips">${usedIn.map(x=>`<button class="ft-chip" onclick="ft_openRef('${x.id}')">${ft_e(x.name)}</button>`).join('')}</div></div>` : '';
-  const card = (cls, l, n)=>n ? `<div class="pt-card ${cls}"><div class="l">${l}</div><div class="n">${ft_e(n)}</div></div>` : '';
-  const block = (title, txt)=>txt ? `<div class="ticket"><div class="section-label">${title}</div><div class="ft-text">${ft_e(txt).replace(/\n/g, '<br>')}</div></div>` : '';
-  const conserv = [f.temp ? 'Température : ' + f.temp : '', f.duree ? 'Durée : ' + f.duree : ''].filter(Boolean).join('\n');
-  return `<div class="ticket">
-      <div style="font-weight:800;font-size:20px;">${ft_e(f.name)}</div>
-      ${f.cat ? `<div style="margin:6px 0;"><span class="ft-cat">${ft_e(f.cat)}</span></div>` : ''}
-      <div class="pt-cards">${card('c-days', 'Pièces par portion', f.pieces)}${card('c-adv', 'Portions (fiche)', f.portions)}${card('c-base', 'Préparation', ft_fmtMin(f.prepMin))}${card('c-transport', 'Température', f.temp)}${card('c-bonus', 'Durée de conservation', f.duree)}</div>
-    </div>
-    <div class="ticket">
-      <div class="section-label">Ingrédients</div>
-      <div class="ft-portions"><span>Pour</span><button class="btn ghost small" onclick="ft_stepPortions(-1)" aria-label="moins">−</button><input type="text" inputmode="numeric" id="ft-portions" class="ft-in" value="${ft_portions}" onchange="ft_setPortions(this.value)"><button class="btn ghost small" onclick="ft_stepPortions(1)" aria-label="plus">＋</button><span>portion${ft_portions > 1 ? 's' : ''}</span>${changed ? `<button class="btn ghost small t-cancel" onclick="ft_setPortions(${Number(f.portions) > 0 ? Number(f.portions) : 1})">Quantités de la fiche</button>` : ''}</div>
-      <ul class="ft-ings">${ing}</ul>
-    </div>
-    <div class="ticket"><div class="section-label">Préparation</div>${steps}</div>
-    ${block('Dressage', f.dressage)}${block('Accompagnements', f.accomp)}${block('Conservation', conserv)}${block('Notes du chef', f.notes)}${usedHtml}`;
-}
-function ft_renderDetail(){ const el = document.getElementById('ft-detail'); const f = ft_fiches.find(x=>x.id === ft_cur); if(el && f) el.innerHTML = ft_detailInner(f); }
-function ft_detailView(f){
-  return `<div style="margin-bottom:10px;"><button class="btn ghost small t-view" onclick="ft_back()">← ${ft_hist.length ? ft_e((ft_fiches.find(x=>x.id === ft_hist[ft_hist.length - 1]) || {}).name || 'Retour') : 'Fiches'}</button></div>
-      <div class="ft-actions"><button class="btn ghost small t-io" onclick="ft_print()">🖨️ Imprimer</button>${ft_isAdmin() ? `<button class="btn ghost small t-edit" onclick="ft_edit('${f.id}')">Modifier</button><button class="btn ghost small t-view" onclick="ft_dup('${f.id}')">Dupliquer</button><button class="btn ghost small t-del" onclick="ft_del('${f.id}')">Supprimer</button>` : ''}</div>
-    <div id="ft-detail">${ft_detailInner(f)}</div>`;
-}
-function ft_print(){
-  const f = ft_fiches.find(x=>x.id === ft_cur); if(!f) return;
-  const items = ft_scaled(f, ft_portions);
-  const css = 'body{font-family:Arial,sans-serif;color:#111;margin:22px;}h1{margin:0 0 4px;font-size:24px;}h2{font-size:14px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #999;padding-bottom:3px;margin:18px 0 8px;}.m{color:#555;font-size:13px;}li{margin:3px 0;}ol li{margin:8px 0;}';
-  const meta = [f.cat, Number(f.pieces) > 0 ? f.pieces + ' pièces par portion' : '', 'Pour ' + ft_portions + ' portion' + (ft_portions > 1 ? 's' : ''), ft_fmtMin(f.prepMin) ? 'Préparation : ' + ft_fmtMin(f.prepMin) : '', f.temp ? 'Température : ' + f.temp : '', f.duree ? 'Conservation : ' + f.duree : ''].filter(Boolean).join(' · ');
-  const html = `<html><head><meta charset="utf-8"><title>${ft_e(f.name)}</title><style>${css}</style></head><body><h1>${ft_e(f.name)}</h1><div class="m">${ft_e(meta)}</div>
-    <h2>Ingrédients</h2><ul>${items.map(i=>`<li><b>${ft_e((i.text + ' ' + i.unit).trim())}</b> ${ft_e(i.name)}</li>`).join('')}</ul>
-    <h2>Préparation</h2><ol>${(f.steps || []).map(s=>`<li>${ft_e(s).replace(/\n/g, '<br>')}</li>`).join('')}</ol>
-    ${f.dressage ? `<h2>Dressage</h2><div>${ft_e(f.dressage).replace(/\n/g, '<br>')}</div>` : ''}${f.accomp ? `<h2>Accompagnements</h2><div>${ft_e(f.accomp).replace(/\n/g, '<br>')}</div>` : ''}${f.notes ? `<h2>Notes du chef</h2><div>${ft_e(f.notes).replace(/\n/g, '<br>')}</div>` : ''}</body></html>`;
-  let fr = document.getElementById('ft-print-frame');
-  if(!fr){ fr = document.createElement('iframe'); fr.id = 'ft-print-frame'; fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'; document.body.appendChild(fr); }
-  fr.srcdoc = html;
-  fr.onload = ()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ console.error(e); } };
-}
-
-/* ---------- édition (administrateur) ---------- */
-function ft_blank(){ return { name:'', cat:'', portions:1, prepMin:'', pieces:'', accomp:'', ingredients:[{ q:'', u:'g', n:'', ref:'' }], steps:[''], dressage:'', temp:'', duree:'', notes:'' }; }
-function ft_clone(f){ return JSON.parse(JSON.stringify({ name:f.name || '', cat:f.cat || '', portions:f.portions || 1, pieces:f.pieces || '', accomp:f.accomp || '', prepMin:f.prepMin || '', ingredients:(f.ingredients || []).map(i0=>{ const i = ft_lineNorm(i0, f.portions); return { q:i.q == null ? '' : String(i.q), u:i.u || '', n:i.n || '', ref:i.ref || '', di:i.di || '' }; }), kit:f.kit || '', ckey:f.ckey || '', steps:(f.steps || []).slice(), dressage:f.dressage || '', temp:f.temp || '', duree:f.duree || '', notes:f.notes || '' })); }
-function ft_new(){ if(!ft_isAdmin()) return; ft_draft = ft_blank(); ft_cur = null; ft_view = 'edit'; ft_render(); }
-function ft_edit(id){ const f = ft_fiches.find(x=>x.id === id); if(!f || !ft_isAdmin()) return; ft_draft = ft_clone(f); ft_cur = id; ft_view = 'edit'; ft_render(); }
-function ft_dup(id){ const f = ft_fiches.find(x=>x.id === id); if(!f || !ft_isAdmin()) return; ft_draft = ft_clone(f); ft_draft.name = (f.name || '') + ' (copie)'; ft_cur = null; ft_view = 'edit'; ft_render(); }
-function ft_cancelEdit(){ ft_draft = null; if(ft_cur){ ft_view = 'detail'; } else ft_view = 'list'; ft_render(); }
-function ft_dSet(k, v){ if(ft_draft) ft_draft[k] = v; }
-function ft_ingSet(i, k, v){
-  if(!ft_draft || !ft_draft.ingredients[i]) return;
-  const g = ft_draft.ingredients[i]; g[k] = v;
-  if(k === 'n'){ const b = ft_baseByName(v); g.ref = b ? b.id : ''; const el = document.getElementById('ft-lk-' + i); if(el) el.innerHTML = g.ref ? '🔗 lié à la fiche « ' + ft_e(b.name) + ' »' : ''; g.di = ft_diByName(v); }
-  ft_tagsRefresh();
-}
-function ft_tag(g){ const di = g.di || ft_diByName(g.n); if(!di || !cx_byDi(di)) return ''; const net = ft_netOf(g.q, g.u, di, ft_draft ? ft_draft.portions : 1); const ing = cx_byDi(di);
-  if(net === null) return '<span style="color:var(--amber);">🔗 Suivi dans le Contrôle — indique la quantité (en ' + ft_e(cx_baseLbl(ing)) + ', kg, l…) pour la compter.</span>';
-  return '<span style="color:var(--forest);">🔗 Suivi dans le Contrôle : ' + ft_e(ft_fmtQ(net, cx_baseLbl(ing))) + ' ' + ft_e(cx_baseLbl(ing)) + ' par portion</span>'; }
-function ft_tagsRefresh(){ if(!ft_draft) return; ft_draft.ingredients.forEach((g, n)=>{ const el = document.getElementById('ft-tg-' + n); if(el) el.innerHTML = ft_tag(g); }); }
-function ft_ingAdd(){ ft_draft.ingredients.push({ q:'', u:'g', n:'', ref:'' }); ft_render(); setTimeout(()=>{ const els = document.querySelectorAll('.ft-ing-name'); if(els.length) els[els.length - 1].focus(); }, 0); }
-function ft_ingDel(i){ ft_draft.ingredients.splice(i, 1); if(!ft_draft.ingredients.length) ft_draft.ingredients.push({ q:'', u:'g', n:'', ref:'' }); ft_render(); }
-function ft_stepSet(i, v){ if(ft_draft) ft_draft.steps[i] = v; }
-function ft_stepAdd(){ ft_draft.steps.push(''); ft_render(); setTimeout(()=>{ const els = document.querySelectorAll('.ft-step-in'); if(els.length) els[els.length - 1].focus(); }, 0); }
-function ft_stepDel(i){ ft_draft.steps.splice(i, 1); if(!ft_draft.steps.length) ft_draft.steps.push(''); ft_render(); }
-function ft_stepMove(i, d){ const j = i + d, s = ft_draft.steps; if(j < 0 || j >= s.length) return; const t = s[i]; s[i] = s[j]; s[j] = t; ft_render(); }
-async function ft_save(){
-  const d = ft_draft; if(!d || !ft_isAdmin()) return;
-  const name = String(d.name || '').trim();
-  if(!name){ alert('Donne un nom au plat.'); return; }
-  const portions = Math.max(1, Math.round(Number(String(d.portions).replace(',', '.')) || 1));
-  const ingredients = d.ingredients.map(i=>{ const n = String(i.n || '').trim(), b = ft_baseByName(n), di = b ? '' : ft_diByName(n); return { n, u:i.u || '', q:ft_parseQ(i.q), ref:b ? b.id : '', di, net:di ? ft_netOf(i.q, i.u, di, portions) : null }; }).filter(i=>i.n);
-  for(const i of d.ingredients){ if(String(i.q || '').trim() && ft_parseQ(i.q) === null){ alert('Quantité non valide : « ' + i.q + ' ». Écris un nombre (1,5) ou une fraction (1/2).'); return; } }
-  const data = { name, cat:String(d.cat || '').trim(), portions, pieces:Math.max(0, Math.round(Number(String(d.pieces).replace(',', '.')) || 0)) || '', accomp:String(d.accomp || '').trim(), prepMin:Math.max(0, Math.round(Number(String(d.prepMin).replace(',', '.')) || 0)), ingredients,
-    kit:d.kit || '', ckey:d.ckey || '', steps:d.steps.map(s=>String(s || '').trim()).filter(Boolean), dressage:String(d.dressage || '').trim(), temp:String(d.temp || '').trim(), duree:String(d.duree || '').trim(), notes:String(d.notes || '').trim(),
-    updatedAt:new Date().toISOString(), updatedBy:(typeof currentUser !== 'undefined' ? currentUser : '') };
-  try{
-    let id = ft_cur;
-    if(id) await ft_col.doc(id).set(data, { merge:true });
-    else { data.createdAt = data.updatedAt; const ref = await ft_col.add(data); id = ref.id; }
-    ft_draft = null; ft_cur = id; ft_view = 'detail'; ft_portions = portions; ft_render(); window.scrollTo && window.scrollTo(0, 0);
-    if(typeof pt_toast === 'function') pt_toast('Fiche enregistrée.');
-  }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
-}
-async function ft_del(id){
-  const f = ft_fiches.find(x=>x.id === id); if(!f || !ft_isAdmin()) return;
-  if(!confirm('Supprimer la fiche « ' + f.name + ' » ? Cette action est définitive.')) return;
-  try{ await ft_col.doc(id).delete(); ft_back(); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
-}
-const cx_byDi = (id)=>(dp_cfg.ingredients || []).find(x=>x.id === id);
-const ft_norm = (t)=>String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-function ft_lineNet(l, portions){ if(l.net !== null && l.net !== undefined && String(l.net).trim() !== '') return l.net; const di = l.di || ft_diByName(l.n); return di ? ft_netOf(l.q, l.u, di, portions) : null; }
-function ft_missingTracked(f){ return cx_ingList().filter(i=>!(f.ingredients || []).some(l=>(l.di || ft_diByName(l.n)) === i.id && ft_lineNet(l, f.portions) !== null)); }
-function ft_complete(f){ if(ft_missingTracked(f).length) return false; return !(cx_allKits().length >= 2 && !f.kit); }
-function ft_addTracked(id, zero){ const ing = cx_byDi(id); if(!ft_draft || !ing) return; let l = ft_draft.ingredients.find(x=>x.di === id);
-  if(!l){ l = { q:zero ? '0' : '', u:cx_baseLbl(ing), n:ing.n, ref:'', di:id }; const empty = ft_draft.ingredients.findIndex(x=>!String(x.n || '').trim() && !x.di); if(empty >= 0) ft_draft.ingredients[empty] = l; else ft_draft.ingredients.push(l); }
-  if(zero){ l.q = '0'; l.u = cx_baseLbl(ing); } ft_render(); }
-function ft_ctlBlock(d){
-  const miss = ft_missingTracked(d), kits = cx_allKits();
-  if(!cx_ingList().length) return '';
-  const chips = miss.length ? `<div class="pt-muted" style="margin-bottom:6px;">Ingrédients suivis à renseigner :</div>` + miss.map(i=>`<div class="row-between" style="padding:4px 0;"><b>${ft_e(i.n)}</b><span><button type="button" class="btn ghost small" onclick="ft_addTracked('${i.id}',false)">＋ Ajouter la ligne</button> <button type="button" class="btn ghost small" onclick="ft_addTracked('${i.id}',true)">∅ n’en contient pas</button></span></div>`).join('') : '<div style="color:var(--moss);font-weight:600;">✓ Tous les ingrédients suivis sont renseignés.</div>';
-  const k = kits.length >= 2 ? `<div class="mep-w" style="margin-top:8px;">Cuisine où le plat est préparé</div><div class="filter-row" style="margin:4px 0;flex-wrap:wrap;">${kits.map(x=>`<button type="button" class="filter-chip ${d.kit === x.id ? 'active' : ''}" onclick="ft_dSet('kit','${x.id}');ft_render()">${ft_e(x.n)}</button>`).join('')}<button type="button" class="filter-chip ${d.kit === '_bar' ? 'active' : ''}" onclick="ft_dSet('kit','_bar');ft_render()">Bar</button></div>` : '';
-  return `<div class="ticket"><div class="section-label">Contrôle des ingrédients</div><div class="pt-muted" style="margin-bottom:6px;">Les ingrédients de la liste ci-dessus qui sont aussi dans Dépenses alimentent le bilan des ingrédients (quantité servie par portion). Ajoute ceux qui manquent, ou indique qu’il n’y en a pas.</div>${chips}${k}</div>`;
-}
-function ft_findFor(key, name){
-  const n = ft_norm(name);
-  return ft_fiches.find(f=>f.ckey && f.ckey === key) || ft_fiches.find(f=>ft_norm(f.name) === n) || ft_fiches.find(f=>n && ft_norm(ft_shortName(f)) === n && f.cat !== FT_BASE_CAT);
-}
-function ft_soldTodo(){
-  if(!cx_data || !ft_ready) return [];
-  return cx_salesTotals().map(sl=>({ sl, f:ft_findFor(sl.key, sl.name) })).filter(x=>!x.f || !ft_complete(x.f));
-}
-function ft_bannerHtml(){
-  if(!(session && session.isAdmin)) return '';
-  const t = ft_soldTodo(); if(!t.length) return '';
-  return `<div class="ticket" style="border-color:var(--amber);cursor:pointer;margin-bottom:12px;" onclick="ft_openSold()"><div class="row-between"><div><b style="color:var(--amber);">⚠️ ${t.length} plat${t.length > 1 ? 's' : ''} vendu${t.length > 1 ? 's' : ''} sans fiche technique complète</b><div class="pt-muted" style="margin-top:2px;">${ft_e(t.slice(0, 3).map(x=>x.sl.name).join(', '))}${t.length > 3 ? '…' : ''}</div></div><span class="pt-chevron">›</span></div></div>`;
-}
-function ft_bannerUpdate(){ const el = document.getElementById('home-banner'); if(el) el.innerHTML = ft_bannerHtml(); }
-function ft_openSold(){ ft_view = 'sold'; ft_cur = null; showModule('fiches'); ft_render(); }
-function ft_soldView(){
-  const t = ft_soldTodo();
-  return `<div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;font-size:18px;">Plats vendus à finaliser (${t.length})</div><button class="btn ghost small" onclick="ft_view='list';ft_render()">‹ Liste</button></div>
-    <div class="pt-muted" style="margin-bottom:8px;">Pour chaque plat vendu : une fiche avec le net servi de chaque ingrédient suivi${cx_allKits().length >= 2 ? ' et la cuisine' : ''}. Le message disparaît quand tout est complet.</div>
-    ${t.map(x=>`<div class="ticket"><div class="row-between"><div><b>${ft_e(x.sl.name)}</b><div class="mep-w">vendu × ${ft_e(cx_n(x.sl.q))} · ${x.f ? 'fiche à compléter' : 'pas encore de fiche'}</div></div><button class="btn small t-add" onclick="ft_soldOpen('${ft_e(x.sl.key)}')">${x.f ? 'Compléter' : 'Créer la fiche'}</button></div></div>`).join('') || '<div class="empty-state">Tous les plats vendus sont finalisés.</div>'}`;
-}
-function ft_soldOpen(key){
-  if(!ft_isAdmin()) return; const sl = cx_salesTotals().find(x=>x.key === key); if(!sl) return; const f = ft_findFor(key, sl.name);
-  if(f){ ft_draft = ft_clone(f); ft_draft.ckey = key; ft_cur = f.id; }
-  else { ft_draft = ft_blank(); ft_draft.name = sl.name; ft_draft.ckey = key; ft_draft.kit = ''; ft_cur = null; }
-  ft_view = 'edit'; ft_render();
-}
-async function ft_copyFromCx(){
-  if(!ft_isAdmin()) return; const keys = Object.keys(cx_cfg.plats || {}); if(!keys.length){ alert('Aucun plat défini dans Contrôle.'); return; }
-  if(!confirm('Copier les ' + keys.length + ' plat(s) définis dans Contrôle vers les fiches techniques ? Les fiches existantes (même nom) reçoivent les lignes d’ingrédients suivis ; les autres sont créées. Contrôle n’est pas modifié.')) return;
-  let upd = 0, cre = 0;
-  try{
-    for(const key of keys){
-      const pl = cx_cfg.plats[key]; if(!pl) continue; let f = ft_findFor(key, pl.name);
-      const lines = ((f && f.ingredients) || []).map(x=>Object.assign({}, x));
-      const pp = Math.max(1, Number(f && f.portions) || 1);
-      cx_ingList().forEach(ing=>{ if(!cx_hasGram(key, ing.id)) return; const v = Number(pl.g[ing.id]); const ex = lines.find(l=>l.di === ing.id);
-        if(ex){ ex.net = v; ex.q = Math.round(v * pp * 1000) / 1000; ex.u = cx_baseLbl(ing); } else lines.push({ n:ing.n, u:cx_baseLbl(ing), q:Math.round(v * pp * 1000) / 1000, ref:'', di:ing.id, net:v }); });
-      const now = new Date().toISOString(), by = (typeof currentUser !== 'undefined' ? currentUser : '');
-      if(f){ await ft_col.doc(f.id).set({ ingredients:lines, ckey:key, kit:pl.k || f.kit || '', updatedAt:now, updatedBy:by }, { merge:true }); upd++; }
-      else { await ft_col.add({ name:pl.name || key, cat:'', portions:1, pieces:'', accomp:'', prepMin:0, ingredients:lines, steps:[], dressage:'', temp:'', duree:'', notes:'', ckey:key, kit:pl.k || '', createdAt:now, updatedAt:now, updatedBy:by }); cre++; }
-    }
-    alert(upd + ' fiche(s) mise(s) à jour, ' + cre + ' fiche(s) créée(s).');
-  }catch(e){ console.error(e); alert('Copie impossible : ' + (e.message || e)); }
-}
-function ft_editView(){
-  const d = ft_draft, a = (k)=>`oninput="ft_dSet('${k}', this.value);ft_tagsRefresh()"`;
-  const ings = d.ingredients.map((i, n)=>`<div class="ft-edrow"><input type="text" inputmode="decimal" class="ft-in ft-q" placeholder="Qté" value="${ft_e(i.q)}" oninput="ft_ingSet(${n},'q',this.value)">
-      <select class="ft-in ft-u" onchange="ft_ingSet(${n},'u',this.value)">${[''].concat(FT_UNITS, FT_UNITS.includes(i.u) || !i.u ? [] : [i.u]).map(u=>`<option value="${ft_e(u)}" ${u === (i.u || '') ? 'selected' : ''}>${u ? ft_e(u) : '—'}</option>`).join('')}</select>
-      <input type="text" class="ft-in ft-ing-name ft-n" list="ft-bases" placeholder="Ingrédient" value="${ft_e(i.n)}" oninput="ft_ingSet(${n},'n',this.value)"><button class="btn ghost small t-del" onclick="ft_ingDel(${n})" aria-label="Retirer">✕</button><div class="pt-muted" style="flex:1 1 100%;font-size:12px;" id="ft-tg-${n}">${ft_tag(i)}</div><div class="ft-lk" id="ft-lk-${n}">${i.ref && ft_fiches.find(x=>x.id === i.ref) ? '🔗 lié à la fiche « ' + ft_e(ft_fiches.find(x=>x.id === i.ref).name) + ' »' : ''}</div></div>`).join('');
-  const steps = d.steps.map((s, n)=>`<div class="ft-edrow ft-edstep"><div class="num">${n + 1}</div><textarea class="ft-in ft-step-in" rows="2" placeholder="Décris l’étape" oninput="ft_stepSet(${n}, this.value)">${ft_e(s)}</textarea>
-      <div class="ft-mv"><button class="btn ghost small" onclick="ft_stepMove(${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="ft_stepMove(${n},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="ft_stepDel(${n})" aria-label="Retirer">✕</button></div></div>`).join('');
-  return `<div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;font-size:18px;">${ft_cur ? 'Modifier la fiche' : 'Nouvelle fiche'}</div></div>
-    <div class="ticket">
-      <div class="field"><label>Nom du plat</label><input type="text" class="ft-in" id="ft-name" value="${ft_e(d.name)}" ${a('name')}></div>
-      <div class="pt-row" style="margin-top:10px;"><div class="field" style="flex:2 1 160px;"><label>Catégorie</label><input type="text" class="ft-in" list="ft-cats" value="${ft_e(d.cat)}" placeholder="Choisis ou écris" ${a('cat')}><datalist id="ft-cats">${ft_catsAll().map(c=>`<option value="${ft_e(c)}">`).join('')}</datalist></div>
-        <div class="field" style="flex:1 1 90px;"><label>Pièces / portion</label><input type="text" inputmode="numeric" class="ft-in" value="${ft_e(d.pieces)}" ${a('pieces')}></div>
-        <div class="field" style="flex:1 1 90px;"><label>Portions</label><input type="text" inputmode="numeric" class="ft-in" value="${ft_e(d.portions)}" ${a('portions')}></div>
-        <div class="field" style="flex:1 1 110px;"><label>Préparation (min)</label><input type="text" inputmode="numeric" class="ft-in" value="${ft_e(d.prepMin)}" ${a('prepMin')}></div></div>
-    </div>
-    <div class="ticket"><div class="section-label">Ingrédients <span class="pt-muted" style="text-transform:none;letter-spacing:0;">(quantités pour ${ft_e(d.portions || 1)} portion${Number(d.portions) > 1 ? 's' : ''} — une ligne par ingrédient pesé ou mesuré)</span></div><datalist id="ft-bases">${ft_fiches.filter(x=>x.cat === FT_BASE_CAT).map(x=>`<option value="${ft_e(x.name)}">`).join('')}</datalist>${ings}<div class="actions-row"><button class="btn small t-add" onclick="ft_ingAdd()">＋ Ingrédient</button></div></div>
-    ${ft_ctlBlock(d)}
-    <div class="ticket"><div class="section-label">Étapes de préparation</div>${steps}<div class="actions-row"><button class="btn small t-add" onclick="ft_stepAdd()">＋ Étape</button></div></div>
-    <div class="ticket"><div class="field"><label>Dressage (comment présenter le plat)</label><textarea class="ft-in" rows="3" ${a('dressage')}>${ft_e(d.dressage)}</textarea></div></div>
-    <div class="ticket"><div class="field"><label>Accompagnements (wasabi, gingembre, sauces…)</label><textarea class="ft-in" rows="2" ${a('accomp')}>${ft_e(d.accomp)}</textarea></div></div>
-    <div class="ticket"><div class="section-label">Conservation</div><div class="pt-row"><div class="field" style="flex:1 1 140px;"><label>Température</label><input type="text" class="ft-in" placeholder="ex. 0–4 °C" value="${ft_e(d.temp)}" ${a('temp')}></div>
-      <div class="field" style="flex:1 1 140px;"><label>Durée</label><input type="text" class="ft-in" placeholder="ex. 48 h" value="${ft_e(d.duree)}" ${a('duree')}></div></div></div>
-    <div class="ticket"><div class="field"><label>Notes ou astuces du chef</label><textarea class="ft-in" rows="3" ${a('notes')}>${ft_e(d.notes)}</textarea></div></div>
-    <div class="actions-row"><button class="btn t-save" onclick="ft_save()">Enregistrer la fiche</button><button class="btn ghost t-cancel" onclick="ft_cancelEdit()">Annuler</button></div>`;
-}
-
-function ft_render(){
-  const body = document.getElementById('ft-body'); if(!body) return;
-  if(!ft_ready){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
-  const f = ft_fiches.find(x=>x.id === ft_cur);
-  if(ft_view === 'sold' && ft_isAdmin()) body.innerHTML = ft_soldView();
-  else if(ft_view === 'edit' && ft_draft && ft_isAdmin()) body.innerHTML = ft_editView();
-  else if(ft_view === 'detail' && f) body.innerHTML = ft_detailView(f);
-  else { ft_view = 'list'; body.innerHTML = ft_listView(); try{ const nav = document.querySelector('nav.tabs'), t = body.querySelector('.ft-top'); if(t && nav) t.style.top = nav.offsetHeight + 'px'; }catch(e){} }
 }
 
 /* ==================== MODULE CA RESTO PRO — chiffre d'affaires synchronisé depuis le PC du restaurant ====================
@@ -6652,7 +6296,8 @@ const cx_n = (v)=>(Math.round(Number(v) * 100) / 100).toLocaleString('fr-FR', { 
 const cx_key = (n)=>String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'x';
 const cx_who = ()=>(typeof currentUser !== 'undefined' && currentUser) ? currentUser : 'administrateur';
 const cx_isAdmin = ()=>!!(session && session.isAdmin);
-function cx_typing(){ try{ const a = document.activeElement, b = document.getElementById('cx-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
+function cx_live(){ return activeModule === 'controle' || (activeModule === 'cuisine' && (v2_tab === 'today' || v2_tab === 'plats')); }
+function cx_typing(){ try{ const a = document.activeElement, b = document.getElementById(activeModule === 'cuisine' ? 'v2-body' : 'cx-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
 /* jour de contrôle : jour calendaire, de 00h00 à 23h59 */
 function cx_dayStart(ms){ const d = new Date(ms); d.setHours(0, 0, 0, 0); return d; }
 function cx_dayWindow(dayKey){ const a = new Date(dayKey + 'T00:00'), b = new Date(a); b.setDate(b.getDate() + 1); return [a.getTime(), b.getTime()]; }
@@ -6677,16 +6322,16 @@ function cx_start(){
   if(typeof mep_start === 'function') mep_start();
   dp_cfgRef.onSnapshot((doc)=>{
     if(!dp_started){ if(doc.exists){ const d = doc.data() || {}; ['concepts', 'boutons', 'ingredients', 'livreurs'].forEach(k=>{ if(Array.isArray(d[k])) dp_cfg[k] = d[k]; }); if(Array.isArray(d.ordre)) dp_cfg.ordre = d.ordre; } dp_cfgFix(); }
-    cx_dpReady = true; if(activeModule === 'controle' && !cx_typing()) cx_render();
+    cx_dpReady = true; if(cx_live() && !cx_typing()) cx_render();
   }, (e)=>{ console.warn(e); cx_dpReady = true; });
   cx_cfgRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
     cx_cfg = { ing:d.ing || {}, plats:d.plats || {}, snapFrom:d.snapFrom || '' }; cx_ready = true;
-    if(activeModule === 'controle' && !cx_typing()) cx_render();
-  }, (e)=>{ console.error(e); cx_ready = true; cx_err = (e && e.message) || String(e); if(activeModule === 'controle') cx_render(); });
+    if(cx_live() && !cx_typing()) cx_render();
+  }, (e)=>{ console.error(e); cx_ready = true; cx_err = (e && e.message) || String(e); if(cx_live()) cx_render(); });
   cx_preset('today', true);
 }
-function cx_refresh(){ if(activeModule === 'controle' && cx_started && !cx_typing()) cx_render(); }
+function cx_refresh(){ if(cx_live() && cx_started && !cx_typing()) cx_render(); }
 /* à l'ouverture de l'application : sauvegarde automatique des jours de contrôle manquants */
 function cx_boot(){
   if(!cx_isAdmin()) return; cx_start();
@@ -6724,8 +6369,7 @@ async function cx_reload(){
   if(!cx_started || !cx_from) return; const tok = ++cx_tok; cx_loading = true;
   try{ const [f, t] = cx_setWindow(); const d = await cx_fetch(f, t); if(tok !== cx_tok) return; cx_data = d; cx_err = ''; }
   catch(e){ if(tok !== cx_tok) return; console.error(e); cx_err = (e && e.message) || String(e); }
-  cx_loading = false; if(activeModule === 'controle' && !cx_typing()) cx_render();
-  try{ ft_bannerUpdate(); }catch(e){}
+  cx_loading = false; if(cx_live() && !cx_typing()) cx_render();
 }
 function cx_preset(k, silent){
   const now = new Date(), ds = cx_dayStart(now.getTime());
@@ -7361,11 +7005,12 @@ function cx_histHtml(){
 }
 
 function cx_render(){
+  if(activeModule === 'cuisine'){ try{ v2_render(); }catch(e){ console.warn(e); } return; }
   const el = document.getElementById('cx-body'); if(!el) return;
   if(!cx_isAdmin()){ el.innerHTML = '<div class="empty-state">Réservé à l’administrateur.</div>'; return; }
   if(!cx_ready || !cx_dpReady){ el.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
   const titles = { jour:'Journal', hist:'Historique des écarts', reg:'Réglages' };
-  const head = cx_tab === 'ctrl' ? `<div class="row-between" style="margin-bottom:10px;"><div style="font-weight:700;font-size:18px;">🎯 Contrôle</div><button class="btn ghost small" onclick="cx_togMenu()" aria-label="Menu">⋯</button></div>`
+  const head = cx_tab === 'ctrl' ? `<div class="row-between" style="margin-bottom:10px;"><button class="btn ghost small" onclick="showModule('cuisine')">‹ Aujourd’hui</button><div style="font-weight:700;font-size:18px;">🎯 Détail du contrôle</div><button class="btn ghost small" onclick="cx_togMenu()" aria-label="Menu">⋯</button></div>`
     : `<div class="row-between" style="margin-bottom:10px;"><button class="btn ghost small" onclick="cx_setTab('ctrl')">‹ Contrôle</button><div style="font-weight:700;font-size:16px;">${titles[cx_tab]}</div><span style="width:60px;"></span></div>`;
   const menu = cx_menu && cx_tab === 'ctrl' ? `<div class="ticket" style="padding:8px;"><button class="btn ghost" style="width:100%;text-align:left;margin-bottom:6px;" onclick="cx_setTab('jour')">📜 Journal (recherche, export Excel)</button><button class="btn ghost" style="width:100%;text-align:left;margin-bottom:6px;" onclick="cx_setTab('hist')">📈 Historique des écarts</button><button class="btn ghost" style="width:100%;text-align:left;" onclick="cx_setTab('reg')">⚙️ Réglages</button></div>` : '';
   const view = cx_tab === 'reg' ? cx_settingsHtml() : cx_tab === 'jour' ? cx_jourHtml() : cx_tab === 'hist' ? cx_histHtml() : cx_ctrlHtml();
@@ -7645,7 +7290,7 @@ const V2_TXT = {
   'rub.sushi':['Sushi', 'سوشي'], 'rub.chaud':['Wok', 'الووك'], 'rub.bar':['Bar', 'البار']
 };
 const V2_TXT_LBL = { 'title.mep':'Titre : Mise en place', 'title.stock':'Titre : Stock', 'btn.valOp':'Bouton valider une opération ({noun}, {n} automatiques)', 'btn.val':'Bouton valider (sans opération)', 'btn.fix':'Lien corriger', 'btn.valInv':'Bouton valider l’inventaire (Stock)', 'btn.fixInv':'Lien corriger la saisie (Stock)', 'btn.sub':'Lien travailler à la place de… ({rub})', 'btn.recuOk':'Puce valider « Reçu »', 'btn.recuFix':'Puce corriger « Reçu »', 'msg.wait':'Message d’attente ({rub})', 'msg.recu':'Message « Reçu à valider »', 'msg.recuOk':'Message « Reçu validé »', 'msg.by':'Message saisi par ({who})', 'msg.saved':'Message enregistré', 'link.hist':'Lien opérations précédentes ({n})', 'title.others':'Titre : autres articles', 'msg.empty':'Message rubrique vide', 'lbl.ro':'Mention consultation seulement' };
-let v2_cfg = {}, v2_cfgReady = false, v2_started = false, v2_tab = 'saisie', v2_sec = '', v2_date = '';
+let v2_tabInit = false, v2_comp = { ing:'', retro:true }, v2_cfg = {}, v2_cfgReady = false, v2_started = false, v2_tab = 'saisie', v2_sec = '', v2_date = '';
 let v2_docs = {}, v2_unsub = null, v2_form = {}, v2_editS = {}, v2_msg = {}, v2_ops = {}, v2_times = {}, v2_subOpen = {}, v2_hist = {}, v2_recuEdit = {}, v2_ar = true, v2_asCook = false, v2_saveT = null, v2_busy = false;
 function v2_tx(key){ const o = (v2_cfg.texts && v2_cfg.texts[key]) || {}, d = V2_TXT[key] || ['', '']; return { fr:(o.fr !== undefined && o.fr !== '' ? o.fr : d[0]), ar:(o.ar !== undefined && o.ar !== '' ? o.ar : d[1]) }; }
 const v2_fill = (s, vars)=>String(s).replace(/\{(\w+)\}/g, (m, k)=>vars && vars[k] !== undefined ? vars[k] : m);
@@ -8081,18 +7726,97 @@ function v2_ecartsView(){
   return h;
 }
 
+/* ==================== AUJOURD'HUI (admin) : résultats du contrôle + avancement des cuisiniers ==================== */
+function v2_thr(){ const t = v2_cfg.thr || {}; return { a:Number(t.a) > 0 ? Number(t.a) : 3, b:Number(t.b) > 0 ? Number(t.b) : 7, cov:Number(t.cov) > 0 ? Number(t.cov) : 90, prec:Number(t.prec) > 0 ? Number(t.prec) : 1 }; }
+function v2_cov(ing){ let tot = 0, k = 0; cx_salesTotals().forEach(s=>{ tot += s.q; if(cx_hasGram(s.key, ing.id)) k += s.q; }); return tot > 0 ? Math.round(k / tot * 100) : 100; }
+const v2_da = (n)=>Math.round(Math.abs(n)).toLocaleString('fr-FR').replace(/ /g, ' ') + ' DA';
+function v2_todayRows(){
+  const [f, t] = cx_setWindow(), th = v2_thr(); cx_res = {};
+  return cx_ingList().map((ing)=>{
+    const r = cx_calc(ing, f, t, cx_mode[ing.id] || { k:'reel', q:'' }, cx_data); cx_res[ing.id] = r;
+    const cov = v2_cov(ing), da = r.ecart === null ? null : r.ecart * r.price, loss = da !== null && da < 0 ? -da : 0, ap = r.pct === null ? 0 : Math.abs(r.pct);
+    const gray = r.ecart === null || cov < th.cov, surplus = !gray && r.ecart > 0 && ap > th.a;
+    const col = gray ? 'var(--ink-muted)' : surplus ? 'var(--amber)' : r.ecart >= 0 || ap < th.a ? 'var(--moss)' : ap < th.b ? 'var(--amber)' : 'var(--rust)';
+    const n = Math.max(1, (r.R || []).length + (r.S || []).length), margin = cx_baseLbl(ing) === 'g' ? th.prec * Math.sqrt(n) : null;
+    return { ing, r, cov, da, loss, gray, surplus, col, margin };
+  }).sort((a, b)=>(a.gray - b.gray) || (b.loss - a.loss) || ((b.da || 0) - (a.da || 0)));
+}
+function v2_learn(){
+  const L = v2_cfg.learn;
+  if(!L || !L.start){ v2_cfg.learn = { start:todayISO(), days:14 }; v2_saveCfg(); }
+  const l = v2_cfg.learn, d = Math.floor((new Date(todayISO() + 'T00:00') - new Date(l.start + 'T00:00')) / 864e5) + 1;
+  return { day:d, days:Number(l.days) || 14 };
+}
+function v2_learnExtend(){ v2_learn(); v2_cfg.learn.days = (Number(v2_cfg.learn.days) || 14) + 7; v2_saveCfg(); v2_render(); }
+function v2_openDetail(id){ cx_open['ing:' + id] = true; cx_tab = 'ctrl'; showModule('controle'); }
+function v2_todayView(){
+  if(!cx_ready || !cx_dpReady) return '<div class="empty-state">Chargement…</div>';
+  if(!cx_ingList().length) return '<div class="ticket"><div class="empty-state">Aucun ingrédient suivi. Coche-les dans Dépenses (« suivre ») puis reviens ici.</div></div>';
+  if(!cx_data) return `<div class="ticket"><div class="empty-state">${cx_err ? esc(cx_err) : 'Chargement…'}</div></div>`;
+  const rows = v2_todayRows(), th = v2_thr(), L = v2_learn(), todo = cx_todoList().length;
+  const okN = rows.filter(x=>!x.gray).length, qual = rows.length ? Math.round(okN / rows.length * 100) : 0, net = rows.reduce((s, x)=>s + x.loss, 0);
+  const learn = L.day <= L.days ? `<div class="v2-card" style="border-left-color:#FBBF24;"><b>Phase d’apprentissage · jour ${L.day} / ${L.days}</b><div class="mep-w" style="margin-top:4px;">On mesure les rendements et on complète les quantités par plat. Les écarts sont indicatifs.</div></div>`
+    : `<div class="v2-card" style="border-left-color:#4ADE80;"><div class="row-between"><b>Apprentissage terminé (${L.days} jours)</b><button class="btn ghost small" onclick="v2_learnExtend()">+ 7 jours</button></div></div>`;
+  const rubs = v2_rubs().map(r=>{ const m = v2_docs[r.id], s = v2_docs[r.id + '@s'], vm = m && m.valid ? Object.keys(m.valid).filter(k=>m.valid[k]).length : 0, ex = v2_stockExpected(r.id), dn = ex.filter(k=>v2_num(((s || {}).vals || {})[k]) !== null).length, stOk = s && s.stockOk;
+    return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);"><span>${esc(r.n)}</span><span style="text-align:right;font-size:13px;">Découpes : <b>${vm}</b> · Stock : <b style="color:${stOk ? '#4ADE80' : 'var(--ink-muted)'}">${stOk ? '✓ saisi' : dn + ' / ' + ex.length}</b></span></div>`; }).join('');
+  const list = rows.map((x)=>{
+    const r = x.r, big = x.gray ? 'partiel' : (r.ecart < 0 ? '−' + v2_da(x.da) : x.surplus ? '⚠ surplus' : 'OK'), pc = r.pct === null ? '' : (r.pct >= 0 ? '+' : '−') + Math.abs(r.pct).toFixed(1).replace('.', ',') + ' %';
+    const qty = r.ecart === null ? 'pesée de fin manquante' : cx_fmt(r.ecart, x.ing, true) + (x.margin ? ' ± ' + Math.round(x.margin) + ' g' : '');
+    const sub = x.gray && r.ecart !== null ? `perte maximale possible · données ${x.cov} % complètes` : x.cov < 100 ? `données ${x.cov} % complètes` : '';
+    return `<div class="v2-card" style="border-left-color:${x.col};cursor:pointer;" onclick="v2_openDetail('${x.ing.id}')"><div class="row-between"><div><b>${esc(x.ing.n)}</b><div class="mep-w">${esc(qty)}${pc ? ' · ' + pc : ''}</div>${sub ? `<div class="mep-w">${esc(sub)}</div>` : ''}</div><div style="text-align:right;"><b style="color:${x.col};font-family:'IBM Plex Mono',monospace;">${big}</b><div class="mep-w">détail ›</div></div></div></div>`; }).join('');
+  const todoBox = todo ? `<div class="v2-card" style="border-left-color:#FBBF24;cursor:pointer;" onclick="v2_setTab('plats')"><div class="row-between"><div><b>${todo} plat${todo > 1 ? 's' : ''} vendu${todo > 1 ? 's' : ''} sans quantité</b><div class="mep-w">Compléter par ingrédient — plat par plat</div></div><b>›</b></div></div>` : '';
+  return learn + `<div class="v2-card"><div class="row-between"><div><div class="mep-w">Perte nette (surplus non déduit)</div><b style="font-size:20px;color:${net > 0 ? 'var(--rust)' : 'var(--moss)'};">${v2_da(net)}</b></div><div style="text-align:right;"><div class="mep-w">Qualité des données</div><b style="font-size:20px;">${qual} %</b></div></div></div>`
+    + `<div class="v2-card"><div style="font-weight:800;margin-bottom:4px;">Saisies des cuisiniers</div>${rubs}</div>` + todoBox
+    + `<div style="font-weight:800;margin:12px 0 6px;">Écarts · du plus coûteux au moins coûteux${cx_loading ? ' · mise à jour…' : ''}</div>` + list
+    + `<div class="mep-w" style="margin:8px 0;">Vert &lt; ${th.a} % · orange ${th.a}–${th.b} % · rouge &gt; ${th.b} % · gris = données incomplètes (&lt; ${th.cov} % des plats connus).</div>`
+    + `<button class="btn ghost small" onclick="cx_tab='ctrl';showModule('controle')">Détail complet & réglages du contrôle ›</button>`;
+}
+/* ---------- compléter les quantités : ingrédient d'abord, plat par plat ---------- */
+function v2_compView(){
+  if(!cx_data) return '<div class="empty-state">Chargement…</div>';
+  const tr = cx_ingList(); if(!tr.length) return '<div class="empty-state">Aucun ingrédient suivi.</div>';
+  if(!v2_comp.ing || !tr.some(i=>i.id === v2_comp.ing)) v2_comp.ing = (tr.find(i=>v2_cov(i) < 100) || tr[0]).id;
+  const ing = cx_ingById(v2_comp.ing), sales = cx_salesTotals(), todo = sales.filter(s=>!cx_hasGram(s.key, ing.id)), cov = v2_cov(ing), isToday = cx_from === cx_dt(cx_dayStart(Date.now())) && !cx_to, multi = cx_allKits().length >= 2;
+  const chips = tr.map(i=>`<button class="filter-chip ${i.id === ing.id ? 'active' : ''}" onclick="v2_comp.ing='${i.id}';v2_render()">${esc(i.n)} · ${v2_cov(i)} %</button>`).join('');
+  const cards = todo.slice(0, 25).map(s=>`<div class="v2-card"><div class="row-between"><b>${esc(s.name)}</b><span class="mep-w">vendu × ${esc(cx_n(s.q))}</span></div>${multi ? cx_kChips(s.key, cx_pk[s.key] !== undefined ? cx_pk[s.key] : ((cx_cfg.plats[s.key] || {}).k || '')) : ''}
+      <div class="g2" style="margin-top:8px;align-items:end;"><div><label>${esc(ing.n)} — ${esc(cx_baseLbl(ing))} par portion (tel que mis dans le plat)</label><input type="text" inputmode="decimal" class="ft-in" id="cp-${s.key}" placeholder="${esc(cx_baseLbl(ing))}"></div><div style="display:flex;gap:6px;"><button class="btn small t-save" onclick="cx_compSave('${s.key}',false)">Valider</button><button class="btn ghost small" onclick="cx_compSave('${s.key}',true)">Sans ${esc(ing.n)}</button></div></div>
+      <div style="margin-top:6px;"><button class="btn ghost small" onclick="cx_compNone('${s.key}')">Aucun ingrédient suivi</button></div></div>`).join('');
+  return `<button class="btn ghost small" onclick="v2_setTab('today')">‹ Aujourd’hui</button>
+    <div class="v2-card" style="margin-top:8px;"><div style="font-weight:800;">Compléter les quantités par plat</div><div class="filter-row" style="flex-wrap:wrap;margin:8px 0 4px;">${chips}</div>
+      <div class="row-between"><span class="mep-w">Couverture ${esc(ing.n)}</span><b>${cov} %</b></div><div style="height:6px;background:var(--line);border-radius:4px;margin-top:4px;"><div style="height:6px;width:${cov}%;background:${cov >= 90 ? 'var(--moss)' : 'var(--amber)'};border-radius:4px;"></div></div>
+      <div class="filter-row" style="flex-wrap:wrap;margin:10px 0 0;"><button class="filter-chip ${isToday ? 'active' : ''}" onclick="cx_preset('today')">Aujourd’hui</button><button class="filter-chip ${!isToday ? 'active' : ''}" onclick="cx_preset('7d')">7 jours</button></div>
+      <label style="display:flex;gap:6px;align-items:center;font-size:13px;margin-top:8px;"><input type="checkbox" ${v2_comp.retro ? 'checked' : ''} onchange="v2_comp.retro=this.checked"> Appliquer aussi aux jours précédents</label></div>`
+    + (todo.length ? cards + (todo.length > 25 ? `<div class="mep-w">Encore ${todo.length - 25} plats — valide ceux-ci d’abord.</div>` : '') : `<div class="v2-card" style="border-left-color:#4ADE80;"><b>✓ ${esc(ing.n)} : tous les plats vendus sont définis sur cette période.</b></div>`);
+}
+async function cx_compWrite(key, map){
+  const sale = cx_salesTotals().find(s=>s.key === key), cur = cx_cfg.plats[key] || {}, name = (sale && sale.name) || cur.name || key, multi = cx_allKits().length >= 2, kSel = cx_pk[key] !== undefined ? cx_pk[key] : (cur.k || '');
+  if(multi && !kSel){ alert('Choisis la cuisine où ce plat est préparé.'); return; }
+  const from = v2_comp.retro ? '0000-00-00' : todayISO(), pl = { name, g:Object.assign({}, cur.g), h:Object.assign({}, cur.h) }, g = {}, h = {};
+  Object.keys(map).forEach((id)=>{ const hh = cx_histAdd(pl, id, map[id], from); pl.h[id] = hh; pl.g[id] = hh[hh.length - 1].q; g[id] = pl.g[id]; h[id] = hh; });
+  if(multi) pl.k = kSel; cx_cfg.plats[key] = pl;
+  try{ await cx_cfgRef.set({ plats:{ [key]:Object.assign({ name, g, h }, multi ? { k:kSel } : {}) } }, { merge:true }); if(typeof pt_toast === 'function') pt_toast('Enregistré : ' + name); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+  cx_reload(); v2_render();
+}
+function cx_compSave(key, sans){
+  const ing = cx_ingById(v2_comp.ing); if(!ing) return; let v;
+  if(sans) v = 0; else { const el = document.getElementById('cp-' + key), raw = el ? el.value.trim() : ''; if(raw === ''){ alert('Saisis une quantité, ou appuie sur « Sans ' + ing.n + ' ».'); return; } v = ft_parseQ(raw); if(v === null || v < 0){ alert('Quantité non valide : « ' + raw + ' ».'); return; } }
+  return cx_compWrite(key, { [ing.id]:v });
+}
+function cx_compNone(key){ const m = {}; cx_ingList().forEach((i)=>{ if(!cx_hasGram(key, i.id)) m[i.id] = 0; }); return cx_compWrite(key, m); }
+
 function v2_render(){
   const body = document.getElementById('v2-body'); if(!body) return;
   if(!v2_on()){ body.innerHTML = ''; return; }
   if(!v2_cfgReady){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
-  const admin = v2_adminView(), tabs = [['saisie', 'mep'], ['stock', 'stock']].map(t=>[t[0], v2_fr('title.' + t[1]), v2_arOf('title.' + t[1])]).concat(admin ? [['ecarts', 'Écarts', ''], ['cfg', 'Cuisine', ''], ['listes', 'Listes', ''], ['textes', 'Textes', '']] : []);
+  const admin = v2_adminView(); if(admin && !v2_tabInit){ v2_tabInit = true; v2_tab = 'today'; }
+  const tabs = (admin ? [['today', 'Aujourd’hui', '']] : []).concat([['saisie', 'mep'], ['stock', 'stock']].map(t=>[t[0], v2_fr('title.' + t[1]), v2_arOf('title.' + t[1])])).concat(admin ? [['ecarts', 'Écarts', ''], ['cfg', 'Cuisine', ''], ['listes', 'Listes', ''], ['textes', 'Textes', '']] : []);
   if(!admin && !['saisie', 'stock'].includes(v2_tab)){ v2_tab = 'saisie'; if(window.v2_lmode){ window.v2_lmode = false; mep_draft = null; } }
-  const zone = v2_tab === 'stock' ? 'stock' : 'mep';
-  const head = `<div id="v2-ob">${v2_obHtml()}</div><div style="font-weight:700;font-size:22px;">${esc(v2_fr(zone === 'stock' ? 'title.stock' : 'title.mep'))}${v2_arSpan(v2_arOf(zone === 'stock' ? 'title.stock' : 'title.mep'))}</div>
+  const zone = v2_tab === 'stock' ? 'stock' : 'mep', isToday = admin && (v2_tab === 'today' || v2_tab === 'plats');
+  const head = `<div id="v2-ob">${v2_obHtml()}</div><div style="font-weight:700;font-size:22px;">${isToday ? 'Aujourd’hui' : esc(v2_fr(zone === 'stock' ? 'title.stock' : 'title.mep')) + v2_arSpan(v2_arOf(zone === 'stock' ? 'title.stock' : 'title.mep'))}</div>
     <div style="font-size:12px;font-weight:600;color:#FBBF24;margin-top:2px;">Version en test — visible par l’administrateur seulement</div>
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 12px;"><input type="date" value="${esc(v2_date)}" onchange="v2_setDate(this.value)" style="min-height:40px;"><label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_ar ? 'checked' : ''} onchange="v2_toggleAr(this.checked)"> Arabe</label>${(session && session.isAdmin) ? `<label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_asCook ? 'checked' : ''} onchange="v2_toggleCook(this.checked)"> Voir comme un cuisinier</label>` : ''}</div>
-    ${tabs.length > 1 ? `<div class="mep-seg">${tabs.map(t=>`<button class="${v2_tab === t[0] ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${esc(t[1])}${v2_ar && t[2] ? `<span class="v2-ar" style="text-align:center">${esc(t[2])}</span>` : ''}</button>`).join('')}</div>` : ''}`;
-  body.innerHTML = head + (v2_tab === 'listes' && admin ? v2_listsView() : v2_tab === 'cfg' && admin ? v2_cfgView() : v2_tab === 'ecarts' && admin ? v2_ecartsView() : v2_tab === 'textes' && admin ? v2_textsView() : v2_saisieView(zone));
+    ${tabs.length > 1 ? `<div class="mep-seg">${tabs.map(t=>`<button class="${(v2_tab === t[0] || (t[0] === 'today' && v2_tab === 'plats')) ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${esc(t[1])}${v2_ar && t[2] ? `<span class="v2-ar" style="text-align:center">${esc(t[2])}</span>` : ''}</button>`).join('')}</div>` : ''}`;
+  body.innerHTML = head + (isToday ? (v2_tab === 'plats' ? v2_compView() : v2_todayView()) : v2_tab === 'listes' && admin ? v2_listsView() : v2_tab === 'cfg' && admin ? v2_cfgView() : v2_tab === 'ecarts' && admin ? v2_ecartsView() : v2_tab === 'textes' && admin ? v2_textsView() : v2_saisieView(zone));
 }
 
 initAuth();
