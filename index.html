@@ -638,6 +638,29 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
 .v2-b:disabled{opacity:.4;cursor:not-allowed;}.v2-b .v2-ar{color:inherit;opacity:.75;}
 .v2-saved{margin-top:12px;border:1px solid #22c55e;color:#86efac;border-radius:12px;padding:10px 12px;}.v2-saved .v2-ar{color:inherit;opacity:.75;}
 </style>
+<style>
+.u-wrap{max-width:560px;margin:0 auto;}
+.u-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:12px;}
+.u-hd{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);}
+.u-t{font-weight:700;font-size:18px;}.u-t.big{font-size:26px;}.u-s{font-size:13px;color:var(--ink-muted);}
+.u-bar{height:4px;background:rgba(255,255,255,.08);}.u-bar>i{display:block;height:4px;background:#60A5FA;}
+.u-pill{border-radius:999px;padding:3px 10px;font-size:12px;background:rgba(255,255,255,.07);white-space:nowrap;}
+.u-ok{background:rgba(34,197,94,.14);color:#4ADE80;}.u-wa{background:rgba(251,191,36,.14);color:#FBBF24;}.u-bad{background:rgba(248,113,113,.14);color:#F87171;}
+.u-btn{border:1px solid var(--line);border-radius:12px;background:none;color:var(--ink);padding:10px 14px;font-size:15px;cursor:pointer;font-family:inherit;}
+.u-btn.sm{padding:6px 11px;font-size:13px;border-radius:10px;}.u-btn.on{border-color:#60A5FA;color:#60A5FA;}
+.u-btn.main{background:#F0EEE8;color:#111;border:0;font-weight:600;width:100%;padding:14px;font-size:17px;}
+.u-kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}.u-kp button{height:52px;font-size:20px;font-weight:600;border:1px solid var(--line);border-radius:12px;background:none;color:var(--ink);cursor:pointer;}
+.u-disp{background:rgba(0,0,0,.28);border-radius:12px;height:68px;display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:700;margin:10px 0;}
+.u-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--line);}.u-row.sel{background:rgba(59,130,246,.18);}
+.u-bn{display:flex;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--surface);margin-top:14px;}.u-bn button{flex:1;padding:12px 0;background:none;border:0;color:var(--ink-muted);font-size:13px;cursor:pointer;}.u-bn button.on{color:#60A5FA;font-weight:700;}
+.u-dot{width:14px;height:14px;border-radius:50%;flex:none;}
+.u-box{width:22px;height:22px;border:1.5px solid var(--line);border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;}
+.u-box.ok{border-color:#22C55E;color:#22C55E;}.u-box.cur{border-color:#60A5FA;}.u-box.sk{border-color:#FBBF24;color:#FBBF24;}
+.u-ban{background:rgba(59,130,246,.18);color:#93C5FD;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px;}
+.u-m{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;}.u-m .v{font-size:28px;font-weight:700;}
+.u-g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.u-pad{padding:14px 16px;}
+</style>
 </head>
 <body>
 
@@ -7575,6 +7598,92 @@ function v2_rendHtml(sec, it){
       : `<div class="v2-pref" style="color:#86efac;font-weight:700;margin-top:8px;">Rendement ${esc(g)} : ${Math.round(so / si * 100)} % ✓${v2_arSpan('المردودية')}</div>`; });
   return h;
 }
+
+/* ---------- Mise en place : une pesée par écran ---------- */
+let v2_wizSkips = {}, v2_wizFlags = {}, v2_wizForce = {}, v2_warnOk = {}, v2_fb = null, v2_warn = null;
+function v2_wizItems(sec){
+  const mord = ((v2_cfg.order || {}).mep || {})[sec] || [], mix = (id)=>{ const i = mord.indexOf(id); return i < 0 ? 9999 : i; };
+  const d = v2_docs[sec] || {}, sk = Object.assign({}, d.skips || {}, v2_wizSkips);
+  return v2_ings().map((it, i)=>({ it, i })).sort((a, b)=>mix(a.it.id) - mix(b.it.id) || a.i - b.i).map(x=>x.it).map((it)=>{
+    const c = v2_ing(it), fs = c.fields.filter(f=>f.sec === sec && f.zone !== 'stock' && v2_visible(f)); if(!fs.length) return null;
+    const ops = fs.filter(f=>f.per === 'op' && !f.src && !f.srcIng), svc = fs.filter(f=>f.per !== 'op' && !f.src && !f.srcIng), hasOp = ops.length > 0, n = hasOp ? v2_curOp(it, sec) : 1;
+    const fields = ops.concat(svc).map((f)=>{ const key = v2_key(it, f, f.per === 'op' ? n : 1), calc = v2_isIn(f) && !f.confirm; let has = String(v2_fv(sec, key)).trim() !== '' || !!sk[key], wait = false;
+      if(f.confirm){ wait = v2_calcOnly(it, f, n) === null; has = v2_getv(it, f, n) !== null; }
+      return { f, key, calc, confirm:!!f.confirm, has, wait, skipped:!!sk[key] && String(v2_fv(sec, key)).trim() === '' }; });
+    const validated = (hasOp ? (n > 1 && !v2_opHasValue(it, sec, n)) : v2_isValid(sec, it.id, 0)) && !v2_wizForce[it.id];
+    return { it, c, hasOp, n, fields, validated, req:fields.filter(x=>!x.calc && !(x.confirm && x.wait)) };
+  }).filter(Boolean);
+}
+function v2_rendCheck(sec, it){
+  const c = v2_ing(it), gs = {}; c.fields.forEach(f=>{ if(f.bg && f.bil) (gs[f.bg] = gs[f.bg] || []).push(f); });
+  for(const g of Object.keys(gs)){ if(!gs[g].some(f=>f.sec === sec)) continue;
+    const ins = gs[g].filter(f=>f.bil === 'in'), outs = gs[g].filter(f=>f.bil === 'out' && !/^loss/.test(f.id)); let si = 0, so = 0, a = false, b = false;
+    ins.forEach(f=>{ const v = v2_sumF(it, f.id); if(v !== null){ si += v; a = true; } }); outs.forEach(f=>{ const v = v2_sumF(it, f.id); if(v !== null){ so += v; b = true; } });
+    if(a && b && si > 0 && so > si + 0.0005) return { g, so, si }; }
+  return null;
+}
+function v2_wizView(sec){
+  const items = v2_wizItems(sec), lock = v2_level(sec) !== 'saisir';
+  if(!items.length) return `<div class="empty-state">${esc(v2_fr('msg.empty'))}</div>`;
+  const tot = items.reduce((t, p)=>t + p.req.length, 0), dn = items.reduce((t, p)=>t + (p.validated ? p.req.length : p.req.filter(x=>x.has).length), 0);
+  const head = `<div class="u-hd"><div><div class="u-t">${esc(v2_rubName(sec))} · ${esc(v2_who())}</div><div class="u-s">Mise en place · ${dn} sur ${tot}</div></div>${v2_arBtn()}</div><div class="u-bar"><i style="width:${tot ? Math.round(dn / tot * 100) : 0}%"></i></div>`;
+  const unitOf = (it)=>esc(v2_unitOf(it));
+  if(v2_fb && v2_fb.sec === sec){ const it = v2_byId(v2_fb.itId); if(it){ const c = v2_ing(it);
+    return `<div class="u-card">${head}<div class="u-pad"><div class="u-t">${esc(it.n)}${v2_fb.hasOp ? ' · ' + esc(String(c.opLabel || 'Opération').charAt(0) + String(c.opLabel || 'Opération').slice(1).toLowerCase()) + ' ' + v2_fb.n : ''} : enregistré</div>${v2_rendHtml(sec, it) || '<div class="u-s" style="margin-top:8px;">Valeurs enregistrées.</div>'}<button class="u-btn main" style="margin-top:14px;" onclick="v2_fb=null;v2_render()">Continuer</button></div></div>`; } }
+  if(v2_warn && v2_warn.sec === sec){ const w = v2_warn;
+    return `<div class="u-card">${head}<div class="u-pad"><div class="u-t" style="color:#F87171;">La somme dépasse le poids mis</div><div style="margin:8px 0;">${esc(w.g)} : ${esc(v2_fmt(w.so))} servis pour ${esc(v2_fmt(w.si))} mis. Vérifie ta pesée.${v2_arSpan('المجموع أكبر من الوزن المُدخل، تحقق من الوزن')}</div><div style="display:flex;gap:10px;"><button class="u-btn main" onclick="v2_warnFix()">Je corrige</button><button class="u-btn" style="flex:1;" onclick="v2_warnKeep()">Je confirme</button></div></div></div>`; }
+  const p = items.find(x=>!x.validated);
+  if(!p){ return `<div class="u-card">${head}<div class="u-pad"><div class="u-t">Tout est saisi</div><div class="u-s" style="margin-top:4px;">Merci, la mise en place est terminée.${v2_arSpan('تم، شكراً')}</div>${lock ? '' : items.filter(x=>x.hasOp).map(x=>`<button class="u-btn" style="margin-top:10px;width:100%;" onclick="v2_wizNew('${x.it.id}')">Nouvelle opération : ${esc(x.it.n)}</button>`).join('')}</div></div>`; }
+  const cur = p.req.find(x=>!x.has), title = `${esc(p.it.n)}${p.hasOp ? ' · ' + esc(String(p.c.opLabel || 'Opération').charAt(0) + String(p.c.opLabel || 'Opération').slice(1).toLowerCase()) + ' ' + p.n : ''}`;
+  const rowsH = p.fields.map((x)=>{ const isCur = cur && x.key === cur.key; let val = '';
+    if(x.calc){ const v = v2_valOf(p.it, x.f, p.n); val = v === null ? '—' : esc(v2_fmt(v)) + ' ' + unitOf(p.it); }
+    else if(x.has){ const num = v2_num(v2_fv(sec, x.key)); val = x.skipped ? 'pas pesé' : (num === null ? '—' : esc(v2_fmt(num)) + ' ' + unitOf(p.it)); }
+    return `<div class="u-row" style="border-top:0;padding:8px 0;"><span class="u-box ${x.has ? (x.skipped ? 'sk' : 'ok') : isCur ? 'cur' : ''}">${x.has ? (x.skipped ? '–' : '✓') : ''}</span><div style="flex:1;${isCur ? 'font-weight:700;' : x.has || x.calc ? '' : 'color:var(--ink-muted);'}">${esc(x.f.n || '—')}${v2_arSpan(x.f.ar)}</div><div style="font-weight:700;">${val}</div></div>`; }).join('');
+  let action;
+  if(!cur){ action = `<button class="u-btn main" onclick="v2_wizValidate('${esc(sec)}','${p.it.id}')">Valider ${esc(p.it.n)}</button>`; }
+  else if(cur.confirm){ const calc = v2_calcOnly(p.it, cur.f, p.n); const rubFrom = (c=>((p.c.fields.find(z=>z.id === (cur.f.calc.p || [])[0]) || {}).sec || 'sushi'))(); 
+    action = v2_recuEdit[cur.key] ? `<div class="u-t" style="font-size:16px;">Pèse : ${esc(cur.f.n)}</div>${v2_kpHtml(v2_unitOf(p.it), `v2_wizOk('${esc(sec)}','${p.it.id}','${cur.f.id}')`)}`
+      : `<div class="u-t" style="font-size:16px;">${esc(cur.f.n)} : ${esc(v2_fmt(calc))} ${unitOf(p.it)}</div><div style="display:flex;gap:10px;margin-top:10px;"><button class="u-btn main" onclick="v2_recuOk('${esc(sec)}','${p.it.id}','${cur.f.id}',${p.n});v2_wizAfterSoon('${esc(sec)}','${p.it.id}')">C’est bon</button><button class="u-btn" style="flex:1;" onclick="v2_recuFix('${cur.key}')">Corriger</button></div>`; }
+  else { action = `<div class="u-t" style="font-size:16px;">Pèse : ${esc(cur.f.n)}</div>${v2_arSpan(cur.f.ar ? 'زن ' + cur.f.ar : '')}${v2_kpHtml(v2_unitOf(p.it), `v2_wizOk('${esc(sec)}','${p.it.id}','${cur.f.id}')`)}<div style="text-align:center;margin-top:10px;"><a class="v2-lk" onclick="v2_wizSkip('${esc(sec)}','${p.it.id}','${cur.f.id}')">Je n’ai pas pesé${v2_arSpan('لم أقم بالوزن')}</a></div>`; }
+  const waits = p.fields.filter(x=>x.confirm && x.wait).map(x=>`<div class="u-s" style="margin-top:6px;">${esc(x.f.n)} : en attente de la rubrique d’origine.</div>`).join('');
+  return `<div class="u-card">${head}<div class="u-pad"><div class="u-t">${title}${v2_arSpan(p.c.ar)}</div><div style="margin-top:6px;">${rowsH}${waits}</div></div><div class="u-pad" style="border-top:1px solid var(--line);">${action}</div></div>`;
+}
+function v2_wizAfterSoon(sec, itId){ setTimeout(()=>v2_wizAfter(sec, itId), 400); }
+function v2_wizNew(id){ v2_wizForce[id] = true; v2_render(); }
+async function v2_wizOk(sec, itId, fid){
+  const p = v2_wizItems(sec).find(i=>i.it.id === itId); if(!p) return; const x = p.fields.find(y=>y.f.id === fid); if(!x) return;
+  const raw = String(v2_kp.val || '').replace(/,$/, ''); if(raw === ''){ alert('Saisis une valeur, ou « Je n’ai pas pesé ».'); return; }
+  (v2_form[sec] = v2_form[sec] || {})[x.key] = raw; v2_kp.val = '';
+  const w = v2_rendCheck(sec, p.it); if(w && !v2_warnOk[x.key]){ v2_warn = { sec, itId, fid, key:x.key, g:w.g, so:w.so, si:w.si }; v2_render(); return; }
+  await v2_wizAfter(sec, itId);
+}
+function v2_warnFix(){ const w = v2_warn; if(!w) return; if(v2_form[w.sec]) delete v2_form[w.sec][w.key]; v2_warn = null; v2_render(); }
+async function v2_warnKeep(){ const w = v2_warn; if(!w) return; v2_wizFlags[w.key] = 'somme trop grande'; v2_warnOk[w.key] = true; v2_warn = null; await v2_wizAfter(w.sec, w.itId); }
+async function v2_wizSkip(sec, itId, fid){
+  const p = v2_wizItems(sec).find(i=>i.it.id === itId); if(!p) return; const x = p.fields.find(y=>y.f.id === fid); if(!x) return;
+  v2_wizSkips[x.key] = new Date().toISOString(); v2_kp.val = ''; await v2_wizAfter(sec, itId);
+}
+async function v2_wizAfter(sec, itId){
+  const p = v2_wizItems(sec).find(i=>i.it.id === itId); if(p && p.req.every(x=>x.has)) return v2_wizValidate(sec, itId); v2_render();
+}
+async function v2_wizValidate(sec, itId){
+  if(v2_busy || v2_level(sec) !== 'saisir') return; const p = v2_wizItems(sec).find(i=>i.it.id === itId); if(!p) return; const it = p.it, n = p.hasOp ? p.n : 0;
+  v2_busy = true;
+  try{
+    const by = v2_who(), at = new Date().toISOString(), vals = Object.assign({}, v2_form[sec] || {}), byKeys = {}, atKeys = {};
+    Object.keys(vals).forEach(k=>{ if(String(vals[k]).trim() !== ''){ byKeys[k] = { w:by, r:sec }; atKeys[k] = at; } });
+    const patch = { vals, valid:{ [itId + '#' + n]:true }, by, at, subOnly:false, byKeys, atKeys };
+    const sk = {}, fl = {}; Object.keys(v2_wizSkips).forEach(k=>{ if(k.indexOf(itId + '.') === 0) sk[k] = v2_wizSkips[k]; }); Object.keys(v2_wizFlags).forEach(k=>{ if(k.indexOf(itId + '.') === 0) fl[k] = v2_wizFlags[k]; });
+    if(Object.keys(sk).length) patch.skips = sk; if(Object.keys(fl).length) patch.flags = fl;
+    if(p.hasOp){ patch.ops = { [itId]:Math.max(v2_opN(it), p.n + 1) }; const times = {}; times[itId + '#' + p.n] = v2_opTime(it, p.n) || v2_hm(); times[itId + '#' + (p.n + 1)] = v2_hm(); patch.times = times; }
+    v2_mergeLocal(sec, sec, 'mep', patch); await v2_write(sec, sec, 'mep', patch); v2_form[sec] = {};
+    Object.keys(sk).forEach(k=>delete v2_wizSkips[k]); Object.keys(fl).forEach(k=>delete v2_wizFlags[k]);
+    if(p.hasOp){ v2_ops[itId] = Math.max(v2_opN(it), p.n + 1); v2_times[itId + '#' + (p.n + 1)] = v2_hm(); }
+    delete v2_wizForce[itId]; await v2_flushForeign(sec, by); v2_fb = { sec, itId, n:p.n, hasOp:p.hasOp };
+  }catch(e){ console.error(e); alert('Enregistrement impossible : ' + (e.message || e)); }
+  v2_busy = false; v2_render();
+}
+
 function v2_cardMep(sec, it){
   const c = v2_ing(it), fs = c.fields.filter(f=>f.sec === sec && f.zone !== 'stock' && v2_visible(f)); if(!fs.length) return '';
   const top = fs.filter(f=>f.src || f.srcIng), ops = fs.filter(f=>f.per === 'op' && !f.src && !f.srcIng), svc = fs.filter(f=>f.per !== 'op' && !f.src && !f.srcIng), lvlLock = v2_level(sec) === 'lire';
@@ -7724,24 +7833,37 @@ function v2_stockRows(sec){
   const ord = ((v2_cfg.order || {}).stock || {})[sec] || [], ix = (k)=>{ const i = ord.indexOf(k); return i < 0 ? 9999 : i; };
   return rows.map((r, i)=>({ r, i })).sort((a, b)=>ix(a.r.key) - ix(b.r.key) || a.i - b.i).map(x=>x.r);
 }
+function v2_kpHtml(unit, okFn, extra){
+  return `<div class="u-disp"><span id="kp-disp">${esc(v2_kp.val || '0')}</span><span class="u-s" style="margin-left:8px;font-size:18px;">${esc(unit || '')}</span></div>${extra || ''}<div class="u-kp">${['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', '⌫'].map(k=>`<button onclick="v2_kpKey('${k}')">${k}</button>`).join('')}</div><button class="u-btn main" style="margin-top:10px;" onclick="${okFn}">Valider</button>`;
+}
+function v2_kpKey(k){
+  let v = v2_kp.val || '';
+  if(k === '⌫') v = v.slice(0, -1); else if(k === ','){ if(!v.includes(',')) v = (v || '0') + ','; } else { if(v === '0') v = ''; if(v.replace(',', '').length < 6) v += k; }
+  v2_kp.val = v; const e = document.getElementById('kp-disp'); if(e) e.textContent = v || '0';
+}
+const v2_arBtn = ()=>`<button class="u-btn sm" onclick="v2_toggleAr(${!v2_ar})">${v2_ar ? '✓ ' : ''}FR + AR</button>`;
 function v2_histBox(sec){
   if(v2_hd[sec] === undefined){ v2_hd[sec] = null; v2_loadHist(sec); }
-  const rows = v2_stockRows(sec), d = v2_docs[sec + '@s'] || {}, vals = d.vals || {}, skips = d.skips || {}, level = v2_level(sec);
+  const rows = v2_stockRows(sec), d = v2_docs[sec + '@s'] || {}, vals = d.vals || {}, level = v2_level(sec), miss = !!V2_STMISS[sec];
   const locked = level !== 'saisir' || (!!d.stockDone && !v2_editS[sec]);
-  const doneN = rows.filter(r=>v2_stState(sec, r.key) !== 'none').length;
-  const miss = !!V2_STMISS[sec];
-  const thanks = d.stockDone ? `<div class="v2-card" style="border-left-color:#4ADE80;"><div style="font-weight:800;font-size:17px;">🎉 Merci ${esc(d.by || '')} !</div><div style="margin-top:4px;">+${Number(d.pts) || 0} points pour ce stock${v2_arSpan('شكراً! تم تسجيل المخزون')}</div>${d.ack ? `<div style="margin-top:8px;color:#86efac;font-weight:700;">🙏 ${esc(d.ack.by)} a vu ton stock : merci !${v2_arSpan('اطّلع على مخزونك، شكراً')}</div>` : ''}${level === 'saisir' ? `<a class="v2-lk" onclick="v2_correctStock('${esc(sec)}')">${esc(v2_fr('btn.fixInv'))}</a>` : ''}</div>` : '';
-  const cards = rows.map((r, k)=>{
-    const st = v2_stState(sec, r.key), val = vals[r.key] !== undefined ? String(vals[r.key]) : '', col = (miss && st === 'none') ? V2_STCOL.miss : V2_STCOL[st];
-    const inp = locked ? `<div style="font-size:22px;font-weight:800;text-align:right;">${val !== '' ? esc(v2_fmt(v2_num(val))) + ' <span class="pt-muted" style="font-size:13px;">' + esc(r.u) + '</span>' : st === 'skip' ? '<span class="pt-muted">pas pesé</span>' : '—'}</div>`
-      : `<div style="display:flex;gap:8px;align-items:center;"><input class="ft-in" style="flex:1;font-size:24px;font-weight:800;text-align:center;height:54px;" inputmode="decimal" placeholder="0,0" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}" value="${esc(val)}" onchange="v2_stockSet('${esc(sec)}','${esc(r.key)}',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();v2_stNext(this);}"><span class="pt-muted" style="min-width:28px;">${esc(r.u)}</span></div>
-        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;"><button class="btn ghost small" onclick="v2_stockSet('${esc(sec)}','${esc(r.key)}','0')">Il n’en reste plus (0)${v2_arSpan('لم يبقَ شيء')}</button><button class="btn ghost small" onclick="v2_stockSkip('${esc(sec)}','${esc(r.key)}')">Je n’ai pas pesé${v2_arSpan('لم أقم بالوزن')}</button></div>`;
-    return `<div class="v2-card st-card ${miss && st === 'none' ? 'miss' : ''}" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}" style="border-left-color:${col};"><div class="v2-ct"><div>${esc(r.n)}${r.sub ? ' <span class="pt-muted" style="font-weight:400;font-size:13px;">· ' + esc(r.sub) + '</span>' : ''}</div>${v2_arSpan(r.ar)}</div>${inp}<div class="mep-w st-info" style="margin-top:6px;" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}">${v2_stInfo(sec, r.key)}</div></div>`;
-  }).join('');
-  const prog = `<div class="v2-card" style="border-left-color:#6b756e;"><div class="row-between"><div><b>${esc(v2_rubName(sec))} — stock de fin de service</b>${v2_arSpan('مخزون نهاية الخدمة')}</div><b id="st-count-${esc(sec)}" style="font-size:18px;">${doneN} / ${rows.length}</b></div>${miss ? '<div style="color:#F87171;margin-top:6px;font-weight:700;">Il reste des lignes sans valeur : saisis-les, ou « Pas pesé ».</div>' : ''}</div>`;
-  const fin = (!locked && rows.length) ? `<button class="v2-pv big" style="width:100%;margin:6px 0 14px;text-align:center;" onclick="v2_stockFinish('${esc(sec)}')">✓ Valider le stock${v2_arSpan('تأكيد المخزون')}</button>` : '';
-  return thanks + prog + cards + fin;
+  const doneN = rows.filter(r=>v2_stState(sec, r.key) !== 'none').length, sel = v2_stSel[sec] && rows.some(r=>r.key === v2_stSel[sec]) ? v2_stSel[sec] : ((rows.find(r=>v2_stState(sec, r.key) === 'none') || {}).key || '');
+  const thanks = d.stockDone ? `<div class="u-card"><div class="u-pad"><div class="u-t">Merci ${esc(d.by || '')} !</div><div class="u-s" style="margin-top:4px;">+${Number(d.pts) || 0} points pour ce stock${v2_arSpan('شكراً! تم تسجيل المخزون')}</div>${d.ack ? `<div style="margin-top:8px;color:#86efac;font-weight:700;">${esc(d.ack.by)} a vu ton stock : merci${v2_arSpan('اطّلع على مخزونك، شكراً')}</div>` : ''}${level === 'saisir' ? `<a class="v2-lk" onclick="v2_correctStock('${esc(sec)}')">${esc(v2_fr('btn.fixInv'))}</a>` : ''}</div></div>` : '';
+  let groupName = null, list = '';
+  rows.forEach((r)=>{
+    if(r.n !== groupName){ groupName = r.n; list += `<div class="u-row" style="background:rgba(255,255,255,.03);padding:8px 16px;"><b>${esc(r.n)}</b>${v2_arSpan(r.ar)}</div>`; }
+    const st = v2_stState(sec, r.key), val = vals[r.key] !== undefined ? String(vals[r.key]) : '', isSel = !locked && sel === r.key, red = miss && st === 'none';
+    list += `<div class="u-row st-card ${isSel ? 'sel' : ''}" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}" ${locked ? '' : `onclick="v2_stSelect('${esc(sec)}','${esc(r.key)}')"`} style="${red ? 'box-shadow:inset 3px 0 #F87171;' : ''}cursor:pointer;"><span class="u-box ${st === 'ok' ? 'ok' : st === 'skip' ? 'sk' : isSel ? 'cur' : ''}">${st === 'ok' ? '✓' : st === 'skip' ? '–' : ''}</span><div style="flex:1;min-width:0;"><div>${esc(r.sub || r.n)}</div>${r.ar ? v2_arSpan(r.ar) : ''}<div class="st-info u-s" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}">${v2_stInfo(sec, r.key)}</div></div><div style="text-align:right;font-weight:700;">${val !== '' ? esc(v2_fmt(v2_num(val))) + ' ' + esc(r.u) : st === 'skip' ? '<span class="u-s">pas pesé</span>' : (!locked ? '<span style="color:#60A5FA;">Saisir</span>' : '—')}</div></div>`;
+    if(isSel){ list += `<div class="u-pad" style="background:rgba(255,255,255,.02);">${v2_kpHtml(r.u, `v2_stOk('${esc(sec)}')`, `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;"><button class="u-btn sm" onclick="v2_stZero('${esc(sec)}','${esc(r.key)}')">Il n’en reste plus (0)${v2_arSpan('لم يبقَ شيء')}</button><button class="u-btn sm" onclick="v2_stSkipGo('${esc(sec)}','${esc(r.key)}')">Je n’ai pas pesé${v2_arSpan('لم أقم بالوزن')}</button></div>`)}</div>`; }
+  });
+  const head = `<div class="u-card"><div class="u-hd"><div><div class="u-t">Stock · ${esc(v2_rubName(sec))} · ${esc(v2_who())}</div><div class="u-s" id="st-count-${esc(sec)}">${doneN} sur ${rows.length} pesées</div></div>${v2_arBtn()}</div><div class="u-bar"><i style="width:${rows.length ? Math.round(doneN / rows.length * 100) : 0}%"></i></div>${miss ? '<div class="u-pad" style="color:#F87171;font-weight:700;">Il reste des lignes sans valeur : saisis-les, ou « Je n’ai pas pesé ».</div>' : ''}${list}${(!locked && rows.length) ? `<div class="u-pad"><button class="u-btn main" onclick="v2_stockFinish('${esc(sec)}')">Valider le stock${v2_arSpan('تأكيد المخزون')}</button></div>` : ''}</div>`;
+  return thanks + head;
 }
+let v2_kp = { val:'' }, v2_stSel = {};
+function v2_stSelect(sec, key){ v2_stSel[sec] = key; v2_kp.val = ''; v2_render(); }
+function v2_stAdvance(sec, key){ const rows = v2_stockRows(sec), i = rows.findIndex(r=>r.key === key); const nx = rows.slice(i + 1).concat(rows.slice(0, i + 1)).find(r=>v2_stState(sec, r.key) === 'none'); v2_stSel[sec] = nx ? nx.key : ''; v2_kp.val = ''; v2_render(); }
+async function v2_stOk(sec){ const rows = v2_stockRows(sec), key = v2_stSel[sec] || (rows.find(r=>v2_stState(sec, r.key) === 'none') || {}).key; if(!key) return; const raw = String(v2_kp.val || '').replace(/,$/, ''); if(raw === ''){ alert('Saisis une valeur, ou utilise « Il n’en reste plus (0) ».'); return; } await v2_stockSet(sec, key, raw); v2_stAdvance(sec, key); }
+async function v2_stZero(sec, key){ await v2_stockSet(sec, key, '0'); v2_stAdvance(sec, key); }
+async function v2_stSkipGo(sec, key){ await v2_stockSkip(sec, key); v2_stAdvance(sec, key); }
 function v2_stNext(el){ const all = Array.from(document.querySelectorAll('input[data-stk]')), i = all.indexOf(el); el.blur(); const n = all[i + 1]; if(n) setTimeout(()=>n.focus(), 30); }
 async function v2_stockSkip(sec, key){
   if(v2_level(sec) !== 'saisir') return; const dk = sec + '@s', by = v2_who(), at = new Date().toISOString();
@@ -7770,16 +7892,9 @@ function v2_stockView(sec){
 function v2_saisieView(zone){
   const rubs = v2_visRubs(); if(!rubs.length) return '<div class="empty-state">Aucune rubrique n’est attribuée à ce compte.</div>';
   const cur = rubs.some(r=>r.id === v2_sec) ? v2_sec : rubs[0].id;
-  const mord = ((v2_cfg.order || {}).mep || {})[cur] || [], mix = (id)=>{ const i = mord.indexOf(id); return i < 0 ? 9999 : i; };
-  const ings = v2_ings().map((it, i)=>({ it, i })).sort((a, b)=>mix(a.it.id) - mix(b.it.id) || a.i - b.i).map(x=>x.it), cardsMep = zone === 'mep' ? ings.map(it=>({ it, h:v2_cardMep(cur, it) })).filter(x=>x.h) : [];
-  const done = cardsMep.filter(x=>{ const it = x.it, hasOp = v2_ing(it).fields.some(f=>f.sec === cur && f.per === 'op' && f.zone !== 'stock' && !v2_isIn(f)); return hasOp ? (v2_curOp(it, cur) > 1 && !v2_opHasValue(it, cur, v2_curOp(it, cur))) : v2_isValid(cur, it.id, 0); }).length;
-  const counter = zone === 'mep' ? `${done} / ${cardsMep.length}` : ((v2_docs[cur + '@s'] || {}).stockOk ? '✓' : '—');
-  const head = `<div class="v2-who"><div>🔒 ${esc(v2_who())} · ${esc(v2_rubName(cur))}${v2_arSpan(v2_rubAr(cur))}</div><div style="text-align:right">${esc(counter)}</div></div>`;
   const rubTabs = rubs.length > 1 ? `<div class="mep-seg">${rubs.map(r=>`<button class="${r.id === cur ? 'on' : ''}" onclick="v2_setSec('${esc(r.id)}')">${esc(r.n)}${v2_ar && v2_rubAr(r.id) ? `<span class="v2-ar" style="text-align:center">${esc(v2_rubAr(r.id))}</span>` : ''}</button>`).join('')}</div>` : '';
   const ro = v2_level(cur) === 'lire' ? `<div class="v2-ro">👁 ${esc(v2_fr('lbl.ro'))}${v2_arSpan(v2_arOf('lbl.ro'))}</div>` : '';
-  let body;
-  if(zone === 'mep') body = cardsMep.length ? cardsMep.map(x=>x.h).join('') : `<div class="empty-state">${esc(v2_fr('msg.empty'))}</div>`; else body = v2_stockView(cur);
-  return head + rubTabs + ro + body;
+  return rubTabs + ro + (zone === 'mep' ? v2_wizView(cur) : v2_stockView(cur));
 }
 
 /* ---------- Écarts (administrateur) ---------- */
@@ -7832,28 +7947,34 @@ function v2_learn(){
 }
 function v2_learnExtend(){ v2_learn(); v2_cfg.learn.days = (Number(v2_cfg.learn.days) || 14) + 7; v2_saveCfg(); v2_render(); }
 function v2_openDetail(id){ cx_open['ing:' + id] = true; cx_tab = 'ctrl'; showModule('controle'); }
+let v2_sort = 'val';
 function v2_todayView(){
   if(!cx_ready || !cx_dpReady) return '<div class="empty-state">Chargement…</div>';
-  if(!cx_ingList().length) return '<div class="ticket"><div class="empty-state">Aucun ingrédient suivi. Coche-les dans Dépenses (« suivre ») puis reviens ici.</div></div>';
-  if(!cx_data) return `<div class="ticket"><div class="empty-state">${cx_err ? esc(cx_err) : 'Chargement…'}</div></div>`;
-  const rows = v2_todayRows(), th = v2_thr(), L = v2_learn(), todo = cx_todoList().length;
+  if(!cx_ingList().length) return '<div class="u-card"><div class="u-pad"><div class="empty-state">Aucun ingrédient suivi. Coche-les dans Dépenses (« suivre ») puis reviens ici.</div></div></div>';
+  if(!cx_data) return `<div class="u-card"><div class="u-pad"><div class="empty-state">${cx_err ? esc(cx_err) : 'Chargement…'}</div></div></div>`;
+  const rows = v2_todayRows(), th = v2_thr(), L = v2_learn(), todo = cx_todoList().length, [f, t] = cx_setWindow();
   const okN = rows.filter(x=>!x.gray).length, qual = rows.length ? Math.round(okN / rows.length * 100) : 0, net = rows.reduce((s, x)=>s + x.loss, 0);
-  const learn = L.day <= L.days ? `<div class="v2-card" style="border-left-color:#FBBF24;"><b>Phase d’apprentissage · jour ${L.day} / ${L.days}</b><div class="mep-w" style="margin-top:4px;">On mesure les rendements et on complète les quantités par plat. Les écarts sont indicatifs.</div></div>`
-    : `<div class="v2-card" style="border-left-color:#4ADE80;"><div class="row-between"><b>Apprentissage terminé (${L.days} jours)</b><button class="btn ghost small" onclick="v2_learnExtend()">+ 7 jours</button></div></div>`;
-  const rubs = v2_rubs().map(r=>{ const m = v2_docs[r.id], s = v2_docs[r.id + '@s'], vm = m && m.valid ? Object.keys(m.valid).filter(k=>m.valid[k]).length : 0, ex = v2_stockExpected(r.id), dn = ex.filter(k=>v2_num(((s || {}).vals || {})[k]) !== null).length, stOk = s && s.stockOk;
-    return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);"><span>${esc(r.n)}</span><span style="text-align:right;font-size:13px;">Découpes : <b>${vm}</b> · Stock : <b style="color:${stOk ? '#4ADE80' : 'var(--ink-muted)'}">${s && s.stockDone ? '✓ validé' : stOk ? '✓ saisi' : dn + ' / ' + ex.length}</b>${s && s.stockDone ? (s.ack ? ' <span style="color:#86efac;">🙏 Merci envoyé</span>' : ` <button class="btn ghost small" onclick="v2_ack('${esc(r.id)}')">🙏 Merci</button>`) + ' · ' + (Number(s.pts) || 0) + ' pts' : ''}</span></div>`; }).join('');
-  const list = rows.map((x)=>{
-    const r = x.r, big = x.gray ? 'partiel' : (r.ecart < 0 ? '−' + v2_da(x.da) : x.surplus ? '⚠ surplus' : 'OK'), pc = r.pct === null ? '' : (r.pct >= 0 ? '+' : '−') + Math.abs(r.pct).toFixed(1).replace('.', ',') + ' %';
-    const qty = r.ecart === null ? 'pesée de fin manquante' : cx_fmt(r.ecart, x.ing, true) + (x.margin ? ' ± ' + Math.round(x.margin) + ' g' : '');
-    const sub = x.gray && r.ecart !== null ? `perte maximale possible · données ${x.cov} % complètes` : x.cov < 100 ? `données ${x.cov} % complètes` : '';
-    return `<div class="v2-card" style="border-left-color:${x.col};cursor:pointer;" onclick="v2_openDetail('${x.ing.id}')"><div class="row-between"><div><b>${esc(x.ing.n)}</b><div class="mep-w">${esc(qty)}${pc ? ' · ' + pc : ''}</div>${sub ? `<div class="mep-w">${esc(sub)}</div>` : ''}</div><div style="text-align:right;"><b style="color:${x.col};font-family:'IBM Plex Mono',monospace;">${big}</b><div class="mep-w">détail ›</div></div></div></div>`; }).join('');
-  const todoBox = todo ? `<div class="v2-card" style="border-left-color:#FBBF24;cursor:pointer;" onclick="v2_setTab('plats')"><div class="row-between"><div><b>${todo} plat${todo > 1 ? 's' : ''} vendu${todo > 1 ? 's' : ''} sans quantité</b><div class="mep-w">Compléter par ingrédient — plat par plat</div></div><b>›</b></div></div>` : '';
-  return learn + `<div class="v2-card"><div class="row-between"><div><div class="mep-w">Perte nette (surplus non déduit)</div><b style="font-size:20px;color:${net > 0 ? 'var(--rust)' : 'var(--moss)'};">${v2_da(net)}</b></div><div style="text-align:right;"><div class="mep-w">Qualité des données</div><b style="font-size:20px;">${qual} %</b></div></div></div>`
-    + `<div class="v2-card"><div style="font-weight:800;margin-bottom:4px;">Saisies des cuisiniers</div>${rubs}</div>` + todoBox
-    + `<div style="font-weight:800;margin:12px 0 6px;">Écarts · du plus coûteux au moins coûteux${cx_loading ? ' · mise à jour…' : ''}</div>` + list
-    + `<div class="mep-w" style="margin:8px 0;">Vert &lt; ${th.a} % · orange ${th.a}–${th.b} % · rouge &gt; ${th.b} % · gris = données incomplètes (&lt; ${th.cov} % des plats connus).</div>`
-    + `<button class="btn ghost small" onclick="cx_tab='ctrl';showModule('controle')">Détail complet & réglages du contrôle ›</button>`;
+  let lt = 0, lw = 0; rows.forEach(x=>{ (x.r.lines || []).filter(l=>l.role === 'stock').forEach(l=>{ lt++; if(cx_weighs(l).some(w=>w.ms > f && w.ms <= t)) lw++; }); });
+  const sorted = rows.slice().sort((a, b)=>{ if(a.gray !== b.gray) return a.gray - b.gray; if(v2_sort === 'pct') return Math.abs(b.r.pct || 0) - Math.abs(a.r.pct || 0); if(v2_sort === 'qty') return Math.abs(b.r.ecart || 0) - Math.abs(a.r.ecart || 0); return (b.loss - a.loss) || ((b.da || 0) - (a.da || 0)); });
+  const learn = L.day <= L.days ? `<div class="u-ban">Phase d’apprentissage, jour ${L.day} sur ${L.days}. Les couleurs sont indicatives.</div>` : `<div class="u-ban" style="background:rgba(34,197,94,.14);color:#86efac;display:flex;justify-content:space-between;align-items:center;"><span>Apprentissage terminé (${L.days} jours)</span><button class="u-btn sm" onclick="v2_learnExtend()">+ 7 jours</button></div>`;
+  const rubs = v2_rubs().map((r)=>{ const items = v2_wizItems(r.id), s = v2_docs[r.id + '@s'], mk = items.filter(x=>x.validated).length, ex = v2_stockExpected(r.id);
+    if(!items.length && !ex.length) return '';
+    const stPill = s && s.stockDone ? `<span class="u-pill u-ok">Stock validé · ${esc(v2_hm2(s.doneAt))}</span>` : `<span class="u-pill u-wa">Stock en attente</span>`;
+    const merci = s && s.stockDone ? (s.ack ? `<span class="u-pill u-ok">Merci envoyé</span>` : `<button class="u-btn sm" onclick="v2_ack('${esc(r.id)}')">Merci</button>`) + (s.pts ? `<span class="u-pill">${Number(s.pts)} pts</span>` : '') : '';
+    return `<div class="u-card" style="margin-bottom:8px;"><div class="u-row" style="border-top:0;flex-wrap:wrap;"><b style="flex:1;font-size:16px;">${esc(r.n)}</b><span class="u-pill ${mk >= items.length && items.length ? 'u-ok' : 'u-wa'}">Mise en place ${mk}/${items.length}</span>${stPill}${merci}</div></div>`; }).join('');
+  const list = sorted.map((x)=>{
+    const r = x.r, pc = r.pct === null ? '—' : (r.pct >= 0 ? '+' : '−') + Math.abs(r.pct).toFixed(2).replace('.', ',') + ' %';
+    const sub = r.ecart === null ? 'Données incomplètes' : cx_fmt(r.ecart, x.ing, true) + (x.margin ? ' ± ' + Math.round(x.margin) + ' g' : '') + (x.gray ? ' · perte maximale possible (' + x.cov + ' % des plats connus)' : '');
+    const da = r.ecart === null ? '<span class="u-pill">En attente</span>' : x.gray ? '<span class="u-pill">partiel</span>' : (r.ecart < 0 ? '−' : '+') + Math.round(Math.abs(x.da)).toLocaleString('fr-FR').replace(/ /g, ' ') + ' DA';
+    const dc = x.gray ? 'var(--ink-muted)' : x.col, dot = x.surplus ? '#60A5FA' : (x.gray ? '#8B958F' : (x.col === 'var(--moss)' ? '#22C55E' : x.col === 'var(--amber)' ? '#FBBF24' : '#F87171'));
+    return `<div class="u-row" style="cursor:pointer;" onclick="v2_openDetail('${x.ing.id}')"><span class="u-dot" style="background:${dot};"></span><div style="flex:1;min-width:0;"><b>${esc(x.ing.n)}</b><div class="u-s">${esc(sub)}</div></div><span class="u-s">${esc(x.gray ? '' : pc)}</span><b style="color:${x.surplus ? '#60A5FA' : dc};min-width:78px;text-align:right;">${da}</b><span class="u-s">›</span></div>`; }).join('');
+  const todoBox = todo ? `<div class="u-card" style="cursor:pointer;" onclick="v2_setTab('plats')"><div class="u-row" style="border-top:0;"><div style="flex:1;"><b>${todo} plat${todo > 1 ? 's' : ''} vendu${todo > 1 ? 's' : ''} sans quantité</b><div class="u-s">Compléter par ingrédient, plat par plat</div></div><b>›</b></div></div>` : '';
+  return learn + `<div class="u-g2"><div class="u-m"><div class="u-s">Qualité des données</div><div class="v">${qual} %</div><div class="u-s">${lw} pesées sur ${lt}</div></div><div class="u-m"><div class="u-s">Perte nette du jour</div><div class="v" style="color:${net > 0 ? '#F87171' : '#4ADE80'};">${net > 0 ? '−' : ''}${Math.round(net).toLocaleString('fr-FR').replace(/ /g, ' ')} DA</div><div class="u-s">${rows.length} ingrédients suivis</div></div></div>`
+    + `<div class="u-s" style="margin:4px 2px 6px;">Saisie des cuisiniers</div>${rubs}${todoBox}`
+    + `<div class="u-card"><div class="u-hd"><b style="font-size:17px;">Écarts du jour</b><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><span class="u-s">Trier par</span>${[['val', 'Valeur'], ['pct', 'Pourcentage'], ['qty', 'Quantité']].map(o=>`<button class="u-btn sm ${v2_sort === o[0] ? 'on' : ''}" onclick="v2_sort='${o[0]}';v2_render()">${o[1]}</button>`).join('')}</div></div>${list}<div class="u-pad u-s">Couleur selon le pourcentage : faible sous ${th.a} %, moyen de ${th.a} à ${th.b} %, élevé au-dessus de ${th.b} %. Gris : moins de ${th.cov} % des plats connus. ${cx_loading ? 'Mise à jour…' : ''}</div></div>`
+    + `<button class="u-btn sm" onclick="cx_tab='ctrl';showModule('controle')">Détail complet du contrôle ›</button>`;
 }
+function v2_hm2(iso){ const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }); }
 /* ---------- compléter les quantités : ingrédient d'abord, plat par plat ---------- */
 function v2_compView(){
   if(!cx_data) return '<div class="empty-state">Chargement…</div>';
@@ -7864,7 +7985,11 @@ function v2_compView(){
   const cards = todo.slice(0, 25).map(s=>`<div class="v2-card"><div class="row-between"><b>${esc(s.name)}</b><span class="mep-w">vendu × ${esc(cx_n(s.q))}</span></div>${multi ? cx_kChips(s.key, cx_pk[s.key] !== undefined ? cx_pk[s.key] : ((cx_cfg.plats[s.key] || {}).k || '')) : ''}
       <div class="g2" style="margin-top:8px;align-items:end;"><div><label>${esc(ing.n)} — ${esc(cx_baseLbl(ing))} par portion (tel que mis dans le plat)</label><input type="text" inputmode="decimal" class="ft-in" id="cp-${s.key}" placeholder="${esc(cx_baseLbl(ing))}"></div><div style="display:flex;gap:6px;"><button class="btn small t-save" onclick="cx_compSave('${s.key}',false)">Valider</button><button class="btn ghost small" onclick="cx_compSave('${s.key}',true)">Sans ${esc(ing.n)}</button></div></div>
       <div style="margin-top:6px;"><button class="btn ghost small" onclick="cx_compNone('${s.key}')">Aucun ingrédient suivi</button></div></div>`).join('');
-  return `<button class="btn ghost small" onclick="v2_setTab('today')">‹ Aujourd’hui</button>
+  let tot = 0, kn = 0; sales.forEach(s=>{ tot += s.q; if(cx_hasGram(s.key, ing.id)) kn += s.q; });
+  let rr = null; try{ const [f0, t0] = cx_setWindow(); rr = cx_calc(ing, f0, t0, { k:'reel', q:'' }, cx_data); }catch(e){}
+  const mx = rr && rr.ecart !== null && rr.ecart < 0 ? `<div class="v" style="color:#F87171;">${esc(cx_fmt(rr.ecart, ing, true))}</div>${rr.pct !== null ? `<span class="u-pill u-bad">${Math.abs(rr.pct).toFixed(2).replace('.', ',')} % du disponible</span>` : ''}` : `<div class="v">${rr && rr.ecart !== null ? 'Aucune perte' : '—'}</div>`;
+  const metrics = `<div class="u-g2"><div class="u-m"><div class="u-s">Perte maximale possible</div>${mx}</div><div class="u-m"><div class="u-s">Couverture des ventes</div><div class="v">${cov} %</div><div class="u-bar" style="border-radius:3px;margin:6px 0;"><i style="width:${cov}%;"></i></div><div class="u-s">${esc(cx_n(kn))} portions sur ${esc(cx_n(tot))} ont une quantité</div></div></div><div class="u-s" style="margin-bottom:12px;">Tant que des plats n’ont pas de quantité, la consommation est sous-estimée : la perte réelle est inférieure ou égale à ce chiffre.</div>`;
+  return `<button class="u-btn sm" onclick="v2_setTab('today')">‹ Aujourd’hui</button><div class="u-t" style="margin:10px 0;">Aujourd’hui · ${esc(ing.n)}</div>${metrics}
     <div class="v2-card" style="margin-top:8px;"><div style="font-weight:800;">Compléter les quantités par plat</div><div class="filter-row" style="flex-wrap:wrap;margin:8px 0 4px;">${chips}</div>
       <div class="row-between"><span class="mep-w">Couverture ${esc(ing.n)}</span><b>${cov} %</b></div><div style="height:6px;background:var(--line);border-radius:4px;margin-top:4px;"><div style="height:6px;width:${cov}%;background:${cov >= 90 ? 'var(--moss)' : 'var(--amber)'};border-radius:4px;"></div></div>
       <div class="filter-row" style="flex-wrap:wrap;margin:10px 0 0;"><button class="filter-chip ${isToday ? 'active' : ''}" onclick="cx_preset('today')">Aujourd’hui</button><button class="filter-chip ${!isToday ? 'active' : ''}" onclick="cx_preset('7d')">7 jours</button></div>
@@ -7925,15 +8050,20 @@ async function v2_corrSave(){
   v2_mergeLocal(c.dk, r.sec, r.zone, patch); await v2_write(c.dk, r.sec, r.zone, patch); v2_corr = null;
   if(typeof cx_reload === 'function' && cx_started) cx_reload(); v2_render();
 }
+let v2_hFilter = 'all';
 function v2_histView(){
-  const rows = v2_histRows(); if(!rows.length) return '<div class="empty-state">Aucune saisie pour cette date. (Choisis la date en haut.)</div>';
-  const nCorr = rows.filter(r=>r.corr).length;
-  return `<div class="mep-w" style="margin:6px 0;">${rows.length} saisie${rows.length > 1 ? 's' : ''} · ${nCorr} corrigée${nCorr > 1 ? 's' : ''} · ${rows.filter(r=>r.skip).length} « pas pesé »</div>` + rows.map((r)=>{
-    const editing = v2_corr && v2_corr.dk === r.dk && v2_corr.key === r.key, me = r.by === v2_who(), u = (()=>{ const it = v2_byId(r.key.split('.')[0]); return it ? v2_unitOf(it) : ''; })();
-    const badges = (r.corr ? '<span class="v2-tag" style="background:rgba(251,191,36,.18);color:#FBBF24;">Corrigé</span> ' : '') + (r.skip ? '<span class="v2-tag" style="background:rgba(251,191,36,.18);color:#FBBF24;">Pas pesé</span> ' : '') + (me ? '<span class="v2-tag">Saisi par moi</span>' : '');
-    const trace = r.corr ? `<div class="mep-w" style="color:#FBBF24;">✎ ${esc(r.corr.by)} · ${esc(v2_fdt(r.corr.at))} : ${esc(String(r.corr.old))} → ${esc(String(r.corr.neu))}${r.corr.note ? ' · « ' + esc(r.corr.note) + ' »' : ''}</div>` : '';
-    const form = editing ? `<div style="margin-top:8px;"><div class="g2"><div><label>Nouvelle valeur (${esc(u)})</label><input class="ft-in" inputmode="decimal" value="${esc(v2_corr.val)}" oninput="v2_corrSet('val',this.value)"></div><div><label>Note (facultatif)</label><input class="ft-in" value="${esc(v2_corr.note)}" oninput="v2_corrSet('note',this.value)"></div></div><div id="v2-corr-prev" class="mep-w" style="margin:8px 0;">${v2_corrPreview(r, v2_corr.val)}</div><div class="actions-row"><button class="btn small t-save" onclick="v2_corrSave()">Enregistrer la correction</button><button class="btn ghost small" onclick="v2_corr=null;v2_render()">Annuler</button></div></div>` : '';
-    return `<div class="v2-card" style="border-left-color:${r.corr ? '#FBBF24' : '#6b756e'};"><div class="row-between"><div><b>${esc(v2_keyLabel(r.key))}</b> <span class="pt-muted">· ${esc(r.rub)}${r.zone === 'stock' ? ' · stock' : ''}</span><div class="mep-w">${esc(r.by)} · ${esc(v2_fdt(r.at))}</div></div><div style="text-align:right;"><b style="font-size:18px;">${r.skip ? '—' : esc(v2_fmt(v2_num(r.val))) + ' ' + esc(u)}</b>${r.skip ? '' : `<div><a class="v2-lk" onclick="v2_corrOpen('${esc(r.dk)}','${esc(r.key)}')">✎ Corriger</a></div>`}</div></div><div style="margin-top:4px;">${badges}</div>${trace}${form}</div>`; }).join('');
+  const all = v2_histRows(), me = v2_who();
+  const flagOf = (r)=>{ const d = v2_docs[r.dk] || {}; return (d.flags && d.flags[r.key]) || ''; };
+  const rows = all.filter(r=>v2_hFilter === 'corr' ? !!r.corr : v2_hFilter === 'chk' ? (r.skip || !!flagOf(r)) : v2_hFilter === 'me' ? r.by === me : true);
+  const chips = [['all', 'Tout'], ['corr', 'Corrigés'], ['chk', 'À vérifier'], ['me', 'Saisis par moi']].map(o=>`<button class="u-btn sm ${v2_hFilter === o[0] ? 'on' : ''}" onclick="v2_hFilter='${o[0]}';v2_render()">${o[1]}</button>`).join('');
+  const top = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">${chips}<button class="u-btn sm" style="margin-left:auto;" onclick="v2_setTab('saisie')">Saisir à la place de…</button></div>`;
+  if(!all.length) return top + '<div class="empty-state">Aucune saisie pour cette date. Choisis la date en haut.</div>';
+  return top + `<div class="u-card">` + (rows.length ? rows.map((r)=>{
+    const editing = v2_corr && v2_corr.dk === r.dk && v2_corr.key === r.key, u = (()=>{ const it = v2_byId(r.key.split('.')[0]); return it ? v2_unitOf(it) : ''; })(), fl = flagOf(r);
+    const badges = (r.corr ? '<span class="u-pill u-wa">Corrigé</span> ' : '') + (r.skip ? '<span class="u-pill u-wa">Pas pesé</span> ' : '') + (fl ? `<span class="u-pill u-wa">Signalé : ${esc(fl)}</span>` : '');
+    const trace = r.corr ? `<div class="u-s" style="color:#FBBF24;margin-top:4px;">✎ ${esc(r.corr.by)} · ${esc(v2_fdt(r.corr.at))} : ${esc(String(r.corr.old))} → ${esc(String(r.corr.neu))}${r.corr.note ? ' · « ' + esc(r.corr.note) + ' »' : ''}</div>` : '';
+    const form = editing ? `<div style="margin-top:10px;"><div class="g2"><div><label>Nouvelle valeur (${esc(u)})</label><input class="ft-in" inputmode="decimal" value="${esc(v2_corr.val)}" oninput="v2_corrSet('val',this.value)"></div><div><label>Note (facultatif)</label><input class="ft-in" value="${esc(v2_corr.note)}" oninput="v2_corrSet('note',this.value)"></div></div><div id="v2-corr-prev" class="u-s" style="margin:8px 0;">${v2_corrPreview(r, v2_corr.val)}</div><div style="display:flex;gap:8px;"><button class="u-btn sm on" onclick="v2_corrSave()">Enregistrer la correction</button><button class="u-btn sm" onclick="v2_corr=null;v2_render()">Annuler</button></div></div>` : '';
+    return `<div class="u-pad" style="border-top:1px solid var(--line);"><div class="rowflex" style="display:flex;justify-content:space-between;gap:10px;"><div style="min-width:0;"><div class="u-s">${esc(v2_hm2(r.at))} · ${esc(r.by)} · ${esc(r.rub)} · ${r.zone === 'stock' ? 'Stock' : 'Mise en place'}</div><div style="margin-top:2px;">${esc(v2_keyLabel(r.key))}</div></div><div style="text-align:right;"><b style="font-size:18px;">${r.skip ? '—' : esc(v2_fmt(v2_num(r.val))) + ' ' + esc(u)}</b>${r.skip ? '' : `<div style="margin-top:6px;"><button class="u-btn sm" onclick="v2_corrOpen('${esc(r.dk)}','${esc(r.key)}')">Corriger</button></div>`}</div></div><div style="margin-top:6px;">${badges}</div>${trace}${form}</div>`; }).join('') : '<div class="u-pad u-s">Aucune saisie dans ce filtre.</div>') + `</div>`;
 }
 
 /* ==================== RÉGLAGES (admin) ==================== */
@@ -7946,25 +8076,26 @@ function v2_orderMove(zone, sec, key, d){
   if(!v2_cfg.order) v2_cfg.order = {}; if(!v2_cfg.order[zone]) v2_cfg.order[zone] = {}; v2_cfg.order[zone][sec] = list; v2_saveCfg(); v2_render();
 }
 let v2_regOrd = { zone:'stock', sec:'' };
+let v2_regTab = 'ing';
+function v2_tplOf(it){ const c = v2_ing(it); return c.fields.some(f=>f.confirm) ? 'Multi-états' : c.fields.some(f=>f.bg) ? 'Transformation' : 'Simple'; }
 function v2_regView(){
   const th = v2_thr(), L = v2_learn(), rubs = v2_rubs(); if(!v2_regOrd.sec || !rubs.some(r=>r.id === v2_regOrd.sec)) v2_regOrd.sec = (rubs[0] || { id:'' }).id;
-  const num = (lbl, k, val, unit)=>`<div class="v2-f"><div class="v2-fl"><div class="v2-fn">${lbl}</div></div><div class="v2-in"><input class="ft-in" inputmode="decimal" style="width:90px;text-align:right;" value="${esc(String(val).replace('.', ','))}" onchange="v2_thrSet('${k}',this.value)"><span class="v2-u">${unit}</span></div></div>`;
-  const ordRows = v2_regOrd.zone === 'stock' ? v2_stockRows(v2_regOrd.sec).map(r=>({ key:r.key, n:r.n + (r.sub ? ' · ' + r.sub : '') })) : v2_ings().filter(it=>v2_cardMep(v2_regOrd.sec, it)).map(it=>({ key:it.id, n:it.n }));
-  const mepOrd = ((v2_cfg.order || {}).mep || {})[v2_regOrd.sec] || [];
-  const rowsSorted = v2_regOrd.zone === 'stock' ? ordRows : ordRows.map((r, i)=>({ r, i })).sort((a, b)=>{ const ia = mepOrd.indexOf(a.r.key), ib = mepOrd.indexOf(b.r.key); return (ia < 0 ? 9999 : ia) - (ib < 0 ? 9999 : ib) || a.i - b.i; }).map(x=>x.r);
-  return `<div class="v2-card"><div style="font-weight:800;margin-bottom:4px;">Balance & seuils</div>
-      <div class="v2-f"><div class="v2-fl"><div class="v2-fn">Précision de la balance</div></div><div class="v2-in"><select onchange="v2_thrSet('prec',this.value)" style="min-height:38px;">${[1, 5, 10].map(n=>`<option value="${n}" ${th.prec === n ? 'selected' : ''}>${n} g</option>`).join('')}</select></div></div>
-      ${num('Seuil orange (écart ≥)', 'a', th.a, '%')}${num('Seuil rouge (écart ≥)', 'b', th.b, '%')}${num('Données minimales pour afficher la couleur', 'cov', th.cov, '%')}
-      <div class="mep-w" style="margin-top:6px;">Conseil : un test de calibrage de la balance (poids connu) une fois par mois.</div></div>
-    <div class="v2-card"><div style="font-weight:800;margin-bottom:4px;">Phase d’apprentissage</div>
-      <div class="v2-f"><div class="v2-fl"><div class="v2-fn">Début</div></div><div class="v2-in"><input type="date" class="ft-in" value="${esc((v2_cfg.learn || {}).start || todayISO())}" onchange="v2_learnSet('start',this.value)"></div></div>
-      <div class="v2-f"><div class="v2-fl"><div class="v2-fn">Durée</div></div><div class="v2-in"><input class="ft-in" inputmode="numeric" style="width:70px;text-align:right;" value="${L.days}" onchange="v2_learnSet('days',this.value)"><span class="v2-u">jours</span></div></div></div>
-    <div class="v2-card"><div style="font-weight:800;margin-bottom:6px;">Ordre d’affichage (identique pour tous les cuisiniers)</div>
-      <div class="mep-seg" style="margin-bottom:8px;">${[['stock', 'Stock'], ['mep', 'Mise en place']].map(z=>`<button class="${v2_regOrd.zone === z[0] ? 'on' : ''}" onclick="v2_regOrd.zone='${z[0]}';v2_render()">${z[1]}</button>`).join('')}</div>
-      <div class="mep-seg" style="margin-bottom:8px;">${rubs.map(r=>`<button class="${v2_regOrd.sec === r.id ? 'on' : ''}" onclick="v2_regOrd.sec='${esc(r.id)}';v2_render()">${esc(r.n)}</button>`).join('')}</div>
-      ${rowsSorted.length ? rowsSorted.map(r=>`<div class="v2-f"><div class="v2-fl"><div class="v2-fn">${esc(r.n)}</div></div><div style="display:flex;gap:6px;"><button class="btn ghost small" onclick="v2_orderMove('${v2_regOrd.zone}','${esc(v2_regOrd.sec)}','${esc(r.key)}',-1)">↑</button><button class="btn ghost small" onclick="v2_orderMove('${v2_regOrd.zone}','${esc(v2_regOrd.sec)}','${esc(r.key)}',1)">↓</button></div></div>`).join('') : '<div class="pt-muted">Rien à ordonner pour cette rubrique.</div>'}</div>
-    <div class="v2-card"><div style="font-weight:800;margin-bottom:6px;">Ingrédients, champs et textes</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;"><button class="btn ghost small" onclick="v2_setTab('cfg')">Ingrédients & champs</button><button class="btn ghost small" onclick="v2_setTab('listes')">Listes & cuisiniers</button><button class="btn ghost small" onclick="v2_setTab('textes')">Textes</button><button class="btn ghost small" onclick="v2_setTab('ecarts')">Bilan simple (ancien)</button><button class="btn ghost small" onclick="cx_tab='reg';showModule('controle')">Réglages du contrôle</button></div></div>`;
+  const tabs = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">${[['ing', 'Ingrédients'], ['ord', 'Ordre d’affichage'], ['bal', 'Balance et seuils']].map(o=>`<button class="u-btn ${v2_regTab === o[0] ? 'on' : ''}" onclick="v2_regTab='${o[0]}';v2_render()">${o[1]}</button>`).join('')}</div>`;
+  const num = (lbl, k, val, unit)=>`<div class="u-row"><div style="flex:1;">${lbl}</div><input class="ft-in" inputmode="decimal" style="width:90px;text-align:right;" value="${esc(String(val).replace('.', ','))}" onchange="v2_thrSet('${k}',this.value)"><span class="u-s">${unit}</span></div>`;
+  let body = '';
+  if(v2_regTab === 'ing'){
+    const ings = v2_ings().filter(i=>i.track).length ? v2_ings().filter(i=>i.track) : v2_ings();
+    body = `<div class="u-card"><div class="u-pad u-s">${ings.length} ingrédients suivis</div>${ings.map(it=>{ const secs = Array.from(new Set(v2_ing(it).fields.map(f=>f.sec))).map(v2_rubName).join(' + '); return `<div class="u-row"><div style="flex:1;"><b>${esc(it.n)}</b> <span class="u-pill">${v2_tplOf(it)}</span></div><span class="u-s">${esc(secs)}</span></div>`; }).join('')}<div class="u-pad" style="display:flex;gap:8px;flex-wrap:wrap;"><button class="u-btn" onclick="v2_setTab('cfg')">Ajouter un ingrédient</button><button class="u-btn sm" onclick="v2_setTab('cfg')">Champs</button><button class="u-btn sm" onclick="v2_setTab('listes')">Listes et cuisiniers</button><button class="u-btn sm" onclick="v2_setTab('textes')">Textes</button><button class="u-btn sm" onclick="v2_setTab('ecarts')">Bilan simple (ancien)</button><button class="u-btn sm" onclick="cx_tab='reg';showModule('controle')">Réglages du contrôle</button></div></div>`;
+  } else if(v2_regTab === 'bal'){
+    body = `<div class="u-card"><div class="u-row" style="border-top:0;"><div style="flex:1;">Précision de la balance</div><select onchange="v2_thrSet('prec',this.value)" style="min-height:38px;">${[1, 5, 10].map(n=>`<option value="${n}" ${th.prec === n ? 'selected' : ''}>${n} g</option>`).join('')}</select></div>${num('Seuil orange (écart ≥)', 'a', th.a, '%')}${num('Seuil rouge (écart ≥)', 'b', th.b, '%')}${num('Données minimales pour afficher la couleur', 'cov', th.cov, '%')}<div class="u-pad u-s">Conseil : un test de calibrage de la balance (poids connu) une fois par mois.</div></div>
+      <div class="u-card"><div class="u-pad"><b>Phase d’apprentissage</b></div><div class="u-row" style="border-top:0;"><div style="flex:1;">Début</div><input type="date" class="ft-in" value="${esc((v2_cfg.learn || {}).start || todayISO())}" onchange="v2_learnSet('start',this.value)"></div><div class="u-row"><div style="flex:1;">Durée</div><input class="ft-in" inputmode="numeric" style="width:70px;text-align:right;" value="${L.days}" onchange="v2_learnSet('days',this.value)"><span class="u-s">jours</span></div></div>`;
+  } else {
+    const ordRows = v2_regOrd.zone === 'stock' ? v2_stockRows(v2_regOrd.sec).map(r=>({ key:r.key, n:r.n + (r.sub ? ' · ' + r.sub : '') })) : v2_ings().filter(it=>v2_cardMep(v2_regOrd.sec, it)).map(it=>({ key:it.id, n:it.n }));
+    const mepOrd = ((v2_cfg.order || {}).mep || {})[v2_regOrd.sec] || [];
+    const rowsSorted = v2_regOrd.zone === 'stock' ? ordRows : ordRows.map((r, i)=>({ r, i })).sort((a, b)=>{ const ia = mepOrd.indexOf(a.r.key), ib = mepOrd.indexOf(b.r.key); return (ia < 0 ? 9999 : ia) - (ib < 0 ? 9999 : ib) || a.i - b.i; }).map(x=>x.r);
+    body = `<div class="u-card"><div class="u-pad"><div class="u-s" style="margin-bottom:8px;">Identique pour tous les cuisiniers.</div><div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">${[['stock', 'Stock'], ['mep', 'Mise en place']].map(z=>`<button class="u-btn sm ${v2_regOrd.zone === z[0] ? 'on' : ''}" onclick="v2_regOrd.zone='${z[0]}';v2_render()">${z[1]}</button>`).join('')}<span style="flex:1;"></span>${rubs.map(r=>`<button class="u-btn sm ${v2_regOrd.sec === r.id ? 'on' : ''}" onclick="v2_regOrd.sec='${esc(r.id)}';v2_render()">${esc(r.n)}</button>`).join('')}</div></div>${rowsSorted.length ? rowsSorted.map(r=>`<div class="u-row"><div style="flex:1;">${esc(r.n)}</div><button class="u-btn sm" onclick="v2_orderMove('${v2_regOrd.zone}','${esc(v2_regOrd.sec)}','${esc(r.key)}',-1)">↑</button><button class="u-btn sm" onclick="v2_orderMove('${v2_regOrd.zone}','${esc(v2_regOrd.sec)}','${esc(r.key)}',1)">↓</button></div>`).join('') : '<div class="u-pad u-s">Rien à ordonner pour cette rubrique.</div>'}</div>`;
+  }
+  return tabs + body;
 }
 
 function v2_render(){
@@ -7972,14 +8103,24 @@ function v2_render(){
   if(!v2_on()){ body.innerHTML = ''; return; }
   if(!v2_cfgReady){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
   const admin = v2_adminView(); if(admin && !v2_tabInit){ v2_tabInit = true; v2_tab = 'today'; }
-  const tabs = (admin ? [['today', 'Aujourd’hui', '']] : []).concat([['saisie', 'mep'], ['stock', 'stock']].map(t=>[t[0], v2_fr('title.' + t[1]), v2_arOf('title.' + t[1])])).concat(admin ? [['hist', 'Historique', ''], ['reg', 'Réglages', '']] : []);
   if(!admin && !['saisie', 'stock'].includes(v2_tab)){ v2_tab = 'saisie'; if(window.v2_lmode){ window.v2_lmode = false; mep_draft = null; } }
-  const zone = v2_tab === 'stock' ? 'stock' : 'mep', isToday = admin && ['today', 'plats', 'hist', 'reg'].includes(v2_tab);
-  const head = `<div id="v2-ob">${v2_obHtml()}</div><div style="font-weight:700;font-size:22px;">${isToday ? (v2_tab === 'hist' ? 'Historique' : v2_tab === 'reg' ? 'Réglages' : 'Aujourd’hui') : esc(v2_fr(zone === 'stock' ? 'title.stock' : 'title.mep')) + v2_arSpan(v2_arOf(zone === 'stock' ? 'title.stock' : 'title.mep'))}</div>
-    <div style="font-size:12px;font-weight:600;color:#FBBF24;margin-top:2px;">Version en test — visible par l’administrateur seulement</div>
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0 12px;"><input type="date" value="${esc(v2_date)}" onchange="v2_setDate(this.value)" style="min-height:40px;"><label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_ar ? 'checked' : ''} onchange="v2_toggleAr(this.checked)"> Arabe</label>${(session && session.isAdmin) ? `<label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_asCook ? 'checked' : ''} onchange="v2_toggleCook(this.checked)"> Voir comme un cuisinier</label>` : ''}</div>
-    ${tabs.length > 1 ? `<div class="mep-seg">${tabs.map(t=>`<button class="${(v2_tab === t[0] || (t[0] === 'today' && v2_tab === 'plats') || (t[0] === 'reg' && ['cfg', 'listes', 'textes', 'ecarts'].includes(v2_tab))) ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${esc(t[1])}${v2_ar && t[2] ? `<span class="v2-ar" style="text-align:center">${esc(t[2])}</span>` : ''}</button>`).join('')}</div>` : ''}`;
-  body.innerHTML = head + (isToday ? (v2_tab === 'plats' ? v2_compView() : v2_tab === 'hist' ? v2_histView() : v2_tab === 'reg' ? v2_regView() : v2_todayView()) : v2_tab === 'listes' && admin ? v2_back() + v2_listsView() : v2_tab === 'cfg' && admin ? v2_back() + v2_cfgView() : v2_tab === 'ecarts' && admin ? v2_back() + v2_ecartsView() : v2_tab === 'textes' && admin ? v2_back() + v2_textsView() : v2_saisieView(zone));
+  const isAdm = admin && ['today', 'plats', 'hist', 'reg'].includes(v2_tab), sub = admin && ['cfg', 'listes', 'textes', 'ecarts'].includes(v2_tab), zone = v2_tab === 'stock' ? 'stock' : 'mep';
+  const nav = admin ? `<div class="u-bn">${[['today', 'Aujourd’hui'], ['saisie', 'Saisie'], ['hist', 'Historique'], ['reg', 'Réglages']].map(t=>`<button class="${(v2_tab === t[0] || (t[0] === 'today' && v2_tab === 'plats') || (t[0] === 'saisie' && v2_tab === 'stock') || (t[0] === 'reg' && sub)) ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${t[1]}</button>`).join('')}</div>` : '';
+  const dateIn = `<input type="date" value="${esc(v2_date)}" onchange="v2_setDate(this.value)" style="min-height:36px;">`;
+  const titles = { today:'Aujourd’hui', plats:'Aujourd’hui', hist:'Historique', reg:'Réglages' };
+  let top, content;
+  if(isAdm){
+    top = `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 12px;"><div class="u-t big">${titles[v2_tab]}</div>${dateIn}</div>`;
+    content = v2_tab === 'plats' ? v2_compView() : v2_tab === 'hist' ? v2_histView() : v2_tab === 'reg' ? v2_regView() : v2_todayView();
+  } else if(sub){
+    top = '';
+    content = v2_back() + (v2_tab === 'listes' ? v2_listsView() : v2_tab === 'cfg' ? v2_cfgView() : v2_tab === 'ecarts' ? v2_ecartsView() : v2_textsView());
+  } else {
+    const seg = `<div class="mep-seg">${[['saisie', 'title.mep'], ['stock', 'title.stock']].map(t=>`<button class="${v2_tab === t[0] ? 'on' : ''}" onclick="v2_setTab('${t[0]}')">${esc(v2_fr(t[1]))}${v2_ar ? `<span class="v2-ar" style="text-align:center">${esc(v2_arOf(t[1]))}</span>` : ''}</button>`).join('')}</div>`;
+    top = (admin ? `<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:4px 0 10px;">${dateIn}<label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox" ${v2_asCook ? 'checked' : ''} onchange="v2_toggleCook(this.checked)"> Voir comme un cuisinier</label></div>` : '') + seg;
+    content = v2_saisieView(zone);
+  }
+  body.innerHTML = `<div id="v2-ob">${v2_obHtml()}</div><div class="u-wrap">${top}${content}${nav}</div>`;
 }
 
 initAuth();
