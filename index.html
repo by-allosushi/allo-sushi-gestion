@@ -6425,6 +6425,20 @@ function cx_setRange(){
   const w = { from:cx_from, to:cx_to, day:mep_ymd(new Date()) }; cx_cfg.win = w; cx_winSave(w); cx_perOpen = false;
   cx_reload(); cx_render();
 }
+/* repart juste après la dernière pesée de stock (elle devient le départ de la période) */
+function cx_lastWeighMs(){
+  let best = 0; const now = Date.now();
+  ((cx_data && cx_data.v2) || []).forEach((d)=>{ if(d.zone !== 'stock' || !d.atKeys) return; Object.keys(d.atKeys).forEach((k)=>{ if(d.vals && d.vals[k] === undefined) return; const m = new Date(d.atKeys[k]).getTime(); if(!isNaN(m) && m <= now && m > best) best = m; }); });
+  return best || null;
+}
+async function cx_fromLastWeigh(){
+  const m = cx_lastWeighMs(); if(!m){ alert('Aucune pesée de stock trouvée.'); return; }
+  const ms = Math.ceil((m + 1000) / 6e4) * 6e4;
+  cx_from = cx_dt(new Date(ms)); cx_to = ''; cx_perDraft = null; cx_mode = {}; cx_adj = null; cx_perOpen = false;
+  const w = { from:cx_from, to:'', day:mep_ymd(new Date()) }; cx_cfg.win = w; cx_winSave(w);
+  if(typeof pt_toast === 'function') pt_toast('Période : depuis ' + cx_pad(new Date(ms).getHours()) + ':' + cx_pad(new Date(ms).getMinutes()) + ' (après la dernière pesée).');
+  await cx_reload(); cx_render(); if(typeof v2_render === 'function') v2_render();
+}
 function cx_nowTo(){ cx_to = ''; cx_reload(); cx_render(); }
 function cx_setTab(t){ cx_tab = t; cx_adj = null; cx_menu = false; if(t === 'jour' && !cx_j.from){ cx_jPreset('today', true); } if(t === 'jour' && !cx_j.data) cx_jLoad(); if(t === 'hist') cx_hLoad(); cx_render(); try{ window.scrollTo(0, 0); }catch(e){} }
 /* ---------- lignes de Mise en place liées à un ingrédient, pesées ---------- */
@@ -7000,7 +7014,7 @@ function cx_ctrlHtml(){
   const per = cx_perOpen ? `<div class="ticket" style="border-color:var(--forest);"><div class="row-between"><div class="section-label" style="margin:0;">Période</div><button class="btn ghost small" onclick="cx_togPer()">Fermer</button></div>
       <div class="grid grid-2" style="margin-top:8px;"><div class="field"><label>De</label><input type="datetime-local" id="cx-from" value="${cx_e(cx_from)}" onchange="cx_perSet('from',this.value)"></div><div class="field"><label>À ${cx_to ? '' : '(maintenant)'}</label><input type="datetime-local" id="cx-to" value="${cx_e(cx_to)}" onchange="cx_perSet('to',this.value)"></div></div>
       <div class="actions-row" style="margin:8px 0;"><button class="btn small t-save" onclick="cx_setRange()">✓ Valider</button></div>
-      <div class="filter-row" style="flex-wrap:wrap;margin-bottom:0;"><button class="filter-chip" onclick="cx_perDraft=null;cx_preset('today')">Jour complet (depuis 00h00)</button><button class="filter-chip" onclick="cx_perDraft=null;cx_preset('yesterday')">Hier</button><button class="filter-chip" onclick="cx_preset('3h')">3 dernières h</button><button class="filter-chip" onclick="cx_preset('7d')">7 jours</button>${cx_to ? '<button class="filter-chip" onclick="cx_nowTo()">Jusqu’à maintenant</button>' : ''}</div>
+      <div class="filter-row" style="flex-wrap:wrap;margin-bottom:0;"><button class="filter-chip active" onclick="cx_fromLastWeigh()">Repartir de la dernière pesée</button><button class="filter-chip" onclick="cx_perDraft=null;cx_preset('today')">Jour complet (depuis 00h00)</button><button class="filter-chip" onclick="cx_perDraft=null;cx_preset('yesterday')">Hier</button><button class="filter-chip" onclick="cx_preset('3h')">3 dernières h</button><button class="filter-chip" onclick="cx_preset('7d')">7 jours</button>${cx_to ? '<button class="filter-chip" onclick="cx_nowTo()">Jusqu’à maintenant</button>' : ''}</div>
       <div class="pt-muted" style="margin-top:8px;">« À » vide = jusqu’à maintenant. Après « Valider », la période est mémorisée pour la journée, même si tu changes de page. Chaque jour est calculé à part, de 00h00 à 23h59.</div></div>`
     : `<div class="ticket" style="padding:12px;"><div class="row-between"><div><div class="mep-w">Période</div>${perLbl}</div><button class="btn ghost small" onclick="cx_togPer()">Modifier</button></div></div>`;
   const rst = cx_rst.open ? `<div class="ticket" style="border-color:var(--forest);"><div class="row-between"><div class="section-label" style="margin:0;">⏱ Recommencer à une heure</div><button class="btn ghost small" onclick="cx_rstOpen()">Annuler</button></div>
