@@ -654,6 +654,10 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
 .u-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--line);}.u-row.sel{background:rgba(59,130,246,.18);}
 .u-bn{display:flex;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--surface);margin-top:14px;}.u-bn button{flex:1;padding:12px 0;background:none;border:0;color:var(--ink-muted);font-size:13px;cursor:pointer;}.u-bn button.on{color:#60A5FA;font-weight:700;}
 .u-dot{width:14px;height:14px;border-radius:50%;flex:none;}
+.u-ih{display:flex;align-items:center;gap:10px;padding:11px 16px;border-left:5px solid var(--c);background:color-mix(in srgb,var(--c) 16%,transparent);}
+.u-ih b{font-weight:600;font-size:16px;color:var(--c);}
+.u-ih .u-s{display:block;margin-top:2px;}
+.u-ih .u-dot{width:10px;height:10px;background:var(--c);}
 .u-box{width:22px;height:22px;border:1.5px solid var(--line);border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;}
 .u-box.ok{border-color:#22C55E;color:#22C55E;}.u-box.cur{border-color:#60A5FA;}.u-box.sk{border-color:#FBBF24;color:#FBBF24;}
 .u-ban{background:rgba(59,130,246,.18);color:#93C5FD;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px;}
@@ -7350,6 +7354,9 @@ async function dt_deleteAvoir(id){
    Données dans la collection existante « mise_en_place » : « v2cfg » (réglages), « v2_<date>_<rubrique> » (Mise en place), « v2_<date>_<rubrique>_s » (Stock).
    Rien ne touche aux saisies actuelles : les cuisiniers continuent comme avant tant que NEW_RUBRIQUES_ADMIN_ONLY est à true. */
 const v2_cfgRef = db.collection('mise_en_place').doc('v2cfg');
+const V2_HEX = { saumon:'#F28B6E', escalope:'#E8B93A', l2:'#E879A6', gamba:'#F0765F', poulet:'#D9C9A3', 'viande hach':'#C0504D', 'viande rouge':'#B5485A', avocat:'#6FBF73' };
+function v2_hexName(name, colKey){ const n = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(), k = Object.keys(V2_HEX).find(x=>n.includes(x)); return k ? V2_HEX[k] : (V2_COLORS[colKey] || '#9aa39e'); }
+const v2_hex = (it)=>v2_hexName(it.n, (v2_ing(it) || {}).col);
 const V2_COLORS = { blanc:'#e9ece9', bleu:'#60a5fa', rouge:'#f87171', rose:'#f472b6', vert:'#4ade80', jaune:'#fbbf24', violet:'#a78bfa' };
 const V2_TXT = {
   'title.mep':['Mise en place', 'التجهيز المسبق'], 'title.stock':['Stock', 'المخزون'],
@@ -7667,7 +7674,7 @@ function v2_wizView(sec){
       : `<div class="u-t" style="font-size:16px;">${esc(cur.f.n)} : ${esc(v2_fmt(calc))} ${unitOf(p.it)}</div><div style="display:flex;gap:10px;margin-top:10px;"><button class="u-btn main" onclick="v2_recuOk('${esc(sec)}','${p.it.id}','${cur.f.id}',${p.n});v2_wizAfterSoon('${esc(sec)}','${p.it.id}')">C’est bon</button><button class="u-btn" style="flex:1;" onclick="v2_recuFix('${cur.key}')">Corriger</button></div>`; }
   else { action = `<div class="u-t" style="font-size:16px;">Pèse : ${esc(cur.f.n)}</div>${v2_arSpan(cur.f.ar ? 'زن ' + cur.f.ar : '')}${v2_kpHtml(v2_unitOf(p.it), `v2_wizOk('${esc(sec)}','${p.it.id}','${cur.f.id}')`)}<div style="text-align:center;margin-top:10px;"><a class="v2-lk" onclick="v2_wizSkip('${esc(sec)}','${p.it.id}','${cur.f.id}')">Je n’ai pas pesé${v2_arSpan('لم أقم بالوزن')}</a></div>`; }
   const waits = p.fields.filter(x=>x.confirm && x.wait).map(x=>`<div class="u-s" style="margin-top:6px;">${esc(x.f.n)} : en attente de la rubrique d’origine.</div>`).join('');
-  return `<div class="u-card">${head}<div class="u-pad"><div class="u-t">${title}${v2_arSpan(p.c.ar)}</div><div style="margin-top:6px;">${rowsH}${waits}</div></div><div class="u-pad" style="border-top:1px solid var(--line);">${action}</div></div>`;
+  return `<div class="u-card">${head}<div class="u-ih" style="--c:${v2_hex(p.it)};"><i class="u-dot"></i><div><b>${title}</b>${v2_arSpan(p.c.ar)}<span class="u-s">${esc(v2_rubName(sec))} · ${esc(v2_who())}</span></div></div><div class="u-pad"><div style="margin-top:2px;">${rowsH}${waits}</div></div><div class="u-pad" style="border-top:1px solid var(--line);">${action}</div></div>`;
 }
 function v2_wizAfterSoon(sec, itId){ setTimeout(()=>v2_wizAfter(sec, itId), 400); }
 function v2_wizNew(id){ v2_wizForce[id] = true; v2_render(); }
@@ -7871,7 +7878,7 @@ function v2_histBox(sec){
   const thanks = d.stockDone ? `<div class="u-card"><div class="u-pad"><div class="u-t">Merci ${esc(d.by || '')} !</div><div class="u-s" style="margin-top:4px;">+${Number(d.pts) || 0} points pour ce stock${v2_arSpan('شكراً! تم تسجيل المخزون')}</div>${d.ack ? `<div style="margin-top:8px;color:#86efac;font-weight:700;">${esc(d.ack.by)} a vu ton stock : merci${v2_arSpan('اطّلع على مخزونك، شكراً')}</div>` : ''}${level === 'saisir' ? `<a class="v2-lk" onclick="v2_correctStock('${esc(sec)}')">${esc(v2_fr('btn.fixInv'))}</a>` : ''}</div></div>` : '';
   let groupName = null, list = '';
   rows.forEach((r)=>{
-    if(r.n !== groupName){ groupName = r.n; list += `<div class="u-row" style="background:rgba(255,255,255,.03);padding:8px 16px;"><b>${esc(r.n)}</b>${v2_arSpan(r.ar)}</div>`; }
+    if(r.n !== groupName){ groupName = r.n; list += `<div class="u-ih" style="--c:${v2_hexName(r.n, r.col)};padding:8px 16px;"><i class="u-dot"></i><b style="font-size:15px;">${esc(r.n)}</b>${v2_arSpan(r.ar)}</div>`; }
     const st = v2_stState(sec, r.key), val = vals[r.key] !== undefined ? String(vals[r.key]) : '', isSel = !locked && sel === r.key, red = miss && st === 'none';
     list += `<div class="u-row st-card ${isSel ? 'sel' : ''}" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}" ${locked ? '' : `onclick="v2_stSelect('${esc(sec)}','${esc(r.key)}')"`} style="${red ? 'box-shadow:inset 3px 0 #F87171;' : ''}cursor:pointer;"><span class="u-box ${st === 'ok' ? 'ok' : st === 'skip' ? 'sk' : isSel ? 'cur' : ''}">${st === 'ok' ? '✓' : st === 'skip' ? '–' : ''}</span><div style="flex:1;min-width:0;"><div>${esc(r.sub || r.n)}</div>${r.ar ? v2_arSpan(r.ar) : ''}<div class="st-info u-s" data-stsec="${esc(sec)}" data-stk="${esc(r.key)}">${v2_stInfo(sec, r.key)}</div></div><div style="text-align:right;font-weight:700;">${val !== '' ? esc(v2_fmt(v2_num(val))) + ' ' + esc(r.u) : st === 'skip' ? '<span class="u-s">pas pesé</span>' : (!locked ? '<span style="color:#60A5FA;">Saisir</span>' : '—')}</div></div>`;
     if(isSel){ list += `<div class="u-pad" style="background:rgba(255,255,255,.02);">${v2_kpHtml(r.u, `v2_stOk('${esc(sec)}')`, `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;"><button class="u-btn sm" onclick="v2_stZero('${esc(sec)}','${esc(r.key)}')">Il n’en reste plus (0)${v2_arSpan('لم يبقَ شيء')}</button><button class="u-btn sm" onclick="v2_stSkipGo('${esc(sec)}','${esc(r.key)}')">Je n’ai pas pesé${v2_arSpan('لم أقم بالوزن')}</button></div>`)}</div>`; }
