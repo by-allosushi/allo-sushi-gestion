@@ -6447,7 +6447,7 @@ function cx_setRange(){
 /* repart juste après la dernière pesée de stock (elle devient le départ de la période) */
 function cx_lastWeighMs(){
   let best = 0; const now = Date.now();
-  ((cx_data && cx_data.v2) || []).forEach((d)=>{ if(d.zone !== 'stock' || !d.atKeys) return; Object.keys(d.atKeys).forEach((k)=>{ if(d.vals && d.vals[k] === undefined) return; const m = new Date(d.atKeys[k]).getTime(); if(!isNaN(m) && m <= now && m > best) best = m; }); });
+  ((cx_data && cx_data.v2) || []).forEach((d)=>{ if(d.zone !== 'stock') return; Object.keys(d.vals || {}).forEach((k)=>{ v2_whList(d, k).forEach((w)=>{ const m = new Date(w.at).getTime(); if(!isNaN(m) && m <= now && m > best) best = m; }); }); });
   return best || null;
 }
 async function cx_fromLastWeigh(){
@@ -6504,9 +6504,10 @@ function cx_lines(ing){
 }
 function cx_weighs(l){
   const out = [];
-  if(l.v2){ cx_v2.forEach((d)=>{ if(d.zone !== 'stock' || d.sec !== l.sec || !d.vals || d.vals[l.key] === undefined) return; const q = v2_num(d.vals[l.key]); if(q === null) return;
-      const at = (d.atKeys && d.atKeys[l.key]) || d.at || (d.v2date + 'T23:00:00'), ms = new Date(at).getTime(); if(isNaN(ms)) return;
-      out.push({ ms, q, who:(d.byKeys && d.byKeys[l.key] && d.byKeys[l.key].w) || d.by || '', corr:'', rec:String(at), sid:d.v2date + '|' + d.sec, iid:l.key }); });
+  if(l.v2){ cx_v2.forEach((d)=>{ if(d.zone !== 'stock' || d.sec !== l.sec) return;
+      v2_whList(d, l.key).forEach((w)=>{ const q = v2_num(w.q); if(q === null) return;
+        const at = w.at || d.at || (d.v2date + 'T23:00:00'), ms = new Date(at).getTime(); if(isNaN(ms)) return;
+        out.push({ ms, q, who:w.by || d.by || '', corr:'', rec:String(at), sid:d.v2date + '|' + d.sec, iid:l.key }); }); });
     return out.sort((a, b)=>a.ms - b.ms || a.rec.localeCompare(b.rec)); }
   mep_saisies.forEach((x)=>{ if(x.section !== l.sec) return; const it = (x.items || []).find(i=>i.id === l.id); if(!it || !mep_counts(x, l.id)) return;
     const ms = new Date(mep_shownAt(x)).getTime(); if(isNaN(ms)) return; out.push({ ms, q:Number(it.q) || 0, who:x.name || '', corr:x.correctedBy || '', rec:String(x.at || ''), sid:x.id, iid:it.id }); });
@@ -7895,7 +7896,7 @@ async function v2_write(dk, sec, zone, patch){
 }
 function v2_mergeLocal(dk, sec, zone, patch){
   const d0 = v2_docs[dk] || { sec, zone }; const d = Object.assign({}, d0);
-  Object.keys(patch).forEach(k=>{ const v = patch[k]; d[k] = (v && typeof v === 'object' && !Array.isArray(v)) ? Object.assign({}, d0[k] || {}, v) : v; }); v2_docs[dk] = d;
+  Object.keys(patch).forEach(k=>{ const v = patch[k]; d[k] = k === 'wh' ? v2_deepMerge(d0[k], v) : (v && typeof v === 'object' && !Array.isArray(v)) ? Object.assign({}, d0[k] || {}, v) : v; }); v2_docs[dk] = d;
 }
 async function v2_flushForeign(sec, by){
   for(const dk of Object.keys(v2_form)){
@@ -7996,13 +7997,35 @@ function v2_wtHtml(sec){
   return t ? `<label class="u-btn sm u-tm"><span>🕐 Pesé à · وقت الوزن</span><input type="time" value="${esc(t)}" onchange="v2_wtSet('${esc(sec)}',this.value)"></label><button class="u-btn sm" onclick="v2_wtSet('${esc(sec)}','')">↺ Maintenant${v2_arSpan('الآن')}</button>`
     : `<button class="u-btn sm" onclick="v2_wtSet('${esc(sec)}',v2_hm())">🕐 Pesé à : maintenant ✎${v2_arSpan('غيّر الوقت')}</button>`;
 }
+/* ---------- historique des pesées de Stock : chaque pesée garde sa valeur et son heure (plusieurs par jour possibles) ---------- */
+function v2_whId(at){ const m = Date.parse(at); return isNaN(m) ? 'w0' : 'w' + m; }
+function v2_whList(d, key){
+  const w = d && d.wh && d.wh[key];
+  if(w){ const a = Object.keys(w).filter(i=>w[i] && !w[i].x && w[i].at).map(i=>Object.assign({ id:i }, w[i])); if(a.length) return a.sort((p, q)=>String(p.at).localeCompare(String(q.at))); }
+  if(d && d.vals && d.vals[key] !== undefined && String(d.vals[key]).trim() !== ''){
+    const at = (d.atKeys && d.atKeys[key]) || d.at || '';
+    return [{ id:v2_whId(at), q:String(d.vals[key]), at, by:(d.byKeys && d.byKeys[key] && d.byKeys[key].w) || d.by || '' }];
+  }
+  return [];
+}
+/* ajoute une pesée (et retire éventuellement l'ancienne identifiée par son heure) ; renvoie les champs du patch */
+function v2_whPut(dk, sec, key, rec, removeAt){
+  const d = v2_docs[dk] || {}, cur = v2_whList(d, key), has = !!(d.wh && d.wh[key]), wh = {}, all = {};
+  cur.forEach(r=>{ all[r.id] = r; if(!has) wh[r.id] = { q:r.q, at:r.at, by:r.by }; });
+  const nid = v2_whId(rec.at);
+  if(removeAt){ const rid = v2_whId(removeAt); if(rid !== nid){ wh[rid] = { x:true, at:removeAt }; delete all[rid]; } }
+  wh[nid] = { q:String(rec.q), at:rec.at, by:rec.by }; all[nid] = { id:nid, q:String(rec.q), at:rec.at, by:rec.by };
+  const last = Object.keys(all).map(k=>all[k]).sort((p, q)=>String(p.at).localeCompare(String(q.at))).pop();
+  return { wh:{ [key]:wh }, vals:{ [key]:String(last.q) }, atKeys:{ [key]:last.at }, byKeys:{ [key]:{ w:last.by, r:sec } } };
+}
 async function v2_stockSet(sec, key, raw){
   if(v2_level(sec) !== 'saisir') return; raw = String(raw == null ? '' : raw).trim(); if(raw === '') return;
   const n = v2_num(raw); if(n === null || !/^-?\d+([.,]\d+)?$/.test(raw)){ alert('Nombre non valide : « ' + raw + ' ».'); v2_render(); return; }
   const dk = sec + '@s', ev = v2_hdEvents(sec, key), last = ev[ev.length - 1], td = ((v2_docs[dk] || {}).vals || {})[key];
-  if(td !== undefined && v2_num(td) === n && !v2_stPending(sec, key)) return;
   const by = v2_who(), now = new Date().toISOString(), wa = v2_wtAt(sec); if(wa === null) return;
-  const patch = { v2date:v2_date, vals:{ [key]:raw }, skips:{ [key]:'' }, byKeys:{ [key]:{ w:by, r:sec } }, atKeys:{ [key]:wa }, tmods:{ [key]:v2_wtMod(sec, wa) ? { entered:now, by } : '' }, by, at:now, stockOk:true };
+  if(td !== undefined && v2_num(td) === n && !v2_stPending(sec, key)){ const la = ((v2_docs[dk] || {}).atKeys || {})[key], dm = Math.abs(Date.parse(wa) - Date.parse(la || '')); if(isNaN(dm) || dm < 60000) return; }
+  const wp = v2_whPut(dk, sec, key, { q:raw, at:wa, by });
+  const patch = { v2date:v2_date, wh:wp.wh, vals:wp.vals, skips:{ [key]:'' }, byKeys:wp.byKeys, atKeys:wp.atKeys, tmods:{ [key]:v2_wtMod(sec, wa) ? { entered:now, by } : '' }, by, at:now, stockOk:true };
   v2_mergeLocal(dk, sec, 'stock', patch);
   await v2_write(dk, sec, 'stock', patch);
   v2_stRefreshAll();
@@ -8242,6 +8265,7 @@ async function v2_corrSave(){
   if(timeChg){ const d = new Date(v2_date + 'T' + c.time + ':00'); if(isNaN(d.getTime()) || d.getTime() > Date.now() + 60000){ alert('Heure non valide (pas dans le futur).'); return; } atNew = d.toISOString(); }
   const at = new Date().toISOString(), id = c.key.replace(/[.#]/g, '_') + '_' + Date.now(), patch = { v2date:v2_date, vals:{ [c.key]:String(c.val).trim() }, skips:{ [c.key]:'' }, corr:{ [id]:Object.assign({ key:c.key, old:r.val, neu:String(c.val).trim(), by:v2_who(), at, note:String(c.note || '').trim() }, timeChg ? { oldAt:r.at || '', newAt:atNew } : {}) } };
   if(timeChg){ patch.atKeys = { [c.key]:atNew }; patch.tmods = { [c.key]:{ entered:at, by:v2_who() } }; }
+  if(r.zone === 'stock'){ const oldAt = r.at || new Date(v2_date + 'T12:00:00').toISOString(), wp = v2_whPut(c.dk, r.sec, c.key, { q:String(c.val).trim(), at:timeChg ? atNew : oldAt, by:r.by }, oldAt); patch.wh = wp.wh; patch.vals = wp.vals; patch.atKeys = wp.atKeys; }
   v2_mergeLocal(c.dk, r.sec, r.zone, patch); await v2_write(c.dk, r.sec, r.zone, patch); v2_corr = null;
   if(typeof cx_reload === 'function' && cx_started) cx_reload(); v2_render();
 }
@@ -8257,8 +8281,9 @@ function v2_histView(){
     const editing = v2_corr && v2_corr.dk === r.dk && v2_corr.key === r.key, u = (()=>{ const it = v2_byId(r.key.split('.')[0]); return it ? v2_unitOf(it) : ''; })(), fl = flagOf(r);
     const badges = (r.corr ? '<span class="u-pill u-wa">Corrigé</span> ' : '') + (r.skip ? '<span class="u-pill u-wa">Pas pesé</span> ' : '') + (fl ? `<span class="u-pill u-wa">Signalé : ${esc(fl)}</span> ` : '') + (((v2_docs[r.dk] || {}).tmods || {})[r.key] ? '<span class="u-pill u-wa">Heure modifiée</span>' : '');
     const trace = r.corr ? `<div class="u-s" style="color:#FBBF24;margin-top:4px;">✎ ${esc(r.corr.by)} · ${esc(v2_fdt(r.corr.at))} : ${esc(String(r.corr.old))} → ${esc(String(r.corr.neu))}${r.corr.newAt ? ' · heure ' + esc(v2_hm2(r.corr.oldAt)) + ' → ' + esc(v2_hm2(r.corr.newAt)) : ''}${r.corr.note ? ' · « ' + esc(r.corr.note) + ' »' : ''}</div>` : '';
+    const wl = r.zone === 'stock' ? v2_whList(v2_docs[r.dk] || {}, r.key) : [], wtr = wl.length > 1 ? `<div class="u-s" style="margin-top:4px;">Pesées du jour : ${wl.map(x=>esc(v2_hm2(x.at)) + ' → ' + esc(v2_fmt(v2_num(x.q)))).join(' · ')}</div>` : '';
     const form = editing ? `<div style="margin-top:10px;"><div class="g2"><div><label>Nouvelle valeur (${esc(u)})</label><input class="ft-in" inputmode="decimal" value="${esc(v2_corr.val)}" oninput="v2_corrSet('val',this.value)"></div><div><label>Note (facultatif)</label><input class="ft-in" value="${esc(v2_corr.note)}" oninput="v2_corrSet('note',this.value)"></div></div>${v2_wtOn() ? `<div style="margin-top:8px;"><label>${r.zone === 'stock' ? 'Heure de pesée' : 'Heure de saisie'}</label><input type="time" class="ft-in" style="width:130px;" value="${esc(v2_corr.time || '')}" oninput="v2_corrSet('time',this.value)"></div>` : ''}<div id="v2-corr-prev" class="u-s" style="margin:8px 0;">${v2_corrPreview(r, v2_corr.val)}</div><div style="display:flex;gap:8px;"><button class="u-btn sm on" onclick="v2_corrSave()">Enregistrer la correction</button><button class="u-btn sm" onclick="v2_corr=null;v2_render()">Annuler</button></div></div>` : '';
-    return `<div class="u-pad" style="border-top:1px solid var(--line);"><div class="rowflex" style="display:flex;justify-content:space-between;gap:10px;"><div style="min-width:0;"><div class="u-s">${esc(v2_hm2(r.at))} · ${esc(r.by)} · ${esc(r.rub)} · ${r.zone === 'stock' ? 'Stock' : 'Mise en place'}</div><div style="margin-top:2px;">${esc(v2_keyLabel(r.key))}</div></div><div style="text-align:right;"><b style="font-size:18px;">${r.skip ? '—' : esc(v2_fmt(v2_num(r.val))) + ' ' + esc(u)}</b>${r.skip ? '' : `<div style="margin-top:6px;"><button class="u-btn sm" onclick="v2_corrOpen('${esc(r.dk)}','${esc(r.key)}')">Corriger</button></div>`}</div></div><div style="margin-top:6px;">${badges}</div>${trace}${form}</div>`; }).join('') : '<div class="u-pad u-s">Aucune saisie dans ce filtre.</div>') + `</div>`;
+    return `<div class="u-pad" style="border-top:1px solid var(--line);"><div class="rowflex" style="display:flex;justify-content:space-between;gap:10px;"><div style="min-width:0;"><div class="u-s">${esc(v2_hm2(r.at))} · ${esc(r.by)} · ${esc(r.rub)} · ${r.zone === 'stock' ? 'Stock' : 'Mise en place'}</div><div style="margin-top:2px;">${esc(v2_keyLabel(r.key))}</div></div><div style="text-align:right;"><b style="font-size:18px;">${r.skip ? '—' : esc(v2_fmt(v2_num(r.val))) + ' ' + esc(u)}</b>${r.skip ? '' : `<div style="margin-top:6px;"><button class="u-btn sm" onclick="v2_corrOpen('${esc(r.dk)}','${esc(r.key)}')">Corriger</button></div>`}</div></div><div style="margin-top:6px;">${badges}</div>${trace}${wtr}${form}</div>`; }).join('') : '<div class="u-pad u-s">Aucune saisie dans ce filtre.</div>') + `</div>`;
 }
 
 /* ==================== RÉGLAGES (admin) ==================== */
