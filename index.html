@@ -1781,9 +1781,11 @@ async function ca_saveSession(){
     ca_allSessions = { ...ca_allSessions, [ca_session.date]: saved };
     ca_setSyncLabel('✓ Synchronisé');
     ca_render();
+    alert('Clôture du '+fmtDateShort(ca_session.date)+' enregistrée.');
   }catch(e){
     console.warn(e);
     ca_setSyncLabel('⚠ Échec de la sauvegarde');
+    alert('⚠ Échec de la sauvegarde de la clôture. Réessaie.');
   }
 }
 async function ca_deleteSession(date){
@@ -1962,10 +1964,33 @@ function ca_ensureRpWatch(){
         });
         r.ca = Math.round(r.ca * 100) / 100;
       }
+      ca_erpAutoSync();
       ca_render();
     }, err=>{ console.warn('Caisse / Resto Pro :', err); r.loaded = true; r.exists = false; ca_render(); });
   }catch(e){ console.warn(e); }
 }
+/* Total ventes ERP de la journée en cours : suit Resto Pro, mis à jour dans la clôture déjà enregistrée, avec un message si le total a changé */
+let ca_erpChange = null;   // { date, from, to, heure }
+let ca_erpWriting = false;
+async function ca_erpAutoSync(){
+  try{
+    if(typeof ca_isLimited === 'function' && ca_isLimited()) return;
+    const d = ca_workingDate, r = ca_rp;
+    if(d !== todayISO() || !r || r.date !== d || !r.loaded || !r.exists || ca_erpWriting) return;
+    const ex = ca_allSessions[d]; if(!ex) return;
+    const prevRaw = (ex.totalVentesErp === undefined || ex.totalVentesErp === null) ? '' : String(ex.totalVentesErp).trim();
+    const prev = ca_parseNum(prevRaw);
+    if(prevRaw !== '' && Math.abs(r.ca - prev) <= 0.004) return;
+    ca_erpWriting = true;
+    await ca_caisseCol.doc(d).update({ totalVentesErp:r.ca });
+    ca_allSessions = { ...ca_allSessions, [d]: { ...ex, totalVentesErp:r.ca } };
+    ca_session.totalVentesErp = r.ca;
+    if(prevRaw !== '') ca_erpChange = { date:d, from:prev, to:r.ca, heure:ca_nowHM() };
+  }catch(e){ console.warn('Total ERP : mise à jour automatique impossible', e); }
+  ca_erpWriting = false;
+  try{ ca_render(); }catch(e){}
+}
+function ca_erpChangeOk(){ ca_erpChange = null; ca_render(); }
 function ca_refreshErp(){
   ca_erpLive = true;
   if(typeof rp_requestSync === 'function'){ try{ rp_requestSync(true); }catch(e){} }
@@ -1974,7 +1999,7 @@ function ca_refreshErp(){
 function ca_cgCard(t, body, foot){ return `<div class="cg-card"><div class="cg-t">${t}</div><div class="cg-body">${body}</div><div class="cg-foot">${foot || ''}</div></div>`; }
 function ca_erpCard(existing){
   const r = ca_rp;
-  const live = !existing || ca_erpLive;
+  const live = !existing || ca_erpLive || ca_workingDate === todayISO();
   if(live && r.loaded && r.exists) ca_session.totalVentesErp = r.ca;
   const refreshBtn = `<button class="cg-link" onclick="ca_refreshErp()">⟳ Actualiser</button>`;
   let body;
@@ -1985,7 +2010,8 @@ function ca_erpCard(existing){
     body = `<div class="cg-big">${ca_fmtMoney(ca_parseNum(ca_session.totalVentesErp))}</div>
       <div class="cg-sub" style="color:#93C5FD;">Resto Pro · ${r.nClosed} ticket${r.nClosed>1?'s':''} fermé${r.nClosed>1?'s':''}</div>
       ${r.nOpen ? `<div class="cg-sub" style="color:var(--amber);">⚠ ${r.nOpen} ticket${r.nOpen>1?'s':''} non fermé${r.nOpen>1?'s':''}</div>` : ''}
-      ${diff > 0.5 ? `<div class="cg-sub" style="color:var(--amber);">⚠ Resto Pro indique maintenant ${ca_fmtMoney(r.ca)}</div>` : ''}`;
+      ${diff > 0.5 ? `<div class="cg-sub" style="color:var(--amber);">⚠ Resto Pro indique maintenant ${ca_fmtMoney(r.ca)}</div>` : ''}
+      ${(ca_erpChange && ca_erpChange.date === ca_workingDate) ? `<div style="border:1px solid var(--amber);background:var(--amber-bg);border-radius:8px;padding:8px 10px;font-size:12.5px;color:var(--amber);">⟳ Le total Resto Pro a changé depuis le dernier enregistrement : ${ca_fmtMoney(ca_erpChange.from)} → <b>${ca_fmtMoney(ca_erpChange.to)}</b> (à ${esc(ca_erpChange.heure)}). La clôture a été mise à jour automatiquement.<button class="cg-link" style="margin-left:8px;" onclick="ca_erpChangeOk()">OK</button></div>` : ''}`;
   } else {
     body = `<input id="erp-input" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_session.totalVentesErp)}" placeholder="Montant" oninput="ca_session.totalVentesErp=this.value;ca_render()">
       <div class="cg-sub" style="color:var(--amber);">Pas de données Resto Pro pour ce jour</div>`;
