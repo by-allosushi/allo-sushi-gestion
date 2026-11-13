@@ -1527,6 +1527,7 @@ async function ca_limTx(mutate){
     const snap = await tx.get(ref);
     const cur = snap.exists ? snap.data() : { date, debutCaisse:ca_session.debutCaisse, entrees:[], totalVentesErp:ca_session.totalVentesErp || '', sorties:[], montantCompte:'', noteValidation:'', debutValidations:[], restant:null };
     const out = mutate({ ...cur });
+    if(String(out.totalVentesErp === undefined || out.totalVentesErp === null ? '' : out.totalVentesErp).trim() === '' && String(ca_session.totalVentesErp || '').trim() !== '') out.totalVentesErp = ca_session.totalVentesErp;
     if(String(out.debutCaisse === undefined || out.debutCaisse === null ? '' : out.debutCaisse).trim() === '' && String(ca_session.debutCaisse || '').trim() !== '') out.debutCaisse = ca_session.debutCaisse;
     tx.set(ref, out); return out;
   });
@@ -1553,7 +1554,6 @@ async function ca_limValidateDebut(){
   try{
     const out = await ca_limTx(c=>({ ...c, debutValidations:[...(Array.isArray(c.debutValidations) ? c.debutValidations : []), v] }));
     ca_session.debutValidations = out.debutValidations; ca_lim.debut = ''; ca_lim.note = ''; ca_lim.dFirst = null; ca_lim.dConf = false;
-    alert('Début de caisse validé : ' + ca_fmtMoney(m) + (diff ? ' (écart ' + (ecart > 0 ? '+' : '') + ca_fmtMoney(ecart) + ')' : '') + '.');
   }catch(e){ console.error(e); alert('Erreur : validation non enregistrée (' + (e.message || e) + '). Réessaie.'); }
   ca_lim.busy = false; ca_render();
 }
@@ -1650,7 +1650,6 @@ async function ca_limSubmitRestant(){
     const out = await ca_limTx(c=>({ ...c, restant:r, ...(diff ? {} : { montantCompte:String(m) }) }));
     ca_session.restant = out.restant; if(!diff) ca_session.montantCompte = String(m);
     ca_lim.rest = ''; ca_lim.rnote = '';
-    alert(diff ? 'Écart de ' + (ecart > 0 ? '+' : '') + ca_fmtMoney(ecart) + ' : envoyé à l’admin pour validation.' : 'Montant restant validé : ' + ca_fmtMoney(m) + '.');
   }catch(e){ console.error(e); alert('Erreur : montant non enregistré (' + (e.message || e) + '). Réessaie.'); }
   ca_lim.busy = false; ca_render();
 }
@@ -1694,7 +1693,6 @@ async function ca_limAddSortie(){
     const out = await ca_limTx(c=>({ ...c, sorties:[...(Array.isArray(c.sorties) ? c.sorties : []), line] }));
     ca_session.sorties = out.sorties; ca_lim.sortie = ''; ca_lim.cmt = '';
     try{ if(ca_retraitReady) await ca_syncRetraits({ ...out, date:ca_session.date }); }catch(e){ console.warn('Sync retraits', e); }
-    alert('Sortie enregistrée : ' + ca_fmtMoney(m) + (type === 'retrait' ? '. Ce montant doit être remis à ' + ca_lim.dest + '.' : '.'));
   }catch(e){ console.error(e); alert('Erreur : sortie non enregistrée (' + (e.message || e) + '). Réessaie.'); }
   ca_lim.busy = false; ca_render();
 }
@@ -1702,7 +1700,7 @@ function ca_renderLimited(){
   const today = todayISO();
   if(ca_workingDate !== today){ ca_workingDate = today; const ex = ca_allSessions[today]; ca_session = ex ? ca_normalizeSession(ex, today) : ca_blankSession(today); ca_hist = null; ca_histEdit = null; }
   ca_ensureRpWatch();
-  if(ca_rp.loaded && ca_rp.exists && !ca_allSessions[ca_workingDate]) ca_session.totalVentesErp = ca_rp.ca;
+  if(ca_rp.loaded && ca_rp.exists) ca_session.totalVentesErp = ca_rp.ca;   // l'employé ne voit pas les ventes, mais le calcul les suit en direct
   const dbt = ca_limDebut(); if(!dbt.none) ca_session.debutCaisse = String(dbt.val);
   const attendu = dbt.val, raw = String(ca_lim.debut).trim(), m = ca_parseNum(raw);
   const mine = (ca_session.debutValidations || []).filter(v=>v.par === currentUser);
@@ -1783,7 +1781,6 @@ async function ca_saveSession(){
     ca_allSessions = { ...ca_allSessions, [ca_session.date]: saved };
     ca_setSyncLabel('✓ Synchronisé');
     ca_render();
-    alert('Clôture du '+fmtDateShort(ca_session.date)+' enregistrée.');
   }catch(e){
     console.warn(e);
     ca_setSyncLabel('⚠ Échec de la sauvegarde');
