@@ -1757,7 +1757,8 @@ async function ca_restantDecide(id, ok){
 function ca_restantStatusHtml(r){
   if(!r) return '';
   const ec = Number(r.ecart) || 0, ecs = Math.abs(ec) > 0.004 ? ' (écart ' + (ec > 0 ? '+' : '') + ca_fmtMoney(ec) + ')' : '';
-  if(r.statut === 'valide') return `<div class="cg-sub"><span style="color:var(--moss);">✓</span> Validé${r.decidePar ? ' par ' + esc(r.decidePar) : ''} à ${esc(r.decideLe || r.heure || '')} : ${ca_fmtMoney(r.montant)}${ecs}</div>`;
+  if(r.statut === 'valide') return '';   // le bandeau vert « Caisse correcte » suffit
+  if(false) return `<div class="cg-sub"><span style="color:var(--moss);">✓</span> Validé${r.decidePar ? ' par ' + esc(r.decidePar) : ''} à ${esc(r.decideLe || r.heure || '')} : ${ca_fmtMoney(r.montant)}${ecs}</div>`;
   if(r.statut === 'refuse') return `<div style="border-left:3px solid var(--rust);background:var(--rust-bg);padding:8px 12px;font-size:12.5px;color:var(--rust);">✕ Refusé par ${esc(r.decidePar || 'l’admin')} : ${ca_fmtMoney(r.montant)}${ecs}. Recompte et renvoie.</div>`;
   return `<div style="border-left:3px solid var(--amber);background:var(--amber-bg);padding:8px 12px;font-size:12.5px;color:var(--amber);">⏳ En attente de validation de l’admin : ${ca_fmtMoney(r.montant)}${ecs}</div>`;
 }
@@ -1891,30 +1892,29 @@ function ca_renderLimited(){
   const recount = ca_lim.dFirst !== null && !needNote;
   return `
     <div class="ticket" style="padding:10px 12px;"><div class="cg-t">Caisse du jour</div><b>${fmtDateShort(ca_session.date)}</b> <span class="cg-sub">· journée en cours</span></div>
-    <div class="cg-card" style="margin-bottom:10px;">
-      <div class="cg-t">💵 Début de caisse</div>
-      ${unc.length ? `<div style="border:1px solid var(--amber);background:var(--amber-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--amber);">⚠ Session précédente non clôturée : ${unc.map(v=>esc(v.par || '')).join(', ')} n’a pas validé sa fin de caisse. Pas de souci : ton comptage vaut clôture de son poste, à cette heure.</div>` : ''}
-      ${dbt.none ? '<div class="cg-sub">Aucune clôture trouvée : saisis ce que tu comptes.</div>' : `<div style="border:1px solid var(--line,#2a312d);background:var(--paper);border-radius:10px;padding:8px 11px;"><div class="cg-sub">${dbt.from ? esc(dbt.from.par) + ' a laissé à ' + esc(dbt.from.heure) : dbt.est !== undefined ? 'Estimé (la clôture de ' + esc(dbt.est) + ' n’est pas encore validée)' : dbt.src ? 'Clôture du ' + fmtDateShort(dbt.src) : 'Montant attendu'}</div><div style="font-size:24px;font-weight:800;color:var(--ink);font-family:'JetBrains Mono',monospace;">${ca_fmtMoney(attendu)}</div></div>`}
-      ${dbt.closed ? '<div class="cg-sub" style="color:var(--amber);">🔒 La clôture du jour est enregistrée : le début est verrouillé (seul l’admin peut le modifier).</div>' : (()=>{
-        const alt = ca_lim.dalt || dbt.none;
-        return `${!alt ? `<button class="btn t-add" style="width:100%;height:44px;" onclick="ca_limReprendre()">✓ Je reprends ${ca_fmtMoney(attendu)}</button>
-      <button class="btn ghost" style="width:100%;height:40px;" onclick="ca_lim.dalt=true;ca_render()">Le montant est différent</button>` : `<input id="lim-debut" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_lim.debut)}" oninput="ca_lim.debut=this.value;ca_render()">
-      <button class="btn t-add" style="width:100%;height:44px;" onclick="ca_limValidateDebut()">✓ Valider mon début de caisse</button>`}`;
-      })()}
-      ${mine.map(v=>{
-        if(ca_lim.editV === v.id){
-          const em = ca_parseNum(ca_lim.eVal), ed = ca_lim.eVal.trim() !== '' && Math.abs(em - ca_parseNum(v.attendu)) > 0.004;
-          return `<div style="border:1px solid var(--forest);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;"><div class="cg-sub">Modifier la validation de ${esc(v.heure || '')}</div>
+    ${(()=>{
+      const pv = ca_myPoste(), active = !!pv && !ca_myRestant() && !ca_repris(), box = (lab, val)=>`<div style="border:1px solid var(--line,#2a312d);background:var(--paper);border-radius:10px;padding:8px 11px;"><div class="cg-sub">${lab}</div><div style="font-size:24px;font-weight:800;color:var(--ink);font-family:'JetBrains Mono',monospace;">${ca_fmtMoney(val)}</div></div>`;
+      if(active && ca_lim.editV === pv.id){
+        return `<div class="cg-card" style="margin-bottom:10px;"><div class="cg-t">💵 Début de caisse</div>
+          <div style="border:1px solid var(--forest);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;"><div class="cg-sub">Modifier le début de ${esc(pv.heure || '')}</div>
             <input class="cg-in" type="text" inputmode="decimal" value="${esc(ca_lim.eVal)}" oninput="ca_lim.eVal=this.value;ca_render()">
-            
-            <div style="display:flex;gap:8px;"><button class="btn t-add" style="flex:1;height:40px;" onclick="ca_limSaveV('${v.id}')">Enregistrer</button><button class="btn ghost" style="flex:1;height:40px;" onclick="ca_limCancelV()">Annuler</button></div></div>`;
-        }
-        const e = Number(v.ecart) || 0, can = ca_canEditV(v);
-        return `<div style="border-top:1px solid var(--line,#2a312d);padding-top:6px;"><div class="cg-sub"><span style="color:var(--moss);">✓</span> Début validé à ${esc(v.heure || '')} : <b style="color:var(--ink);">${ca_fmtMoney(v.montant)}</b>${v.tardive ? ' (saisie tardive à ' + esc(v.saisieHeure || '') + ')' : ''}${Math.abs(e) > 0.004 ? ' (écart ' + (e > 0 ? '+' : '') + ca_fmtMoney(e) + ')' : ''}</div>${v.note ? `<div class="cg-sub">Commentaire : ${esc(v.note)}</div>` : ''}
-          ${v.tardive ? '<div class="cg-sub" style="color:var(--amber);">' + (v.statut === 'refuse' ? '✗ Refusé par l’admin.' : v.statut === 'valide' ? '✓ Vu par l’admin.' : '⏳ L’admin vérifie ta saisie : elle ne change rien au reste de la journée.') + '</div>' : v.statut === 'attente' ? '<div class="cg-sub" style="color:var(--amber);">⏳ En attente de validation par l’admin : le début reste ' + ca_fmtMoney(attendu) + '.</div>' : v.statut === 'valide' ? '<div class="cg-sub" style="color:var(--moss);">✓ Validé par l’admin : ton montant est le début du jour.</div>' : v.statut === 'refuse' ? '<div class="cg-sub" style="color:var(--rust);">✗ Refusé par l’admin : le début reste ' + ca_fmtMoney(attendu) + '.</div>' : ''}
-          ${can ? `<div style="display:flex;gap:8px;margin-top:4px;">${v.tardive ? '' : `<button class="btn ghost small" onclick="ca_limEditV('${v.id}')">✎ Modifier</button>`}<button class="btn ghost small" style="color:var(--rust);" onclick="ca_limDelV('${v.id}')">🗑 Supprimer</button></div><div class="cg-sub" style="font-size:10.5px;">Modifiable pendant 1 h après la validation.</div>` : ''}</div>`;
-      }).join('')}
-    </div>
+            <div style="display:flex;gap:8px;"><button class="btn t-add" style="flex:1;height:40px;" onclick="ca_limSaveV('${pv.id}')">Enregistrer</button><button class="btn ghost" style="flex:1;height:40px;" onclick="ca_limCancelV()">Annuler</button></div></div>
+        </div>`;
+      }
+      if(active){   // début enregistré : une simple coche, plus aucun message
+        const can = ca_canEditV(pv);
+        return `<div class="cg-card" style="margin-bottom:10px;"><div class="cg-t" style="display:flex;justify-content:space-between;align-items:center;"><span>💵 Début de caisse</span><span style="display:flex;align-items:center;gap:12px;">${can ? `<a href="#" aria-label="Modifier" style="color:var(--ink-muted);text-decoration:none;font-size:15px;" onclick="ca_limEditV('${pv.id}');return false;">✎</a><a href="#" aria-label="Supprimer" style="color:var(--ink-muted);text-decoration:none;font-size:15px;" onclick="ca_limDelV('${pv.id}');return false;">🗑</a>` : ''}<span style="color:var(--moss);font-size:16px;">✓</span></span></div>
+          ${box(esc(pv.heure || ''), ca_parseNum(pv.montant))}
+        </div>`;
+      }
+      const alt = ca_lim.dalt || dbt.none;
+      return `<div class="cg-card" style="margin-bottom:10px;"><div class="cg-t">💵 Début de caisse</div>
+      ${dbt.none ? '<div class="cg-sub">Aucune clôture trouvée : saisis ce que tu comptes.</div>' : `<div style="border:1px solid var(--line,#2a312d);background:var(--paper);border-radius:10px;padding:8px 11px;"><div class="cg-sub">${dbt.from ? esc(dbt.from.par) + ' a laissé à ' + esc(dbt.from.heure) : dbt.est !== undefined ? 'Estimé (la clôture de ' + esc(dbt.est) + ' n’est pas encore validée)' : dbt.src ? 'Clôture du ' + fmtDateShort(dbt.src) : 'Montant attendu'}</div><div style="font-size:24px;font-weight:800;color:var(--ink);font-family:'JetBrains Mono',monospace;">${ca_fmtMoney(attendu)}</div></div>`}
+      ${!alt ? `<button class="btn t-add" style="width:100%;height:44px;" onclick="ca_limReprendre()">✓ Je reprends ${ca_fmtMoney(attendu)}</button>
+      <button class="btn ghost" style="width:100%;height:40px;" onclick="ca_lim.dalt=true;ca_render()">Le montant est différent</button>` : `<input id="lim-debut" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_lim.debut)}" oninput="ca_lim.debut=this.value;ca_render()">
+      <button class="btn t-add" style="width:100%;height:44px;" onclick="ca_limValidateDebut()">✓ Valider mon début de caisse</button>`}
+    </div>`;
+    })()}
     <div class="cg-card" style="margin-bottom:10px;">
       <div class="cg-t">↗ Sorties de caisse</div>
       <div class="cl-tp">${[['retrait','💵 Remise d’argent'],['virement','🏦 Virement'],['nonregle','⏳ Non payée']].map(([k,l])=>`<button type="button" class="${ca_lim.type===k?'on':''}" onclick="ca_limType('${k}')">${l}</button>`).join('')}</div>
@@ -1939,25 +1939,15 @@ function ca_renderLimited(){
     </div>
     ${(()=>{
       const myR = ca_myRestant(), rep = ca_repris(), att = ca_restantAttendu(), rr = String(ca_lim.rest).trim(), rm = ca_parseNum(rr), rec = rr === '' ? null : Math.round((rm - att) * 100) / 100;
-      if(rep) return `<div class="cg-card" style="margin-bottom:10px;">
-      <div class="cg-t">🧮 Montant restant en caisse</div>
-      <div class="cg-sub" style="color:var(--moss);">✓ ${esc(rep.par || '')} a repris la caisse à ${esc(rep.heure || '')} avec ${ca_fmtMoney(rep.montant)} : ton poste est terminé à cette heure.</div>
-    </div>`;
+      if(rep) return '';   // un autre employé a repris la caisse : son début vaut clôture de ce poste
       return `<div class="cg-card" style="margin-bottom:10px;">
       <div class="cg-t">🧮 Montant restant en caisse</div>
-      <div class="cg-sub">Attendu : <b style="color:var(--ink);">${ca_fmtMoney(att)}</b></div>
       <input id="lim-rest" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_lim.rest)}" oninput="ca_lim.rest=this.value;ca_render()">
       ${rec !== null ? ca_ecartBand(att, rm) : ''}
       <input id="lim-rnote" class="cg-in" type="text" style="font-family:'Inter',sans-serif;" placeholder="Commentaire (facultatif)" value="${esc(ca_lim.rnote)}" oninput="ca_lim.rnote=this.value">
-      <button class="btn t-add" style="width:100%;height:44px;" onclick="ca_limSubmitRestant()">✓ Terminer mon poste</button>
       ${rr === '' && myR ? ((myR.tardive || myR.attendu === null || myR.attendu === undefined || myR.ecart === null || myR.ecart === undefined) ? (myR.statut === 'valide' ? ca_ecartBand(myR.montant, myR.montant) : '') : ca_ecartBand(myR.attendu, myR.montant)) : ''}${ca_restantStatusHtml(myR)}
-    </div>`; })()}
-    ${(()=>{ const lr = ca_restantsList(ca_session).filter(x=>x.statut !== 'refuse').slice(-1)[0];
-      return `<div class="cg-card">
-      <div class="cg-t">📌 Reste transmis à la personne suivante</div>
-      <div class="cg-val" style="font-size:22px;font-weight:800;">${ca_fmtMoney(lr ? ca_parseNum(lr.montant) : ca_montantPourLendemain(ca_session))}</div>
-      <div class="cg-sub">${lr ? 'compté par ' + esc(lr.par || '') + ' à ' + esc(lr.heure || '') : 'calculé automatiquement'}</div>
-    </div>`; })()}`;
+    </div>
+    <button class="btn t-close" style="width:100%;height:48px;margin-top:2px;" onclick="ca_limSubmitRestant()">Terminer mon poste</button>`; })()}`;
 }
 
 async function ca_saveSession(){
@@ -6987,7 +6977,12 @@ const CK_T = {
   fg_s:['Disponible au début', 'المتوفر في البداية'], fg_a2:['À décortiquer', 'للتقشير'], fg_dec:['Décortiquée (net)', 'المقشّر (الصافي)'], fg_n:['Pour les nems', 'للنيم'],
   fg_wok:['Pour le wok', 'للووك'], fg_d:['Disponible', 'المتوفر'], fg_g:['Gyozas', 'غيوزا'], fg_vu:['Utilisée dans les gyozas', 'المستعملة في الغيوزا'],
   fg_rc:['Restante coupée', 'المتبقي المقطّع'], fg_rn:['Restante non coupée', 'المتبقي غير المقطّع'], fg_r:['Restante', 'المتبقي'],
-  fg_pc:['Perdue : poulet crispy', 'مفقود: دجاج كريسبي'], fg_pq:['Perdue : mauvaise qualité', 'مفقود: رديء الجودة'], fg_ut:['Utilisé (déchet compris)', 'المستعمل (شامل الفضلات)'], fg_h:['Hachée directement', 'مفرومة مباشرة'], fg_dv:['Chutes de bœuf reçues', 'فضلات البقر المستلمة'], fg_vb:['Dont chutes de bœuf', 'منها فضلات البقر'], fg_vs:['Dont stock acheté', 'منها من المخزون المشترى'], fg_b:['Achetée directement', 'مشتراة مباشرة']
+  fg_pc:['Perdue : poulet crispy', 'مفقود: دجاج كريسبي'], fg_pq:['Perdue : mauvaise qualité', 'مفقود: رديء الجودة'], fg_ut:['Utilisé (déchet compris)', 'المستعمل (شامل الفضلات)'], fg_h:['Hachée directement', 'مفرومة مباشرة'], fg_dv:['Chutes de bœuf reçues', 'فضلات البقر المستلمة'], fg_vb:['Dont chutes de bœuf', 'منها فضلات البقر'], fg_vs:['Dont stock acheté', 'منها من المخزون المشترى'], fg_b:['Achetée directement', 'مشتراة مباشرة'],
+  q_fin_cr:['{i} crispée : quelle quantité restante ?', '{i} المقرمشة: كم الكمية المتبقية؟'],
+  q_start_cr:['Quel poids de {i} crispée disponible au début de service ?', 'كم وزن {i} المقرمشة المتوفر في بداية الخدمة؟'],
+  fg_sc:['Crispée au début', 'المقرمش في البداية'], fg_cr:['Crispée restante', 'المقرمش المتبقي'], fg_cu:['Crispée utilisée', 'المقرمش المستعمل'],
+  fg_rg:['Restante non décortiquée', 'المتبقي غير المقشّر'], fg_pe:['Perdue : écart de reprise', 'مفقود: فرق الاستلام'],
+  fg_rd:['Rendement du jour', 'مردود اليوم'], fg_eq:['Crispée restante, équivalent non décortiqué', 'المقرمش المتبقي، ما يعادله غير مقشّر']
 };
 let ck_started = false, ck_cfg = { settings:{}, ings:{}, cooks:{}, meta:{} }, ck_cfgReady = false, ck_saveT = null;
 let ck_ingsRaw = [], ck_ingsReady = false, ck_emp = {}, ck_empReady = false;
@@ -7046,7 +7041,7 @@ function ck_kind(id){
   return 'simple';
 }
 const ck_color = (id)=>CK_KCOL[ck_kind(id)] || '#60A5FA';
-const ck_needsStart = (id)=>ck_kind(id) === 'avocat';   // seul l'avocat a un stock de début (proposé depuis la veille, validé par le cuisinier)   // la crevette L2 n'a plus de stock de début : le cuisinier saisit ce qu'il décortique
+const ck_needsStart = (id)=>ck_kind(id) === 'avocat' || ck_kind(id) === 'crevette';   // seul l'avocat a un stock de début (proposé depuis la veille, validé par le cuisinier)   // la crevette L2 n'a plus de stock de début : le cuisinier saisit ce qu'il décortique
 const ck_hasWaste = (id)=>ck_kind(id) === 'avocat';   // « + Déchet » séparé : seulement l'avocat ; ailleurs le déchet est rattaché à la découpe
 const ck_hasCut = (id)=>ck_kind(id) !== 'avocat';
 const ck_wasteInCut = (id)=>/^(saumon|simple|crevette|gamba)$/.test(ck_kind(id));
@@ -7101,36 +7096,50 @@ function ck_received(id){   // disponible pour cet ingrédient (poulet haché / 
   });
   return { tot:ck_r(tot), parts };
 }
-function ck_prevRest(id){   // quantité restante saisie en fin de service la veille (point de départ du lendemain)
-  let best = null;
-  Object.keys(ck_prevSrv).forEach(k=>{ const r = ck_recOne(ck_prevSrv[k], id, 'fin'); if(r && r.f && r.f.r !== undefined && r.f.r !== null && (!best || String(r.at) > String(best.at))) best = r; });
-  return best ? Number(best.f.r) : null;
+function ck_prevFin(id){   // fin de service de la veille pour cet ingrédient : { q (quantité reportée), rd (rendement, L2), code (cuisinier) } ; L2 : c'est la crispée restante
+  const key = ck_kind(id) === 'crevette' ? 'cr' : 'r'; let best = null, code = '';
+  Object.keys(ck_prevSrv).forEach(k=>{ const r = ck_recOne(ck_prevSrv[k], id, 'fin'); if(r && r.f && r.f[key] !== undefined && r.f[key] !== null && (!best || String(r.at) > String(best.at))){ best = r; code = String(ck_prevSrv[k].emp || ''); } });
+  return best ? { q:Number(best.f[key]), rd:(best.f.rd !== undefined && Number(best.f.rd) > 0 ? Number(best.f.rd) : null), code } : null;
 }
+function ck_prevRest(id){ const p = ck_prevFin(id); return p ? p.q : null; }   // quantité restante saisie en fin de service la veille (point de départ du lendemain)
 function ck_startOf(id, doc){ const r = ck_recOne(doc, id, 'start'); return r && r.f && r.f.s !== undefined ? Number(r.f.s) : null; }
+function ck_rendement(id, doc){   // L2 : rendement du jour = lot pondéré (crispée de la veille + décortiquée du jour) ÷ (son équivalent non décortiqué + quantité prise du jour) ; sans opération : dernier rendement connu
+  const cut = ck_recs(doc, id, 'cut'), a = ck_sumF(cut, 'a'), w = ck_sumF(cut, 'w'), P = Math.max(0, ck_r(a - w)), st = ck_recOne(doc, id, 'start'), f = (st && st.f) || {};
+  const S = Number(f.s) > 0 ? Number(f.s) : 0, rp = Number(f.rp) > 0 ? Number(f.rp) : null;
+  const num = P + (rp ? S : 0), den = a + (rp ? S / rp : 0);
+  if(den > 0 && num > 0) return Math.round(num / den * 10000) / 10000;
+  return rp;
+}
 function ck_calc(id, doc){
   const k = ck_kind(id), cut = ck_recs(doc, id, 'cut'), wst = ck_recs(doc, id, 'waste'), fin = ck_recOne(doc, id, 'fin'), s = ck_startOf(id, doc);
   const mince = ck_recs(doc, id, 'mince'), buy = ck_recs(doc, id, 'buy');
   const o = { k, cut, wst, mince, buy, fin:fin ? (fin.f || {}) : null, s, a:ck_sumF(cut, 'a'), t:ck_sumF(cut, 't'), n:ck_sumF(cut, 'n'), g:ck_sumF(cut, 'g'), v:ck_sumF(cut, 'v'), w:ck_r(ck_sumF(wst, 'w') + ck_sumF(cut, 'w')), h:ck_sumF(mince, 'h'), b:ck_sumF(buy, 'b') };   // le déchet = pesées séparées + déchet rattaché aux découpes
   o.used = ck_r(o.a - o.t);
   if(k === 'avocat'){ const x = o.fin; o.ut = (s !== null && x && x.r !== undefined) ? ck_r(s - (Number(x.r) || 0) - (Number(x.pq) || 0)) : null; }   // utilisé = différence entre deux stocks validés, sans la perte qualité
+  if(k === 'crevette'){   // crispée : reste de la veille + décortiquée du jour − reste du soir ; équivalent non décortiqué = crispée ÷ rendement
+    const x = o.fin, adj = ck_recOne(doc, id, 'adj'); o.rd = ck_rendement(id, doc); o.dec = ck_r(o.a - o.w);
+    o.cr = (x && x.cr !== undefined) ? (Number(x.cr) || 0) : null; o.cu = o.cr === null ? null : ck_r((s || 0) + o.dec - o.cr);
+    o.eq = o.cr === null ? null : ck_r(o.cr / (o.rd || 1)); o.pe = adj && adj.f ? (Number(adj.f.pe) || 0) : 0;
+  }
   if(k === 'gamba'){ o.dec = ck_r(o.a - o.w); o.wok = ck_r(o.dec - o.n); o.rest = s === null ? null : ck_r(s - o.a); }
   if(k === 'poulet'){ o.d = ck_received(id).tot; o.nem = ck_r(o.d - o.g); }
   if(k === 'viande') o.d = ck_received(id).tot;
   return o;
 }
-function ck_figs(id, doc, poste){   // [[libellé, valeur]] : ce que montre la fiche et le suivi
+function ck_figs(id, doc, poste, adm){   // [[libellé, valeur]] : ce que montre la fiche et le suivi
   const c = ck_calc(id, doc), k = c.k, u = ck_unit(id), f = (x)=>ck_fmt(x) + ' ' + u, o = [], tn = ck_targetName(id);
   if(k === 'escalope' || k === 'boeuf'){ o.push([ck_s('fg_a'), f(c.a)], [ck_s('fg_t', { t:tn }), f(c.t)], [ck_s('fg_used'), f(c.used)]); if(c.mince.length) o.push([ck_s('fg_h'), f(c.h)]); }
   else if(k === 'saumon' || k === 'simple'){ o.push([ck_s('fg_a'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_used'), f(ck_r(c.a - c.w))]); }
-  else if(k === 'crevette'){ o.push([ck_s('fg_a2'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_used'), f(ck_r(c.a - c.w))]); }
+  else if(k === 'crevette'){ if(c.s !== null) o.push([ck_s('fg_sc'), f(c.s)]); o.push([ck_s('fg_a2'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_dec'), f(c.dec)]); }
   else if(k === 'avocat'){ o.push([ck_s('fg_s'), c.s === null ? '—' : f(c.s)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_ut'), c.ut === null ? '—' : f(c.ut)]); }
   else if(k === 'gamba'){ o.push([ck_s('fg_a2'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_dec'), f(c.dec)], [ck_s('fg_n'), f(c.n)], [ck_s('fg_wok'), f(c.wok)]); }
   else if(k === 'poulet'){ o.push([ck_s('fg_d'), f(c.d)], [ck_s('fg_g'), f(c.g)], [ck_s('fg_n'), f(c.nem)]); }
   else if(k === 'viande'){ o.push([ck_s('fg_vu'), f(c.v)], [ck_s('fg_dv'), f(c.d)]); if(c.v > 0 && c.d > 0) o.push([ck_s('fg_vb'), f(Math.min(c.v, c.d))], [ck_s('fg_vs'), f(Math.max(0, ck_r(c.v - c.d)))]); }   // répartition : chutes de bœuf d'abord, le reste vient du stock acheté
   if(c.fin){ const x = c.fin;
     if(x.rc !== undefined) o.push([ck_s('fg_rc'), f(Number(x.rc) || 0)]); if(x.rn !== undefined) o.push([ck_s('fg_rn'), f(Number(x.rn) || 0)]);
-    if(x.r !== undefined) o.push([ck_s('fg_r'), f(Number(x.r) || 0)]);
+    if(x.r !== undefined) o.push([ck_s(k === 'crevette' ? 'fg_rg' : 'fg_r'), f(Number(x.r) || 0)]); if(x.cr !== undefined) o.push([ck_s('fg_cr'), f(Number(x.cr) || 0)]);
     if(x.pc !== undefined) o.push([ck_s('fg_pc'), f(Number(x.pc) || 0)]); if(x.pq !== undefined) o.push([ck_s('fg_pq'), f(Number(x.pq) || 0)]); }
+  if(k === 'crevette'){ if(c.cu !== null) o.push([ck_s('fg_cu'), f(c.cu)]); if(c.pe > 0) o.push([ck_s('fg_pe'), f(c.pe)]); if(adm && c.rd){ o.push([ck_s('fg_rd'), ck_fmt(Math.round(c.rd * 1000) / 10) + ' %']); if(c.eq !== null && c.cr) o.push([ck_s('fg_eq'), f(c.eq)]); } }   // rendement et équivalent : réservés à l'admin (Suivi)
   return o;
 }
 function ck_setViewDate(d){
@@ -7209,7 +7218,7 @@ const ck_specBuy = (id, rid)=>ck_specSimple(id, rid, 'buy', 'b', 'q_buy');
 function ck_specStart(id){
   const old = ck_recOne(ck_myDoc(), id, 'start'), p = ck_prevRest(id);
   const pre = p !== null ? ck_fmt(p) : '';   // restante de fin de la veille : proposée, validée ou corrigée par le cuisinier ; vide si la veille n'a rien donné
-  return { id, type:'start', rid:'start', old, fields:[{ ing:id, k:'s', q:'q_start', pre }], init:[old ? ck_fmtOrEmpty(old.f.s) : pre], after:'ing', check:()=>'' };
+  return { id, type:'start', rid:'start', old, fields:[{ ing:id, k:'s', q:ck_kind(id) === 'crevette' ? 'q_start_cr' : 'q_start', pre }], init:[old ? ck_fmtOrEmpty(old.f.s) : pre], after:'ing', check:()=>'' };
 }
 function ck_specFin(){
   const doc = ck_myDoc(), poste = ck_poste(), fields = [], init = [];
@@ -7217,7 +7226,8 @@ function ck_specFin(){
     const k = ck_kind(id), old = (ck_recOne(doc, id, 'fin') || {}).f || {}, add = (key, q, def, calc)=>{ fields.push({ ing:id, k:key, q, zero:true, def:calc ? ck_fmtOrEmpty(def) : '' }); init.push(old[key] !== undefined ? ck_fmtOrEmpty(old[key]) : ck_fmtOrEmpty(def)); };
     if(k === 'escalope'){ add('rc', 'q_fin_rc'); add('rn', 'q_fin_rn'); if(poste === 'Sushi') add('pc', 'q_fin_pc'); add('pq', 'q_fin_pq'); }
     else if(k === 'boeuf' || k === 'saumon' || k === 'simple'){ add('rc', 'q_fin_rc'); add('rn', 'q_fin_rn'); add('pq', 'q_fin_pq'); }
-    else if(k === 'avocat' || k === 'crevette'){ add('r', 'q_fin_r'); add('pq', 'q_fin_pq'); }
+    else if(k === 'crevette'){ add('r', 'q_fin_rg'); add('cr', 'q_fin_cr'); add('pq', 'q_fin_pq'); }
+    else if(k === 'avocat'){ add('r', 'q_fin_r'); add('pq', 'q_fin_pq'); }
     else if(k === 'gamba'){ const c = ck_calc(id, doc); add('r', 'q_fin_rg', c.rest === null ? '' : Math.max(0, c.rest), true); add('pq', 'q_fin_pq'); }
   });
   return { id:'', type:'fin', rid:'fin', fields, init, after:'tiles', check:()=>'' };
@@ -7259,8 +7269,8 @@ function ck_banUndo(){
 function ck_press(k){
   const F = ck_form; if(!F) return; let v = F.v[F.step] || '';
   if(k === 'del') v = v.slice(0, -1);
-  else if(k === ','){ const fl0 = F.spec.fields[F.step]; if(fl0 && fl0._auto !== undefined && v === fl0._auto) v = ''; if(v.indexOf(',') < 0) v = (v === '' ? '0' : v) + ','; }
-  else { const fl = F.spec.fields[F.step]; if(fl && fl._auto !== undefined && v === fl._auto) v = ''; const p = v.split(','); if(p[1] !== undefined && p[1].length >= 3) return; if(v.replace(',', '').length >= 7) return; v = v === '0' ? k : v + k; }
+  else if(k === ','){ const fl0 = F.spec.fields[F.step]; if(fl0 && fl0._auto !== undefined && v === fl0._auto){ v = ''; fl0._auto = undefined; } if(v.indexOf(',') < 0) v = (v === '' ? '0' : v) + ','; }
+  else { const fl = F.spec.fields[F.step]; if(fl && fl._auto !== undefined && v === fl._auto){ v = ''; fl._auto = undefined; } const p = v.split(','); if(p[1] !== undefined && p[1].length >= 3) return; if(v.replace(',', '').length >= 7) return; v = v === '0' ? k : v + k; }
   F.v[F.step] = v; ck_err = ''; ck_entryUpdate();
 }
 function ck_chip(kind){
@@ -7280,12 +7290,18 @@ function ck_ok(){
   /* dernière question : on enregistre */
   if(sp.type === 'fin'){
     const per = {}; sp.fields.forEach((f, j)=>{ (per[f.ing] = per[f.ing] || {})[f.k] = ck_num(F.v[j]) || 0; });
+    Object.keys(per).forEach(id=>{ if(ck_kind(id) === 'crevette'){ const rd = ck_rendement(id, ck_myDoc()); if(rd) per[id].rd = rd; } });   // le rendement du jour est gardé pour le lendemain
     const recs = {}; Object.keys(per).forEach(id=>{ recs[id] = { fin:{ del:false, t:'fin', f:per[id], at:ck_nowIso() } }; });
     ck_writeCook(ck_who, { done:ck_nowIso(), recs }); ck_form = null; ck_view = 'tiles'; ck_render(); return;
   }
   const id = sp.id, prev = sp.old ? Object.assign({}, sp.old) : null; if(prev) delete prev.id;
   if(sp.type === 'start'){
-    ck_putRec(id, 'start', { t:'start', f:{ s:ck_num(F.v[0]) || 0 }, at:ck_nowIso() }); ck_form = null; ck_openIng(id); return;
+    const sv = ck_num(F.v[0]) || 0, sf = { s:sv };
+    if(ck_kind(id) === 'crevette'){   // crispée de la veille : on garde la quantité annoncée et son rendement ; une correction à la baisse est une perte de la veille
+      const pv = ck_prevFin(id);
+      if(pv){ sf.p = pv.q; if(pv.rd) sf.rp = pv.rd; if(pv.code && sv < pv.q - 1e-9) ck_writePrevAdj(pv.code, id, ck_r(pv.q - sv)); }
+    }
+    ck_putRec(id, 'start', { t:'start', f:sf, at:ck_nowIso() }); ck_form = null; ck_openIng(id); return;
   }
   sp.save(F.v.slice()); ck_form = null; ck_ingOpen = id; ck_view = 'ing'; ck_setBan({ id, rid:sp.rid, prev, msg:ck_s('saved') }); ck_render();
 }
@@ -7311,6 +7327,9 @@ async function ck_flush(){
   }finally{ ck_obBusy = false; ck_refresh(); if(!failed && Object.keys(ck_ob).length) setTimeout(ck_flush, 50); }   // une saisie arrivée pendant l'envoi part tout de suite
 }
 function ck_write(id, data){ const e = ck_ob[id]; ck_ob[id] = { data:e ? ck_deepMerge(e.data, data) : data, seq:(e ? e.seq : 0) + 1 }; ck_obSave(); ck_flush(); }
+function ck_writePrevAdj(code, id, pe){   // écart de reprise : rattaché à la fin de service de la veille
+  ck_write(ck_docId(ck_prevDate, code), { ckdate:ck_prevDate, emp:String(code), recs:{ [id]:{ adj:{ del:false, t:'adj', f:{ pe }, at:ck_nowIso() } } } });
+}
 function ck_writeCook(code, patch){
   const c = ck_cook(code) || { name:ck_empName(code), poste:'' };
   ck_write(ck_docId(ck_service(), code), Object.assign({ ckdate:ck_service(), emp:String(code), name:c.name, poste:c.poste }, patch));
@@ -7489,7 +7508,7 @@ function ck_tilesHtml(){
 function ck_recText(id, r){
   const u = ck_unit(id), f = r.f || {}, v = (x)=>ck_fmt(Number(x) || 0) + ' ' + u, k = ck_kind(id);
   if(r.t === 'waste') return ck_s('fg_w') + ' ' + v(f.w);
-  if(r.t === 'start') return ck_s('fg_s') + ' ' + v(f.s);
+  if(r.t === 'start') return ck_s(k === 'crevette' ? 'fg_sc' : 'fg_s') + ' ' + v(f.s);
   if(r.t === 'mince') return ck_s('fg_h') + ' ' + v(f.h);
   if(r.t === 'buy') return ck_s('fg_b') + ' ' + v(f.b);
   if(k === 'gamba') return ck_s('fg_a2') + ' ' + v(f.a) + (f.w !== undefined ? ' · ' + ck_s('fg_w') + ' ' + v(f.w) : '') + ' · ' + ck_s('fg_n') + ' ' + v(f.n) + (f.w !== undefined ? ' · ' + ck_s('fg_wok') + ' ' + v(Math.max(0, ck_r((Number(f.a) || 0) - (Number(f.w) || 0) - (Number(f.n) || 0)))) : '');
@@ -7558,7 +7577,7 @@ function ck_suiviHtml(){
     if(!doc.emp && (!ids.length || date !== ck_service())) return '';   // un jour passé n'affiche que les cuisiniers qui ont saisi
     const pill = doc.done ? `<span class="ck-pill ok">Fin de service ${esc(ck_hm(doc.done))}</span>` : (doc.emp ? '<span class="ck-pill wa">Fin de service non faite</span>' : '<span class="ck-pill">rien saisi</span>');
     const items = ids.map(id=>{
-      const it = ck_ingById(id) || { n:id }, k = ck_kind(id), figs = ck_figs(id, doc);
+      const it = ck_ingById(id) || { n:id }, k = ck_kind(id), figs = ck_figs(id, doc, null, true);
       const recs = ck_allRecs(doc, id);
       const rl = recs.map(r=>`<div class="ck-rec"><span class="tm">${esc(ck_hm(r.at))}</span><span class="tx">${esc(ck_recText(id, r))}${r.t === 'start' && r.auto ? ' <small>(repris de la veille)</small>' : ''}</span>${r.t === 'start' ? '' : `<button class="rd" aria-label="Supprimer" onclick="ck_adminDel(${ck_a(code)},${ck_a(id)},${ck_a(r.id)})">✕</button>`}</div>`).join('');
       return `<div class="ck-sitem" style="--c:${ck_color(id)}"><div class="ck-ihead">${ck_icon(k, 34)}<b>${esc(it.n)}</b> <small style="color:var(--ink-muted)">${esc(ck_unit(id))}</small></div><div class="ck-figs">${figs.map(x=>`<div class="ck-fig"><span>${esc(x[0])}</span><b>${esc(x[1])}</b></div>`).join('')}</div>${rl ? `<div class="ck-recs">${rl}</div>` : '<div class="ck-sub">rien saisi</div>'}</div>`;
@@ -7569,7 +7588,7 @@ function ck_suiviHtml(){
   /* total par ingrédient, tous cuisiniers confondus */
   const tr = ings.map(it=>{
     const tot = { a:0, t:0, w:0, p:0, r:0, any:false }; const id = it.id;
-    Object.keys(docs).forEach(k=>{ const c = ck_calc(id, docs[k]); if(c.cut.length || c.wst.length || c.mince.length || c.buy.length || c.fin) tot.any = true; tot.a += c.a; tot.t += c.t; tot.w += c.w; tot.p += c.fin ? (Number(c.fin.pc) || 0) + (Number(c.fin.pq) || 0) : 0; tot.r += c.fin ? (Number(c.fin.rc) || 0) + (Number(c.fin.rn) || 0) + (Number(c.fin.r) || 0) : 0; });
+    Object.keys(docs).forEach(k=>{ const c = ck_calc(id, docs[k]); if(c.cut.length || c.wst.length || c.mince.length || c.buy.length || c.fin) tot.any = true; tot.a += c.a; tot.t += c.t; tot.w += c.w; tot.p += c.fin ? (Number(c.fin.pc) || 0) + (Number(c.fin.pq) || 0) : 0; tot.r += (c.fin ? (Number(c.fin.rc) || 0) + (Number(c.fin.rn) || 0) + (Number(c.fin.r) || 0) : 0) + (c.eq || 0); tot.p += c.pe ? ck_r(c.pe / (c.rd || 1)) : 0; });
     if(!tot.any) return '';
     return `<div class="ck-trow" style="--c:${ck_color(id)}"><span class="n">${ck_icon(ck_kind(id), 24)}${esc(it.n)} <small style="color:var(--ink-muted);font-weight:500">${esc(ck_unit(id))}</small></span><span class="q">${esc(ck_fmt(tot.a))}</span><span class="q">${tot.t > 0 ? esc(ck_fmt(tot.t)) : '—'}</span><span class="q">${esc(ck_fmt(tot.w))}</span><span class="q">${esc(ck_fmt(tot.p))}</span><span class="q">${esc(ck_fmt(tot.r))}</span></div>`; }).join('');
   const totBox = tr ? `<div class="ck-box"><h3>Total du jour, tous cuisiniers</h3><div class="ck-trow hd"><span>Ingrédient</span><span class="q">Découpé / sorti</span><span class="q">Transféré</span><span class="q">Déchet</span><span class="q">Perdu</span><span class="q">Restant</span></div>${tr}</div>` : '';
@@ -7605,8 +7624,8 @@ function ck_adminClearAll(){
 }
 function ck_export(){
   if(typeof XLSX === 'undefined'){ alert('Export Excel indisponible : la bibliothèque n’est pas chargée.'); return; }
-  const date = ck_adate || ck_service(), docs = ck_docs(), rows = [], TYPE = { cut:'Découpe / saisie', waste:'Déchet', start:'Disponible au début', fin:'Fin de service', mince:'Hachée directement', buy:'Achat direct' };
-  const COL = { a:'À découper / sorti du stock', t:'Transféré', n:'Pour les nems', g:'Gyozas (poulet haché)', v:'Utilisée gyozas (viande hachée)', w:'Déchet', h:'Escalope hachée directement', b:'Viande hachée achetée directement', s:'Disponible au début', rc:'Restante coupée', rn:'Restante non coupée', r:'Restante', pc:'Perdue poulet crispy', pq:'Perdue mauvaise qualité' };
+  const date = ck_adate || ck_service(), docs = ck_docs(), rows = [], TYPE = { cut:'Découpe / saisie', waste:'Déchet', start:'Disponible au début', fin:'Fin de service', mince:'Hachée directement', buy:'Achat direct', adj:'Écart de reprise (perte)' };
+  const COL = { a:'À découper / sorti du stock', t:'Transféré', n:'Pour les nems', g:'Gyozas (poulet haché)', v:'Utilisée gyozas (viande hachée)', w:'Déchet', h:'Escalope hachée directement', b:'Viande hachée achetée directement', s:'Disponible au début', rc:'Restante coupée', rn:'Restante non coupée', r:'Restante', pc:'Perdue poulet crispy', pq:'Perdue mauvaise qualité', cr:'Crispée restante', pe:'Écart de reprise (perte)', rd:'Rendement du jour' };
   Object.keys(docs).forEach(k=>{ const d = docs[k]; Object.keys(d.recs || {}).forEach(id=>{ Object.keys(d.recs[id]).forEach(rid=>{ const r = d.recs[id][rid]; if(!r || r.del) return; const it = ck_ingById(id) || { n:id };
     const row = { Date:date, Cuisinier:d.name || ck_empName(d.emp), Poste:d.poste || '', Ingrédient:it.n, Saisie:TYPE[r.t] || r.t, Heure:ck_hm(r.at), Unité:ck_unit(id) };
     Object.keys(COL).forEach(c=>{ if(r.f && r.f[c] !== undefined) row[COL[c]] = Number(r.f[c]) || 0; }); if(r.f && r.f.corr) row['Quantité corrigée'] = 'oui';
