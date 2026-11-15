@@ -6767,12 +6767,14 @@ async function dt_deleteAvoir(id){
    • Tablette murale partagée : le cuisinier touche son prénom, tape son code à 4 chiffres, puis ne voit que SES ingrédients.
      La tablette revient seule à la liste des prénoms après N minutes sans toucher l'écran ; sur téléphone la session est gardée.
    • Chaque ingrédient a sa propre fiche (reconnue par son nom) :
-       escalope / bœuf : « à découper » + « transféré vers le poulet haché / la viande hachée » (utilisé = différence)
-       saumon          : « à découper » ; avocat / crevette L2 : « disponible au début » (repris de la veille) ;
-       gamba           : « sorti du stock » + « décortiqué pour les nems » (le wok se calcule) ;
-       poulet haché    : « dans les gyozas » (le disponible = chutes des escalopes, les nems se calculent) ;
-       viande hachée   : la quantité reçue (chutes du bœuf) est validée ou corrigée.
-     Découpes et déchets peuvent se saisir plusieurs fois par service ; chaque saisie est corrigeable.
+       escalope / bœuf : « à découper » + « transféré vers le poulet haché / la viande hachée » (utilisé = différence) ;
+                         le cuisinier du Wok a en plus « hachée directement » (escalope hachée sans découpe → poulet haché)
+       saumon / L2     : « à découper » + « déchet de cette découpe » (obligatoire, 0 si rien) ; L2 : disponible au début repris de la veille ;
+       avocat          : « disponible au début » validé, puis pesées de déchet (« + Déchet ») autant de fois que nécessaire ;
+       gamba           : « à décortiquer » + « déchet » + part pour les nems (proposée = tout le net, validée ou corrigée), le reste va au wok ;
+       poulet haché    : « dans les gyozas » (le disponible = chutes des escalopes + escalope hachée directement, les nems se calculent) ;
+       viande hachée   : disponible = chutes du bœuf + achat direct, puis « utilisée dans les gyozas ».
+     Découpes, déchets et sorties peuvent se saisir plusieurs fois par service ; chaque saisie est corrigeable.
      En fin de service : restantes (coupée / non coupée) et quantités perdues (avec leur motif).
    • Données (collection existante « mise_en_place », rien d'autre ne change) :
        ckcfg                    : { settings:{lockMin,cutoff}, ings:{<id>:{ar}}, cooks:{<codeEmployé>:{n,pin,poste,ings:[]}}, meta:{<id>:{n,u}} }
@@ -6795,10 +6797,11 @@ const CK_T = {
   logout:['Changer de cuisinier', 'تغيير الطباخ'], back:['Retour', 'رجوع'], ok:['Fait', 'تم'], undo:['Annuler', 'تراجع'], step:['{a} sur {b}', '{a} من {b}'],
   reqWeight:['Indique un poids, ou 0 s’il n’y en a pas', 'أدخل الوزن، أو 0 إن لم يوجد'],
   tGt:['Le poids transféré ne peut pas dépasser le poids à découper.', 'الوزن المنقول لا يمكن أن يتجاوز وزن التقطيع.'],
-  nGt:['Les nems dépassent la quantité décortiquée ({w} {u}).', 'كمية النيم تتجاوز المقشّر ({w} {u}).'],
+  nGt:['Les nems dépassent la quantité décortiquée nette ({w} {u}).', 'كمية النيم تتجاوز الصافي المقشّر ({w} {u}).'],
+  wGt:['Le déchet ne peut pas dépasser le poids de départ.', 'الفضلات لا يمكن أن تتجاوز الوزن الأصلي.'],
   chipNone:['Rien (0)', 'لا شيء (0)'], chipCalc:['Comme calculé ({v})', 'كما هو محسوب ({v})'], chipAll:['Tout ({v})', 'الكل ({v})'],
   saved:['Enregistré', 'تم الحفظ'], deleted:['Supprimé', 'تم الحذف'],
-  newCut:['Nouvelle découpe', 'تقطيع جديد'], newOut:['Nouvelle sortie du stock', 'سحب جديد من المخزون'], newIn:['Nouvelle saisie', 'إدخال جديد'], addW:['+ Déchet', '+ فضلات'],
+  newCut:['Nouvelle découpe', 'تقطيع جديد'], newOut:['Nouvelle sortie du stock', 'سحب جديد من المخزون'], newIn:['Nouvelle saisie', 'إدخال جديد'], addW:['+ Déchet', '+ فضلات'], newMince:['Hachée directement', 'مفرومة مباشرة'], newBuy:['Achat direct', 'شراء مباشر'], direct:['hachée', 'مفرومة'], buyLab:['Achat direct', 'شراء مباشر'],
   setStart:['Disponible au début', 'المتوفر في البداية'], today:['Aujourd’hui', 'اليوم'], noEntry:['Rien saisi pour l’instant', 'لا يوجد إدخال بعد'],
   ob:['{n} saisie(s) en attente de connexion : elles partiront toutes seules.', '{n} إدخال بانتظار الاتصال: سيتم إرسالها تلقائياً.'],
   obFull:['La mémoire de cet appareil est pleine : les saisies risquent de ne pas partir. Prévenez l’administrateur.', 'ذاكرة الجهاز ممتلئة: قد لا تُرسل الإدخالات. أبلغ المسؤول.'],
@@ -6806,8 +6809,12 @@ const CK_T = {
   /* questions */
   q_cut_a:['Quel poids de {i} à découper / nettoyer ?', 'كم وزن {i} المراد تقطيعه / تنظيفه؟'],
   q_cut_t:['Quel poids transférez-vous vers {t} ? (0 s’il n’y en a pas)', 'كم الوزن الذي تنقله إلى {t}؟ (0 إن لم يوجد)'],
-  q_gam_a:['Quel poids de {i} sorti du stock (à décortiquer) ?', 'كم وزن {i} المسحوب من المخزون (للتقشير)؟'],
-  q_gam_n:['Quel poids décortiqué pour les nems ?', 'كم الوزن المقشّر المخصص للنيم؟'],
+  q_gam_a:['Quel poids de {i} à décortiquer (sorti du stock) ?', 'كم وزن {i} المراد تقشيره (المسحوب من المخزون)؟'],
+  q_gam_w:['Quel poids de déchet pour cette opération ? (0 s’il n’y en a pas)', 'كم وزن فضلات هذه العملية؟ (0 إن لم يوجد)'],
+  q_gam_n:['Quel poids décortiqué est utilisé pour les nems ? (le reste ira au wok)', 'كم الوزن المقشّر المستعمل للنيم؟ (الباقي للووك)'],
+  q_cut_w:['Quel poids de déchet pour cette découpe de {i} ? (0 s’il n’y en a pas)', 'كم وزن فضلات هذا التقطيع من {i}؟ (0 إن لم يوجد)'],
+  q_min:['Quel poids de {i} hachée directement ?', 'كم وزن {i} المفرومة مباشرة؟'],
+  q_buy:['Quel poids de {i} achetée directement ?', 'كم وزن {i} المشتراة مباشرة؟'],
   q_pou_g:['Quel poids de {i} dans les gyozas ?', 'كم وزن {i} في الغيوزا؟'],
   q_vi_v:['Quel poids de {i} reçu, utilisé dans les gyozas ?', 'كم وزن {i} المستلم والمستعمل في الغيوزا؟'],
   q_waste:['Quel poids de déchet de {i} ?', 'كم وزن فضلات {i}؟'],
@@ -6820,10 +6827,10 @@ const CK_T = {
   q_fin_pq:['{i} : quelle quantité perdue (mauvaise qualité, périmé) ?', '{i}: كم الكمية المفقودة (رديئة الجودة، منتهية)؟'],
   /* chiffres affichés */
   fg_a:['À découper', 'للتقطيع'], fg_t:['Transféré vers {t}', 'منقول إلى {t}'], fg_used:['Utilisé', 'المستعمل'], fg_w:['Déchet', 'الفضلات'],
-  fg_s:['Disponible au début', 'المتوفر في البداية'], fg_a2:['Sorti du stock', 'المسحوب من المخزون'], fg_dec:['Décortiquée', 'المقشّر'], fg_n:['Pour les nems', 'للنيم'],
-  fg_wok:['Pour le wok', 'للووك'], fg_d:['Reçu (chutes)', 'المستلم (فضلات)'], fg_g:['Gyozas', 'غيوزا'], fg_vu:['Utilisée dans les gyozas', 'المستعملة في الغيوزا'],
+  fg_s:['Disponible au début', 'المتوفر في البداية'], fg_a2:['À décortiquer', 'للتقشير'], fg_dec:['Décortiquée (net)', 'المقشّر (الصافي)'], fg_n:['Pour les nems', 'للنيم'],
+  fg_wok:['Pour le wok', 'للووك'], fg_d:['Disponible', 'المتوفر'], fg_g:['Gyozas', 'غيوزا'], fg_vu:['Utilisée dans les gyozas', 'المستعملة في الغيوزا'],
   fg_rc:['Restante coupée', 'المتبقي المقطّع'], fg_rn:['Restante non coupée', 'المتبقي غير المقطّع'], fg_r:['Restante', 'المتبقي'],
-  fg_pc:['Perdue : poulet crispy', 'مفقود: دجاج كريسبي'], fg_pq:['Perdue : mauvaise qualité', 'مفقود: رديء الجودة'], fg_ut:['Utilisé (provisoire)', 'المستعمل (مؤقت)']
+  fg_pc:['Perdue : poulet crispy', 'مفقود: دجاج كريسبي'], fg_pq:['Perdue : mauvaise qualité', 'مفقود: رديء الجودة'], fg_ut:['Utilisé (déchet compris)', 'المستعمل (شامل الفضلات)'], fg_h:['Hachée directement', 'مفرومة مباشرة'], fg_b:['Achetée directement', 'مشتراة مباشرة']
 };
 let ck_started = false, ck_cfg = { settings:{}, ings:{}, cooks:{}, meta:{} }, ck_cfgReady = false, ck_saveT = null;
 let ck_ingsRaw = [], ck_ingsReady = false, ck_emp = {}, ck_empReady = false;
@@ -6883,8 +6890,12 @@ function ck_kind(id){
 }
 const ck_color = (id)=>CK_KCOL[ck_kind(id)] || '#60A5FA';
 const ck_needsStart = (id)=>/^(avocat|crevette|gamba)$/.test(ck_kind(id));
-const ck_hasWaste = (id)=>/^(saumon|avocat|crevette|gamba|simple)$/.test(ck_kind(id));
-const ck_hasCut = (id)=>!/^(avocat|crevette)$/.test(ck_kind(id));
+const ck_hasWaste = (id)=>ck_kind(id) === 'avocat';   // « + Déchet » séparé : seulement l'avocat ; ailleurs le déchet est rattaché à la découpe
+const ck_hasCut = (id)=>ck_kind(id) !== 'avocat';
+const ck_wasteInCut = (id)=>/^(saumon|simple|crevette|gamba)$/.test(ck_kind(id));
+function ck_hasMince(id){ return ck_kind(id) === 'escalope' && ck_poste() === 'Wok'; }   // « hachée directement » : réservé au cuisinier du Wok
+const ck_hasBuy = (id)=>ck_kind(id) === 'viande';
+const ck_allRecs = (doc, id)=>['start', 'cut', 'waste', 'mince', 'buy'].reduce((a, t)=>a.concat(ck_recs(doc, id, t)), []).sort((a, b)=>String(a.at).localeCompare(String(b.at)));
 function ck_targetKind(id){ const k = ck_kind(id); return k === 'escalope' ? 'poulet' : k === 'boeuf' ? 'viande' : ''; }
 function ck_targetId(id){ const tk = ck_targetKind(id); if(!tk) return ''; const t = ck_ingList().find(x=>ck_kind(x.id) === tk); return t ? t.id : ''; }
 function ck_targetName(id){ const t = ck_targetId(id); if(t) return ck_ingName(t); return ck_targetKind(id) === 'poulet' ? (ck_lang === 'ar' ? 'الدجاج المفروم' : 'le poulet haché') : (ck_lang === 'ar' ? 'اللحم المفروم' : 'la viande hachée'); }
@@ -6924,9 +6935,13 @@ function ck_docs(){
 const ck_recOne = (doc, id, rid)=>{ const r = ((((doc || {}).recs || {})[id]) || {})[rid]; return r && !r.del ? Object.assign({ id:rid }, r) : null; };
 const ck_recs = (doc, id, t)=>Object.keys((((doc || {}).recs || {})[id]) || {}).map(k=>Object.assign({ id:k }, doc.recs[id][k])).filter(r=>r && !r.del && r.t === t).sort((a, b)=>String(a.at).localeCompare(String(b.at)));
 const ck_sumF = (list, key)=>ck_r(list.reduce((a, r)=>a + (Number(r.f && r.f[key]) || 0), 0));
-function ck_received(id){   // chutes envoyées vers cet ingrédient (poulet haché / viande hachée), tous cuisiniers confondus
-  const src = ck_sources(id), parts = {}; let tot = 0; const docs = ck_docs();
-  Object.keys(docs).forEach(k=>{ const d = docs[k]; src.forEach(s=>{ const q = ck_sumF(ck_recs(d, s.id, 'cut'), 't'); if(q > 0){ const lb = d.poste || d.name || '?'; parts[lb] = ck_r((parts[lb] || 0) + q); tot += q; } }); });
+function ck_received(id){   // disponible pour cet ingrédient (poulet haché / viande hachée), tous cuisiniers confondus
+  /* poulet haché : chutes des escalopes + escalope hachée directement ; viande hachée : chutes du bœuf + achat direct */
+  const src = ck_sources(id), k = ck_kind(id), parts = {}; let tot = 0; const docs = ck_docs();
+  const add = (lb, q)=>{ if(q > 0){ parts[lb] = ck_r((parts[lb] || 0) + q); tot += q; } };
+  Object.keys(docs).forEach(key=>{ const d = docs[key], lb = d.poste || d.name || '?';
+    src.forEach(s=>{ add(lb, ck_sumF(ck_recs(d, s.id, 'cut'), 't')); if(k === 'poulet') add(lb + ' ' + ck_s('direct'), ck_sumF(ck_recs(d, s.id, 'mince'), 'h')); });
+    if(k === 'viande') add(ck_s('buyLab'), ck_sumF(ck_recs(d, id, 'buy'), 'b')); });
   return { tot:ck_r(tot), parts };
 }
 function ck_prevRest(id){   // quantité restante saisie en fin de service la veille (point de départ du lendemain)
@@ -6937,8 +6952,10 @@ function ck_prevRest(id){   // quantité restante saisie en fin de service la ve
 function ck_startOf(id, doc){ const r = ck_recOne(doc, id, 'start'); return r && r.f && r.f.s !== undefined ? Number(r.f.s) : null; }
 function ck_calc(id, doc){
   const k = ck_kind(id), cut = ck_recs(doc, id, 'cut'), wst = ck_recs(doc, id, 'waste'), fin = ck_recOne(doc, id, 'fin'), s = ck_startOf(id, doc);
-  const o = { k, cut, wst, fin:fin ? (fin.f || {}) : null, s, a:ck_sumF(cut, 'a'), t:ck_sumF(cut, 't'), n:ck_sumF(cut, 'n'), g:ck_sumF(cut, 'g'), v:ck_sumF(cut, 'v'), w:ck_sumF(wst, 'w') };
+  const mince = ck_recs(doc, id, 'mince'), buy = ck_recs(doc, id, 'buy');
+  const o = { k, cut, wst, mince, buy, fin:fin ? (fin.f || {}) : null, s, a:ck_sumF(cut, 'a'), t:ck_sumF(cut, 't'), n:ck_sumF(cut, 'n'), g:ck_sumF(cut, 'g'), v:ck_sumF(cut, 'v'), w:ck_r(ck_sumF(wst, 'w') + ck_sumF(cut, 'w')), h:ck_sumF(mince, 'h'), b:ck_sumF(buy, 'b') };   // le déchet = pesées séparées + déchet rattaché aux découpes
   o.used = ck_r(o.a - o.t);
+  if(k === 'avocat'){ const x = o.fin; o.ut = (s !== null && x && x.r !== undefined) ? ck_r(s - (Number(x.r) || 0) - (Number(x.pq) || 0)) : null; }   // utilisé = différence entre deux stocks validés, sans la perte qualité
   if(k === 'gamba'){ o.dec = ck_r(o.a - o.w); o.wok = ck_r(o.dec - o.n); o.rest = s === null ? null : ck_r(s - o.a); }
   if(k === 'poulet'){ o.d = ck_received(id).tot; o.nem = ck_r(o.d - o.g); }
   if(k === 'viande') o.d = ck_received(id).tot;
@@ -6946,9 +6963,10 @@ function ck_calc(id, doc){
 }
 function ck_figs(id, doc, poste){   // [[libellé, valeur]] : ce que montre la fiche et le suivi
   const c = ck_calc(id, doc), k = c.k, u = ck_unit(id), f = (x)=>ck_fmt(x) + ' ' + u, o = [], tn = ck_targetName(id);
-  if(k === 'escalope' || k === 'boeuf'){ o.push([ck_s('fg_a'), f(c.a)], [ck_s('fg_t', { t:tn }), f(c.t)], [ck_s('fg_used'), f(c.used)]); }
+  if(k === 'escalope' || k === 'boeuf'){ o.push([ck_s('fg_a'), f(c.a)], [ck_s('fg_t', { t:tn }), f(c.t)], [ck_s('fg_used'), f(c.used)]); if(c.mince.length) o.push([ck_s('fg_h'), f(c.h)]); }
   else if(k === 'saumon' || k === 'simple'){ o.push([ck_s('fg_a'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_used'), f(ck_r(c.a - c.w))]); }
-  else if(k === 'avocat' || k === 'crevette'){ o.push([ck_s('fg_s'), c.s === null ? '—' : f(c.s)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_ut'), c.s === null ? '—' : f(ck_r(c.s - c.w))]); }
+  else if(k === 'crevette'){ o.push([ck_s('fg_s'), c.s === null ? '—' : f(c.s)], [ck_s('fg_a'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_used'), f(ck_r(c.a - c.w))]); }
+  else if(k === 'avocat'){ o.push([ck_s('fg_s'), c.s === null ? '—' : f(c.s)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_ut'), c.ut === null ? '—' : f(c.ut)]); }
   else if(k === 'gamba'){ o.push([ck_s('fg_s'), c.s === null ? '—' : f(c.s)], [ck_s('fg_a2'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_dec'), f(c.dec)], [ck_s('fg_n'), f(c.n)], [ck_s('fg_wok'), f(c.wok)]); }
   else if(k === 'poulet'){ o.push([ck_s('fg_d'), f(c.d)], [ck_s('fg_g'), f(c.g)], [ck_s('fg_n'), f(c.nem)]); }
   else if(k === 'viande'){ o.push([ck_s('fg_d'), f(c.d)], [ck_s('fg_vu'), f(c.v)]); }
@@ -6991,19 +7009,27 @@ function ck_qText(key, id){ const v = { i:ck_ingName(id), t:ck_targetName(id) };
 function ck_fmtOrEmpty(x){ return x === undefined || x === null || x === '' ? '' : ck_fmt(Number(x)); }
 
 function ck_specCut(id, rid){
-  const doc = ck_myDoc(), old = rid ? ck_recOne(doc, id, rid) : null, of = (old && old.f) || {}, k = ck_kind(id), c = ck_calc(id, doc), fields = [];
-  if(k === 'gamba'){ fields.push({ ing:id, k:'a', q:'q_gam_a' }, { ing:id, k:'n', q:'q_gam_n', zero:true }); }
+  const doc = ck_myDoc(), old = rid ? ck_recOne(doc, id, rid) : null, of = (old && old.f) || {}, k = ck_kind(id), fields = [];
+  if(k === 'gamba'){   // à décortiquer → déchet → part des nems (proposée = tout le net, validée ou corrigée) ; le reste va au wok
+    fields.push({ ing:id, k:'a', q:'q_gam_a' }, { ing:id, k:'w', q:'q_gam_w', zero:true },
+      { ing:id, k:'n', q:'q_gam_n', zero:true, defFn:(v)=>ck_fmt(Math.max(0, ck_r((ck_num(v[0]) || 0) - (ck_num(v[1]) || 0)))) });
+  }
   else if(k === 'poulet'){ fields.push({ ing:id, k:'g', q:'q_pou_g', zero:true }); }
   else if(k === 'viande'){
     const others = ck_r(ck_recs(doc, id, 'cut').filter(r=>r.id !== rid).reduce((a, r)=>a + (Number(r.f.v) || 0), 0)), def = Math.max(0, ck_r(ck_received(id).tot - others));
     fields.push({ ing:id, k:'v', q:'q_vi_v', def:def > 0 ? ck_fmt(def) : '', defN:def });
-  } else { fields.push({ ing:id, k:'a', q:'q_cut_a' }); if(ck_targetKind(id)) fields.push({ ing:id, k:'t', q:'q_cut_t', zero:true }); }
+  } else {
+    fields.push({ ing:id, k:'a', q:'q_cut_a' });
+    if(ck_wasteInCut(id)) fields.push({ ing:id, k:'w', q:'q_cut_w', zero:true });   // le déchet est toujours rattaché à sa découpe (0 s'il n'y en a pas)
+    if(ck_targetKind(id)) fields.push({ ing:id, k:'t', q:'q_cut_t', zero:true });
+  }
   const myRid = rid || ck_rid();
   return { id, type:'cut', rid:myRid, old, fields, init:fields.map(f=>ck_fmtOrEmpty(of[f.k]) || (old ? '' : (f.def || ''))), after:'ing',
     check:(vals, i)=>{
-      const F = {}; fields.forEach((f, j)=>{ F[f.k] = ck_num(vals[j]); });
-      if(f_is(fields[i], 't') && (F.t || 0) > (F.a || 0) + 1e-9) return ck_s('tGt');
-      if(k === 'gamba' && f_is(fields[i], 'n')){ const a = c.a - (Number(of.a) || 0) + (F.a || 0), n0 = c.n - (Number(of.n) || 0), room = Math.max(0, ck_r(a - c.w - n0)); if((F.n || 0) > room + 1e-9) return ck_s('nGt', { w:ck_fmt(room), u:ck_unit(id) }); }
+      const F = {}; fields.forEach((f, j)=>{ F[f.k] = ck_num(vals[j]); }); const fk = fields[i].k;
+      if(fk === 't' && (F.t || 0) > (F.a || 0) + 1e-9) return ck_s('tGt');
+      if(fk === 'w' && (F.w || 0) > (F.a || 0) + 1e-9) return ck_s('wGt');
+      if(fk === 'n'){ const room = Math.max(0, ck_r((F.a || 0) - (F.w || 0))); if((F.n || 0) > room + 1e-9) return ck_s('nGt', { w:ck_fmt(room), u:ck_unit(id) }); }
       return '';
     },
     save:(vals)=>{
@@ -7017,6 +7043,12 @@ function ck_specWaste(id, rid){
   const old = rid ? ck_recOne(ck_myDoc(), id, rid) : null, myRid = rid || ck_rid();
   return { id, type:'waste', rid:myRid, old, fields:[{ ing:id, k:'w', q:'q_waste' }], init:[old ? ck_fmtOrEmpty(old.f.w) : ''], after:'ing', check:()=>'', save:(vals)=>{ ck_putRec(id, myRid, { t:'waste', f:{ w:ck_num(vals[0]) || 0 }, at:old ? old.at : ck_nowIso() }); } };
 }
+function ck_specSimple(id, rid, type, key, q){   // saisie d'une seule quantité : « hachée directement » (escalope du Wok), « achat direct » (viande hachée)
+  const old = rid ? ck_recOne(ck_myDoc(), id, rid) : null, myRid = rid || ck_rid();
+  return { id, type, rid:myRid, old, fields:[{ ing:id, k:key, q }], init:[old ? ck_fmtOrEmpty(old.f[key]) : ''], after:'ing', check:()=>'', save:(vals)=>{ ck_putRec(id, myRid, { t:type, f:{ [key]:ck_num(vals[0]) || 0 }, at:old ? old.at : ck_nowIso() }); } };
+}
+const ck_specMince = (id, rid)=>ck_specSimple(id, rid, 'mince', 'h', 'q_min');
+const ck_specBuy = (id, rid)=>ck_specSimple(id, rid, 'buy', 'b', 'q_buy');
 function ck_specStart(id){
   const old = ck_recOne(ck_myDoc(), id, 'start'), p = ck_prevRest(id);
   return { id, type:'start', rid:'start', old, fields:[{ ing:id, k:'s', q:'q_start' }], init:[old ? ck_fmtOrEmpty(old.f.s) : (p !== null ? ck_fmt(p) : '')], after:'ing', check:()=>'' };
@@ -7034,18 +7066,28 @@ function ck_specFin(){
 }
 
 function ck_openForm(spec){
-  ck_form = { spec, v:spec.init.slice(), step:0, fresh:spec.init.map(x=>x === '') }; ck_err = ''; ck_ban = null; ck_view = 'entry'; ck_render();
+  ck_form = { spec, v:spec.init.slice(), step:0 }; ck_err = ''; ck_ban = null; ck_view = 'entry';
+  spec.fields.forEach((f, j)=>{ if(f.def && spec.init[j] === f.def) f._auto = f.def; });   // valeur proposée : si le cuisinier tape un chiffre, elle est remplacée
+  ck_render();
+}
+function ck_applyDef(){   // valeur proposée qui dépend des réponses précédentes (ex. nems = tout le net décortiqué)
+  const F = ck_form, f = F && F.spec.fields[F.step]; if(!f || !f.defFn) return;
+  const d = f.defFn(F.v), cur = F.v[F.step]; f.def = d;
+  if(cur === '' || cur === f._auto){ F.v[F.step] = d; }
+  f._auto = d;
 }
 function ck_openIng(id){
   ck_ingOpen = id; const doc = ck_myDoc();
   if(ck_needsStart(id) && ck_startOf(id, doc) === null){ ck_openForm(ck_specStart(id)); return; }
-  const has = ck_recs(doc, id, 'cut').length || ck_recs(doc, id, 'waste').length;
-  if(!has){ ck_openForm(ck_hasCut(id) ? ck_specCut(id) : ck_specWaste(id)); return; }
+  const has = ck_allRecs(doc, id).some(r=>r.t !== 'start');
+  if(!has && !ck_hasBuy(id) && !ck_hasMince(id)){ ck_openForm(ck_hasCut(id) ? ck_specCut(id) : ck_specWaste(id)); return; }   // viande hachée et escalope du Wok : on montre d'abord la fiche (achat direct / hachée directement)
   ck_ban = null; ck_view = 'ing'; ck_render();
 }
 const ck_newCut = (id)=>ck_openForm(ck_specCut(id));
 const ck_newWaste = (id)=>ck_openForm(ck_specWaste(id));
-function ck_editRec(id, rid){ const r = ck_recOne(ck_myDoc(), id, rid); if(!r) return; ck_ingOpen = id; ck_openForm(r.t === 'waste' ? ck_specWaste(id, rid) : r.t === 'start' ? ck_specStart(id) : ck_specCut(id, rid)); }
+const ck_newMince = (id)=>ck_openForm(ck_specMince(id));
+const ck_newBuy = (id)=>ck_openForm(ck_specBuy(id));
+function ck_editRec(id, rid){ const r = ck_recOne(ck_myDoc(), id, rid); if(!r) return; ck_ingOpen = id; ck_openForm(r.t === 'waste' ? ck_specWaste(id, rid) : r.t === 'start' ? ck_specStart(id) : r.t === 'mince' ? ck_specMince(id, rid) : r.t === 'buy' ? ck_specBuy(id, rid) : ck_specCut(id, rid)); }
 function ck_delRec(id, rid){
   const prev = ck_recOne(ck_myDoc(), id, rid); if(!prev) return; const p = Object.assign({}, prev); delete p.id;
   ck_putRec(id, rid, { del:true }); ck_setBan({ id, rid, prev:p, msg:ck_s('deleted') }); ck_render();
@@ -7059,8 +7101,8 @@ function ck_banUndo(){
 function ck_press(k){
   const F = ck_form; if(!F) return; let v = F.v[F.step] || '';
   if(k === 'del') v = v.slice(0, -1);
-  else if(k === ','){ if(v.indexOf(',') < 0) v = (v === '' ? '0' : v) + ','; }
-  else { const p = v.split(','); if(p[1] !== undefined && p[1].length >= 3) return; if(v.replace(',', '').length >= 7) return; v = v === '0' ? k : v + k; }
+  else if(k === ','){ const fl0 = F.spec.fields[F.step]; if(fl0 && fl0._auto !== undefined && v === fl0._auto) v = ''; if(v.indexOf(',') < 0) v = (v === '' ? '0' : v) + ','; }
+  else { const fl = F.spec.fields[F.step]; if(fl && fl._auto !== undefined && v === fl._auto) v = ''; const p = v.split(','); if(p[1] !== undefined && p[1].length >= 3) return; if(v.replace(',', '').length >= 7) return; v = v === '0' ? k : v + k; }
   F.v[F.step] = v; ck_err = ''; ck_entryUpdate();
 }
 function ck_chip(kind){
@@ -7069,14 +7111,14 @@ function ck_chip(kind){
   else if(kind === 'none') F.v[F.step] = '0'; else F.v[F.step] = ck_fmt(Number(kind));
   ck_err = ''; ck_entryUpdate();
 }
-function ck_entryUpdate(){ const F = ck_form, el = document.getElementById('ck-val'); if(!el || !F){ ck_render(); return; } const v = F.v[F.step]; el.textContent = v === '' ? '0' : v; el.className = v === '' ? 'e' : ''; const er = document.getElementById('ck-er'); if(er) er.textContent = ck_err; }
+function ck_entryUpdate(){ const F = ck_form, el = document.getElementById('ck-val'); if(!el || !F){ ck_render(); return; } const v = F.v[F.step]; el.textContent = v === '' ? '0' : v; el.className = v === '' ? 'e' : ''; const er = document.getElementById('ck-er'); if(er) er.textContent = ck_err; const inf = document.getElementById('ck-inf'); if(inf) inf.innerHTML = ck_fieldInfo(F.spec.fields[F.step], F); }
 function ck_ok(){
   const F = ck_form; if(!F) return; const sp = F.spec, i = F.step, raw = F.v[i], n = ck_num(raw);
   const fail = (m)=>{ ck_err = m; const er = document.getElementById('ck-er'); if(er) er.textContent = m; };
   if(raw === '' || n === null) return fail(ck_s('reqWeight'));
   const bad = sp.check(F.v, i); if(bad) return fail(bad);
   try{ if(navigator.vibrate) navigator.vibrate(15); }catch(e){}
-  if(i < sp.fields.length - 1){ F.step++; ck_err = ''; ck_render(); return; }
+  if(i < sp.fields.length - 1){ F.step++; ck_err = ''; ck_applyDef(); ck_render(); return; }
   /* dernière question : on enregistre */
   if(sp.type === 'fin'){
     const per = {}; sp.fields.forEach((f, j)=>{ (per[f.ing] = per[f.ing] || {})[f.k] = ck_num(F.v[j]) || 0; });
@@ -7089,10 +7131,11 @@ function ck_ok(){
   }
   sp.save(F.v.slice()); ck_form = null; ck_ingOpen = id; ck_view = 'ing'; ck_setBan({ id, rid:sp.rid, prev, msg:ck_s('saved') }); ck_render();
 }
-function ck_prevStep(){ const F = ck_form; if(F && F.step > 0){ F.step--; ck_err = ''; ck_render(); } }
+function ck_prevStep(){ const F = ck_form; if(F && F.step > 0){ F.step--; ck_err = ''; ck_applyDef(); ck_render(); } }
 function ck_backFromForm(){
   const sp = ck_form && ck_form.spec; ck_form = null; ck_err = '';
-  if(sp && sp.type !== 'fin' && sp.id && ck_ingOpen && (ck_recs(ck_myDoc(), sp.id, 'cut').length || ck_recs(ck_myDoc(), sp.id, 'waste').length)) ck_view = 'ing'; else ck_view = 'tiles';
+  const has = sp && sp.id && (ck_allRecs(ck_myDoc(), sp.id).some(r=>r.t !== 'start') || (sp.type !== 'start' && (ck_hasBuy(sp.id) || ck_hasMince(sp.id))));
+  if(sp && sp.type !== 'fin' && ck_ingOpen && has) ck_view = 'ing'; else ck_view = 'tiles';
   ck_render();
 }
 function ck_backToTiles(){ ck_form = null; ck_ingOpen = null; ck_ban = null; ck_err = ''; ck_view = 'tiles'; ck_render(); }
@@ -7245,15 +7288,15 @@ function ck_pinHtml(){
 function ck_banHtml(){ return ck_ban ? `<div class="ck-banner ok"><span>✓ ${esc(ck_ban.msg)}</span><button onclick="ck_banUndo()">↶ ${esc(ck_s('undo'))}</button></div>` : ''; }
 function ck_tileInfo(id, doc){
   const c = ck_calc(id, doc), k = c.k, u = ck_unit(id), f = (x)=>ck_fmt(x) + ' ' + u;
-  const ready = ck_hasCut(id) ? c.cut.length > 0 : c.wst.length > 0;
+  const ready = ck_hasCut(id) ? (c.cut.length > 0 || c.mince.length > 0) : c.wst.length > 0;
   if(ready){
     let t = '';
-    if(k === 'escalope' || k === 'boeuf' || k === 'saumon' || k === 'simple') t = ck_s('fg_a') + ' ' + f(c.a);
+    if(k === 'escalope' || k === 'boeuf' || k === 'saumon' || k === 'simple' || k === 'crevette') t = ck_s('fg_a') + ' ' + f(c.a) + (c.h > 0 ? ' · ' + ck_s('fg_h') + ' ' + f(c.h) : '');
     else if(k === 'gamba') t = ck_s('fg_a2') + ' ' + f(c.a);
     else if(k === 'poulet') t = ck_s('fg_g') + ' ' + f(c.g);
     else if(k === 'viande') t = ck_s('fg_vu') + ' ' + f(c.v);
     else t = ck_s('fg_w') + ' ' + f(c.w);
-    const n = ck_hasCut(id) ? c.cut.length : c.wst.length;
+    const n = ck_hasCut(id) ? c.cut.length + c.mince.length : c.wst.length;
     if(n > 1) t += ' · ' + ck_s('cuts', { n });
     return { st:'ready', text:t };
   }
@@ -7283,18 +7326,22 @@ function ck_recText(id, r){
   const u = ck_unit(id), f = r.f || {}, v = (x)=>ck_fmt(Number(x) || 0) + ' ' + u, k = ck_kind(id);
   if(r.t === 'waste') return ck_s('fg_w') + ' ' + v(f.w);
   if(r.t === 'start') return ck_s('fg_s') + ' ' + v(f.s);
-  if(k === 'gamba') return ck_s('fg_a2') + ' ' + v(f.a) + ' · ' + ck_s('fg_n') + ' ' + v(f.n);
+  if(r.t === 'mince') return ck_s('fg_h') + ' ' + v(f.h);
+  if(r.t === 'buy') return ck_s('fg_b') + ' ' + v(f.b);
+  if(k === 'gamba') return ck_s('fg_a2') + ' ' + v(f.a) + (f.w !== undefined ? ' · ' + ck_s('fg_w') + ' ' + v(f.w) : '') + ' · ' + ck_s('fg_n') + ' ' + v(f.n) + (f.w !== undefined ? ' · ' + ck_s('fg_wok') + ' ' + v(Math.max(0, ck_r((Number(f.a) || 0) - (Number(f.w) || 0) - (Number(f.n) || 0)))) : '');
   if(k === 'poulet') return ck_s('fg_g') + ' ' + v(f.g);
   if(k === 'viande') return ck_s('fg_vu') + ' ' + v(f.v) + (f.corr ? ' ✎' : '');
-  return ck_s('fg_a') + ' ' + v(f.a) + (ck_targetKind(id) ? ' · ' + ck_s('fg_t', { t:ck_targetName(id) }) + ' ' + v(f.t) : '');
+  return ck_s('fg_a') + ' ' + v(f.a) + (f.w !== undefined && ck_wasteInCut(id) ? ' · ' + ck_s('fg_w') + ' ' + v(f.w) : '') + (ck_targetKind(id) ? ' · ' + ck_s('fg_t', { t:ck_targetName(id) }) + ' ' + v(f.t) : '');
 }
 function ck_ingHtml(){
   const id = ck_ingOpen, doc = ck_myDoc(), u = ck_unit(id), k = ck_kind(id), it = ck_ingById(id) || {}, alt = ck_lang === 'ar' ? (it.n || '') : ((ck_cfg.ings[id] || {}).ar || '');
   const figs = ck_figs(id, doc).map(x=>`<div class="ck-fig"><span>${esc(x[0])}</span><b>${esc(x[1])}</b></div>`).join('');
   const btns = [];
   if(ck_hasCut(id)) btns.push(`<button class="ck-act main" onclick="ck_newCut(${ck_a(id)})">＋ ${esc(ck_s(k === 'gamba' ? 'newOut' : (k === 'poulet' || k === 'viande') ? 'newIn' : 'newCut'))}</button>`);
+  if(ck_hasMince(id)) btns.push(`<button class="ck-act ${ck_hasCut(id) ? '' : 'main'}" onclick="ck_newMince(${ck_a(id)})">＋ ${esc(ck_s('newMince'))}</button>`);
+  if(ck_hasBuy(id)) btns.push(`<button class="ck-act" onclick="ck_newBuy(${ck_a(id)})">＋ ${esc(ck_s('newBuy'))}</button>`);
   if(ck_hasWaste(id)) btns.push(`<button class="ck-act ${ck_hasCut(id) ? '' : 'main'}" onclick="ck_newWaste(${ck_a(id)})">${esc(ck_s('addW'))}</button>`);
-  const recs = ck_recs(doc, id, 'start').concat(ck_recs(doc, id, 'cut'), ck_recs(doc, id, 'waste')).sort((a, b)=>String(a.at).localeCompare(String(b.at)));
+  const recs = ck_allRecs(doc, id);
   const list = recs.length ? recs.map(r=>`<div class="ck-rec"><span class="tm">${esc(ck_hm(r.at))}</span><span class="tx">${esc(ck_recText(id, r))}</span><button aria-label="Corriger" onclick="ck_editRec(${ck_a(id)},${ck_a(r.id)})">✎</button>${r.t === 'start' ? '' : `<button class="rd" aria-label="Supprimer" onclick="ck_delRec(${ck_a(id)},${ck_a(r.id)})">✕</button>`}</div>`).join('') : `<div class="ck-empty">${esc(ck_s('noEntry'))}</div>`;
   return `<div class="ck-entry"><div class="ck-top"><button class="ck-btn" onclick="ck_backToTiles()">‹ ${esc(ck_s('back'))}</button><div class="ck-tools">${ck_langBtn()}</div></div>${ck_alerts()}${ck_banHtml()}
     <div class="ck-card" style="--c:${ck_color(id)}"><div class="ck-ihead">${ck_icon(k, 54)}<div><div class="ck-q" style="margin:0">${esc(ck_ingName(id))}</div>${alt && alt !== ck_ingName(id) ? `<div class="ck-ar" ${ck_lang === 'fr' ? '' : 'style="direction:ltr;"'}>${esc(alt)}</div>` : ''}</div></div>
@@ -7304,8 +7351,11 @@ function ck_ingHtml(){
 /* ---------- 4. une question à la fois ---------- */
 function ck_fieldInfo(fld, F){
   const id = fld.ing, k = ck_kind(id), u = ck_unit(id), c = ck_calc(id, ck_myDoc());
-  if(k === 'viande' || k === 'poulet'){ const r = ck_received(id), parts = Object.keys(r.parts).map(x=>`${esc(x)} ${ck_fmt(r.parts[x])}`).join(' + '); return parts ? `${parts} = ${ck_fmt(r.tot)} ${esc(u)}` : '—'; }
-  if(k === 'gamba' && fld.k === 'n'){ const a = ck_num(F.v[0]) || 0, old = F.spec.old ? F.spec.old.f : {}, room = Math.max(0, ck_r(c.a - (Number(old.a) || 0) + a - c.w - (c.n - (Number(old.n) || 0)))); return `${esc(ck_s('fg_dec'))} : ${ck_fmt(room)} ${esc(u)}`; }
+  if((k === 'viande' && fld.k === 'v') || (k === 'poulet' && fld.k === 'g')){ const r = ck_received(id), parts = Object.keys(r.parts).map(x=>`${esc(x)} ${ck_fmt(r.parts[x])}`).join(' + '); return parts ? `${parts} = ${ck_fmt(r.tot)} ${esc(u)}` : '—'; }
+  if(k === 'gamba' && fld.k === 'n'){   // net décortiqué, et ce qui ira au wok avec la part nem saisie
+    const a = ck_num(F.v[0]) || 0, w = ck_num(F.v[1]) || 0, n = ck_num(F.v[2]) || 0, net = Math.max(0, ck_r(a - w)), wok = Math.max(0, ck_r(net - n));
+    return `${esc(ck_s('fg_dec'))} : <b>${ck_fmt(net)} ${esc(u)}</b> · ${esc(ck_s('fg_wok'))} : <b>${ck_fmt(wok)} ${esc(u)}</b>`;
+  }
   return '';
 }
 function ck_entryHtml(){
@@ -7313,7 +7363,7 @@ function ck_entryHtml(){
   if(fld.def && fld.def !== v) chips.push(`<button class="ck-chip" onclick="ck_chip('${ck_num(fld.def)}')">${esc(ck_s('chipCalc', { v:fld.def }))}</button>`);
   if(fld.zero) chips.push(`<button class="ck-chip" onclick="ck_chip('none')">${esc(ck_s('chipNone'))}</button>`);
   chips.push(`<button class="ck-chip" onclick="ck_chip('m')">− 0,1</button><button class="ck-chip" onclick="ck_chip('p')">+ 0,1</button>`);
-  const inf = ck_fieldInfo(fld, F), info = inf ? `<div class="ck-sub" style="margin-top:6px;">${inf}</div>` : '';
+  const inf = ck_fieldInfo(fld, F), info = `<div class="ck-sub" id="ck-inf" style="margin-top:6px;">${inf}</div>`;
   const kp = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ','].map(k=>`<button onclick="ck_press('${k}')">${k}</button>`).join('') + `<button onclick="ck_press('0')">0</button><button onclick="ck_press('del')" aria-label="Effacer">⌫</button>`;
   const many = sp.fields.length > 1, prev = F.step > 0 ? `<button class="ck-btn" onclick="ck_prevStep()">↶ ${esc(ck_s('undo'))}</button>` : '';
   return `<div class="ck-entry"><div class="ck-top"><button class="ck-btn" onclick="ck_backFromForm()">‹ ${esc(ck_s('back'))}</button><div class="ck-tools">${prev}${many ? `<span class="ck-pill">${esc(ck_s('step', { a:F.step + 1, b:sp.fields.length }))}</span>` : ''}</div></div>${ck_alerts()}
@@ -7344,7 +7394,7 @@ function ck_suiviHtml(){
     const pill = doc.done ? `<span class="ck-pill ok">Fin de service ${esc(ck_hm(doc.done))}</span>` : (doc.emp ? '<span class="ck-pill wa">Fin de service non faite</span>' : '<span class="ck-pill">rien saisi</span>');
     const items = ids.map(id=>{
       const it = ck_ingById(id) || { n:id }, k = ck_kind(id), figs = ck_figs(id, doc);
-      const recs = ck_recs(doc, id, 'start').concat(ck_recs(doc, id, 'cut'), ck_recs(doc, id, 'waste')).sort((a, b)=>String(a.at).localeCompare(String(b.at)));
+      const recs = ck_allRecs(doc, id);
       const rl = recs.map(r=>`<div class="ck-rec"><span class="tm">${esc(ck_hm(r.at))}</span><span class="tx">${esc(ck_recText(id, r))}${r.t === 'start' && r.auto ? ' <small>(repris de la veille)</small>' : ''}</span>${r.t === 'start' ? '' : `<button class="rd" aria-label="Supprimer" onclick="ck_adminDel(${ck_a(code)},${ck_a(id)},${ck_a(r.id)})">✕</button>`}</div>`).join('');
       return `<div class="ck-sitem" style="--c:${ck_color(id)}"><div class="ck-ihead">${ck_icon(k, 34)}<b>${esc(it.n)}</b> <small style="color:var(--ink-muted)">${esc(ck_unit(id))}</small></div><div class="ck-figs">${figs.map(x=>`<div class="ck-fig"><span>${esc(x[0])}</span><b>${esc(x[1])}</b></div>`).join('')}</div>${rl ? `<div class="ck-recs">${rl}</div>` : '<div class="ck-sub">rien saisi</div>'}</div>`;
     }).join('');
@@ -7354,7 +7404,7 @@ function ck_suiviHtml(){
   /* total par ingrédient, tous cuisiniers confondus */
   const tr = ings.map(it=>{
     const tot = { a:0, t:0, w:0, p:0, r:0, any:false }; const id = it.id;
-    Object.keys(docs).forEach(k=>{ const c = ck_calc(id, docs[k]); if(c.cut.length || c.wst.length || c.fin) tot.any = true; tot.a += c.a; tot.t += c.t; tot.w += c.w; tot.p += c.fin ? (Number(c.fin.pc) || 0) + (Number(c.fin.pq) || 0) : 0; tot.r += c.fin ? (Number(c.fin.rc) || 0) + (Number(c.fin.rn) || 0) + (Number(c.fin.r) || 0) : 0; });
+    Object.keys(docs).forEach(k=>{ const c = ck_calc(id, docs[k]); if(c.cut.length || c.wst.length || c.mince.length || c.buy.length || c.fin) tot.any = true; tot.a += c.a; tot.t += c.t; tot.w += c.w; tot.p += c.fin ? (Number(c.fin.pc) || 0) + (Number(c.fin.pq) || 0) : 0; tot.r += c.fin ? (Number(c.fin.rc) || 0) + (Number(c.fin.rn) || 0) + (Number(c.fin.r) || 0) : 0; });
     if(!tot.any) return '';
     return `<div class="ck-trow" style="--c:${ck_color(id)}"><span class="n">${ck_icon(ck_kind(id), 24)}${esc(it.n)} <small style="color:var(--ink-muted);font-weight:500">${esc(ck_unit(id))}</small></span><span class="q">${esc(ck_fmt(tot.a))}</span><span class="q">${tot.t > 0 ? esc(ck_fmt(tot.t)) : '—'}</span><span class="q">${esc(ck_fmt(tot.w))}</span><span class="q">${esc(ck_fmt(tot.p))}</span><span class="q">${esc(ck_fmt(tot.r))}</span></div>`; }).join('');
   const totBox = tr ? `<div class="ck-box"><h3>Total du jour, tous cuisiniers</h3><div class="ck-trow hd"><span>Ingrédient</span><span class="q">Découpé / sorti</span><span class="q">Transféré</span><span class="q">Déchet</span><span class="q">Perdu</span><span class="q">Restant</span></div>${tr}</div>` : '';
@@ -7390,8 +7440,8 @@ function ck_adminClearAll(){
 }
 function ck_export(){
   if(typeof XLSX === 'undefined'){ alert('Export Excel indisponible : la bibliothèque n’est pas chargée.'); return; }
-  const date = ck_adate || ck_service(), docs = ck_docs(), rows = [], TYPE = { cut:'Découpe / saisie', waste:'Déchet', start:'Disponible au début', fin:'Fin de service' };
-  const COL = { a:'À découper / sorti du stock', t:'Transféré', n:'Pour les nems', g:'Gyozas (poulet haché)', v:'Utilisée gyozas (viande hachée)', w:'Déchet', s:'Disponible au début', rc:'Restante coupée', rn:'Restante non coupée', r:'Restante', pc:'Perdue poulet crispy', pq:'Perdue mauvaise qualité' };
+  const date = ck_adate || ck_service(), docs = ck_docs(), rows = [], TYPE = { cut:'Découpe / saisie', waste:'Déchet', start:'Disponible au début', fin:'Fin de service', mince:'Hachée directement', buy:'Achat direct' };
+  const COL = { a:'À découper / sorti du stock', t:'Transféré', n:'Pour les nems', g:'Gyozas (poulet haché)', v:'Utilisée gyozas (viande hachée)', w:'Déchet', h:'Escalope hachée directement', b:'Viande hachée achetée directement', s:'Disponible au début', rc:'Restante coupée', rn:'Restante non coupée', r:'Restante', pc:'Perdue poulet crispy', pq:'Perdue mauvaise qualité' };
   Object.keys(docs).forEach(k=>{ const d = docs[k]; Object.keys(d.recs || {}).forEach(id=>{ Object.keys(d.recs[id]).forEach(rid=>{ const r = d.recs[id][rid]; if(!r || r.del) return; const it = ck_ingById(id) || { n:id };
     const row = { Date:date, Cuisinier:d.name || ck_empName(d.emp), Poste:d.poste || '', Ingrédient:it.n, Saisie:TYPE[r.t] || r.t, Heure:ck_hm(r.at), Unité:ck_unit(id) };
     Object.keys(COL).forEach(c=>{ if(r.f && r.f[c] !== undefined) row[COL[c]] = Number(r.f[c]) || 0; }); if(r.f && r.f.corr) row['Quantité corrigée'] = 'oui';
