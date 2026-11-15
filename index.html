@@ -6995,7 +6995,8 @@ function ck_syncSub(){
   if(want !== ck_viewDate) ck_setViewDate(want);
   if(!ck_isAdmin() || ck_who){ const pd = ck_addDays(ck_service(), -1); if(pd !== ck_prevDate) ck_setPrev(pd); }
 }
-function ck_autoStart(){   // « disponible au début » : repris tout seul de la restante de la veille (le cuisinier peut le corriger)
+function ck_autoStart(){   // plus d'enregistrement automatique : la restante de la veille est seulement PROPOSÉE au cuisinier, qui la valide ou la corrige (voir ck_specStart)
+  return;
   if(!ck_who || !ck_docsReady || !ck_prevReady || ck_viewDate !== ck_service()) return;
   const doc = ck_docs()[ck_docId(ck_viewDate, ck_who)] || {}, patch = {};
   ck_myIngs(ck_who).forEach(id=>{ if(!ck_needsStart(id) || ck_recOne(doc, id, 'start')) return; const p = ck_prevRest(id); if(p !== null) patch[id] = { start:{ del:false, t:'start', f:{ s:p }, auto:true, at:new Date().toISOString() } }; });
@@ -7054,7 +7055,8 @@ const ck_specMince = (id, rid)=>ck_specSimple(id, rid, 'mince', 'h', 'q_min');
 const ck_specBuy = (id, rid)=>ck_specSimple(id, rid, 'buy', 'b', 'q_buy');
 function ck_specStart(id){
   const old = ck_recOne(ck_myDoc(), id, 'start'), p = ck_prevRest(id);
-  return { id, type:'start', rid:'start', old, fields:[{ ing:id, k:'s', q:'q_start' }], init:[old ? ck_fmtOrEmpty(old.f.s) : (p !== null ? ck_fmt(p) : '')], after:'ing', check:()=>'' };
+  const pre = p !== null ? ck_fmt(p) : '';   // restante de fin de la veille : proposée, validée ou corrigée par le cuisinier ; vide si la veille n'a rien donné
+  return { id, type:'start', rid:'start', old, fields:[{ ing:id, k:'s', q:'q_start', pre }], init:[old ? ck_fmtOrEmpty(old.f.s) : pre], after:'ing', check:()=>'' };
 }
 function ck_specFin(){
   const doc = ck_myDoc(), poste = ck_poste(), fields = [], init = [];
@@ -7070,7 +7072,7 @@ function ck_specFin(){
 
 function ck_openForm(spec){
   ck_form = { spec, v:spec.init.slice(), step:0 }; ck_err = ''; ck_ban = null; ck_view = 'entry';
-  spec.fields.forEach((f, j)=>{ if(f.def && spec.init[j] === f.def) f._auto = f.def; });   // valeur proposée : si le cuisinier tape un chiffre, elle est remplacée
+  spec.fields.forEach((f, j)=>{ const d = f.def || f.pre; if(d && spec.init[j] === d) f._auto = d; });   // valeur proposée : si le cuisinier tape un chiffre, elle est remplacée
   ck_render();
 }
 function ck_applyDef(){   // valeur proposée qui dépend des réponses précédentes (ex. nems = tout le net décortiqué)
