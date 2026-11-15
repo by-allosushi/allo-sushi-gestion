@@ -6773,7 +6773,7 @@ async function dt_deleteAvoir(id){
        avocat          : « disponible au début » (proposé depuis la veille, validé par le cuisinier), puis pesées de déchet (« + Déchet ») autant de fois que nécessaire ;
        gamba           : « à décortiquer » + « déchet » + part pour les nems (proposée = tout le net, validée ou corrigée), le reste va au wok ;
        poulet haché    : « dans les gyozas » (le disponible = chutes des escalopes + escalope hachée directement, les nems se calculent) ;
-       viande hachée   : disponible = chutes du bœuf + achat direct, puis « utilisée dans les gyozas ».
+       viande hachée   : seulement « utilisée dans les gyozas » (achetée pour l'essentiel) ; les chutes de bœuf reçues sont affichées et la répartition chutes / stock acheté se calcule.
      Découpes, déchets et sorties peuvent se saisir plusieurs fois par service ; chaque saisie est corrigeable.
      En fin de service : restantes (coupée / non coupée) et quantités perdues (avec leur motif).
    • Données (collection existante « mise_en_place », rien d'autre ne change) :
@@ -6818,7 +6818,7 @@ const CK_T = {
   q_min:['Quel poids de {i} hachée directement ?', 'كم وزن {i} المفرومة مباشرة؟'],
   q_buy:['Quel poids de {i} achetée directement ?', 'كم وزن {i} المشتراة مباشرة؟'],
   q_pou_g:['Quel poids de {i} dans les gyozas ?', 'كم وزن {i} في الغيوزا؟'],
-  q_vi_v:['Quel poids de {i} reçu, utilisé dans les gyozas ?', 'كم وزن {i} المستلم والمستعمل في الغيوزا؟'],
+  q_vi_v:['Quel poids de {i} utilisé dans les gyozas ?', 'كم وزن {i} المستعمل في الغيوزا؟'],
   q_waste:['Quel poids de déchet de {i} ?', 'كم وزن فضلات {i}؟'],
   q_start:['Quel poids de {i} disponible au début de service ?', 'كم وزن {i} المتوفر في بداية الخدمة؟'],
   q_fin_rc:['{i} : quelle quantité restante, déjà coupée ?', '{i}: كم الكمية المتبقية المقطّعة؟'],
@@ -6832,7 +6832,7 @@ const CK_T = {
   fg_s:['Disponible au début', 'المتوفر في البداية'], fg_a2:['À décortiquer', 'للتقشير'], fg_dec:['Décortiquée (net)', 'المقشّر (الصافي)'], fg_n:['Pour les nems', 'للنيم'],
   fg_wok:['Pour le wok', 'للووك'], fg_d:['Disponible', 'المتوفر'], fg_g:['Gyozas', 'غيوزا'], fg_vu:['Utilisée dans les gyozas', 'المستعملة في الغيوزا'],
   fg_rc:['Restante coupée', 'المتبقي المقطّع'], fg_rn:['Restante non coupée', 'المتبقي غير المقطّع'], fg_r:['Restante', 'المتبقي'],
-  fg_pc:['Perdue : poulet crispy', 'مفقود: دجاج كريسبي'], fg_pq:['Perdue : mauvaise qualité', 'مفقود: رديء الجودة'], fg_ut:['Utilisé (déchet compris)', 'المستعمل (شامل الفضلات)'], fg_h:['Hachée directement', 'مفرومة مباشرة'], fg_b:['Achetée directement', 'مشتراة مباشرة']
+  fg_pc:['Perdue : poulet crispy', 'مفقود: دجاج كريسبي'], fg_pq:['Perdue : mauvaise qualité', 'مفقود: رديء الجودة'], fg_ut:['Utilisé (déchet compris)', 'المستعمل (شامل الفضلات)'], fg_h:['Hachée directement', 'مفرومة مباشرة'], fg_dv:['Chutes de bœuf reçues', 'فضلات البقر المستلمة'], fg_vb:['Dont chutes de bœuf', 'منها فضلات البقر'], fg_vs:['Dont stock acheté', 'منها من المخزون المشترى'], fg_b:['Achetée directement', 'مشتراة مباشرة']
 };
 let ck_started = false, ck_cfg = { settings:{}, ings:{}, cooks:{}, meta:{} }, ck_cfgReady = false, ck_saveT = null;
 let ck_ingsRaw = [], ck_ingsReady = false, ck_emp = {}, ck_empReady = false;
@@ -6896,7 +6896,7 @@ const ck_hasWaste = (id)=>ck_kind(id) === 'avocat';   // « + Déchet » sépar�
 const ck_hasCut = (id)=>ck_kind(id) !== 'avocat';
 const ck_wasteInCut = (id)=>/^(saumon|simple|crevette|gamba)$/.test(ck_kind(id));
 function ck_hasMince(id){ return ck_kind(id) === 'escalope' && ck_poste() === 'Wok'; }   // « hachée directement » : réservé au cuisinier du Wok
-const ck_hasBuy = (id)=>ck_kind(id) === 'viande';
+const ck_hasBuy = (id)=>false;   // l'achat de viande hachée n'est plus saisi par le cuisinier (relève des dépenses)
 const ck_allRecs = (doc, id)=>['start', 'cut', 'waste', 'mince', 'buy'].reduce((a, t)=>a.concat(ck_recs(doc, id, t)), []).sort((a, b)=>String(a.at).localeCompare(String(b.at)));
 function ck_targetKind(id){ const k = ck_kind(id); return k === 'escalope' ? 'poulet' : k === 'boeuf' ? 'viande' : ''; }
 function ck_targetId(id){ const tk = ck_targetKind(id); if(!tk) return ''; const t = ck_ingList().find(x=>ck_kind(x.id) === tk); return t ? t.id : ''; }
@@ -6943,7 +6943,7 @@ function ck_received(id){   // disponible pour cet ingrédient (poulet haché / 
   const add = (lb, q)=>{ if(q > 0){ parts[lb] = ck_r((parts[lb] || 0) + q); tot += q; } };
   Object.keys(docs).forEach(key=>{ const d = docs[key], lb = d.poste || d.name || '?';
     src.forEach(s=>{ add(lb, ck_sumF(ck_recs(d, s.id, 'cut'), 't')); if(k === 'poulet') add(lb + ' ' + ck_s('direct'), ck_sumF(ck_recs(d, s.id, 'mince'), 'h')); });
-    if(k === 'viande') add(ck_s('buyLab'), ck_sumF(ck_recs(d, id, 'buy'), 'b')); });
+  });
   return { tot:ck_r(tot), parts };
 }
 function ck_prevRest(id){   // quantité restante saisie en fin de service la veille (point de départ du lendemain)
@@ -6971,7 +6971,7 @@ function ck_figs(id, doc, poste){   // [[libellé, valeur]] : ce que montre la f
   else if(k === 'avocat'){ o.push([ck_s('fg_s'), c.s === null ? '—' : f(c.s)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_ut'), c.ut === null ? '—' : f(c.ut)]); }
   else if(k === 'gamba'){ o.push([ck_s('fg_a2'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_dec'), f(c.dec)], [ck_s('fg_n'), f(c.n)], [ck_s('fg_wok'), f(c.wok)]); }
   else if(k === 'poulet'){ o.push([ck_s('fg_d'), f(c.d)], [ck_s('fg_g'), f(c.g)], [ck_s('fg_n'), f(c.nem)]); }
-  else if(k === 'viande'){ o.push([ck_s('fg_d'), f(c.d)], [ck_s('fg_vu'), f(c.v)]); }
+  else if(k === 'viande'){ o.push([ck_s('fg_vu'), f(c.v)], [ck_s('fg_dv'), f(c.d)]); if(c.v > 0 && c.d > 0) o.push([ck_s('fg_vb'), f(Math.min(c.v, c.d))], [ck_s('fg_vs'), f(Math.max(0, ck_r(c.v - c.d)))]); }   // répartition : chutes de bœuf d'abord, le reste vient du stock acheté
   if(c.fin){ const x = c.fin;
     if(x.rc !== undefined) o.push([ck_s('fg_rc'), f(Number(x.rc) || 0)]); if(x.rn !== undefined) o.push([ck_s('fg_rn'), f(Number(x.rn) || 0)]);
     if(x.r !== undefined) o.push([ck_s('fg_r'), f(Number(x.r) || 0)]);
@@ -7019,8 +7019,7 @@ function ck_specCut(id, rid){
   }
   else if(k === 'poulet'){ fields.push({ ing:id, k:'g', q:'q_pou_g', zero:true }); }
   else if(k === 'viande'){
-    const others = ck_r(ck_recs(doc, id, 'cut').filter(r=>r.id !== rid).reduce((a, r)=>a + (Number(r.f.v) || 0), 0)), def = Math.max(0, ck_r(ck_received(id).tot - others));
-    fields.push({ ing:id, k:'v', q:'q_vi_v', def:def > 0 ? ck_fmt(def) : '', defN:def });
+    fields.push({ ing:id, k:'v', q:'q_vi_v' });   // viande hachée : seulement « utilisée dans les gyozas » (achetée pour l'essentiel)
   } else {
     const L2 = k === 'crevette';   // crevette L2 : « à décortiquer » (pas « à découper »)
     fields.push({ ing:id, k:'a', q:L2 ? 'q_dec_a' : 'q_cut_a' });
@@ -7038,7 +7037,6 @@ function ck_specCut(id, rid){
     },
     save:(vals)=>{
       const f = {}; fields.forEach((fl, j)=>{ f[fl.k] = ck_num(vals[j]) || 0; });
-      if(k === 'viande'){ const def = fields[0].defN || 0; f.auto = ck_r(def); f.corr = Math.abs(f.v - def) > 1e-9; }
       ck_putRec(id, myRid, { t:'cut', f, at:old ? old.at : ck_nowIso() });
     } };
 }
@@ -7310,7 +7308,8 @@ function ck_tileInfo(id, doc){
     if(n > 1) t += ' · ' + ck_s('cuts', { n });
     return { st:'ready', text:t };
   }
-  if(k === 'poulet' || k === 'viande'){ const r = ck_received(id); if(r.tot <= 0) return { st:'wait', text:ck_s('nothingRecv') }; return { st:'todo', text:ck_s('recvd', { v:ck_fmt(r.tot), u }) }; }
+  if(k === 'poulet'){ const r = ck_received(id); if(r.tot <= 0) return { st:'wait', text:ck_s('nothingRecv') }; return { st:'todo', text:ck_s('recvd', { v:ck_fmt(r.tot), u }) }; }
+  if(k === 'viande'){ const r = ck_received(id); return { st:'todo', text:r.tot > 0 ? ck_s('recvd', { v:ck_fmt(r.tot), u }) : ck_s('todo') }; }
   return { st:'todo', text:ck_s('todo') };
 }
 function ck_tilesHtml(){
@@ -7340,7 +7339,7 @@ function ck_recText(id, r){
   if(r.t === 'buy') return ck_s('fg_b') + ' ' + v(f.b);
   if(k === 'gamba') return ck_s('fg_a2') + ' ' + v(f.a) + (f.w !== undefined ? ' · ' + ck_s('fg_w') + ' ' + v(f.w) : '') + ' · ' + ck_s('fg_n') + ' ' + v(f.n) + (f.w !== undefined ? ' · ' + ck_s('fg_wok') + ' ' + v(Math.max(0, ck_r((Number(f.a) || 0) - (Number(f.w) || 0) - (Number(f.n) || 0)))) : '');
   if(k === 'poulet') return ck_s('fg_g') + ' ' + v(f.g);
-  if(k === 'viande') return ck_s('fg_vu') + ' ' + v(f.v) + (f.corr ? ' ✎' : '');
+  if(k === 'viande') return ck_s('fg_vu') + ' ' + v(f.v);
   return ck_s(k === 'crevette' ? 'fg_a2' : 'fg_a') + ' ' + v(f.a) + (f.w !== undefined && ck_wasteInCut(id) ? ' · ' + ck_s('fg_w') + ' ' + v(f.w) : '') + (ck_targetKind(id) ? ' · ' + ck_s('fg_t', { t:ck_targetName(id) }) + ' ' + v(f.t) : '');
 }
 function ck_ingHtml(){
@@ -7361,7 +7360,8 @@ function ck_ingHtml(){
 /* ---------- 4. une question à la fois ---------- */
 function ck_fieldInfo(fld, F){
   const id = fld.ing, k = ck_kind(id), u = ck_unit(id), c = ck_calc(id, ck_myDoc());
-  if((k === 'viande' && fld.k === 'v') || (k === 'poulet' && fld.k === 'g')){ const r = ck_received(id), parts = Object.keys(r.parts).map(x=>`${esc(x)} ${ck_fmt(r.parts[x])}`).join(' + '); return parts ? `${parts} = ${ck_fmt(r.tot)} ${esc(u)}` : '—'; }
+  if(k === 'viande' && fld.k === 'v'){ const r = ck_received(id); return r.tot > 0 ? `${esc(ck_s('fg_dv'))} : <b>${ck_fmt(r.tot)} ${esc(u)}</b>` : ''; }
+  if(k === 'poulet' && fld.k === 'g'){ const r = ck_received(id), parts = Object.keys(r.parts).map(x=>`${esc(x)} ${ck_fmt(r.parts[x])}`).join(' + '); return parts ? `${parts} = ${ck_fmt(r.tot)} ${esc(u)}` : '—'; }
   if(k === 'gamba' && fld.k === 'n'){   // net décortiqué, et ce qui ira au wok avec la part nem saisie
     const a = ck_num(F.v[0]) || 0, w = ck_num(F.v[1]) || 0, n = ck_num(F.v[2]) || 0, net = Math.max(0, ck_r(a - w)), wok = Math.max(0, ck_r(net - n));
     return `${esc(ck_s('fg_dec'))} : <b>${ck_fmt(net)} ${esc(u)}</b> · ${esc(ck_s('fg_wok'))} : <b>${ck_fmt(wok)} ${esc(u)}</b>`;
