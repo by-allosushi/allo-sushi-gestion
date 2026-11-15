@@ -1396,13 +1396,14 @@ function ca_normalizeSession(s, date){
     debutValidations: Array.isArray(s.debutValidations) ? s.debutValidations : [],
     debutManuel: s.debutManuel || null,
     restant: s.restant || null,
+    restants: Array.isArray(s.restants) ? s.restants : [],
     enregistreParEn: s.enregistreParEn,
     enregistreLe: s.enregistreLe,
   };
 }
 function ca_blankSession(date){
   const prev = ca_allSessions[prevDateStr(date)];
-  const base = { date, entrees: [], totalVentesErp: '', sorties: [], montantCompte: '', noteValidation: '', debutValidations: [], debutManuel: null, restant: null };
+  const base = { date, entrees: [], totalVentesErp: '', sorties: [], montantCompte: '', noteValidation: '', debutValidations: [], debutManuel: null, restant: null, restants: [] };
   if(prev){
     return { ...base, debutCaisse: ca_montantPourLendemain(prev), debutCaisseAuto: true };
   }
@@ -1459,7 +1460,7 @@ async function ca_debutDecide(id, ok){
       const list = Array.isArray(c.debutValidations) ? c.debutValidations : [], v = list.find(x=>x.id === id);
       if(!v || v.statut !== 'attente') throw new Error('proposition déjà traitée ou introuvable');
       const r = { ...c, debutValidations:list.map(x=>x.id === id ? { ...x, statut:ok ? 'valide' : 'refuse', decidePar:currentUser, decideLe:iso } : x) };
-      if(ok){ r.debutManuel = { montant:Number(v.montant), par:v.par, vid:v.id, at:iso, source:'employe', validePar:currentUser }; r.debutCaisse = String(v.montant); }
+      if(ok && v.premier !== false){ r.debutManuel = { montant:Number(v.montant), par:v.par, vid:v.id, at:iso, source:'employe', validePar:currentUser }; r.debutCaisse = String(v.montant); }
       return r;
     });
     ca_session.debutValidations = out.debutValidations; ca_session.debutManuel = out.debutManuel || null;
@@ -1486,6 +1487,7 @@ ca_caisseCol.onSnapshot((snap)=>{
     if(srv && ca_session && ca_session.date === ca_workingDate){
       (Array.isArray(srv.sorties) ? srv.sorties : []).forEach(l=>{ if(l && l.par && !(ca_session.sorties || []).some(x=>x.id === l.id)){ if(!Array.isArray(ca_session.sorties)) ca_session.sorties = []; ca_session.sorties.push(l); } });
       if(Array.isArray(srv.debutValidations)) ca_session.debutValidations = srv.debutValidations;
+      if(Array.isArray(srv.restants)){ if(JSON.stringify(ca_session.restants || []) !== JSON.stringify(srv.restants)) ca_session.restants = srv.restants; }
       ca_session.debutManuel = srv.debutManuel || null;
       { const a = JSON.stringify(ca_session.restant || null), b = JSON.stringify(srv.restant || null);   // montant restant saisi / validé par un employé ou par l'admin
         if(a !== b){ ca_session.restant = srv.restant || null; if(srv.restant && srv.restant.statut === 'valide') ca_session.montantCompte = srv.montantCompte !== undefined ? srv.montantCompte : ''; } }
@@ -1562,7 +1564,7 @@ async function ca_limTx(mutate){
   const date = ca_session.date, ref = ca_caisseCol.doc(date);
   return db.runTransaction(async (tx)=>{
     const snap = await tx.get(ref);
-    const cur = snap.exists ? snap.data() : { date, debutCaisse:ca_session.debutCaisse, entrees:[], totalVentesErp:ca_session.totalVentesErp || '', sorties:[], montantCompte:'', noteValidation:'', debutValidations:[], restant:null };
+    const cur = snap.exists ? snap.data() : { date, debutCaisse:ca_session.debutCaisse, entrees:[], totalVentesErp:ca_session.totalVentesErp || '', sorties:[], montantCompte:'', noteValidation:'', debutValidations:[], restant:null, restants:[] };
     const out = mutate({ ...cur });
     if(String(out.totalVentesErp === undefined || out.totalVentesErp === null ? '' : out.totalVentesErp).trim() === '' && String(ca_session.totalVentesErp || '').trim() !== '') out.totalVentesErp = ca_session.totalVentesErp;
     if(String(out.debutCaisse === undefined || out.debutCaisse === null ? '' : out.debutCaisse).trim() === '' && String(ca_session.debutCaisse || '').trim() !== '') out.debutCaisse = ca_session.debutCaisse;
@@ -1575,7 +1577,7 @@ async function ca_limValidateDebut(){
   const raw = String(ca_lim.debut).trim(); if(raw === ''){ alert('Saisis le montant que tu comptes dans la caisse.'); return; }
   const dbt = ca_limDebut(); if(dbt.closed){ alert('La clôture du jour est enregistrée : le début est verrouillé.'); return; }
   const m = ca_parseNum(raw), attendu = dbt.val, ecart = dbt.none ? 0 : Math.round((m - attendu) * 100) / 100, diff = Math.abs(ecart) > 0.004;
-  if(!dbt.none) ca_session.debutCaisse = String(dbt.val);
+  if(!dbt.dayNone) ca_session.debutCaisse = String(dbt.dayVal);
   let note = '';
   if(diff){
     if(ca_lim.dFirst === null || m !== ca_lim.dFirst){
@@ -1587,7 +1589,7 @@ async function ca_limValidateDebut(){
     note = String(ca_lim.note || '').trim();
     if(!note){ alert('Le montant diffère toujours de l’attendu : écris un commentaire avant de valider.'); return; }
   }
-  const v = { id:uid(), par:currentUser, heure:ca_nowHM(), at:new Date().toISOString(), montant:m, attendu, ecart, note:diff ? note : '', ...(diff ? { statut:'attente' } : {}) };
+  const v = { id:uid(), par:currentUser, heure:ca_nowHM(), at:new Date().toISOString(), montant:m, attendu, ecart, theo:Math.round(ca_montantTheorique(ca_session) * 100) / 100, premier:!(ca_session.debutValidations || []).some(x=>x.par !== currentUser) && !ca_restantsList(ca_session).length, note:diff ? note : '', ...(diff ? { statut:'attente' } : {}) };
   ca_lim.busy = true;
   try{
     const out = await ca_limTx(c=>({ ...c, debutValidations:[...(Array.isArray(c.debutValidations) ? c.debutValidations : []), v] }));
@@ -1668,32 +1670,79 @@ async function ca_limDelS(id){
 }
 /* Début de caisse attendu (accès limité) : calculé à l'affichage, jamais « 0 » par défaut */
 function ca_limDebut(){
-  const e = ca_debutEff(ca_session.date);
-  return { val:e.val, src:(e.src === 'report' ? e.prevDate : null), manuel:e.src === 'manuel', none:!!e.none, closed:!!(ca_allSessions[ca_session.date] && ca_allSessions[ca_session.date].enregistreLe) };
+  const e = ca_debutEff(ca_session.date), closed = !!(ca_allSessions[ca_session.date] && ca_allSessions[ca_session.date].enregistreLe);
+  const rs = ca_restantsList(ca_session).filter(r=>r.statut !== 'refuse'), last = rs.length ? rs[rs.length - 1] : null;
+  const base = { dayVal:e.val, dayNone:!!e.none, closed };
+  if(last) return { ...base, val:ca_parseNum(last.montant), src:null, from:{ par:last.par || '', heure:last.heure || '' }, manuel:false, none:false };   // le début = le reste de l'employé précédent
+  return { ...base, val:e.val, src:(e.src === 'report' ? e.prevDate : null), from:null, manuel:e.src === 'manuel', none:!!e.none };
 }
-function ca_restantAttendu(){ return Math.round(ca_montantTheorique(ca_session) * 100) / 100; }
+function ca_cmpAt(a, b){ return String(a.at || '').localeCompare(String(b.at || '')); }
+function ca_restantsList(s){   // toutes les fins de session de la journée (une par employé), de la plus ancienne à la plus récente
+  const a = Array.isArray(s.restants) ? s.restants : [];
+  if(a.length) return a.slice().sort(ca_cmpAt);
+  return s.restant ? [{ ...s.restant, id:s.restant.id || 'legacy' }] : [];
+}
+function ca_myPoste(){   // mon dernier début de caisse validé aujourd'hui
+  const l = (ca_session.debutValidations || []).filter(v=>v.par === currentUser).sort(ca_cmpAt);
+  return l.length ? l[l.length - 1] : null;
+}
+function ca_myRestant(){   // ma fin de session pour ce poste
+  const v = ca_myPoste(), vid = v ? v.id : null;
+  const l = ca_restantsList(ca_session).filter(r=>r.par === currentUser && (r.vid || null) === vid);
+  return l.length ? l[l.length - 1] : null;
+}
+function ca_unclosedOthers(){   // postes d'autres employés dont la fin de caisse n'a pas été validée
+  const rs = ca_restantsList(ca_session), last = {};
+  (ca_session.debutValidations || []).slice().sort(ca_cmpAt).forEach(v=>{ last[v.par || ''] = v; });
+  return Object.values(last).filter(v=>v.par !== currentUser && v.statut !== 'refuse' && !rs.some(r=>r.vid === v.id));
+}
+/* Montant attendu à la fin de MON poste : ce que j'ai trouvé au début + ce qui s'est passé depuis (ventes en espèces, sorties) */
+function ca_restantAttendu(){
+  const t = ca_montantTheorique(ca_session), v = ca_myPoste();
+  if(v && v.theo !== undefined && v.theo !== null && !isNaN(Number(v.theo))){
+    const base = v.statut === 'refuse' ? ca_parseNum(v.attendu) : ca_parseNum(v.montant);
+    return Math.round((base + t - Number(v.theo)) * 100) / 100;
+  }
+  return Math.round(t * 100) / 100;
+}
+function ca_ecartBand(att, m){   // bandeau d'état de l'écart (vert : correct, rouge : écart)
+  const ec = Math.round((m - att) * 100) / 100, diff = Math.abs(ec) > 0.004, col = diff ? 'var(--rust)' : 'var(--moss)', bg = diff ? 'var(--rust-bg)' : 'var(--moss-bg)';
+  return `<div style="border:1.5px solid ${col};background:${bg};border-radius:10px;padding:9px 12px;"><div style="font-weight:700;font-size:14px;color:${col};">${diff ? '⚠ Écart de ' + ca_fmtMoney(Math.abs(ec)) + (ec < 0 ? ' en moins' : ' en trop') : '✓ Caisse correcte — aucun écart'}</div><div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Attendu ${ca_fmtMoney(att)} · compté ${ca_fmtMoney(m)}</div></div>`;
+}
 async function ca_limSubmitRestant(){
   if(ca_lim.busy) return;
   if(!currentUser){ askUserName(false); if(!currentUser) return; }
   const raw = String(ca_lim.rest).trim(); if(raw === ''){ alert('Saisis le montant qui reste dans la caisse.'); return; }
   const m = ca_parseNum(raw), attendu = ca_restantAttendu(), ecart = Math.round((m - attendu) * 100) / 100, note = String(ca_lim.rnote || '').trim(), diff = Math.abs(ecart) > 0.004;
   if(diff && !note){ alert('Le montant diffère de l’attendu (' + ca_fmtMoney(attendu) + ') : la note d’explication est obligatoire.'); return; }
-  const r = { par:currentUser, heure:ca_nowHM(), at:new Date().toISOString(), montant:m, attendu, ecart, note:diff ? note : '', statut:diff ? 'attente' : 'valide' };
+  const v = ca_myPoste(), prev = ca_myRestant();
+  const r = { id:(prev && prev.id && prev.id !== 'legacy') ? prev.id : uid(), vid:v ? v.id : null, par:currentUser, heure:ca_nowHM(), at:new Date().toISOString(), montant:m, attendu, ecart, note:diff ? note : '', statut:diff ? 'attente' : 'valide' };
   ca_lim.busy = true;
   try{
-    const out = await ca_limTx(c=>({ ...c, restant:r, ...(diff ? {} : { montantCompte:String(m) }) }));
-    ca_session.restant = out.restant; if(!diff) ca_session.montantCompte = String(m);
+    const out = await ca_limTx(c=>{
+      let list = Array.isArray(c.restants) ? c.restants.slice() : [];
+      if(!list.length && c.restant) list = [{ ...c.restant, id:c.restant.id || 'legacy' }];
+      list = list.filter(x=>x.id !== r.id); list.push(r);
+      return { ...c, restants:list, restant:r, ...(diff ? {} : { montantCompte:String(m) }) };
+    });
+    ca_session.restants = out.restants; ca_session.restant = out.restant; if(!diff) ca_session.montantCompte = String(m);
     ca_lim.rest = ''; ca_lim.rnote = '';
   }catch(e){ console.error(e); alert('Erreur : montant non enregistré (' + (e.message || e) + '). Réessaie.'); }
   ca_lim.busy = false; ca_render();
 }
-async function ca_restantDecide(ok){
-  const r = ca_session.restant; if(!r || r.statut !== 'attente') return;
+async function ca_restantDecide(id, ok){
+  const r = ca_restantsList(ca_session).find(x=>x.id === id); if(!r || r.statut !== 'attente') return;
   if(!ok && !confirm('Refuser ce montant ? L’employé devra recompter et renvoyer.')) return;
   const nr = { ...r, statut:ok ? 'valide' : 'refuse', decidePar:currentUser || '', decideLe:ca_nowHM() };
   try{
-    const out = await ca_limTx(c=>({ ...c, restant:nr, ...(ok ? { montantCompte:String(r.montant) } : {}) }));
-    ca_session.restant = out.restant; if(ok) ca_session.montantCompte = String(r.montant);
+    const out = await ca_limTx(c=>{
+      let list = Array.isArray(c.restants) ? c.restants.slice() : [];
+      if(!list.length && c.restant) list = [{ ...c.restant, id:c.restant.id || 'legacy' }];
+      list = list.map(x=>x.id === id ? nr : x);
+      const last = list.slice().sort(ca_cmpAt).pop();
+      return { ...c, restants:list, restant:last, ...(ok && last && last.id === id ? { montantCompte:String(r.montant) } : {}) };
+    });
+    ca_session.restants = out.restants; ca_session.restant = out.restant; if(ok && out.restant && out.restant.id === id) ca_session.montantCompte = String(r.montant);
   }catch(e){ console.error(e); alert('Erreur : décision non enregistrée (' + (e.message || e) + ').'); }
   ca_render();
 }
@@ -1704,15 +1753,32 @@ function ca_restantStatusHtml(r){
   if(r.statut === 'refuse') return `<div class="cg-sub" style="color:var(--rust);">✕ Refusé par ${esc(r.decidePar || 'l’admin')} : ${ca_fmtMoney(r.montant)}${ecs}. Recompte et renvoie.</div>`;
   return `<div class="cg-sub" style="color:var(--amber);">⏳ En attente de validation de l’admin : ${ca_fmtMoney(r.montant)}${ecs}</div>`;
 }
+/* Admin : passations de la journée (qui a tenu la caisse, de quand à quand) + fins de session à valider */
+function ca_passationsCard(){
+  const dvs = (ca_session.debutValidations || []).slice().sort(ca_cmpAt), rs = ca_restantsList(ca_session);
+  if(!dvs.length && !rs.length) return '';
+  const ecs = (e)=>Math.abs(Number(e) || 0) > 0.004 ? ' <span style="color:var(--rust);">(écart ' + (e > 0 ? '+' : '') + ca_fmtMoney(e) + ')</span>' : '';
+  const used = new Set();
+  const rows = dvs.map(v=>{
+    const r = rs.find(x=>x.vid === v.id); if(r) used.add(r.id);
+    const t0 = Date.parse(v.at || '') || 0, t1 = r ? (Date.parse(r.at || '') || Infinity) : Infinity;
+    const rem = (ca_session.sorties || []).filter(l=>{ const lt = Date.parse(l.at || '') || 0; return l.motif === 'retrait' && l.par === v.par && lt >= t0 - 1000 && lt <= t1 + 1000; }).reduce((s,l)=>s + ca_parseNum(l.montant), 0);
+    return `<div style="border-top:1px solid var(--line,#2a312d);padding:7px 0;"><div style="font-size:13px;"><b>${esc(v.par || '')}</b> · ${esc(v.heure || '')} → ${r ? esc(r.heure || '') : '<span style="color:var(--amber);">⚠ fin de caisse non validée</span>'}</div><div class="cg-sub">Début ${ca_fmtMoney(v.montant)}${ecs(v.ecart)} · Remis ${ca_fmtMoney(rem)} · Reste ${r ? ca_fmtMoney(r.montant) + ecs(r.ecart) + (r.statut === 'attente' ? ' ⏳' : r.statut === 'refuse' ? ' ✕' : '') : '—'}</div></div>`;
+  });
+  rs.filter(r=>!used.has(r.id)).forEach(r=>{ rows.push(`<div style="border-top:1px solid var(--line,#2a312d);padding:7px 0;"><div style="font-size:13px;"><b>${esc(r.par || '')}</b> · fin ${esc(r.heure || '')}</div><div class="cg-sub">Reste ${ca_fmtMoney(r.montant)}${ecs(r.ecart)}${r.statut === 'attente' ? ' ⏳' : r.statut === 'refuse' ? ' ✕' : ''}</div></div>`); });
+  return `<div class="cg-card" style="margin-bottom:10px;"><div class="cg-t">🔁 Passations de la journée</div>${rows.join('')}</div>`;
+}
 function ca_restantAdminCard(){
-  const r = ca_session.restant; if(!r) return '';
-  const ec = Number(r.ecart) || 0, diff = Math.abs(ec) > 0.004;
-  return `<div class="cg-card" style="margin-bottom:10px;${r.statut === 'attente' ? 'border-color:var(--rust);' : ''}">
+  const all = ca_restantsList(ca_session);
+  const show = all.filter((r,i)=>r.statut === 'attente' || i === all.length - 1);
+  return ca_passationsCard() + show.map(r=>{
+    const ec = Number(r.ecart) || 0, diff = Math.abs(ec) > 0.004;
+    return `<div class="cg-card" style="margin-bottom:10px;${r.statut === 'attente' ? 'border-color:var(--rust);' : ''}">
     <div class="cg-t">🧮 Montant restant${r.statut === 'attente' ? ' — à valider' : ''}</div>
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;"><div><div class="cg-sub">Compté par ${esc(r.par || '')} à ${esc(r.heure || '')}</div><div class="cg-big" style="font-size:24px;">${ca_fmtMoney(r.montant)}</div></div><div style="text-align:right;"><div class="cg-sub">Attendu ${ca_fmtMoney(r.attendu)}</div><b style="color:var(${diff ? '--rust' : '--moss'});">${diff ? 'Écart ' + (ec > 0 ? '+' : '') + ca_fmtMoney(ec) : 'Aucun écart'}</b></div></div>
     ${r.note ? `<div style="border:1px solid var(--rust);background:var(--rust-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--rust);">Note : ${esc(r.note)}</div>` : ''}
-    ${r.statut === 'attente' ? `<div style="display:flex;gap:8px;"><button class="btn t-save" style="flex:1;height:42px;" onclick="ca_restantDecide(true)">✓ Valider</button><button class="btn" style="flex:1;height:42px;background:var(--rust-bg);border:1px solid var(--rust);color:var(--rust);font-weight:700;" onclick="ca_restantDecide(false)">✕ Refuser (recompter)</button></div><div class="cg-sub">Une fois validé, ce montant devient le Retenu pour demain.</div>` : ca_restantStatusHtml(r)}
-  </div>`;
+    ${r.statut === 'attente' ? `<div style="display:flex;gap:8px;"><button class="btn t-save" style="flex:1;height:42px;" onclick="ca_restantDecide('${r.id}',true)">✓ Valider</button><button class="btn" style="flex:1;height:42px;background:var(--rust-bg);border:1px solid var(--rust);color:var(--rust);font-weight:700;" onclick="ca_restantDecide('${r.id}',false)">✕ Refuser (recompter)</button></div><div class="cg-sub">Une fois validé, ce montant devient le début de la personne suivante.</div>` : ca_restantStatusHtml(r)}
+  </div>`; }).join('');
 }
 async function ca_limAddSortie(){
   if(ca_lim.busy) return;
@@ -1735,16 +1801,17 @@ function ca_renderLimited(){
   if(ca_workingDate !== today){ ca_workingDate = today; const ex = ca_allSessions[today]; ca_session = ex ? ca_normalizeSession(ex, today) : ca_blankSession(today); ca_hist = null; ca_histEdit = null; }
   ca_ensureRpWatch();
   if(ca_rp.loaded && ca_rp.exists) ca_session.totalVentesErp = ca_rp.ca;   // l'employé ne voit pas les ventes, mais le calcul les suit en direct
-  const dbt = ca_limDebut(); if(!dbt.none) ca_session.debutCaisse = String(dbt.val);
+  const dbt = ca_limDebut(); if(!dbt.dayNone) ca_session.debutCaisse = String(dbt.dayVal);
   const attendu = dbt.val, raw = String(ca_lim.debut).trim(), m = ca_parseNum(raw);
-  const mine = (ca_session.debutValidations || []).filter(v=>v.par === currentUser);
+  const mine = (ca_session.debutValidations || []).filter(v=>v.par === currentUser), unc = ca_unclosedOthers(), mySorties = (ca_session.sorties || []).filter(l=>l.par === currentUser);
   const needNote = ca_lim.dConf && raw !== '' && ca_lim.dFirst !== null && m === ca_lim.dFirst;
   const recount = ca_lim.dFirst !== null && !needNote;
   return `
     <div class="ticket" style="padding:10px 12px;"><div class="cg-t">Caisse du jour</div><b>${fmtDateShort(ca_session.date)}</b> <span class="cg-sub">· journée en cours</span></div>
     <div class="cg-card" style="margin-bottom:10px;">
       <div class="cg-t">💵 Début de caisse</div>
-      <div class="cg-sub">Attendu : <b style="color:var(--ink);">${dbt.none ? 'aucune clôture trouvée : saisis ce que tu comptes' : ca_fmtMoney(attendu)}</b>${dbt.src ? ' (clôture du ' + fmtDateShort(dbt.src) + ')' : ''}${dbt.manuel ? ' (montant modifié et validé par l’admin)' : ''}</div>
+      ${unc.length ? `<div style="border:1px solid var(--amber);background:var(--amber-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--amber);">⚠ Session précédente non clôturée : ${unc.map(v=>esc(v.par || '')).join(', ')} n’a pas validé sa fin de caisse. Tu peux commencer : l’admin est prévenu.</div>` : ''}
+      <div class="cg-sub">Attendu : <b style="color:var(--ink);">${dbt.none ? 'aucune clôture trouvée : saisis ce que tu comptes' : ca_fmtMoney(attendu)}</b>${dbt.from ? ' (clôture de ' + esc(dbt.from.par) + ' à ' + esc(dbt.from.heure) + ')' : dbt.src ? ' (clôture du ' + fmtDateShort(dbt.src) + ')' : ''}${dbt.manuel ? ' (montant modifié et validé par l’admin)' : ''}</div>
       ${dbt.closed ? '<div class="cg-sub" style="color:var(--amber);">🔒 La clôture du jour est enregistrée : le début est verrouillé (seul l’admin peut le modifier).</div>' : `<input id="lim-debut" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_lim.debut)}" oninput="ca_lim.debut=this.value;ca_render()">
       ${recount ? `<div style="border:1px solid var(--amber);background:var(--amber-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--amber);">⚠ Le montant saisi (${ca_fmtMoney(ca_lim.dFirst)}) diffère de l’attendu (${ca_fmtMoney(attendu)}). Recompte la caisse et saisis à nouveau le montant.</div>` : ''}
       ${needNote ? `<input id="lim-note" class="cg-in" type="text" style="border-color:var(--rust);font-family:'Inter',sans-serif;" placeholder="Commentaire obligatoire : explique l’écart" value="${esc(ca_lim.note)}" oninput="ca_lim.note=this.value"><div class="cg-sub" style="color:var(--rust);">Le montant diffère toujours de l’attendu : écris un commentaire avant de valider.</div>` : ''}
@@ -1772,7 +1839,7 @@ function ca_renderLimited(){
         ? (ca_lim.dest ? `<div style="border:1px solid var(--service);background:var(--service-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--service);">ℹ️ Ce montant doit être remis à ${esc(ca_lim.dest)}.</div>` : '')
         : `<input id="lim-cmt" class="cg-in" type="text" style="border-color:var(--rust);font-family:'Inter',sans-serif;" placeholder="Commentaire obligatoire (client, référence, raison…)" value="${esc(ca_lim.cmt)}" oninput="ca_lim.cmt=this.value" onkeydown="if(event.key==='Enter')ca_limAddSortie()">`}
       <div class="cg-act"><span class="cg-sub">Ajout uniquement</span><button class="cg-plus" title="Ajouter" onclick="ca_limAddSortie()">+</button></div>
-      ${(ca_session.sorties || []).length ? `<div>${(ca_session.sorties || []).map(l=>{
+      ${mySorties.length ? `<div>${mySorties.map(l=>{
         const isR = l.motif === 'retrait', lab = l.motif === 'virement' ? '🏦 Virement' : l.motif === 'nonregle' ? '⏳ Non payée' : '💵 Remise → ' + esc(l.note || '');
         if(ca_lim.editS === l.id){
           return `<div style="border:1px solid var(--forest);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;margin-top:6px;"><div class="cg-sub">Modifier : ${lab}</div>
@@ -1786,23 +1853,24 @@ function ca_renderLimited(){
       }).join('')}</div><div class="cg-sub" style="font-size:10.5px;">Tes lignes sont modifiables pendant 1 h après leur saisie.</div>` : ''}
     </div>
     ${(()=>{
-      const att = ca_restantAttendu(), rr = String(ca_lim.rest).trim(), rm = ca_parseNum(rr), rec = rr === '' ? null : Math.round((rm - att) * 100) / 100, rdiff = rec !== null && Math.abs(rec) > 0.004;
+      const myR = ca_myRestant(), att = ca_restantAttendu(), rr = String(ca_lim.rest).trim(), rm = ca_parseNum(rr), rec = rr === '' ? null : Math.round((rm - att) * 100) / 100, rdiff = rec !== null && Math.abs(rec) > 0.004;
       return `<div class="cg-card" style="margin-bottom:10px;">
       <div class="cg-t">🧮 Montant restant en caisse</div>
       <div class="cg-sub">Attendu : <b style="color:var(--ink);">${ca_fmtMoney(att)}</b></div>
       <input id="lim-rest" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_lim.rest)}" oninput="ca_lim.rest=this.value;ca_render()">
-      ${rec !== null ? `<div style="font-size:13px;">Écart : <b style="color:var(${rdiff ? '--rust' : '--moss'});">${rdiff ? (rec > 0 ? '+' : '') + ca_fmtMoney(rec) : 'Aucun écart'}</b></div>` : ''}
+      ${rec !== null ? ca_ecartBand(att, rm) : ''}
       ${rdiff ? `<input id="lim-rnote" class="cg-in" type="text" style="border-color:var(--rust);font-family:'Inter',sans-serif;" placeholder="Note obligatoire : explique l’écart" value="${esc(ca_lim.rnote)}" oninput="ca_lim.rnote=this.value"><div class="cg-sub" style="color:var(--rust);">Un écart ne peut pas être validé seul : il sera envoyé à l’admin.</div>` : ''}
       ${rdiff
         ? `<button class="btn" style="width:100%;height:44px;background:var(--rust-bg);border:1px solid var(--rust);color:var(--rust);font-weight:700;" onclick="ca_limSubmitRestant()">📨 Envoyer à l’admin pour validation</button>`
         : `<button class="btn t-save" style="width:100%;height:44px;" onclick="ca_limSubmitRestant()">✓ Valider le montant restant</button>`}
-      ${ca_restantStatusHtml(ca_session.restant)}
+      ${rr === '' && myR ? ca_ecartBand(myR.attendu, myR.montant) : ''}${ca_restantStatusHtml(myR)}
     </div>`; })()}
-    <div class="cg-card">
-      <div class="cg-t">📌 Retenu pour demain</div>
-      <div class="cg-val" style="font-size:22px;font-weight:800;">${ca_fmtMoney(ca_montantPourLendemain(ca_session))}</div>
-      <div class="cg-sub">calculé automatiquement</div>
-    </div>`;
+    ${(()=>{ const lr = ca_restantsList(ca_session).filter(x=>x.statut !== 'refuse').slice(-1)[0];
+      return `<div class="cg-card">
+      <div class="cg-t">📌 Reste transmis à la personne suivante</div>
+      <div class="cg-val" style="font-size:22px;font-weight:800;">${ca_fmtMoney(lr ? ca_parseNum(lr.montant) : ca_montantPourLendemain(ca_session))}</div>
+      <div class="cg-sub">${lr ? 'compté par ' + esc(lr.par || '') + ' à ' + esc(lr.heure || '') : 'calculé automatiquement'}</div>
+    </div>`; })()}`;
 }
 
 async function ca_saveSession(){
