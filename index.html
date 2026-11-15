@@ -1549,7 +1549,6 @@ async function ca_syncRetraits(sess){
 
 /* ---------------- Accès limité « saisie du soir » : début de caisse, sorties (ajout seulement), retenu pour demain ---------------- */
 function ca_isLimited(){ return !!(session && !session.isAdmin && session.permissions && session.permissions.caisseLim && !session.permissions.caisse); }
-const CA_TOL = 50;   // écart toléré (DA) : au-dessous, rien n'est demandé
 let ca_lim = { dalt:false, dtard:false, dheure:'', tard:false, rheure:'', debut:'', note:'', sortie:'', rest:'', rnote:'', busy:false, type:'retrait', dest:'', cmt:'', dFirst:null, dConf:false, editV:null, eVal:'', eNote:'', editS:null, eMont:'', eDest:'', eCmt:'' };
 const CA_EDIT_MS = 3600000;   // délai de modification / suppression par l'employé : 1 h
 function ca_inWindow(at){ const t = Date.parse(at || ''); return !isNaN(t) && (Date.now() - t) <= CA_EDIT_MS && (Date.now() - t) >= -60000; }
@@ -1729,8 +1728,8 @@ function ca_restantAttendu(){
   return rnd(t0);
 }
 function ca_ecartBand(att, m){   // bandeau d'état de l'écart (vert : correct ou toléré, rouge : écart à vérifier)
-  const ec = Math.round((m - att) * 100) / 100, a = Math.abs(ec), diff = a > 0.004, bad = diff && a > CA_TOL, col = bad ? 'var(--rust)' : 'var(--moss)', bg = bad ? 'var(--rust-bg)' : 'var(--moss-bg)';
-  const txt = !diff ? '✓ Caisse correcte — aucun écart' : (bad ? '⚠ Écart de ' : '✓ Écart de ') + ca_fmtMoney(a) + (ec < 0 ? ' en moins' : ' en trop') + (bad ? '' : ' (toléré)');
+  const ec = Math.round((m - att) * 100) / 100, a = Math.abs(ec), diff = a > 0.004, bad = diff, col = bad ? 'var(--rust)' : 'var(--moss)', bg = bad ? 'var(--rust-bg)' : 'var(--moss-bg)';
+  const txt = !diff ? '✓ Caisse correcte — aucun écart' : (bad ? '⚠ Écart de ' : '✓ Écart de ') + ca_fmtMoney(a) + (ec < 0 ? ' en moins' : ' en trop');
   return `<div style="border:1.5px solid ${col};background:${bg};border-radius:10px;padding:9px 12px;"><div style="font-weight:700;font-size:14px;color:${col};">${txt}</div><div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Attendu ${ca_fmtMoney(att)} · compté ${ca_fmtMoney(m)}</div></div>`;
 }
 async function ca_limSubmitRestant(){
@@ -1750,7 +1749,7 @@ async function ca_limSubmitRestant(){
   }else{
     attendu = ca_restantAttendu(); ecart = Math.round((m - attendu) * 100) / 100; note = String(ca_lim.rnote || '').trim(); diff = Math.abs(ecart) > 0.004;
   }
-  const r = { id:(prev && prev.id && prev.id !== 'legacy') ? prev.id : uid(), vid:v ? v.id : null, par:currentUser, heure, at, ...(tard ? { tardive:true, saisieHeure:ca_nowHM() } : {}), montant:m, attendu, ecart, note, statut:(tard || Math.abs(ecart) > CA_TOL) ? 'attente' : 'valide' };
+  const r = { id:(prev && prev.id && prev.id !== 'legacy') ? prev.id : uid(), vid:v ? v.id : null, par:currentUser, heure, at, ...(tard ? { tardive:true, saisieHeure:ca_nowHM() } : {}), montant:m, attendu, ecart, note, statut:(tard || Math.abs(ecart) > 0.004) ? 'attente' : 'valide' };
   ca_lim.busy = true;
   try{
     const out = await ca_limTx(c=>{
@@ -1854,7 +1853,7 @@ function ca_passationsCard(){
   const dvs = (ca_session.debutValidations || []).slice().sort(ca_cmpAt), rs = ca_restantsList(ca_session), closed = !!(ca_allSessions[ca_session.date] && ca_allSessions[ca_session.date].enregistreLe), adm = ca_isAdminNow();
   if(!dvs.length && !rs.length && !closed) return '';
   const M = ca_fmtMoney, mono = "font-family:'JetBrains Mono',monospace;";
-  const ecTxt = (e)=>{ const a = Math.abs(e); return a < 0.005 ? '<span style="color:var(--moss);">Aucun écart</span>' : '<span style="color:var(' + (a <= CA_TOL ? '--amber' : '--rust') + ');">Écart de ' + M(a) + (e < 0 ? ' en moins' : ' en trop') + '</span>'; };
+  const ecTxt = (e)=>{ const a = Math.abs(e); return a < 0.005 ? '<span style="color:var(--moss);">Aucun écart</span>' : '<span style="color:var(' + '--rust' + ');">Écart de ' + M(a) + (e < 0 ? ' en moins' : ' en trop') + '</span>'; };
   const sg = (e)=>(e > 0 ? '+' : '') + M(e);
   const lastOpen = dvs.filter(v=>!v.tardive).pop(), used = new Set();
   const line = '<div style="border-top:1px solid var(--line,#2a312d);padding:7px 0;">';
@@ -1980,7 +1979,7 @@ function ca_renderLimited(){
       ${tard
         ? `<button class="btn" style="width:100%;height:44px;background:var(--rust-bg);border:1px solid var(--rust);color:var(--rust);font-weight:700;" onclick="ca_limSubmitRestant()">📨 Envoyer à l’admin pour validation</button>`
         : `<button class="btn t-save" style="width:100%;height:44px;" onclick="ca_limSubmitRestant()">✓ Terminer mon poste</button>`}
-      <div class="cg-sub" style="display:flex;justify-content:space-between;gap:8px;"><span>${tard ? '' : 'Écart sous ' + CA_TOL + ' DA : accepté sans rien demander'}</span><a href="#" style="color:var(--forest-light);white-space:nowrap;" onclick="ca_limTard(${tard ? 'false' : 'true'});return false;">${tard ? '↩ Comptage fait maintenant' : 'Comptage fait plus tôt ?'}</a></div>
+      <div class="cg-sub" style="display:flex;justify-content:space-between;gap:8px;"><span></span><a href="#" style="color:var(--forest-light);white-space:nowrap;" onclick="ca_limTard(${tard ? 'false' : 'true'});return false;">${tard ? '↩ Comptage fait maintenant' : 'Comptage fait plus tôt ?'}</a></div>
       ${rr === '' && myR && myR.attendu !== null && myR.attendu !== undefined && !tard ? ca_ecartBand(myR.attendu, myR.montant) : ''}${ca_restantStatusHtml(myR)}
     </div>`; })()}
     ${(()=>{ const lr = ca_restantsList(ca_session).filter(x=>x.statut !== 'refuse').slice(-1)[0];
