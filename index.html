@@ -1671,9 +1671,19 @@ async function ca_limDelS(id){
 /* Début de caisse attendu (accès limité) : calculé à l'affichage, jamais « 0 » par défaut */
 function ca_limDebut(){
   const e = ca_debutEff(ca_session.date), closed = !!(ca_allSessions[ca_session.date] && ca_allSessions[ca_session.date].enregistreLe);
-  const rs = ca_restantsList(ca_session).filter(r=>r.statut !== 'refuse'), last = rs.length ? rs[rs.length - 1] : null;
   const base = { dayVal:e.val, dayNone:!!e.none, closed };
-  if(last) return { ...base, val:ca_parseNum(last.montant), src:null, from:{ par:last.par || '', heure:last.heure || '' }, manuel:false, none:false };   // le début = le reste de l'employé précédent
+  const rs = ca_restantsList(ca_session).filter(r=>r.statut !== 'refuse');
+  const dvs = (ca_session.debutValidations || []).slice().sort(ca_cmpAt), P = dvs.length ? dvs[dvs.length - 1] : null;   // poste le plus récent
+  const fromR = (r)=>({ ...base, val:ca_parseNum(r.montant), src:null, from:{ par:r.par || '', heure:r.heure || '' }, manuel:false, none:false });
+  if(P){
+    const rP = rs.find(r=>r.vid === P.id);
+    if(rP) return fromR(rP);   // le début = le reste de l'employé précédent
+    if(P.par !== currentUser){   // le dernier poste n'est pas clôturé : on estime ce qui doit être en caisse
+      const s2 = e.none ? ca_session : { ...ca_session, debutCaisse:String(e.val) };
+      return { ...base, val:Math.round(ca_montantTheorique(s2) * 100) / 100, src:null, from:null, est:P.par || '', manuel:false, none:false };
+    }
+  }
+  if(rs.length) return fromR(rs[rs.length - 1]);
   return { ...base, val:e.val, src:(e.src === 'report' ? e.prevDate : null), from:null, manuel:e.src === 'manuel', none:!!e.none };
 }
 function ca_cmpAt(a, b){ return String(a.at || '').localeCompare(String(b.at || '')); }
@@ -1691,6 +1701,11 @@ function ca_myRestant(){   // ma fin de session pour ce poste
   const l = ca_restantsList(ca_session).filter(r=>r.par === currentUser && (r.vid || null) === vid);
   return l.length ? l[l.length - 1] : null;
 }
+function ca_lateInfo(){   // clôture tardive : un autre employé a déjà pris le poste après moi
+  const v = ca_myPoste(); if(!v) return null;
+  const n = (ca_session.debutValidations || []).filter(x=>x.par !== currentUser && String(x.at || '') > String(v.at || '')).sort(ca_cmpAt)[0];
+  return n ? { v, n } : null;
+}
 function ca_unclosedOthers(){   // postes d'autres employés dont la fin de caisse n'a pas été validée
   const rs = ca_restantsList(ca_session), last = {};
   (ca_session.debutValidations || []).slice().sort(ca_cmpAt).forEach(v=>{ last[v.par || ''] = v; });
@@ -1698,12 +1713,13 @@ function ca_unclosedOthers(){   // postes d'autres employés dont la fin de cais
 }
 /* Montant attendu à la fin de MON poste : ce que j'ai trouvé au début + ce qui s'est passé depuis (ventes en espèces, sorties) */
 function ca_restantAttendu(){
-  const t = ca_montantTheorique(ca_session), v = ca_myPoste();
-  if(v && v.theo !== undefined && v.theo !== null && !isNaN(Number(v.theo))){
+  const t0 = ca_montantTheorique(ca_session), v = ca_myPoste(), late = ca_lateInfo(), rnd = (x)=>Math.round(x * 100) / 100, okT = (x)=>x !== undefined && x !== null && !isNaN(Number(x));
+  if(v && okT(v.theo)){
     const base = v.statut === 'refuse' ? ca_parseNum(v.attendu) : ca_parseNum(v.montant);
-    return Math.round((base + t - Number(v.theo)) * 100) / 100;
+    if(late) return okT(late.n.theo) ? rnd(base + Number(late.n.theo) - Number(v.theo)) : rnd(ca_parseNum(late.n.attendu));   // calculé à l'heure où l'autre a pris la caisse
+    return rnd(base + t0 - Number(v.theo));
   }
-  return Math.round(t * 100) / 100;
+  return rnd(t0);
 }
 function ca_ecartBand(att, m){   // bandeau d'état de l'écart (vert : correct, rouge : écart)
   const ec = Math.round((m - att) * 100) / 100, diff = Math.abs(ec) > 0.004, col = diff ? 'var(--rust)' : 'var(--moss)', bg = diff ? 'var(--rust-bg)' : 'var(--moss-bg)';
@@ -1716,16 +1732,18 @@ async function ca_limSubmitRestant(){
   const m = ca_parseNum(raw), attendu = ca_restantAttendu(), ecart = Math.round((m - attendu) * 100) / 100, note = String(ca_lim.rnote || '').trim(), diff = Math.abs(ecart) > 0.004;
   if(diff && !note){ alert('Le montant diffère de l’attendu (' + ca_fmtMoney(attendu) + ') : la note d’explication est obligatoire.'); return; }
   const v = ca_myPoste(), prev = ca_myRestant();
-  const r = { id:(prev && prev.id && prev.id !== 'legacy') ? prev.id : uid(), vid:v ? v.id : null, par:currentUser, heure:ca_nowHM(), at:new Date().toISOString(), montant:m, attendu, ecart, note:diff ? note : '', statut:diff ? 'attente' : 'valide' };
+  const late = ca_lateInfo(), tn = late ? (Date.parse(late.n.at || '') || Date.now()) : 0;
+  const r = { id:(prev && prev.id && prev.id !== 'legacy') ? prev.id : uid(), vid:v ? v.id : null, par:currentUser, heure:late ? (late.n.heure || ca_nowHM()) : ca_nowHM(), at:late ? new Date(tn - 1000).toISOString() : new Date().toISOString(), ...(late ? { tardive:true, saisieHeure:ca_nowHM() } : {}), montant:m, attendu, ecart, note:diff ? note : '', statut:diff ? 'attente' : 'valide' };
   ca_lim.busy = true;
   try{
     const out = await ca_limTx(c=>{
       let list = Array.isArray(c.restants) ? c.restants.slice() : [];
       if(!list.length && c.restant) list = [{ ...c.restant, id:c.restant.id || 'legacy' }];
       list = list.filter(x=>x.id !== r.id); list.push(r);
-      return { ...c, restants:list, restant:r, ...(diff ? {} : { montantCompte:String(m) }) };
+      const last = list.slice().sort(ca_cmpAt).pop();
+      return { ...c, restants:list, restant:last, ...(!diff && last.id === r.id && !r.tardive ? { montantCompte:String(m) } : {}) };
     });
-    ca_session.restants = out.restants; ca_session.restant = out.restant; if(!diff) ca_session.montantCompte = String(m);
+    ca_session.restants = out.restants; ca_session.restant = out.restant; if(!diff && !r.tardive && out.restant && out.restant.id === r.id) ca_session.montantCompte = String(m);
     ca_lim.rest = ''; ca_lim.rnote = '';
   }catch(e){ console.error(e); alert('Erreur : montant non enregistré (' + (e.message || e) + '). Réessaie.'); }
   ca_lim.busy = false; ca_render();
@@ -1740,9 +1758,9 @@ async function ca_restantDecide(id, ok){
       if(!list.length && c.restant) list = [{ ...c.restant, id:c.restant.id || 'legacy' }];
       list = list.map(x=>x.id === id ? nr : x);
       const last = list.slice().sort(ca_cmpAt).pop();
-      return { ...c, restants:list, restant:last, ...(ok && last && last.id === id ? { montantCompte:String(r.montant) } : {}) };
+      return { ...c, restants:list, restant:last, ...(ok && last && last.id === id && !r.tardive ? { montantCompte:String(r.montant) } : {}) };
     });
-    ca_session.restants = out.restants; ca_session.restant = out.restant; if(ok && out.restant && out.restant.id === id) ca_session.montantCompte = String(r.montant);
+    ca_session.restants = out.restants; ca_session.restant = out.restant; if(ok && !r.tardive && out.restant && out.restant.id === id) ca_session.montantCompte = String(r.montant);
   }catch(e){ console.error(e); alert('Erreur : décision non enregistrée (' + (e.message || e) + ').'); }
   ca_render();
 }
@@ -1763,7 +1781,7 @@ function ca_passationsCard(){
     const r = rs.find(x=>x.vid === v.id); if(r) used.add(r.id);
     const t0 = Date.parse(v.at || '') || 0, t1 = r ? (Date.parse(r.at || '') || Infinity) : Infinity;
     const rem = (ca_session.sorties || []).filter(l=>{ const lt = Date.parse(l.at || '') || 0; return l.motif === 'retrait' && l.par === v.par && lt >= t0 - 1000 && lt <= t1 + 1000; }).reduce((s,l)=>s + ca_parseNum(l.montant), 0);
-    return `<div style="border-top:1px solid var(--line,#2a312d);padding:7px 0;"><div style="font-size:13px;"><b>${esc(v.par || '')}</b> · ${esc(v.heure || '')} → ${r ? esc(r.heure || '') : '<span style="color:var(--amber);">⚠ fin de caisse non validée</span>'}</div><div class="cg-sub">Début ${ca_fmtMoney(v.montant)}${ecs(v.ecart)} · Remis ${ca_fmtMoney(rem)} · Reste ${r ? ca_fmtMoney(r.montant) + ecs(r.ecart) + (r.statut === 'attente' ? ' ⏳' : r.statut === 'refuse' ? ' ✕' : '') : '—'}</div></div>`;
+    return `<div style="border-top:1px solid var(--line,#2a312d);padding:7px 0;"><div style="font-size:13px;"><b>${esc(v.par || '')}</b> · ${esc(v.heure || '')} → ${r ? esc(r.heure || '') + (r.tardive ? ' <span class="cg-sub">(saisie tardive à ' + esc(r.saisieHeure || '') + ')</span>' : '') : '<span style="color:var(--amber);">⚠ fin de caisse non validée</span>'}</div><div class="cg-sub">Début ${ca_fmtMoney(v.montant)}${ecs(v.ecart)} · Remis ${ca_fmtMoney(rem)} · Reste ${r ? ca_fmtMoney(r.montant) + ecs(r.ecart) + (r.statut === 'attente' ? ' ⏳' : r.statut === 'refuse' ? ' ✕' : '') : '—'}</div></div>`;
   });
   rs.filter(r=>!used.has(r.id)).forEach(r=>{ rows.push(`<div style="border-top:1px solid var(--line,#2a312d);padding:7px 0;"><div style="font-size:13px;"><b>${esc(r.par || '')}</b> · fin ${esc(r.heure || '')}</div><div class="cg-sub">Reste ${ca_fmtMoney(r.montant)}${ecs(r.ecart)}${r.statut === 'attente' ? ' ⏳' : r.statut === 'refuse' ? ' ✕' : ''}</div></div>`); });
   return `<div class="cg-card" style="margin-bottom:10px;"><div class="cg-t">🔁 Passations de la journée</div>${rows.join('')}</div>`;
@@ -1775,7 +1793,7 @@ function ca_restantAdminCard(){
     const ec = Number(r.ecart) || 0, diff = Math.abs(ec) > 0.004;
     return `<div class="cg-card" style="margin-bottom:10px;${r.statut === 'attente' ? 'border-color:var(--rust);' : ''}">
     <div class="cg-t">🧮 Montant restant${r.statut === 'attente' ? ' — à valider' : ''}</div>
-    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;"><div><div class="cg-sub">Compté par ${esc(r.par || '')} à ${esc(r.heure || '')}</div><div class="cg-big" style="font-size:24px;">${ca_fmtMoney(r.montant)}</div></div><div style="text-align:right;"><div class="cg-sub">Attendu ${ca_fmtMoney(r.attendu)}</div><b style="color:var(${diff ? '--rust' : '--moss'});">${diff ? 'Écart ' + (ec > 0 ? '+' : '') + ca_fmtMoney(ec) : 'Aucun écart'}</b></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;"><div><div class="cg-sub">Compté par ${esc(r.par || '')} à ${esc(r.heure || '')}${r.tardive ? ' (saisie tardive à ' + esc(r.saisieHeure || '') + ')' : ''}</div><div class="cg-big" style="font-size:24px;">${ca_fmtMoney(r.montant)}</div></div><div style="text-align:right;"><div class="cg-sub">Attendu ${ca_fmtMoney(r.attendu)}</div><b style="color:var(${diff ? '--rust' : '--moss'});">${diff ? 'Écart ' + (ec > 0 ? '+' : '') + ca_fmtMoney(ec) : 'Aucun écart'}</b></div></div>
     ${r.note ? `<div style="border:1px solid var(--rust);background:var(--rust-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--rust);">Note : ${esc(r.note)}</div>` : ''}
     ${r.statut === 'attente' ? `<div style="display:flex;gap:8px;"><button class="btn t-save" style="flex:1;height:42px;" onclick="ca_restantDecide('${r.id}',true)">✓ Valider</button><button class="btn" style="flex:1;height:42px;background:var(--rust-bg);border:1px solid var(--rust);color:var(--rust);font-weight:700;" onclick="ca_restantDecide('${r.id}',false)">✕ Refuser (recompter)</button></div><div class="cg-sub">Une fois validé, ce montant devient le début de la personne suivante.</div>` : ca_restantStatusHtml(r)}
   </div>`; }).join('');
@@ -1811,7 +1829,7 @@ function ca_renderLimited(){
     <div class="cg-card" style="margin-bottom:10px;">
       <div class="cg-t">💵 Début de caisse</div>
       ${unc.length ? `<div style="border:1px solid var(--amber);background:var(--amber-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--amber);">⚠ Session précédente non clôturée : ${unc.map(v=>esc(v.par || '')).join(', ')} n’a pas validé sa fin de caisse. Tu peux commencer : l’admin est prévenu.</div>` : ''}
-      <div class="cg-sub">Attendu : <b style="color:var(--ink);">${dbt.none ? 'aucune clôture trouvée : saisis ce que tu comptes' : ca_fmtMoney(attendu)}</b>${dbt.from ? ' (clôture de ' + esc(dbt.from.par) + ' à ' + esc(dbt.from.heure) + ')' : dbt.src ? ' (clôture du ' + fmtDateShort(dbt.src) + ')' : ''}${dbt.manuel ? ' (montant modifié et validé par l’admin)' : ''}</div>
+      <div class="cg-sub">Attendu : <b style="color:var(--ink);">${dbt.none ? 'aucune clôture trouvée : saisis ce que tu comptes' : ca_fmtMoney(attendu)}</b>${dbt.est !== undefined ? ' (calculé : la clôture de ' + esc(dbt.est) + ' n’est pas encore validée)' : dbt.from ? ' (clôture de ' + esc(dbt.from.par) + ' à ' + esc(dbt.from.heure) + ')' : dbt.src ? ' (clôture du ' + fmtDateShort(dbt.src) + ')' : ''}${dbt.manuel ? ' (montant modifié et validé par l’admin)' : ''}</div>
       ${dbt.closed ? '<div class="cg-sub" style="color:var(--amber);">🔒 La clôture du jour est enregistrée : le début est verrouillé (seul l’admin peut le modifier).</div>' : `<input id="lim-debut" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_lim.debut)}" oninput="ca_lim.debut=this.value;ca_render()">
       ${recount ? `<div style="border:1px solid var(--amber);background:var(--amber-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--amber);">⚠ Le montant saisi (${ca_fmtMoney(ca_lim.dFirst)}) diffère de l’attendu (${ca_fmtMoney(attendu)}). Recompte la caisse et saisis à nouveau le montant.</div>` : ''}
       ${needNote ? `<input id="lim-note" class="cg-in" type="text" style="border-color:var(--rust);font-family:'Inter',sans-serif;" placeholder="Commentaire obligatoire : explique l’écart" value="${esc(ca_lim.note)}" oninput="ca_lim.note=this.value"><div class="cg-sub" style="color:var(--rust);">Le montant diffère toujours de l’attendu : écris un commentaire avant de valider.</div>` : ''}
@@ -1853,10 +1871,11 @@ function ca_renderLimited(){
       }).join('')}</div><div class="cg-sub" style="font-size:10.5px;">Tes lignes sont modifiables pendant 1 h après leur saisie.</div>` : ''}
     </div>
     ${(()=>{
-      const myR = ca_myRestant(), att = ca_restantAttendu(), rr = String(ca_lim.rest).trim(), rm = ca_parseNum(rr), rec = rr === '' ? null : Math.round((rm - att) * 100) / 100, rdiff = rec !== null && Math.abs(rec) > 0.004;
+      const myR = ca_myRestant(), late = ca_lateInfo(), att = ca_restantAttendu(), rr = String(ca_lim.rest).trim(), rm = ca_parseNum(rr), rec = rr === '' ? null : Math.round((rm - att) * 100) / 100, rdiff = rec !== null && Math.abs(rec) > 0.004;
       return `<div class="cg-card" style="margin-bottom:10px;">
       <div class="cg-t">🧮 Montant restant en caisse</div>
       <div class="cg-sub">Attendu : <b style="color:var(--ink);">${ca_fmtMoney(att)}</b></div>
+      ${late ? `<div class="cg-sub" style="color:var(--amber);">Clôture tardive : ${esc(late.n.par || '')} a pris la caisse à ${esc(late.n.heure || '')}. L’attendu est calculé à cette heure.</div>` : ''}
       <input id="lim-rest" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_lim.rest)}" oninput="ca_lim.rest=this.value;ca_render()">
       ${rec !== null ? ca_ecartBand(att, rm) : ''}
       ${rdiff ? `<input id="lim-rnote" class="cg-in" type="text" style="border-color:var(--rust);font-family:'Inter',sans-serif;" placeholder="Note obligatoire : explique l’écart" value="${esc(ca_lim.rnote)}" oninput="ca_lim.rnote=this.value"><div class="cg-sub" style="color:var(--rust);">Un écart ne peut pas être validé seul : il sera envoyé à l’admin.</div>` : ''}
