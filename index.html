@@ -600,7 +600,7 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
   .cg-in{width:100%;min-width:0;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:14px;color:var(--ink);font-family:'IBM Plex Mono',monospace;}
   .cg-act{display:flex;justify-content:space-between;align-items:center;margin-top:2px;}
   .cg-mod{border:1px solid var(--line);background:none;color:var(--ink);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;}
-  .cl-tp{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}.cl-tp button,.cl-dest button{border:1px solid var(--line,#2a312d);border-radius:10px;padding:10px 4px;background:var(--paper);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;}.cl-tp button.on{border-color:var(--moss);background:var(--moss-bg);color:var(--moss);}.cl-dest{display:grid;grid-template-columns:1fr 1fr;gap:6px;}.cl-dest button{font-size:14px;font-weight:700;padding:11px;}.cl-dest button.on{border-color:var(--service);background:var(--service-bg);color:var(--service);}.cl-ln{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:7px 0;border-top:1px solid var(--line,#2a312d);}.cl-ln small{display:block;color:var(--ink-muted);}
+  .cl-tp{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}.cl-tp button,.cl-dest button{border:1px solid var(--line,#2a312d);border-radius:10px;padding:10px 4px;background:var(--paper);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;}.cl-tp button.on{border-color:var(--forest);background:#1B2A3F;color:var(--forest-light);}.cl-dest{display:grid;grid-template-columns:1fr 1fr;gap:6px;}.cl-dest button{font-size:14px;font-weight:700;padding:11px;}.cl-dest button.on{border-color:var(--service);background:var(--service-bg);color:var(--service);}.cl-ln{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:7px 0;border-top:1px solid var(--line,#2a312d);}.cl-ln small{display:block;color:var(--ink-muted);}
   .cg-plus{width:38px;height:38px;border-radius:50%;background:#1B2A3F;border:1px solid var(--forest);color:#93C5FD;font-size:22px;font-weight:800;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
   .cg-link{align-self:flex-start;background:none;border:none;color:#93C5FD;font-size:11.5px;font-weight:700;cursor:pointer;padding:2px 0;}
   .cg-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;}
@@ -1714,7 +1714,7 @@ function ca_restantAttendu(){
 function ca_ecartBand(att, m){   // bandeau d'état de l'écart (vert : correct ou toléré, rouge : écart à vérifier)
   const ec = Math.round((m - att) * 100) / 100, a = Math.abs(ec), diff = a > 0.004, bad = diff, col = bad ? 'var(--rust)' : 'var(--moss)', bg = bad ? 'var(--rust-bg)' : 'var(--moss-bg)';
   const txt = !diff ? '✓ Caisse correcte — aucun écart' : (bad ? '⚠ Écart de ' : '✓ Écart de ') + ca_fmtMoney(a) + (ec < 0 ? ' en moins' : ' en trop');
-  return `<div style="border:1.5px solid ${col};background:${bg};border-radius:10px;padding:9px 12px;"><div style="font-weight:700;font-size:14px;color:${col};">${txt}</div><div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Attendu ${ca_fmtMoney(att)} · compté ${ca_fmtMoney(m)}</div></div>`;
+  return `<div style="border-left:3px solid ${col};background:${bg};border-radius:0;padding:9px 12px;"><div style="font-weight:700;font-size:14px;color:${col};">${txt}</div><div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Attendu ${ca_fmtMoney(att)} · compté ${ca_fmtMoney(m)}</div></div>`;
 }
 async function ca_limSubmitRestant(){
   if(ca_lim.busy) return;
@@ -1757,9 +1757,9 @@ async function ca_restantDecide(id, ok){
 function ca_restantStatusHtml(r){
   if(!r) return '';
   const ec = Number(r.ecart) || 0, ecs = Math.abs(ec) > 0.004 ? ' (écart ' + (ec > 0 ? '+' : '') + ca_fmtMoney(ec) + ')' : '';
-  if(r.statut === 'valide') return `<div class="cg-sub" style="color:var(--moss);">✓ Validé${r.decidePar ? ' par ' + esc(r.decidePar) : ''} à ${esc(r.decideLe || r.heure || '')} : ${ca_fmtMoney(r.montant)}${ecs}</div>`;
-  if(r.statut === 'refuse') return `<div class="cg-sub" style="color:var(--rust);">✕ Refusé par ${esc(r.decidePar || 'l’admin')} : ${ca_fmtMoney(r.montant)}${ecs}. Recompte et renvoie.</div>`;
-  return `<div class="cg-sub" style="color:var(--amber);">⏳ En attente de validation de l’admin : ${ca_fmtMoney(r.montant)}${ecs}</div>`;
+  if(r.statut === 'valide') return `<div class="cg-sub"><span style="color:var(--moss);">✓</span> Validé${r.decidePar ? ' par ' + esc(r.decidePar) : ''} à ${esc(r.decideLe || r.heure || '')} : ${ca_fmtMoney(r.montant)}${ecs}</div>`;
+  if(r.statut === 'refuse') return `<div style="border-left:3px solid var(--rust);background:var(--rust-bg);padding:8px 12px;font-size:12.5px;color:var(--rust);">✕ Refusé par ${esc(r.decidePar || 'l’admin')} : ${ca_fmtMoney(r.montant)}${ecs}. Recompte et renvoie.</div>`;
+  return `<div style="border-left:3px solid var(--amber);background:var(--amber-bg);padding:8px 12px;font-size:12.5px;color:var(--amber);">⏳ En attente de validation de l’admin : ${ca_fmtMoney(r.montant)}${ecs}</div>`;
 }
 /* Admin : passations de la journée (qui a tenu la caisse, de quand à quand) + fins de session à valider */
 function ca_dvDelLink(id){ return ca_isAdminNow() ? `<div style="margin-top:4px;"><a href="#" style="color:var(--rust);font-size:12.5px;" onclick="ca_debutDelete('${id}');return false;">🗑 Supprimer cette saisie</a></div>` : ''; }
@@ -1859,7 +1859,7 @@ function ca_passationsCard(){
     <div style="display:flex;justify-content:space-between;align-items:center;"><div class="cg-t">🔁 Contrôle de la journée</div>${adm ? '<a href="#" style="font-size:22px;line-height:1;color:var(--ink-muted);padding:0 6px;" aria-label="Menu" onclick="ca_ctlToggle();return false;">⋯</a>' : ''}</div>
     ${rows.length ? rows.join('') : '<div class="cg-sub">Aucune passation pour cette journée.</div>'}
     ${menu}
-    ${adm ? (pend ? `<button class="btn t-save" style="width:100%;height:42px;" onclick="ca_toutValider()">✓ Tout valider</button>` : (rows.length ? '<div class="cg-sub" style="color:var(--moss);">✓ Tout est validé</div>' : '')) : ''}
+    ${adm ? (pend ? `<button class="btn t-add" style="width:100%;height:42px;" onclick="ca_toutValider()">✓ Tout valider</button>` : (rows.length ? '<div class="cg-sub" style="color:var(--moss);">✓ Tout est validé</div>' : '')) : ''}
   </div>`;
 }
 function ca_restantAdminCard(){ return ca_passationsCard(); }
@@ -1894,12 +1894,12 @@ function ca_renderLimited(){
     <div class="cg-card" style="margin-bottom:10px;">
       <div class="cg-t">💵 Début de caisse</div>
       ${unc.length ? `<div style="border:1px solid var(--amber);background:var(--amber-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--amber);">⚠ Session précédente non clôturée : ${unc.map(v=>esc(v.par || '')).join(', ')} n’a pas validé sa fin de caisse. Pas de souci : ton comptage vaut clôture de son poste, à cette heure.</div>` : ''}
-      ${dbt.none ? '<div class="cg-sub">Aucune clôture trouvée : saisis ce que tu comptes.</div>' : `<div style="border:1px solid var(--moss);background:var(--moss-bg);border-radius:10px;padding:8px 11px;"><div class="cg-sub">${dbt.from ? esc(dbt.from.par) + ' a laissé à ' + esc(dbt.from.heure) : dbt.est !== undefined ? 'Estimé (la clôture de ' + esc(dbt.est) + ' n’est pas encore validée)' : dbt.src ? 'Clôture du ' + fmtDateShort(dbt.src) : 'Montant attendu'}</div><div style="font-size:24px;font-weight:800;color:var(--moss);font-family:'JetBrains Mono',monospace;">${ca_fmtMoney(attendu)}</div></div>`}
+      ${dbt.none ? '<div class="cg-sub">Aucune clôture trouvée : saisis ce que tu comptes.</div>' : `<div style="border:1px solid var(--line,#2a312d);background:var(--paper);border-radius:10px;padding:8px 11px;"><div class="cg-sub">${dbt.from ? esc(dbt.from.par) + ' a laissé à ' + esc(dbt.from.heure) : dbt.est !== undefined ? 'Estimé (la clôture de ' + esc(dbt.est) + ' n’est pas encore validée)' : dbt.src ? 'Clôture du ' + fmtDateShort(dbt.src) : 'Montant attendu'}</div><div style="font-size:24px;font-weight:800;color:var(--ink);font-family:'JetBrains Mono',monospace;">${ca_fmtMoney(attendu)}</div></div>`}
       ${dbt.closed ? '<div class="cg-sub" style="color:var(--amber);">🔒 La clôture du jour est enregistrée : le début est verrouillé (seul l’admin peut le modifier).</div>' : (()=>{
         const alt = ca_lim.dalt || dbt.none;
-        return `${!alt ? `<button class="btn t-save" style="width:100%;height:44px;" onclick="ca_limReprendre()">✓ Je reprends ${ca_fmtMoney(attendu)}</button>
+        return `${!alt ? `<button class="btn t-add" style="width:100%;height:44px;" onclick="ca_limReprendre()">✓ Je reprends ${ca_fmtMoney(attendu)}</button>
       <button class="btn ghost" style="width:100%;height:40px;" onclick="ca_lim.dalt=true;ca_render()">Le montant est différent</button>` : `<input id="lim-debut" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_lim.debut)}" oninput="ca_lim.debut=this.value;ca_render()">
-      <button class="btn t-save" style="width:100%;height:44px;" onclick="ca_limValidateDebut()">✓ Valider mon début de caisse</button>`}`;
+      <button class="btn t-add" style="width:100%;height:44px;" onclick="ca_limValidateDebut()">✓ Valider mon début de caisse</button>`}`;
       })()}
       ${mine.map(v=>{
         if(ca_lim.editV === v.id){
@@ -1907,10 +1907,10 @@ function ca_renderLimited(){
           return `<div style="border:1px solid var(--forest);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;"><div class="cg-sub">Modifier la validation de ${esc(v.heure || '')}</div>
             <input class="cg-in" type="text" inputmode="decimal" value="${esc(ca_lim.eVal)}" oninput="ca_lim.eVal=this.value;ca_render()">
             
-            <div style="display:flex;gap:8px;"><button class="btn t-save" style="flex:1;height:40px;" onclick="ca_limSaveV('${v.id}')">Enregistrer</button><button class="btn ghost" style="flex:1;height:40px;" onclick="ca_limCancelV()">Annuler</button></div></div>`;
+            <div style="display:flex;gap:8px;"><button class="btn t-add" style="flex:1;height:40px;" onclick="ca_limSaveV('${v.id}')">Enregistrer</button><button class="btn ghost" style="flex:1;height:40px;" onclick="ca_limCancelV()">Annuler</button></div></div>`;
         }
         const e = Number(v.ecart) || 0, can = ca_canEditV(v);
-        return `<div style="border-top:1px solid var(--line,#2a312d);padding-top:6px;"><div class="cg-sub" style="color:var(--moss);">✓ Début validé à ${esc(v.heure || '')} : <b>${ca_fmtMoney(v.montant)}</b>${v.tardive ? ' (saisie tardive à ' + esc(v.saisieHeure || '') + ')' : ''}${Math.abs(e) > 0.004 ? ' (écart ' + (e > 0 ? '+' : '') + ca_fmtMoney(e) + ')' : ''}</div>${v.note ? `<div class="cg-sub">Commentaire : ${esc(v.note)}</div>` : ''}
+        return `<div style="border-top:1px solid var(--line,#2a312d);padding-top:6px;"><div class="cg-sub"><span style="color:var(--moss);">✓</span> Début validé à ${esc(v.heure || '')} : <b style="color:var(--ink);">${ca_fmtMoney(v.montant)}</b>${v.tardive ? ' (saisie tardive à ' + esc(v.saisieHeure || '') + ')' : ''}${Math.abs(e) > 0.004 ? ' (écart ' + (e > 0 ? '+' : '') + ca_fmtMoney(e) + ')' : ''}</div>${v.note ? `<div class="cg-sub">Commentaire : ${esc(v.note)}</div>` : ''}
           ${v.tardive ? '<div class="cg-sub" style="color:var(--amber);">' + (v.statut === 'refuse' ? '✗ Refusé par l’admin.' : v.statut === 'valide' ? '✓ Vu par l’admin.' : '⏳ L’admin vérifie ta saisie : elle ne change rien au reste de la journée.') + '</div>' : v.statut === 'attente' ? '<div class="cg-sub" style="color:var(--amber);">⏳ En attente de validation par l’admin : le début reste ' + ca_fmtMoney(attendu) + '.</div>' : v.statut === 'valide' ? '<div class="cg-sub" style="color:var(--moss);">✓ Validé par l’admin : ton montant est le début du jour.</div>' : v.statut === 'refuse' ? '<div class="cg-sub" style="color:var(--rust);">✗ Refusé par l’admin : le début reste ' + ca_fmtMoney(attendu) + '.</div>' : ''}
           ${can ? `<div style="display:flex;gap:8px;margin-top:4px;">${v.tardive ? '' : `<button class="btn ghost small" onclick="ca_limEditV('${v.id}')">✎ Modifier</button>`}<button class="btn ghost small" style="color:var(--rust);" onclick="ca_limDelV('${v.id}')">🗑 Supprimer</button></div><div class="cg-sub" style="font-size:10.5px;">Modifiable pendant 1 h après la validation.</div>` : ''}</div>`;
       }).join('')}
@@ -1931,7 +1931,7 @@ function ca_renderLimited(){
             ${isR ? `<div class="cl-dest">${['Sidahmed','Soufyane'].map(n=>`<button type="button" class="${ca_lim.eDest===n?'on':''}" onclick="ca_limEDest('${n}')">${n}</button>`).join('')}</div>` : ''}
             <input class="cg-in" type="text" inputmode="decimal" value="${esc(ca_lim.eMont)}" oninput="ca_lim.eMont=this.value">
             ${isR ? '' : `<input class="cg-in" type="text" style="border-color:var(--rust);font-family:'Inter',sans-serif;" placeholder="Commentaire obligatoire" value="${esc(ca_lim.eCmt)}" oninput="ca_lim.eCmt=this.value">`}
-            <div style="display:flex;gap:8px;"><button class="btn t-save" style="flex:1;height:40px;" onclick="ca_limSaveS('${l.id}')">Enregistrer</button><button class="btn ghost" style="flex:1;height:40px;" onclick="ca_limCancelS()">Annuler</button></div></div>`;
+            <div style="display:flex;gap:8px;"><button class="btn t-add" style="flex:1;height:40px;" onclick="ca_limSaveS('${l.id}')">Enregistrer</button><button class="btn ghost" style="flex:1;height:40px;" onclick="ca_limCancelS()">Annuler</button></div></div>`;
         }
         const can = ca_canEditS(l);
         return `<div class="cl-ln"><div>${lab}<small>${esc(l.heure || '')}${l.par ? ' · ' + esc(l.par) : ''}${!isR && l.note ? ' · ' + esc(l.note) : ''}</small>${can ? `<span style="display:flex;gap:8px;margin-top:4px;"><button class="btn ghost small" onclick="ca_limEditS('${l.id}')">✎ Modifier</button><button class="btn ghost small" style="color:var(--rust);" onclick="ca_limDelS('${l.id}')">🗑 Supprimer</button></span>` : ''}</div><b class="mono">${ca_fmtMoney(ca_parseNum(l.montant))}</b></div>`;
@@ -1949,7 +1949,7 @@ function ca_renderLimited(){
       <input id="lim-rest" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_lim.rest)}" oninput="ca_lim.rest=this.value;ca_render()">
       ${rec !== null ? ca_ecartBand(att, rm) : ''}
       <input id="lim-rnote" class="cg-in" type="text" style="font-family:'Inter',sans-serif;" placeholder="Commentaire (facultatif)" value="${esc(ca_lim.rnote)}" oninput="ca_lim.rnote=this.value">
-      <button class="btn t-save" style="width:100%;height:44px;" onclick="ca_limSubmitRestant()">✓ Terminer mon poste</button>
+      <button class="btn t-add" style="width:100%;height:44px;" onclick="ca_limSubmitRestant()">✓ Terminer mon poste</button>
       ${rr === '' && myR ? ((myR.tardive || myR.attendu === null || myR.attendu === undefined || myR.ecart === null || myR.ecart === undefined) ? (myR.statut === 'valide' ? ca_ecartBand(myR.montant, myR.montant) : '') : ca_ecartBand(myR.attendu, myR.montant)) : ''}${ca_restantStatusHtml(myR)}
     </div>`; })()}
     ${(()=>{ const lr = ca_restantsList(ca_session).filter(x=>x.statut !== 'refuse').slice(-1)[0];
