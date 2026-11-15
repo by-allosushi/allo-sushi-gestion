@@ -1940,12 +1940,19 @@ function ca_renderLimited(){
     ${(()=>{
       const myR = ca_myRestant(), rep = ca_repris(), att = ca_restantAttendu(), rr = String(ca_lim.rest).trim(), rm = ca_parseNum(rr), rec = rr === '' ? null : Math.round((rm - att) * 100) / 100;
       if(rep) return '';   // un autre employé a repris la caisse : son début vaut clôture de ce poste
+      if(myR && myR.statut !== 'refuse'){   // poste terminé : il ne reste que le bandeau d'état (un refus de l'admin rouvre la saisie)
+        const sans = myR.tardive || myR.attendu === null || myR.attendu === undefined || myR.ecart === null || myR.ecart === undefined;
+        return `<div class="cg-card" style="margin-bottom:10px;">
+      <div class="cg-t">🧮 Montant restant en caisse</div>
+      ${sans ? (myR.statut === 'valide' ? ca_ecartBand(myR.montant, myR.montant) : '') : ca_ecartBand(myR.attendu, myR.montant)}${ca_restantStatusHtml(myR)}
+    </div>`;
+      }
       return `<div class="cg-card" style="margin-bottom:10px;">
       <div class="cg-t">🧮 Montant restant en caisse</div>
       <input id="lim-rest" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_lim.rest)}" oninput="ca_lim.rest=this.value;ca_render()">
       ${rec !== null ? ca_ecartBand(att, rm) : ''}
       <input id="lim-rnote" class="cg-in" type="text" style="font-family:'Inter',sans-serif;" placeholder="Commentaire (facultatif)" value="${esc(ca_lim.rnote)}" oninput="ca_lim.rnote=this.value">
-      ${rr === '' && myR ? ((myR.tardive || myR.attendu === null || myR.attendu === undefined || myR.ecart === null || myR.ecart === undefined) ? (myR.statut === 'valide' ? ca_ecartBand(myR.montant, myR.montant) : '') : ca_ecartBand(myR.attendu, myR.montant)) : ''}${ca_restantStatusHtml(myR)}
+      ${myR ? ca_restantStatusHtml(myR) : ''}
     </div>
     <button class="btn t-close" style="width:100%;height:48px;margin-top:2px;" onclick="ca_limSubmitRestant()">Terminer mon poste</button>`; })()}`;
 }
