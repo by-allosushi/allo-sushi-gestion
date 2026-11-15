@@ -6770,7 +6770,7 @@ async function dt_deleteAvoir(id){
        escalope / bœuf : « à découper » + « transféré vers le poulet haché / la viande hachée » (utilisé = différence) ;
                          le cuisinier du Wok a en plus « hachée directement » (escalope hachée sans découpe → poulet haché)
        saumon / L2     : « à découper » (L2 : « à décortiquer ») + déchet de cette opération (obligatoire, 0 si rien), sans stock de début ;
-       avocat          : « disponible au début » validé, puis pesées de déchet (« + Déchet ») autant de fois que nécessaire ;
+       avocat          : « disponible au début » (proposé depuis la veille, validé par le cuisinier), puis pesées de déchet (« + Déchet ») autant de fois que nécessaire ;
        gamba           : « à décortiquer » + « déchet » + part pour les nems (proposée = tout le net, validée ou corrigée), le reste va au wok ;
        poulet haché    : « dans les gyozas » (le disponible = chutes des escalopes + escalope hachée directement, les nems se calculent) ;
        viande hachée   : disponible = chutes du bœuf + achat direct, puis « utilisée dans les gyozas ».
@@ -6891,7 +6891,7 @@ function ck_kind(id){
   return 'simple';
 }
 const ck_color = (id)=>CK_KCOL[ck_kind(id)] || '#60A5FA';
-const ck_needsStart = (id)=>/^(avocat|gamba)$/.test(ck_kind(id));   // la crevette L2 n'a plus de stock de début : le cuisinier saisit ce qu'il décortique
+const ck_needsStart = (id)=>ck_kind(id) === 'avocat';   // seul l'avocat a un stock de début (proposé depuis la veille, validé par le cuisinier)   // la crevette L2 n'a plus de stock de début : le cuisinier saisit ce qu'il décortique
 const ck_hasWaste = (id)=>ck_kind(id) === 'avocat';   // « + Déchet » séparé : seulement l'avocat ; ailleurs le déchet est rattaché à la découpe
 const ck_hasCut = (id)=>ck_kind(id) !== 'avocat';
 const ck_wasteInCut = (id)=>/^(saumon|simple|crevette|gamba)$/.test(ck_kind(id));
@@ -6969,7 +6969,7 @@ function ck_figs(id, doc, poste){   // [[libellé, valeur]] : ce que montre la f
   else if(k === 'saumon' || k === 'simple'){ o.push([ck_s('fg_a'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_used'), f(ck_r(c.a - c.w))]); }
   else if(k === 'crevette'){ o.push([ck_s('fg_a2'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_used'), f(ck_r(c.a - c.w))]); }
   else if(k === 'avocat'){ o.push([ck_s('fg_s'), c.s === null ? '—' : f(c.s)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_ut'), c.ut === null ? '—' : f(c.ut)]); }
-  else if(k === 'gamba'){ o.push([ck_s('fg_s'), c.s === null ? '—' : f(c.s)], [ck_s('fg_a2'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_dec'), f(c.dec)], [ck_s('fg_n'), f(c.n)], [ck_s('fg_wok'), f(c.wok)]); }
+  else if(k === 'gamba'){ o.push([ck_s('fg_a2'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_dec'), f(c.dec)], [ck_s('fg_n'), f(c.n)], [ck_s('fg_wok'), f(c.wok)]); }
   else if(k === 'poulet'){ o.push([ck_s('fg_d'), f(c.d)], [ck_s('fg_g'), f(c.g)], [ck_s('fg_n'), f(c.nem)]); }
   else if(k === 'viande'){ o.push([ck_s('fg_d'), f(c.d)], [ck_s('fg_vu'), f(c.v)]); }
   if(c.fin){ const x = c.fin;
