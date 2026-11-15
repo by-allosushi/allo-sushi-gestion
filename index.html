@@ -6809,9 +6809,9 @@ const CK_T = {
   /* questions */
   q_cut_a:['Quel poids de {i} à découper / nettoyer ?', 'كم وزن {i} المراد تقطيعه / تنظيفه؟'],
   q_cut_t:['Quel poids transférez-vous vers {t} ? (0 s’il n’y en a pas)', 'كم الوزن الذي تنقله إلى {t}؟ (0 إن لم يوجد)'],
-  q_gam_a:['Quel poids de {i} à décortiquer (sorti du stock) ?', 'كم وزن {i} المراد تقشيره (المسحوب من المخزون)؟'],
-  q_gam_w:['Quel poids de déchet pour cette opération ? (0 s’il n’y en a pas)', 'كم وزن فضلات هذه العملية؟ (0 إن لم يوجد)'],
-  q_gam_n:['Quel poids décortiqué est utilisé pour les nems ? (le reste ira au wok)', 'كم الوزن المقشّر المستعمل للنيم؟ (الباقي للووك)'],
+  q_gam_a:['Quel poids de {i} à décortiquer ?', 'كم وزن {i} المراد تقشيره؟'],
+  q_gam_w:['Déchet', 'الفضلات'],
+  q_gam_n:['Poids utilisé dans le nem', 'الوزن المستعمل في النيم'],
   q_dec_a:['Quel poids de {i} à décortiquer ?', 'كم وزن {i} المراد تقشيره؟'],
   q_dec_w:['Quel poids de déchet pour cette décortication ? (0 s’il n’y en a pas)', 'كم وزن فضلات هذا التقشير؟ (0 إن لم يوجد)'],
   q_cut_w:['Quel poids de déchet pour cette découpe de {i} ? (0 s’il n’y en a pas)', 'كم وزن فضلات هذا التقطيع من {i}؟ (0 إن لم يوجد)'],
@@ -7208,7 +7208,11 @@ function ck_show(){
   if(!ck_isAdmin() && !ck_who) ck_view = 'gate';
   ck_syncSub(); ck_render();
 }
-function ck_refresh(){ if(!ck_started || activeModule !== 'cuisine' || ck_view === 'entry' || ck_typing()) return; ck_render(); }
+function ck_refresh(){
+  if(!ck_started || activeModule !== 'cuisine') return;
+  if(ck_view === 'entry'){ const el = document.getElementById('ck-alerts'); if(el) el.innerHTML = ck_alertsInner(); return; }   // écran de saisie : on ne le redessine pas (la valeur tapée reste), mais le bandeau « en attente » se met à jour tout seul
+  if(ck_typing()) return; ck_render();
+}
 
 /* ---------- connexion par prénom + code ---------- */
 function ck_pick(code){ ck_pinFor = String(code); ck_pin = ''; ck_pinErr = ''; ck_view = 'pin'; ck_render(); }
@@ -7254,7 +7258,8 @@ function ck_render(){
   root.innerHTML = h;
   ck_wakeLock();
 }
-function ck_alerts(){
+function ck_alerts(){ return `<div id="ck-alerts">${ck_alertsInner()}</div>`; }
+function ck_alertsInner(){
   let h = '';
   const n = ck_obCount(); if(Object.keys(ck_ob).length) h += `<div class="ck-banner wa"><span>⏳ ${esc(ck_s('ob', { n }))}</span></div>`;
   if(ck_obFull) h += `<div class="ck-banner er"><span>${esc(ck_s('obFull'))}</span></div>`;
