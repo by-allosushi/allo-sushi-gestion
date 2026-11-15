@@ -6769,7 +6769,7 @@ async function dt_deleteAvoir(id){
    • Chaque ingrédient a sa propre fiche (reconnue par son nom) :
        escalope / bœuf : « à découper » + « transféré vers le poulet haché / la viande hachée » (utilisé = différence) ;
                          le cuisinier du Wok a en plus « hachée directement » (escalope hachée sans découpe → poulet haché)
-       saumon / L2     : « à découper » + « déchet de cette découpe » (obligatoire, 0 si rien) ; L2 : disponible au début repris de la veille ;
+       saumon / L2     : « à découper » (L2 : « à décortiquer ») + déchet de cette opération (obligatoire, 0 si rien), sans stock de début ;
        avocat          : « disponible au début » validé, puis pesées de déchet (« + Déchet ») autant de fois que nécessaire ;
        gamba           : « à décortiquer » + « déchet » + part pour les nems (proposée = tout le net, validée ou corrigée), le reste va au wok ;
        poulet haché    : « dans les gyozas » (le disponible = chutes des escalopes + escalope hachée directement, les nems se calculent) ;
@@ -6812,6 +6812,8 @@ const CK_T = {
   q_gam_a:['Quel poids de {i} à décortiquer (sorti du stock) ?', 'كم وزن {i} المراد تقشيره (المسحوب من المخزون)؟'],
   q_gam_w:['Quel poids de déchet pour cette opération ? (0 s’il n’y en a pas)', 'كم وزن فضلات هذه العملية؟ (0 إن لم يوجد)'],
   q_gam_n:['Quel poids décortiqué est utilisé pour les nems ? (le reste ira au wok)', 'كم الوزن المقشّر المستعمل للنيم؟ (الباقي للووك)'],
+  q_dec_a:['Quel poids de {i} à décortiquer ?', 'كم وزن {i} المراد تقشيره؟'],
+  q_dec_w:['Quel poids de déchet pour cette décortication ? (0 s’il n’y en a pas)', 'كم وزن فضلات هذا التقشير؟ (0 إن لم يوجد)'],
   q_cut_w:['Quel poids de déchet pour cette découpe de {i} ? (0 s’il n’y en a pas)', 'كم وزن فضلات هذا التقطيع من {i}؟ (0 إن لم يوجد)'],
   q_min:['Quel poids de {i} hachée directement ?', 'كم وزن {i} المفرومة مباشرة؟'],
   q_buy:['Quel poids de {i} achetée directement ?', 'كم وزن {i} المشتراة مباشرة؟'],
@@ -6889,7 +6891,7 @@ function ck_kind(id){
   return 'simple';
 }
 const ck_color = (id)=>CK_KCOL[ck_kind(id)] || '#60A5FA';
-const ck_needsStart = (id)=>/^(avocat|crevette|gamba)$/.test(ck_kind(id));
+const ck_needsStart = (id)=>/^(avocat|gamba)$/.test(ck_kind(id));   // la crevette L2 n'a plus de stock de début : le cuisinier saisit ce qu'il décortique
 const ck_hasWaste = (id)=>ck_kind(id) === 'avocat';   // « + Déchet » séparé : seulement l'avocat ; ailleurs le déchet est rattaché à la découpe
 const ck_hasCut = (id)=>ck_kind(id) !== 'avocat';
 const ck_wasteInCut = (id)=>/^(saumon|simple|crevette|gamba)$/.test(ck_kind(id));
@@ -6965,7 +6967,7 @@ function ck_figs(id, doc, poste){   // [[libellé, valeur]] : ce que montre la f
   const c = ck_calc(id, doc), k = c.k, u = ck_unit(id), f = (x)=>ck_fmt(x) + ' ' + u, o = [], tn = ck_targetName(id);
   if(k === 'escalope' || k === 'boeuf'){ o.push([ck_s('fg_a'), f(c.a)], [ck_s('fg_t', { t:tn }), f(c.t)], [ck_s('fg_used'), f(c.used)]); if(c.mince.length) o.push([ck_s('fg_h'), f(c.h)]); }
   else if(k === 'saumon' || k === 'simple'){ o.push([ck_s('fg_a'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_used'), f(ck_r(c.a - c.w))]); }
-  else if(k === 'crevette'){ o.push([ck_s('fg_s'), c.s === null ? '—' : f(c.s)], [ck_s('fg_a'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_used'), f(ck_r(c.a - c.w))]); }
+  else if(k === 'crevette'){ o.push([ck_s('fg_a2'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_used'), f(ck_r(c.a - c.w))]); }
   else if(k === 'avocat'){ o.push([ck_s('fg_s'), c.s === null ? '—' : f(c.s)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_ut'), c.ut === null ? '—' : f(c.ut)]); }
   else if(k === 'gamba'){ o.push([ck_s('fg_s'), c.s === null ? '—' : f(c.s)], [ck_s('fg_a2'), f(c.a)], [ck_s('fg_w'), f(c.w)], [ck_s('fg_dec'), f(c.dec)], [ck_s('fg_n'), f(c.n)], [ck_s('fg_wok'), f(c.wok)]); }
   else if(k === 'poulet'){ o.push([ck_s('fg_d'), f(c.d)], [ck_s('fg_g'), f(c.g)], [ck_s('fg_n'), f(c.nem)]); }
@@ -7019,8 +7021,9 @@ function ck_specCut(id, rid){
     const others = ck_r(ck_recs(doc, id, 'cut').filter(r=>r.id !== rid).reduce((a, r)=>a + (Number(r.f.v) || 0), 0)), def = Math.max(0, ck_r(ck_received(id).tot - others));
     fields.push({ ing:id, k:'v', q:'q_vi_v', def:def > 0 ? ck_fmt(def) : '', defN:def });
   } else {
-    fields.push({ ing:id, k:'a', q:'q_cut_a' });
-    if(ck_wasteInCut(id)) fields.push({ ing:id, k:'w', q:'q_cut_w', zero:true });   // le déchet est toujours rattaché à sa découpe (0 s'il n'y en a pas)
+    const L2 = k === 'crevette';   // crevette L2 : « à décortiquer » (pas « à découper »)
+    fields.push({ ing:id, k:'a', q:L2 ? 'q_dec_a' : 'q_cut_a' });
+    if(ck_wasteInCut(id)) fields.push({ ing:id, k:'w', q:L2 ? 'q_dec_w' : 'q_cut_w', zero:true });   // le déchet est toujours rattaché à sa découpe (0 s'il n'y en a pas)
     if(ck_targetKind(id)) fields.push({ ing:id, k:'t', q:'q_cut_t', zero:true });
   }
   const myRid = rid || ck_rid();
@@ -7291,7 +7294,7 @@ function ck_tileInfo(id, doc){
   const ready = ck_hasCut(id) ? (c.cut.length > 0 || c.mince.length > 0) : c.wst.length > 0;
   if(ready){
     let t = '';
-    if(k === 'escalope' || k === 'boeuf' || k === 'saumon' || k === 'simple' || k === 'crevette') t = ck_s('fg_a') + ' ' + f(c.a) + (c.h > 0 ? ' · ' + ck_s('fg_h') + ' ' + f(c.h) : '');
+    if(k === 'escalope' || k === 'boeuf' || k === 'saumon' || k === 'simple' || k === 'crevette') t = ck_s(k === 'crevette' ? 'fg_a2' : 'fg_a') + ' ' + f(c.a) + (c.h > 0 ? ' · ' + ck_s('fg_h') + ' ' + f(c.h) : '');
     else if(k === 'gamba') t = ck_s('fg_a2') + ' ' + f(c.a);
     else if(k === 'poulet') t = ck_s('fg_g') + ' ' + f(c.g);
     else if(k === 'viande') t = ck_s('fg_vu') + ' ' + f(c.v);
@@ -7331,7 +7334,7 @@ function ck_recText(id, r){
   if(k === 'gamba') return ck_s('fg_a2') + ' ' + v(f.a) + (f.w !== undefined ? ' · ' + ck_s('fg_w') + ' ' + v(f.w) : '') + ' · ' + ck_s('fg_n') + ' ' + v(f.n) + (f.w !== undefined ? ' · ' + ck_s('fg_wok') + ' ' + v(Math.max(0, ck_r((Number(f.a) || 0) - (Number(f.w) || 0) - (Number(f.n) || 0)))) : '');
   if(k === 'poulet') return ck_s('fg_g') + ' ' + v(f.g);
   if(k === 'viande') return ck_s('fg_vu') + ' ' + v(f.v) + (f.corr ? ' ✎' : '');
-  return ck_s('fg_a') + ' ' + v(f.a) + (f.w !== undefined && ck_wasteInCut(id) ? ' · ' + ck_s('fg_w') + ' ' + v(f.w) : '') + (ck_targetKind(id) ? ' · ' + ck_s('fg_t', { t:ck_targetName(id) }) + ' ' + v(f.t) : '');
+  return ck_s(k === 'crevette' ? 'fg_a2' : 'fg_a') + ' ' + v(f.a) + (f.w !== undefined && ck_wasteInCut(id) ? ' · ' + ck_s('fg_w') + ' ' + v(f.w) : '') + (ck_targetKind(id) ? ' · ' + ck_s('fg_t', { t:ck_targetName(id) }) + ' ' + v(f.t) : '');
 }
 function ck_ingHtml(){
   const id = ck_ingOpen, doc = ck_myDoc(), u = ck_unit(id), k = ck_kind(id), it = ck_ingById(id) || {}, alt = ck_lang === 'ar' ? (it.n || '') : ((ck_cfg.ings[id] || {}).ar || '');
