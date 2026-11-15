@@ -7100,14 +7100,14 @@ function ck_backToTiles(){ ck_form = null; ck_ingOpen = null; ck_ban = null; ck_
 function ck_obSave(){ try{ localStorage.setItem(CK_OBK, JSON.stringify(ck_ob)); ck_obFull = false; }catch(e){ ck_obFull = true; } }
 function ck_obCount(){ let n = 0; Object.keys(ck_ob).forEach(id=>{ const p = ((ck_ob[id] || {}).data || {}).recs || {}; let c = 0; Object.keys(p).forEach(i=>{ c += Object.keys(p[i] || {}).length; }); n += Math.max(1, c); }); return n; }
 async function ck_flush(){
-  if(ck_obBusy || !Object.keys(ck_ob).length) return; ck_obBusy = true;
+  if(ck_obBusy || !Object.keys(ck_ob).length) return; ck_obBusy = true; let failed = false;
   try{
     for(const id of Object.keys(ck_ob)){
       const e = ck_ob[id]; if(!e) continue;
-      try{ await Promise.race([CK_COL.doc(id).set(e.data, { merge:true }), new Promise((_, rj)=>setTimeout(()=>rj(new Error('timeout')), 8000))]); }catch(err){ break; }
+      try{ await Promise.race([CK_COL.doc(id).set(e.data, { merge:true }), new Promise((_, rj)=>setTimeout(()=>rj(new Error('timeout')), 8000))]); }catch(err){ failed = true; break; }
       if(ck_ob[id] && ck_ob[id].seq === e.seq){ delete ck_ob[id]; ck_obSave(); }
     }
-  }finally{ ck_obBusy = false; ck_refresh(); }
+  }finally{ ck_obBusy = false; ck_refresh(); if(!failed && Object.keys(ck_ob).length) setTimeout(ck_flush, 50); }   // une saisie arrivée pendant l'envoi part tout de suite
 }
 function ck_write(id, data){ const e = ck_ob[id]; ck_ob[id] = { data:e ? ck_deepMerge(e.data, data) : data, seq:(e ? e.seq : 0) + 1 }; ck_obSave(); ck_flush(); }
 function ck_writeCook(code, patch){
@@ -7335,7 +7335,7 @@ const CK_KLAB = { escalope:'Escalope', saumon:'Saumon', avocat:'Avocat', crevett
 function ck_suiviHtml(){
   const date = ck_adate || ck_service(), docs = ck_docs(), cooks = ck_cooks(), ings = ck_ingList(), codes = [];
   cooks.forEach(c=>codes.push(c.code)); Object.keys(docs).forEach(k=>{ const e = String(docs[k].emp); if(!codes.includes(e)) codes.push(e); });
-  const nav = `<div class="ck-date"><button class="ck-btn sm" onclick="ck_adateMove(-1)">‹</button><input type="date" class="ck-in" value="${esc(date)}" onchange="ck_adateSet(this.value)"><button class="ck-btn sm" onclick="ck_adateMove(1)">›</button><button class="ck-btn sm" onclick="ck_adateSet('')">Aujourd’hui</button><button class="ck-btn sm" onclick="ck_export()">⬇ Excel</button></div>`;
+  const nav = `<div class="ck-date"><button class="ck-btn sm" onclick="ck_adateMove(-1)">‹</button><input type="date" class="ck-in" value="${esc(date)}" onchange="ck_adateSet(this.value)"><button class="ck-btn sm" onclick="ck_adateMove(1)">›</button><button class="ck-btn sm" onclick="ck_adateSet('')">Aujourd’hui</button><button class="ck-btn sm" onclick="ck_export()">⬇ Excel</button><button class="ck-btn sm danger" style="margin-inline-start:auto" onclick="ck_adminClearAll()">Vider toute la journée</button></div>`;
   if(!ings.length) return nav + '<div class="ck-box"><div class="ck-empty">Aucun ingrédient suivi. Cochez « Suivi » dans Dépenses › Ingrédients.</div></div>';
   const touched = (doc, id)=>Object.keys(((doc.recs || {})[id]) || {}).some(r=>doc.recs[id][r] && !doc.recs[id][r].del);
   const blocks = codes.map(code=>{
@@ -7348,7 +7348,8 @@ function ck_suiviHtml(){
       const rl = recs.map(r=>`<div class="ck-rec"><span class="tm">${esc(ck_hm(r.at))}</span><span class="tx">${esc(ck_recText(id, r))}${r.t === 'start' && r.auto ? ' <small>(repris de la veille)</small>' : ''}</span>${r.t === 'start' ? '' : `<button class="rd" aria-label="Supprimer" onclick="ck_adminDel(${ck_a(code)},${ck_a(id)},${ck_a(r.id)})">✕</button>`}</div>`).join('');
       return `<div class="ck-sitem" style="--c:${ck_color(id)}"><div class="ck-ihead">${ck_icon(k, 34)}<b>${esc(it.n)}</b> <small style="color:var(--ink-muted)">${esc(ck_unit(id))}</small></div><div class="ck-figs">${figs.map(x=>`<div class="ck-fig"><span>${esc(x[0])}</span><b>${esc(x[1])}</b></div>`).join('')}</div>${rl ? `<div class="ck-recs">${rl}</div>` : '<div class="ck-sub">rien saisi</div>'}</div>`;
     }).join('');
-    return `<div class="ck-box"><h3>${esc(doc.name || ck_empName(code))}${(c && c.poste) || doc.poste ? `<span class="ck-pill">${esc((c && c.poste) || doc.poste)}</span>` : ''}${pill}</h3>${items || '<div class="ck-empty">Rien saisi.</div>'}</div>`;
+    const acts = doc.emp ? `<span style="margin-inline-start:auto;display:flex;gap:6px;flex-wrap:wrap;">${doc.done ? `<button class="ck-btn sm" onclick="ck_adminReopen(${ck_a(code)})">Rouvrir le service</button>` : ''}<button class="ck-btn sm danger" onclick="ck_adminClear(${ck_a(code)})">Vider sa journée</button></span>` : '';
+    return `<div class="ck-box"><h3>${esc(doc.name || ck_empName(code))}${(c && c.poste) || doc.poste ? `<span class="ck-pill">${esc((c && c.poste) || doc.poste)}</span>` : ''}${pill}${acts}</h3>${items || '<div class="ck-empty">Rien saisi.</div>'}</div>`;
   }).join('');
   /* total par ingrédient, tous cuisiniers confondus */
   const tr = ings.map(it=>{
@@ -7369,6 +7370,23 @@ function ck_suiviHtml(){
 function ck_adminDel(code, ing, rid){
   if(!confirm('Supprimer cette saisie ?')) return; const date = ck_adate || ck_service();
   ck_write(ck_docId(date, code), { ckdate:date, emp:String(code), recs:{ [ing]:{ [rid]:{ del:true } } } }); ck_render();
+}
+function ck_clearPatch(date, code){   // supprime toutes les saisies du cuisinier pour ce jour (début, découpes, déchets, fin) et le marquage « terminé »
+  const d = ck_docs()[ck_docId(date, code)]; if(!d) return null; const recs = {};
+  Object.keys(d.recs || {}).forEach(id=>{ Object.keys(d.recs[id] || {}).forEach(rid=>{ (recs[id] = recs[id] || {})[rid] = { del:true }; }); });
+  return { ckdate:date, emp:String(code), recs, done:null };
+}
+function ck_adminReopen(code){ const date = ck_adate || ck_service(); ck_write(ck_docId(date, code), { ckdate:date, emp:String(code), done:null }); ck_render(); }
+function ck_adminClear(code){
+  const date = ck_adate || ck_service();
+  if(!confirm('Supprimer toutes les saisies de ' + ck_empName(code) + ' du ' + ck_frDate(date) + ' ?\nCette action est définitive.')) return;
+  const p = ck_clearPatch(date, code); if(p) ck_write(ck_docId(date, code), p); ck_render();
+}
+function ck_adminClearAll(){
+  const date = ck_adate || ck_service(), docs = ck_docs(), ids = Object.keys(docs);
+  if(!ids.length){ alert('Aucune saisie à supprimer pour cette journée.'); return; }
+  if(!confirm('Supprimer TOUTES les saisies de TOUS les cuisiniers du ' + ck_frDate(date) + ' ?\nCette action est définitive.')) return;
+  ids.forEach(k=>{ const p = ck_clearPatch(date, docs[k].emp); if(p) ck_write(k, p); }); ck_render();
 }
 function ck_export(){
   if(typeof XLSX === 'undefined'){ alert('Export Excel indisponible : la bibliothèque n’est pas chargée.'); return; }
