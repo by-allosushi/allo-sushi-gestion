@@ -1712,7 +1712,7 @@ function ca_restantAttendu(){
   return rnd(t0);
 }
 function ca_ecartBand(att, m){   // bandeau d'état de l'écart (vert : correct ou toléré, rouge : écart à vérifier)
-  const ec = Math.round((m - att) * 100) / 100, a = Math.abs(ec), diff = a > 0.004, bad = diff, col = bad ? 'var(--rust)' : 'var(--moss)', bg = bad ? 'var(--rust-bg)' : 'var(--moss-bg)';
+  const ec = Math.round((m - att) * 100) / 100, a = Math.abs(ec), diff = a > 0.004, bad = diff, col = !diff ? 'var(--moss)' : ec > 0 ? 'var(--amber)' : 'var(--rust)', bg = !diff ? 'var(--moss-bg)' : ec > 0 ? 'var(--amber-bg)' : 'var(--rust-bg)';   // en trop : orange, en moins : rouge
   const txt = !diff ? '✓ Caisse correcte — aucun écart' : (bad ? '⚠ Écart de ' : '✓ Écart de ') + ca_fmtMoney(a) + (ec < 0 ? ' en moins' : ' en trop');
   return `<div style="border-left:3px solid ${col};background:${bg};border-radius:0;padding:9px 12px;"><div style="font-weight:700;font-size:14px;color:${col};">${txt}</div><div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Attendu ${ca_fmtMoney(att)} · compté ${ca_fmtMoney(m)}</div></div>`;
 }
@@ -1828,7 +1828,7 @@ function ca_passationsCard(){
   const dvs = (ca_session.debutValidations || []).slice().sort(ca_cmpAt), rs = ca_restantsList(ca_session), closed = !!(ca_allSessions[ca_session.date] && ca_allSessions[ca_session.date].enregistreLe), adm = ca_isAdminNow();
   if(!dvs.length && !rs.length && !closed) return '';
   const M = ca_fmtMoney, mono = "font-family:'JetBrains Mono',monospace;";
-  const ecTxt = (e)=>{ const a = Math.abs(e); return a < 0.005 ? '<span style="color:var(--moss);">Aucun écart</span>' : '<span style="color:var(' + '--rust' + ');">Écart de ' + M(a) + (e < 0 ? ' en moins' : ' en trop') + '</span>'; };
+  const ecTxt = (e)=>{ const a = Math.abs(e); return a < 0.005 ? '<span style="color:var(--moss);">Aucun écart</span>' : '<span style="color:var(' + (e > 0 ? '--amber' : '--rust') + ');">Écart de ' + M(a) + (e < 0 ? ' en moins' : ' en trop') + '</span>'; };
   const sg = (e)=>(e > 0 ? '+' : '') + M(e);
   const lastOpen = dvs.filter(v=>!v.tardive).pop(), used = new Set();
   const line = '<div style="border-top:1px solid var(--line,#2a312d);padding:7px 0;">';
