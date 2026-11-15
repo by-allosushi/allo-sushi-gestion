@@ -1782,6 +1782,35 @@ function ca_restantStatusHtml(r){
   return `<div class="cg-sub" style="color:var(--amber);">⏳ En attente de validation de l’admin : ${ca_fmtMoney(r.montant)}${ecs}</div>`;
 }
 /* Admin : passations de la journée (qui a tenu la caisse, de quand à quand) + fins de session à valider */
+function ca_isAdminNow(){ return !!(session && session.isAdmin); }
+function ca_delLink(id){ return ca_isAdminNow() ? `<div style="margin-top:4px;"><a href="#" style="color:var(--rust);font-size:12.5px;" onclick="ca_restantDelete('${id}');return false;">🗑 Supprimer cette saisie</a></div>` : ''; }
+async function ca_restantDelete(id){   // admin : supprime une fin de session (ex. saisie tardive erronée)
+  if(!ca_isAdminNow()) return;
+  const r = ca_restantsList(ca_session).find(x=>x.id === id); if(!r) return;
+  if(!confirm('Supprimer la clôture de ' + (r.par || '') + ' (' + ca_fmtMoney(r.montant) + ', ' + (r.heure || '') + ') ?\nLe début de la personne suivante sera recalculé.')) return;
+  try{
+    const out = await ca_limTx(c=>{
+      let list = Array.isArray(c.restants) ? c.restants.slice() : [];
+      if(!list.length && c.restant) list = [{ ...c.restant, id:c.restant.id || 'legacy' }];
+      list = list.filter(x=>x.id !== id);
+      const lastAny = list.slice().sort(ca_cmpAt).pop() || null, lastOk = list.filter(x=>x.statut === 'valide').sort(ca_cmpAt).pop() || null;
+      const mc = (r.statut === 'valide' && String(c.montantCompte) === String(r.montant)) ? (lastOk ? String(lastOk.montant) : '') : c.montantCompte;
+      return { ...c, restants:list, restant:lastAny, montantCompte:mc };
+    });
+    ca_session.restants = out.restants; ca_session.restant = out.restant || null; ca_session.montantCompte = out.montantCompte !== undefined ? out.montantCompte : '';
+  }catch(e){ console.error(e); alert('Erreur : suppression impossible (' + (e.message || e) + ').'); }
+  ca_render();
+}
+async function ca_rouvrirJournee(){   // admin : rouvre une journée clôturée (les saisies sont conservées)
+  if(!ca_isAdminNow()) return;
+  const date = ca_session.date, ex = ca_allSessions[date]; if(!(ex && ex.enregistreLe)) return;
+  if(!confirm('Rouvrir la journée du ' + fmtDateShort(date) + ' ?\nLes saisies sont conservées. Les employés pourront à nouveau valider leur début. Tu pourras clôturer de nouveau ensuite.')) return;
+  try{
+    await ca_limTx(c=>{ const o = { ...c }; delete o.enregistreLe; delete o.enregistreParEn; return o; });
+    ca_session.enregistreLe = undefined; ca_session.enregistreParEn = undefined;
+  }catch(e){ console.error(e); alert('Erreur : la journée n’a pas été rouverte (' + (e.message || e) + ').'); }
+  ca_render();
+}
 function ca_passationsCard(){
   const dvs = (ca_session.debutValidations || []).slice().sort(ca_cmpAt), rs = ca_restantsList(ca_session);
   if(!dvs.length && !rs.length) return '';
@@ -1791,9 +1820,9 @@ function ca_passationsCard(){
     const r = rs.find(x=>x.vid === v.id); if(r) used.add(r.id);
     const t0 = Date.parse(v.at || '') || 0, t1 = r ? (Date.parse(r.at || '') || Infinity) : Infinity;
     const rem = (ca_session.sorties || []).filter(l=>{ const lt = Date.parse(l.at || '') || 0; return l.motif === 'retrait' && l.par === v.par && lt >= t0 - 1000 && lt <= t1 + 1000; }).reduce((s,l)=>s + ca_parseNum(l.montant), 0);
-    return `<div style="border-top:1px solid var(--line,#2a312d);padding:7px 0;"><div style="font-size:13px;"><b>${esc(v.par || '')}</b> · ${esc(v.heure || '')} → ${r ? esc(r.heure || '') + (r.tardive ? ' <span class="cg-sub">(saisie tardive à ' + esc(r.saisieHeure || '') + ')</span>' : '') : '<span style="color:var(--amber);">⚠ fin de caisse non validée</span>'}</div><div class="cg-sub">Début ${ca_fmtMoney(v.montant)}${ecs(v.ecart)} · Remis ${ca_fmtMoney(rem)} · Reste ${r ? ca_fmtMoney(r.montant) + ecs(r.ecart) + (r.statut === 'attente' ? ' ⏳' : r.statut === 'refuse' ? ' ✕' : '') : '—'}</div></div>`;
+    return `<div style="border-top:1px solid var(--line,#2a312d);padding:7px 0;"><div style="font-size:13px;"><b>${esc(v.par || '')}</b> · ${esc(v.heure || '')} → ${r ? esc(r.heure || '') + (r.tardive ? ' <span class="cg-sub">(saisie tardive à ' + esc(r.saisieHeure || '') + ')</span>' : '') : '<span style="color:var(--amber);">⚠ fin de caisse non validée</span>'}</div><div class="cg-sub">Début ${ca_fmtMoney(v.montant)}${ecs(v.ecart)} · Remis ${ca_fmtMoney(rem)} · Reste ${r ? ca_fmtMoney(r.montant) + ecs(r.ecart) + (r.statut === 'attente' ? ' ⏳' : r.statut === 'refuse' ? ' ✕' : '') : '—'}</div>${r ? ca_delLink(r.id) : ''}</div>`;
   });
-  rs.filter(r=>!used.has(r.id)).forEach(r=>{ rows.push(`<div style="border-top:1px solid var(--line,#2a312d);padding:7px 0;"><div style="font-size:13px;"><b>${esc(r.par || '')}</b> · fin ${esc(r.heure || '')}</div><div class="cg-sub">Reste ${ca_fmtMoney(r.montant)}${ecs(r.ecart)}${r.statut === 'attente' ? ' ⏳' : r.statut === 'refuse' ? ' ✕' : ''}</div></div>`); });
+  rs.filter(r=>!used.has(r.id)).forEach(r=>{ rows.push(`<div style="border-top:1px solid var(--line,#2a312d);padding:7px 0;"><div style="font-size:13px;"><b>${esc(r.par || '')}</b> · fin ${esc(r.heure || '')}</div><div class="cg-sub">Reste ${ca_fmtMoney(r.montant)}${ecs(r.ecart)}${r.statut === 'attente' ? ' ⏳' : r.statut === 'refuse' ? ' ✕' : ''}</div>${ca_delLink(r.id)}</div>`); });
   return `<div class="cg-card" style="margin-bottom:10px;"><div class="cg-t">🔁 Passations de la journée</div>${rows.join('')}</div>`;
 }
 function ca_restantAdminCard(){
@@ -1807,6 +1836,7 @@ function ca_restantAdminCard(){
     ${r.tardive ? (nx ? `<div class="cg-sub">Début de ${esc(nx.par || '')} à ${esc(nx.heure || '')} : <b style="color:var(--ink);">${ca_fmtMoney(nx.montant)}</b>${Math.abs(ca_parseNum(nx.montant) - ca_parseNum(r.montant)) > 0.004 ? ' <span style="color:var(--rust);">(écart de passation ' + (ca_parseNum(nx.montant) - ca_parseNum(r.montant) > 0 ? '+' : '') + ca_fmtMoney(Math.round((ca_parseNum(nx.montant) - ca_parseNum(r.montant)) * 100) / 100) + ')</span>' : ' · identique'}</div>` : '<div class="cg-sub">Personne n’a encore pris la caisse après cette clôture.</div>') : ''}
     ${r.note ? `<div style="border:1px solid var(--rust);background:var(--rust-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--rust);">Note : ${esc(r.note)}</div>` : ''}
     ${r.statut === 'attente' ? `<div style="display:flex;gap:8px;"><button class="btn t-save" style="flex:1;height:42px;" onclick="ca_restantDecide('${r.id}',true)">✓ Valider</button><button class="btn" style="flex:1;height:42px;background:var(--rust-bg);border:1px solid var(--rust);color:var(--rust);font-weight:700;" onclick="ca_restantDecide('${r.id}',false)">✕ Refuser (recompter)</button></div><div class="cg-sub">Une fois validé, ce montant devient le début de la personne suivante.</div>` : ca_restantStatusHtml(r)}
+    ${ca_delLink(r.id)}
   </div>`; }).join('');
 }
 async function ca_limAddSortie(){
@@ -2179,6 +2209,7 @@ function ca_renderCaisseTab(){
         </div>
       </div>
       ${existing ? `<div style="margin-top:8px;font-size:11.5px;color:var(--amber);">⚠ Une clôture existe déjà pour cette date. L'enregistrer à nouveau la remplacera.</div>` : ''}
+      ${existing && existing.enregistreLe && ca_isAdminNow() ? `<button class="btn ghost" style="width:100%;margin-top:8px;height:40px;" onclick="ca_rouvrirJournee()">🔓 Rouvrir la journée</button>` : ''}
     </div>
 
     ${ca_renderStatusBanner(existing, ecart)}
