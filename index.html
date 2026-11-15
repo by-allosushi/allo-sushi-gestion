@@ -6998,14 +6998,14 @@ function ck_syncSub(){
 function ck_autoStart(){   // « disponible au début » : repris tout seul de la restante de la veille (le cuisinier peut le corriger)
   if(!ck_who || !ck_docsReady || !ck_prevReady || ck_viewDate !== ck_service()) return;
   const doc = ck_docs()[ck_docId(ck_viewDate, ck_who)] || {}, patch = {};
-  ck_myIngs(ck_who).forEach(id=>{ if(!ck_needsStart(id) || ck_recOne(doc, id, 'start')) return; const p = ck_prevRest(id); if(p !== null) patch[id] = { start:{ t:'start', f:{ s:p }, auto:true, at:new Date().toISOString() } }; });
+  ck_myIngs(ck_who).forEach(id=>{ if(!ck_needsStart(id) || ck_recOne(doc, id, 'start')) return; const p = ck_prevRest(id); if(p !== null) patch[id] = { start:{ del:false, t:'start', f:{ s:p }, auto:true, at:new Date().toISOString() } }; });
   if(Object.keys(patch).length) ck_writeCook(ck_who, { recs:patch });
 }
 /* ---------- saisie : une question à la fois (formulaire générique) ---------- */
 const ck_nowIso = ()=>new Date().toISOString();
 const ck_rid = ()=>'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4);
 function ck_poste(){ const c = ck_cook(ck_who); return c ? c.poste : ''; }
-function ck_putRec(id, rid, rec){ ck_writeCook(ck_who, { recs:{ [id]:{ [rid]:rec } } }); }
+function ck_putRec(id, rid, rec){ ck_writeCook(ck_who, { recs:{ [id]:{ [rid]:rec.del ? rec : Object.assign({ del:false }, rec) } } }); }   // del:false : une saisie neuve remplace une ancienne marque « supprimée » (début, fin)
 const ck_myDoc = ()=>ck_docs()[ck_docId(ck_viewDate, ck_who)] || {};
 function ck_qText(key, id){ const v = { i:ck_ingName(id), t:ck_targetName(id) }; return { main:ck_s(key, v), alt:ck_o(key, { i:(ck_ingById(id) || {}).n || '', t:ck_targetName(id) }) }; }
 function ck_fmtOrEmpty(x){ return x === undefined || x === null || x === '' ? '' : ck_fmt(Number(x)); }
@@ -7125,7 +7125,7 @@ function ck_ok(){
   /* dernière question : on enregistre */
   if(sp.type === 'fin'){
     const per = {}; sp.fields.forEach((f, j)=>{ (per[f.ing] = per[f.ing] || {})[f.k] = ck_num(F.v[j]) || 0; });
-    const recs = {}; Object.keys(per).forEach(id=>{ recs[id] = { fin:{ t:'fin', f:per[id], at:ck_nowIso() } }; });
+    const recs = {}; Object.keys(per).forEach(id=>{ recs[id] = { fin:{ del:false, t:'fin', f:per[id], at:ck_nowIso() } }; });
     ck_writeCook(ck_who, { done:ck_nowIso(), recs }); ck_form = null; ck_view = 'tiles'; ck_render(); return;
   }
   const id = sp.id, prev = sp.old ? Object.assign({}, sp.old) : null; if(prev) delete prev.id;
