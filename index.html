@@ -7775,16 +7775,16 @@ function ck_cookSet(code, key, val){
   }
   c[key] = val; ck_cfgSave(); ck_render();
 }
-const CK_QKEYS = {
-  escalope:['q_cut_a','q_cut_w','q_cut_t','q_min','q_buy','q_waste','q_fin_rc','q_fin_rn','q_fin_pc','q_fin_pq'],
-  boeuf:['q_cut_a','q_cut_w','q_cut_t','q_min','q_buy','q_waste','q_fin_rc','q_fin_rn','q_fin_pq'],
-  saumon:['q_cut_a','q_cut_w','q_buy','q_waste','q_fin_rc','q_fin_rn','q_fin_pq'],
-  simple:['q_cut_a','q_cut_w','q_buy','q_waste','q_fin_rc','q_fin_rn','q_fin_pq'],
-  crevette:['q_start_cr','q_dec_a','q_dec_w','q_buy','q_waste','q_fin_rg','q_fin_cr','q_fin_pq'],
-  gamba:['q_gam_a','q_gam_w','q_gam_n','q_buy','q_waste','q_fin_rg','q_fin_pq'],
-  avocat:['q_start','q_buy','q_waste','q_fin_r','q_fin_pq'],
-  poulet:['q_pou_g','q_min','q_buy','q_waste'],
-  viande:['q_vi_v','q_buy','q_waste']
+const CK_QKEYS = {   // seulement les questions réellement posées pour chaque type d'ingrédient
+  escalope:['q_cut_a','q_cut_t','q_min','q_fin_rc','q_fin_rn','q_fin_pc','q_fin_pq'],
+  boeuf:['q_cut_a','q_cut_t','q_fin_rc','q_fin_rn','q_fin_pq'],
+  saumon:['q_cut_a','q_cut_w','q_fin_rc','q_fin_rn','q_fin_pq'],
+  simple:['q_cut_a','q_cut_w','q_fin_rc','q_fin_rn','q_fin_pq'],
+  crevette:['q_start_cr','q_dec_a','q_dec_w','q_fin_rg','q_fin_cr','q_fin_pq'],
+  gamba:['q_gam_a','q_gam_w','q_gam_n','q_fin_rg','q_fin_pq'],
+  avocat:['q_start','q_waste','q_fin_r','q_fin_pq'],
+  poulet:['q_pou_g'],
+  viande:['q_vi_v']
 };
 let ck_qOpen = {};
 function ck_qSet(id, key, lang, val){
@@ -7796,7 +7796,8 @@ function ck_qSet(id, key, lang, val){
 }
 function ck_qReset(id, key){ ck_qSet(id, key, 'fr', ''); ck_qSet(id, key, 'ar', ''); ck_render(); }
 function ck_qHtml(id){
-  const keys = CK_QKEYS[ck_kind(id)] || CK_QKEYS.simple, q = ((ck_cfg.ings || {})[id] || {}).q || {};
+  const q = ((ck_cfg.ings || {})[id] || {}).q || {}, base = CK_QKEYS[ck_kind(id)] || CK_QKEYS.simple;
+  const keys = base.concat(Object.keys(q).filter(k=>!base.includes(k) && CK_T[k] && (ck_qOv(k, id, 'fr') || ck_qOv(k, id, 'ar'))));   // une question déjà modifiée reste toujours visible
   const nMod = keys.filter(k=>ck_qOv(k, id, 'fr') || ck_qOv(k, id, 'ar')).length;
   return `<details style="margin-top:6px;" ${ck_qOpen[id] ? 'open' : ''} ontoggle="ck_qOpen[${ck_a(id)}]=this.open"><summary style="cursor:pointer;font-weight:600;">Questions de saisie${nMod ? ' (' + nMod + ' modifiée' + (nMod > 1 ? 's' : '') + ')' : ''}</summary>
     <div class="ck-sub" style="margin:6px 0;">Texte vide = question d’origine. Écris <b>{i}</b> pour insérer le nom de l’ingrédient.</div>
