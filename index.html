@@ -1192,11 +1192,11 @@ function uu_subscribeUsers(){
 function uu_fillNewEmp(){ // liste des employés du formulaire « Nouvel utilisateur »
   const el = document.getElementById('nu-emp'); if(!el || typeof pt_codes !== 'function') return;
   const cur = el.value;
-  el.innerHTML = '<option value="">— Aucun employé —</option>' + pt_codes().map(c=>`<option value="${c}">${esc(pt_label(c))} (code ${c})</option>`).join('');
+  el.innerHTML = '<option value="">— Aucun employé —</option>' + pt_activeCodes().map(c=>`<option value="${c}">${esc(pt_label(c))} (code ${c})</option>`).join('');
   el.value = cur;
 }
 function uu_empSelect(u){
-  const codes = (typeof pt_codes === 'function') ? pt_codes() : [];
+  const codes = (typeof pt_activeCodes === 'function') ? pt_activeCodes() : [];
   const cur = (u.empCode === undefined || u.empCode === null || u.empCode === '') ? '' : String(u.empCode);
   const opts = ['<option value="">— Aucun employé —</option>'].concat(codes.map(c=>`<option value="${c}" ${String(c) === cur ? 'selected' : ''}>${esc(pt_label(c))} (code ${c})</option>`));
   if(cur && !codes.map(String).includes(cur)) opts.push(`<option value="${esc(cur)}" selected>Code ${esc(cur)}</option>`);
@@ -2399,6 +2399,8 @@ function pt_codes(){
   Object.keys(pt_emp).forEach(k=>s.add(Number(k)));
   return Array.from(s).filter(c=>!isNaN(c)).sort((a,b)=>a-b);
 }
+function pt_isActive(c){ const e = pt_emp[c]; return !(e && e.actif === false); }
+function pt_activeCodes(){ return pt_codes().filter(pt_isActive); }
 function pt_name(c){ const e=pt_emp[c]; if(e && e.name) return e.name; if(PT_DEFAULT_NAMES[c]) return PT_DEFAULT_NAMES[c]; return 'Code ' + c + ' (à identifier)'; }
 function pt_poste(c){ return (pt_emp[c] && pt_emp[c].poste) || ''; }
 function pt_label(c){ const p=pt_poste(c), dp = (typeof pt_departDate === 'function') ? pt_departDate(c) : ''; return pt_name(c) + (p ? ' — ' + p : '') + (dp ? ' — sorti le ' + dp.slice(8) + '/' + dp.slice(5, 7) : ''); }
@@ -2457,12 +2459,12 @@ function pt_start(){
   }, onErr);
   pt_cloturesCol.onSnapshot((snap)=>{
     const list = []; snap.forEach(d=>list.push({ id:d.id, ...d.data() }));
-    pt_clotures = list; pt_ready.clot = true; pt_scheduleRender();
+    pt_clotures = list; pt_ready.clot = true; pt_scheduleRender(); av_schedule();
   }, onErr);
   pt_entriesCol.onSnapshot((snap)=>{
     const list = [];
     snap.forEach(d=>list.push({ id:d.id, ...d.data() }));
-    pt_entries = list; pt_ready.entries = true; pt_scheduleRender();
+    pt_entries = list; pt_ready.entries = true; pt_scheduleRender(); av_schedule();
   }, onErr);
 }
 
@@ -2646,7 +2648,7 @@ function pt_eventsNear(code, dt){
 /* ---------- chevauchements de poste (deux collègues qui se relaient) ---------- */
 function pt_overlapKey(codeA, codeB, aEndIso, bStartIso){ return codeA + '_' + codeB + '_' + String(aEndIso).slice(0,16) + '_' + String(bStartIso).slice(0,16); }
 function pt_computeOverlaps(sessions, all){
-  const codes = pt_codes();
+  const codes = pt_activeCodes();
   const out = [];
   pt_groups.forEach((group, gi)=>{
     const members = (group || []).filter(c=>codes.includes(c));
@@ -2680,7 +2682,7 @@ function pt_computeOverlaps(sessions, all){
 /* ---------- paie ---------- */
 function pt_entriesOf(kind, code){
   return pt_entries.filter(e=>e.kind === kind && e.code === code && pt_inRange(e.date))
-    .map(e=>({ id:e.id, date:e.date, amount:Number(e.amount)||0, note:e.note || '', src:'local' }));
+    .map(e=>({ id:e.id, date:e.date, amount:Number(e.amount)||0, note:e.note || '', src:'local', av:e.source === 'depenses' }));
 }
 /* ---------- verrou des jours clôturés ---------- */
 function pt_addDays(iso, n){ const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return toLocalISO(d); }
@@ -3080,13 +3082,14 @@ function pt_render(fresh){
   const anoms = anomsPeriod.filter(a=>!pt_anomIgnored(a));
   const nIgnored = anomsPeriod.length - anoms.length;
   const overlaps = pt_computeOverlaps(sessions).filter(o=>pt_showClosed || !pt_dayClosed(o.day, o.codeA));
-  const codes = pt_codes();
+  const allCodes = pt_codes(), cl0 = (()=>{ try{ return pt_currentClosure(); }catch(e){ return null; } })();
+  const codes = allCodes.filter(c=>pt_isActive(c) || !!(cl0 && cl0.rows && cl0.rows[c]));   // un employé désactivé reste visible dans une période déjà clôturée où il figure
   if(pt_sel === null || !codes.includes(pt_sel)) pt_sel = codes.length ? codes[0] : null;
   pt_renderTabs(anoms.length + overlaps.length);
   let html;
   if(pt_tab === 'employes') html = pt_tabEmployes(codes, sessions, anoms, overlaps);
   else if(pt_tab === 'journal') html = pt_tabJournal();
-  else html = pt_tabReglages(codes);
+  else html = pt_tabReglages(allCodes);
   body.innerHTML = html;
   pt_restoreInputs(st, !fresh);
 }
@@ -3350,6 +3353,7 @@ function pt_closureRows(from, to, only){
     const rows = {};
     (only !== undefined && only !== null ? [Number(only)] : pt_codes()).forEach(code=>{
       const p = pt_payroll(code, sessions);
+      if(!pt_isActive(code) && !(p.totalHours > 0.005 || Math.round(p.net) !== 0)) return;   // employé désactivé sans activité sur la période
       rows[code] = { name:pt_name(code), hours:pt_r2(p.totalHours), rate:p.rate, mode:p.mode, workedDays:p.workedDays, baseWage:pt_r2(p.baseWage),
         transportTotal:pt_r2(p.transportTotal), bonusesTotal:pt_r2(p.bonusesTotal), subTotal:pt_r2(p.subTotal), leavesTotal:pt_r2(p.leavesTotal),
         advancesTotal:pt_r2(p.advancesTotal), loanTotal:pt_r2(p.loanTotal), reportIn:pt_r2(p.reportIn), solde:pt_r2(p.solde), paidAmt:pt_r2(p.paidAmt), reportOut:pt_r2(p.reportOut),
@@ -3742,14 +3746,15 @@ function pt_paieSection(c, sessions, codes){
   const rows = pt_histRows(p);
   const hist = rows.length ? rows.map(r=>`<tr>
       <td>${fmtDateShort(r.date)}</td>
-      <td><span class="pt-badge ${r.cls}">${r.cat}</span></td>
+      <td><span class="pt-badge ${r.cls}">${r.av ? 'Avance caisse' : r.cat}</span></td>
       <td>${pt_e(r.note)}</td>
       <td class="${r.sign<0?'pt-minus':'pt-plus'}">${r.sign === 0 ? '1 jour' : (r.sign<0?'−':'+') + pt_fmtMoney(r.amount)}</td>
-      <td><button class="btn ghost small t-del" onclick="pt_delEntryConfirm('${r.id}','cette entrée')">Supprimer</button></td></tr>`).join('')
+      <td>${r.av ? '<span class="pt-muted" style="font-size:11px;">via Dépenses</span>' : `<button class="btn ghost small t-del" onclick="pt_delEntryConfirm('${r.id}','cette entrée')">Supprimer</button>`}</td></tr>`).join('')
     : `<tr><td colspan="5" class="pt-muted">Aucune entrée sur cette période.</td></tr>`;
+  const avWarn = (!(session && session.isAdmin === false) && rows.some(r=>r.av) && Number(p.solde) < -0.004) ? `<div class="pt-muted" style="color:var(--rust);margin-bottom:6px;">⚠ Les avances dépassent le solde de la période (solde : ${pt_fmtMoney(p.solde)}). Le déficit est reporté.</div>` : '';
   const rateLine = `Taux : ${pt_fmtMoney(p.rate)}${p.mode==='daily'?' / jour':' / heure'} · ${p.transport.enabled ? 'Transport : ' + pt_fmtMoney(p.transport.amount) + ' / jour' : 'Transport désactivé'} · <a href="#" class="pt-link" onclick="pt_setTab('reglages');return false;">Modifier dans Réglages</a>`;
   const repLine = (p.reportIn || p.reportOut) ? `<div class="pt-muted" style="margin-bottom:8px;">${[p.reportIn > 0.004 ? '<span style="color:var(--moss);">Report précédent : +' + pt_fmtMoney(p.reportIn) + ' (non versé, repris dans cette paie)</span>' : p.reportIn < -0.004 ? '<span style="color:var(--rust);">Report précédent : −' + pt_fmtMoney(-p.reportIn) + ' (déduit de cette paie)</span>' : '', p.reportOut > 0.004 ? '<span style="color:var(--moss);">Reste dû reporté : +' + pt_fmtMoney(p.reportOut) + '</span>' : p.reportOut < -0.004 ? '<span style="color:var(--rust);">Solde négatif reporté : −' + pt_fmtMoney(-p.reportOut) + '</span>' : ''].filter(Boolean).join(' · ')}</div>` : '';
-  return `${lockLine}${repLine}
+  return `${lockLine}${repLine}${avWarn}
     <div class="pt-muted">${rateLine}</div>${pt_isAuto(c) ? `<div class="pt-muted" style="margin-top:4px;">Présent tous les jours depuis le ${fmtDateShort(PT_AUTO_START)}, sans pointage : <b>${p.workedDays} jour${p.workedDays > 1 ? 's' : ''}</b> sur la période${(p.absences || []).length ? ' · ' + p.absences.length + ' absence' + (p.absences.length > 1 ? 's' : '') : ''}. Marque un jour d’absence ci-dessous pour qu’il ne soit ni payé ni compté pour le congé.</div>` : ''}
     <div class="pt-row" style="margin-top:10px;"><div class="field"><label>Date</label><input type="date" id="pt-f-date" class="pt-draft pt-auto" value="${todayISO()}"></div></div>
     ${pt_formRow('prime','Primes')}${pt_formRow('off','Jour Off')}${pt_formRow('avance','Avance')}${pt_isAuto(c) ? pt_absenceRow() : ''}
@@ -3798,7 +3803,7 @@ function pt_pointagesSection(c, sessions, myAn, myOv){
       lines.length ? lines.map(l=>l.html).join('') + `<tr class="pt-total"><td colspan="3">Total</td><td>${pt_fmtH(total)}</td><td></td></tr>` : `<tr><td colspan="5" class="pt-muted">Aucune session sur cette période.</td></tr>`}</tbody></table></div>
     <div class="pt-muted" style="margin-top:12px;font-weight:600;">Ajouter un pointage</div>
     <div class="pt-row" style="margin-top:4px;">
-      <select id="pt-ne-emp" class="pt-draft pt-auto">${pt_codes().map(x=>`<option value="${x}" ${x===c?'selected':''}>${pt_e(pt_label(x))}</option>`).join('')}</select>
+      <select id="pt-ne-emp" class="pt-draft pt-auto">${pt_codes().filter(x=>pt_isActive(x) || x===c).map(x=>`<option value="${x}" ${x===c?'selected':''}>${pt_e(pt_label(x))}</option>`).join('')}</select>
       <input type="date" id="pt-ne-date" class="pt-draft pt-auto"><input type="time" id="pt-ne-time" class="pt-draft pt-auto">
       <select id="pt-ne-type" class="pt-draft pt-auto"><option value="0">Entrée</option><option value="1">Sortie</option></select>
       <button class="btn small b-add t-add" onclick="pt_addEventUI()">Ajouter</button>
@@ -3880,7 +3885,9 @@ function pt_tabReglages(codes){
   const isAdmin = !!(session && session.isAdmin);
   const mailCard = isAdmin ? pt_mailCfgCard() : '';
   let suggestion = 1; while(codes.includes(suggestion)) suggestion++;
-  const cards = codes.map(c=>{
+  const inactiveCodes = codes.filter(c=>!pt_isActive(c));
+  const inactiveHtml = inactiveCodes.length ? `<h2 class="section">Désactivés <span class="pt-muted" style="text-transform:none;font-weight:400;letter-spacing:0;">— cachés des listes, historique conservé</span></h2>` + inactiveCodes.map(c=>`<div class="ticket"><div class="row-between"><div><div style="font-weight:700;">${pt_e(pt_name(c))}</div><div class="pt-muted">Code ${c}${(pt_emp[c] || {}).poste ? ' · ' + pt_e(pt_emp[c].poste) : ''}</div></div><button class="btn small t-add" onclick="pt_setActive(${c},true)">Réactiver</button></div></div>`).join('') : '';
+  const cards = codes.filter(pt_isActive).map(c=>{
     const e = pt_emp[c] || {}, tr = pt_transport(c);
     return `<div class="ticket">
       <div class="row-between"><div style="font-weight:700;font-family:'Manrope',sans-serif;">Code ${c}</div>${isAdmin ? `<button class="btn small t-del" onclick="pt_deleteEmployee(${c})">🗑️ Supprimer</button>` : ''}</div>
@@ -3891,6 +3898,7 @@ function pt_tabReglages(codes){
         <div class="field"><label>Présence</label><select onchange="pt_setEmp(${c},{autoPresent:this.value==='1'})"><option value="0" ${pt_isAuto(c)?'':'selected'}>Selon le pointage</option><option value="1" ${pt_isAuto(c)?'selected':''}>Présent tous les jours (sans pointage)</option></select></div>
         <div class="field"><label>Taux (DA)</label><input type="text" inputmode="decimal" value="${pt_rate(c) || ''}" placeholder="0" onchange="pt_setRate(${c},this.value)"></div>
       </div>
+      <div class="perm-row" style="margin-top:8px;"><span>Employé actif</span><label class="switch"><input type="checkbox" checked onchange="pt_setActive(${c},false)"><span class="slider"></span></label></div>
       <div class="perm-row" style="margin-top:8px;"><span>Prime de transport par jour travaillé</span><label class="switch"><input type="checkbox" ${tr.enabled?'checked':''} onchange="pt_setTransport(${c},{enabled:this.checked})"><span class="slider"></span></label></div>
       ${tr.enabled ? `<div class="field" style="margin-top:8px;max-width:220px;"><label>Montant / jour (DA)</label><input type="text" inputmode="decimal" value="${tr.amount || ''}" placeholder="0" onchange="pt_setTransport(${c},{amount:pt_num(this.value)})"></div>` : ''}
     </div>`;
@@ -3910,7 +3918,8 @@ function pt_tabReglages(codes){
   </div>
   <h2 class="section">Employés</h2>
   ${cards || pt_empty('Importe un export ZKBio ou ajoute un employé ci-dessus.')}
-  ${isAdmin ? pt_groupsSection(codes) : ''}
+  ${inactiveHtml}
+  ${isAdmin ? pt_groupsSection(codes.filter(pt_isActive)) : ''}
   ${mailCard}
   <div class="ticket"><div class="section-label">Données</div>
     <div class="actions-row" style="margin-top:0;"><button class="btn small b-neutral t-io" onclick="pt_exportExcel()">Exporter en Excel (sauvegarde complète)</button></div>
@@ -3946,6 +3955,18 @@ function pt_grpAdd(gi){
   const sel = document.getElementById('pt-grp-add-' + gi); const c = parseInt(sel.value, 10);
   if(isNaN(c)) return;
   pt_groups[gi] = (pt_groups[gi] || []).concat([c]); pt_grpSave(); pt_render(true);
+}
+async function pt_setActive(c, on){
+  if(!on){
+    const lines = [];
+    try{
+      const q = pt_payroll(c, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date))));
+      if(Math.abs(Number(q.solde) || 0) > 0.5) lines.push('Solde de la période affichée : ' + pt_fmtMoney(q.solde));
+      const lb = pt_loanBalance(c); if(lb.due > 0.5) lines.push('Prêt non remboursé : ' + pt_fmtMoney(lb.due));
+    }catch(e){ console.warn(e); }
+    if(lines.length && !confirm(pt_name(c) + ' a encore :\n• ' + lines.join('\n• ') + '\n\nDésactiver quand même ? Rien n’est supprimé.')) { pt_render(true); return; }
+  }
+  try{ await pt_setEmp(c, { actif:!!on }); if(!on && pt_sel === c) pt_sel = null; pt_render(true); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); pt_render(true); }
 }
 function pt_setField(c, field, v){ pt_setEmp(c, { [field]: (field === 'payMode' ? v : String(v).trim()) }).catch(e=>alert('Erreur : ' + (e.message || e))); }
 function pt_setRate(c, v){ pt_setEmp(c, { rate: pt_num(v) }).catch(e=>alert('Erreur : ' + (e.message || e))); }
@@ -4617,7 +4638,7 @@ function mep_empName(c){ const e = (typeof pt_emp !== 'undefined' && pt_emp) ? p
 function mep_empList(){
   if(!mep_isAdmin()){ const c = mep_myCode(); return c === null ? [] : [{ code:c, name:mep_empName(c) }]; }
   const codes = (typeof pt_codes === 'function') ? pt_codes() : [];
-  return codes.filter(c=>((pt_emp[c] && pt_emp[c].name) || PT_DEFAULT_NAMES[c]) && !(typeof pt_departDate === 'function' && pt_departDate(c))).map(c=>({ code:c, name:mep_empName(c) })).sort((a, b)=>a.name.localeCompare(b.name, 'fr'));
+  return codes.filter(c=>(typeof pt_isActive !== 'function' || pt_isActive(c)) && ((pt_emp[c] && pt_emp[c].name) || PT_DEFAULT_NAMES[c]) && !(typeof pt_departDate === 'function' && pt_departDate(c))).map(c=>({ code:c, name:mep_empName(c) })).sort((a, b)=>a.name.localeCompare(b.name, 'fr'));
 }
 function mep_canCorrect(st){   // l'administrateur corrige le dernier inventaire ; un cuisinier seulement le sien, du jour en cours
   if(!st) return false; if(mep_isAdmin()) return true;
@@ -5062,7 +5083,7 @@ function dp_periodLabel(){
   return `${fmtDateShort(start)} → ${fmtDateShort(end)}`;
 }
 
-let dp_mouvements = [];
+let dp_mouvements = [], dp_mouvReady = false;
 let dp_listMax = 50, dp_period = 'jour', dp_jPeriod = 'jour';
 function dp_setPeriod(x){ dp_period = x; dp_listMax = 50; dp_render(); }
 let dp_pending = [];          // retraits de caisse en attente de confirmation (hors solde)
@@ -5110,11 +5131,51 @@ let dp_verifications = [];
 let dp_verificationResult = null;
 let dp_verificationBusy = false;
 
+/* ---------- Avances sur salaire : Dépenses → Pointage ----------
+   Chaque avance saisie dans Dépenses (type Charge, « avance sur salaire ») crée automatiquement une entrée « avance » dans
+   pointage_entries (id avc_<id du mouvement>, source:'depenses'), déduite de la paie de l’employé. Modifier ou supprimer l’avance
+   dans Dépenses met l’entrée à jour. Les jours clôturés dans le Pointage ne sont jamais touchés. Les avances existantes sont reprises
+   une seule fois (même id) ; une avance identique déjà saisie à la main dans le Pointage n’est pas recopiée. */
+let av_t = null, av_busy = false, av_failed = false;
+function av_schedule(){ if(av_failed) return; clearTimeout(av_t); av_t = setTimeout(()=>{ av_sync().catch(e=>{ av_failed = true; console.warn('Synchro avances', e); }); }, 1200); }
+async function av_sync(){
+  if(av_busy || av_failed || !session || !pt_ready.entries || !pt_ready.clot || !dp_mouvReady) return;
+  av_busy = true;
+  try{
+    const byName = {}; pt_codes().forEach(c=>{ byName[String(pt_name(c)).trim().toLowerCase()] = c; });
+    const wanted = {};
+    dp_mouvements.forEach(m=>{
+      if(m.type !== 'Charge' || !m.estAvanceSalaire) return;
+      const amount = Math.round((Number(m.montant) || 0) * 100) / 100, code = byName[String(m.employeNom || '').trim().toLowerCase()];
+      if(code === undefined || !(amount > 0) || !m.date) return;
+      wanted['avc_' + m.id] = { id:'avc_' + m.id, mouvId:m.id, code, date:m.date, amount };
+    });
+    const existing = {}; pt_entries.forEach(e=>{ if(e.source === 'depenses' && e.kind === 'avance') existing[e.id] = e; });
+    const batch = db.batch(); let ops = 0;
+    Object.keys(wanted).forEach(id=>{
+      const w = wanted[id], ex = existing[id];
+      if(!ex){
+        if(pt_dayClosed(w.date, w.code)) return;
+        if(pt_entries.some(e=>e.kind === 'avance' && e.source !== 'depenses' && Number(e.code) === w.code && e.date === w.date && Math.abs((Number(e.amount) || 0) - w.amount) < 0.005)) return;
+        batch.set(pt_entriesCol.doc(id), { kind:'avance', code:w.code, date:w.date, amount:w.amount, note:'Avance caisse', source:'depenses', mouvId:w.mouvId, creePar:(typeof currentUser !== 'undefined' ? currentUser : ''), creeLe:new Date().toISOString() }); ops++;
+      } else if(Number(ex.code) !== w.code || ex.date !== w.date || Math.abs((Number(ex.amount) || 0) - w.amount) > 0.004){
+        if(pt_dayClosed(ex.date, ex.code) || pt_dayClosed(w.date, w.code)) return;
+        const { id:_i, ...rest } = ex; batch.set(pt_entriesCol.doc(id), { ...rest, code:w.code, date:w.date, amount:w.amount, modifieLe:new Date().toISOString() }); ops++;
+      }
+    });
+    Object.keys(existing).forEach(id=>{
+      if(wanted[id]) return;
+      const ex = existing[id]; if(pt_dayClosed(ex.date, ex.code)) return;
+      batch.delete(pt_entriesCol.doc(id)); ops++;
+    });
+    if(ops) await batch.commit();
+  } finally { av_busy = false; }
+}
 const dp_watchMouv = ()=>dp_mouvCol.onSnapshot((snap)=>{
   dp_mouvements = []; dp_pending = [];
   snap.forEach(doc=>{ const o = { id: doc.id, ...doc.data() }; if(o.statut === 'annule') return; (o.statut === 'attente' ? dp_pending : dp_mouvements).push(o); });
-  dp_verificationResult = null;
-  dp_render();
+  dp_verificationResult = null; dp_mouvReady = true;
+  dp_render(); av_schedule();
 }, (err)=>console.error(err));
 const dp_watchPointages = ()=>dp_pointagesCol.onSnapshot((snap)=>{
   dp_pointages = [];
@@ -6080,8 +6141,8 @@ function dp_champs(btn){ return Object.assign({}, DP_CHAMPS_DEF, (btn && btn.cha
 function dp_unitOf(btn, name){ const it = (btn && btn.m === 'liste' ? dp_L('items:' + btn.id) : dp_cfg.ingredients).find(x=>x.n === name); return it && it.u; }
 function dp_employeesList(extra){
   const set = new Set();
-  Object.keys(dp_ptEmp).forEach(c=>{ const n = String((dp_ptEmp[c] || {}).name || '').trim(); if(n) set.add(n); });
-  Object.keys(PT_DEFAULT_NAMES).forEach(c=>{ if(!dp_ptEmp[c] || !(dp_ptEmp[c] || {}).name) set.add(PT_DEFAULT_NAMES[c]); });
+  Object.keys(dp_ptEmp).forEach(c=>{ if((dp_ptEmp[c] || {}).actif === false) return; const n = String((dp_ptEmp[c] || {}).name || '').trim(); if(n) set.add(n); });
+  Object.keys(PT_DEFAULT_NAMES).forEach(c=>{ if((dp_ptEmp[c] || {}).actif === false) return; if(!dp_ptEmp[c] || !(dp_ptEmp[c] || {}).name) set.add(PT_DEFAULT_NAMES[c]); });
   if(extra) set.add(extra);
   return Array.from(set).sort((a, b)=>a.localeCompare(b, 'fr'));
 }
