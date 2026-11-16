@@ -601,6 +601,7 @@ table.mep-g th{color:var(--ink-muted,#9aa39d);font-size:12px;font-weight:600;bor
   .cg-act{display:flex;justify-content:space-between;align-items:center;margin-top:2px;}
   .cg-mod{border:1px solid var(--line);background:none;color:var(--ink);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;}
   .cl-tp{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}.cl-tp button,.cl-dest button{border:1px solid var(--line,#2a312d);border-radius:10px;padding:10px 4px;background:var(--paper);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;}.cl-tp button.on{border-color:var(--forest);background:#1B2A3F;color:var(--forest-light);}.cl-dest{display:grid;grid-template-columns:1fr 1fr;gap:6px;}.cl-dest button{font-size:14px;font-weight:700;padding:11px;}.cl-dest button.on{border-color:var(--service);background:var(--service-bg);color:var(--service);}.cl-ln{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:7px 0;border-top:1px solid var(--line,#2a312d);}.cl-ln small{display:block;color:var(--ink-muted);}
+  .mv-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;}.mv-row button{min-height:46px;padding:2px;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1.15;white-space:normal;border:1px solid var(--line,#2a312d);background:var(--paper);}.mv-row .mv-r{color:var(--rust);}.mv-row .mv-o{color:var(--amber);}.mv-row .mv-g{color:var(--moss);}.mv-row .mv-r.on{background:var(--rust-bg);border-color:var(--rust);}.mv-row .mv-o.on{background:var(--amber-bg);border-color:var(--amber);}.mv-row .mv-g.on{background:var(--moss-bg);border-color:var(--moss);}.mv-in{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) 38px;gap:6px;align-items:center;}
   .cg-plus{width:38px;height:38px;border-radius:50%;background:#1B2A3F;border:1px solid var(--forest);color:#93C5FD;font-size:22px;font-weight:800;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
   .cg-link{align-self:flex-start;background:none;border:none;color:#93C5FD;font-size:11.5px;font-weight:700;cursor:pointer;padding:2px 0;}
   .cg-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;}
@@ -1486,6 +1487,7 @@ ca_caisseCol.onSnapshot((snap)=>{
   { const srv = next[ca_workingDate];   // lignes / validations saisies entre-temps par un employé à accès limité : ne pas les écraser à l'enregistrement de la clôture
     if(srv && ca_session && ca_session.date === ca_workingDate){
       (Array.isArray(srv.sorties) ? srv.sorties : []).forEach(l=>{ if(l && l.par && !(ca_session.sorties || []).some(x=>x.id === l.id)){ if(!Array.isArray(ca_session.sorties)) ca_session.sorties = []; ca_session.sorties.push(l); } });
+      (Array.isArray(srv.entrees) ? srv.entrees : []).forEach(l=>{ if(l && l.par && !(ca_session.entrees || []).some(x=>x.id === l.id)){ if(!Array.isArray(ca_session.entrees)) ca_session.entrees = []; ca_session.entrees.push(l); } });
       if(Array.isArray(srv.debutValidations)) ca_session.debutValidations = srv.debutValidations;
       if(Array.isArray(srv.restants)){ if(JSON.stringify(ca_session.restants || []) !== JSON.stringify(srv.restants)) ca_session.restants = srv.restants; }
       ca_session.debutManuel = srv.debutManuel || null;
@@ -1550,6 +1552,45 @@ async function ca_syncRetraits(sess){
 /* ---------------- Accès limité « saisie du soir » : début de caisse, sorties (ajout seulement), retenu pour demain ---------------- */
 function ca_isLimited(){ return !!(session && !session.isAdmin && session.permissions && session.permissions.caisseLim && !session.permissions.caisse); }
 let ca_lim = { dalt:false, debut:'', note:'', sortie:'', rest:'', rnote:'', busy:false, type:'retrait', dest:'', cmt:'', dFirst:null, dConf:false, editV:null, eVal:'', eNote:'', editS:null, eMont:'', eDest:'', eCmt:'' };
+let ca_mv = { k:'', montant:'', note:'' };   // bloc « Mouvements de la caisse » (admin + employé)
+const CA_MV = [['sidahmed','Sidahmed','r'],['soufyane','Soufyane','r'],['virement','Virement','o'],['nonregle','Non payée','o'],['entree','Entrée diverse','g']];
+function ca_mvHtml(){
+  const d = ca_mv;
+  return `<div class="mv-row">${CA_MV.map(([k,l,c])=>`<button type="button" class="mv-${c}${d.k===k?' on':''}" onclick="ca_mvKind('${k}')">${l}</button>`).join('')}</div>
+    <div class="mv-in"><input id="mv-m" class="cg-in" type="text" inputmode="decimal" placeholder="Montant" value="${esc(d.montant)}" oninput="ca_mv.montant=this.value" onkeydown="if(event.key==='Enter')ca_mvAdd()"><input id="mv-n" class="cg-in" type="text" style="font-family:'Inter',sans-serif;" placeholder="Note, remarque ou motif (facultatif)" value="${esc(d.note)}" oninput="ca_mv.note=this.value" onkeydown="if(event.key==='Enter')ca_mvAdd()"><button class="cg-plus" title="Ajouter" onclick="ca_mvAdd()">+</button></div>`;
+}
+function ca_mvKind(k){ ca_mv.k = k; ca_render(); }
+async function ca_mvAdd(){
+  const d = ca_mv, m = ca_parseNum(d.montant);
+  if(!d.k){ alert('Choisis le type de mouvement.'); return; }
+  if(!(m > 0)){ alert('Saisis le montant.'); return; }
+  const note = String(d.note || '').trim();
+  const line = { id:uid(), montant:String(d.montant).trim().replace(',', '.'), heure:ca_nowHM(), at:new Date().toISOString() };
+  let key;
+  if(d.k === 'entree'){ key = 'entrees'; line.libelle = note; }
+  else {
+    key = 'sorties';
+    if(d.k === 'sidahmed' || d.k === 'soufyane'){ line.motif = 'retrait'; line.note = d.k === 'sidahmed' ? 'Sidahmed' : 'Soufyane'; if(note) line.remarque = note; }
+    else { line.motif = d.k; line.note = note; }
+  }
+  if(ca_isLimited()){
+    if(ca_lim.busy) return;
+    if(!currentUser){ askUserName(false); if(!currentUser) return; }
+    line.par = currentUser; ca_lim.busy = true;
+    try{
+      const out = await ca_limTx(c=>({ ...c, [key]:[...(Array.isArray(c[key]) ? c[key] : []), line] }));
+      ca_session[key] = out[key]; ca_mv.montant = ''; ca_mv.note = '';
+      if(line.motif === 'retrait'){ try{ if(ca_retraitReady) await ca_syncRetraits({ ...out, date:ca_session.date }); }catch(e){ console.warn('Sync retraits', e); } }
+    }catch(e){ console.error(e); alert('Erreur : mouvement non enregistré (' + (e.message || e) + '). Réessaie.'); }
+    ca_lim.busy = false; ca_render(); return;
+  }
+  if(!Array.isArray(ca_session[key])) ca_session[key] = [];
+  ca_session[key].push(line);
+  ca_mv.montant = ''; ca_mv.note = '';
+  if(line.motif === 'retrait') ca_syncNow();
+  ca_render();
+  const el = document.getElementById('mv-m'); if(el) el.focus();
+}
 const CA_EDIT_MS = 3600000;   // délai de modification / suppression par l'employé : 1 h
 function ca_inWindow(at){ const t = Date.parse(at || ''); return !isNaN(t) && (Date.now() - t) <= CA_EDIT_MS && (Date.now() - t) >= -60000; }
 function ca_canEditV(v){ const d = ca_allSessions[ca_session.date]; return !!(v && v.par === currentUser && ca_inWindow(v.saisieLe || v.at) && (!v.statut || v.statut === 'attente') && !(d && d.enregistreLe)); }
@@ -1622,41 +1663,44 @@ async function ca_limDelV(id){
   }catch(e){ console.error(e); alert('Suppression impossible : ' + (e.message || e)); }
   ca_lim.busy = false; ca_render();
 }
-function ca_limEditS(id){ const l = (ca_session.sorties || []).find(x=>x.id === id); if(!l) return; ca_lim.editS = id; ca_lim.eMont = String(l.montant); ca_lim.eDest = l.motif === 'retrait' ? (l.note || '') : ''; ca_lim.eCmt = l.motif === 'retrait' ? '' : (l.note || ''); ca_render(); }
+function ca_limFind(id){ for(const key of ['sorties','entrees']){ const l = (ca_session[key] || []).find(x=>x.id === id); if(l) return { key, l }; } return null; }
+function ca_limEditS(id){ const f = ca_limFind(id); if(!f) return; const l = f.l, isR = f.key === 'sorties' && l.motif === 'retrait'; ca_lim.editS = id; ca_lim.eMont = String(l.montant); ca_lim.eDest = isR ? (l.note || '') : ''; ca_lim.eCmt = isR ? (l.remarque || '') : f.key === 'entrees' ? (l.libelle || '') : (l.note || ''); ca_render(); }
 function ca_limCancelS(){ ca_lim.editS = null; ca_render(); }
 function ca_limEDest(d){ ca_lim.eDest = d; ca_render(); }
 async function ca_limSaveS(id){
   if(ca_lim.busy) return;
-  const l0 = (ca_session.sorties || []).find(x=>x.id === id); if(!l0) return;
-  const m = ca_parseNum(ca_lim.eMont); if(!(m > 0)){ alert('Saisis le montant de la sortie.'); return; }
-  const isR = l0.motif === 'retrait', cmt = String(ca_lim.eCmt || '').trim();
+  const f = ca_limFind(id); if(!f) return;
+  const m = ca_parseNum(ca_lim.eMont); if(!(m > 0)){ alert('Saisis le montant.'); return; }
+  const key = f.key, isR = key === 'sorties' && f.l.motif === 'retrait', cmt = String(ca_lim.eCmt || '').trim();
   if(isR && !ca_lim.eDest){ alert('Choisis Sidahmed ou Soufyane.'); return; }
-  if(!isR && !cmt){ alert('Le commentaire est obligatoire.'); return; }
-  const montant = String(ca_lim.eMont).trim().replace(',', '.'), note = isR ? ca_lim.eDest : cmt;
+  const montant = String(ca_lim.eMont).trim().replace(',', '.');
+  const patch = isR ? { note:ca_lim.eDest, remarque:cmt } : key === 'entrees' ? { libelle:cmt } : { note:cmt };
   ca_lim.busy = true;
   try{
     const out = await ca_limTx(c=>{
-      const list = Array.isArray(c.sorties) ? c.sorties : [], cur = list.find(x=>x.id === id);
+      const list = Array.isArray(c[key]) ? c[key] : [], cur = list.find(x=>x.id === id);
       if(!ca_canEditS(cur)) throw new Error('délai d’1 h dépassé, ligne déjà confirmée ou introuvable');
-      return { ...c, sorties:list.map(x=>x.id === id ? { ...x, montant, note, modifieLe:new Date().toISOString() } : x) };
+      return { ...c, [key]:list.map(x=>x.id === id ? { ...x, montant, ...patch, modifieLe:new Date().toISOString() } : x) };
     });
-    ca_session.sorties = out.sorties; ca_lim.editS = null;
-    try{ if(ca_retraitReady) await ca_syncRetraits({ ...out, date:ca_session.date }); }catch(e){ console.warn('Sync retraits', e); }
+    ca_session[key] = out[key]; ca_lim.editS = null;
+    if(key === 'sorties'){ try{ if(ca_retraitReady) await ca_syncRetraits({ ...out, date:ca_session.date }); }catch(e){ console.warn('Sync retraits', e); } }
   }catch(e){ console.error(e); alert('Modification impossible : ' + (e.message || e)); }
   ca_lim.busy = false; ca_render();
 }
 async function ca_limDelS(id){
   if(ca_lim.busy) return;
-  if(!confirm('Supprimer cette sortie de caisse ?')) return;
+  const f = ca_limFind(id); if(!f) return;
+  if(!confirm('Supprimer ce mouvement ?')) return;
+  const key = f.key;
   ca_lim.busy = true;
   try{
     const out = await ca_limTx(c=>{
-      const list = Array.isArray(c.sorties) ? c.sorties : [], cur = list.find(x=>x.id === id);
+      const list = Array.isArray(c[key]) ? c[key] : [], cur = list.find(x=>x.id === id);
       if(!ca_canEditS(cur)) throw new Error('délai d’1 h dépassé, ligne déjà confirmée ou introuvable');
-      return { ...c, sorties:list.filter(x=>x.id !== id) };
+      return { ...c, [key]:list.filter(x=>x.id !== id) };
     });
-    ca_session.sorties = out.sorties; ca_lim.editS = null;
-    try{ if(ca_retraitReady) await ca_syncRetraits({ ...out, date:ca_session.date }); }catch(e){ console.warn('Sync retraits', e); }
+    ca_session[key] = out[key]; ca_lim.editS = null;
+    if(key === 'sorties'){ try{ if(ca_retraitReady) await ca_syncRetraits({ ...out, date:ca_session.date }); }catch(e){ console.warn('Sync retraits', e); } }
   }catch(e){ console.error(e); alert('Suppression impossible : ' + (e.message || e)); }
   ca_lim.busy = false; ca_render();
 }
@@ -1864,22 +1908,6 @@ function ca_passationsCard(){
   </div>`;
 }
 function ca_restantAdminCard(){ return ca_passationsCard(); }
-async function ca_limAddSortie(){
-  if(ca_lim.busy) return;
-  if(!currentUser){ askUserName(false); if(!currentUser) return; }
-  const m = ca_parseNum(ca_lim.sortie); if(!(m > 0)){ alert('Saisis le montant de la sortie.'); return; }
-  const type = ca_lim.type || 'retrait', cmt = String(ca_lim.cmt || '').trim();
-  if(type === 'retrait' && !ca_lim.dest){ alert('Choisis à qui ce montant est remis : Sidahmed ou Soufyane.'); return; }
-  if(type !== 'retrait' && !cmt){ alert('Le commentaire est obligatoire (client, référence, raison…).'); return; }
-  const line = { id:uid(), montant:String(ca_lim.sortie).trim().replace(',', '.'), heure:ca_nowHM(), at:new Date().toISOString(), motif:type, note:(type === 'retrait' ? ca_lim.dest : cmt), par:currentUser };
-  ca_lim.busy = true;
-  try{
-    const out = await ca_limTx(c=>({ ...c, sorties:[...(Array.isArray(c.sorties) ? c.sorties : []), line] }));
-    ca_session.sorties = out.sorties; ca_lim.sortie = ''; ca_lim.cmt = '';
-    try{ if(ca_retraitReady) await ca_syncRetraits({ ...out, date:ca_session.date }); }catch(e){ console.warn('Sync retraits', e); }
-  }catch(e){ console.error(e); alert('Erreur : sortie non enregistrée (' + (e.message || e) + '). Réessaie.'); }
-  ca_lim.busy = false; ca_render();
-}
 function ca_renderLimited(){
   const today = todayISO();
   if(ca_workingDate !== today){ ca_workingDate = today; const ex = ca_allSessions[today]; ca_session = ex ? ca_normalizeSession(ex, today) : ca_blankSession(today); ca_hist = null; ca_histEdit = null; }
@@ -1916,26 +1944,27 @@ function ca_renderLimited(){
     </div>`;
     })()}
     <div class="cg-card" style="margin-bottom:10px;">
-      <div class="cg-t">↗ Sorties de caisse</div>
-      <div class="cl-tp">${[['retrait','💵 Remise d’argent'],['virement','🏦 Virement'],['nonregle','⏳ Non payée']].map(([k,l])=>`<button type="button" class="${ca_lim.type===k?'on':''}" onclick="ca_limType('${k}')">${l}</button>`).join('')}</div>
-      ${ca_lim.type === 'retrait' ? `<div class="cl-dest">${['Sidahmed','Soufyane'].map(n=>`<button type="button" class="${ca_lim.dest===n?'on':''}" onclick="ca_limDest('${n}')">${n}</button>`).join('')}</div>` : ''}
-      <input id="lim-sortie" class="cg-in" type="text" inputmode="decimal" placeholder="Montant" value="${esc(ca_lim.sortie)}" oninput="ca_lim.sortie=this.value" onkeydown="if(event.key==='Enter')ca_limAddSortie()">
-      ${ca_lim.type === 'retrait'
-        ? (ca_lim.dest ? `<div style="border:1px solid var(--service);background:var(--service-bg);border-radius:8px;padding:9px 10px;font-size:12.5px;color:var(--service);">ℹ️ Ce montant doit être remis à ${esc(ca_lim.dest)}.</div>` : '')
-        : `<input id="lim-cmt" class="cg-in" type="text" style="border-color:var(--rust);font-family:'Inter',sans-serif;" placeholder="Commentaire obligatoire (client, référence, raison…)" value="${esc(ca_lim.cmt)}" oninput="ca_lim.cmt=this.value" onkeydown="if(event.key==='Enter')ca_limAddSortie()">`}
-      <div class="cg-act"><span class="cg-sub">Ajout uniquement</span><button class="cg-plus" title="Ajouter" onclick="ca_limAddSortie()">+</button></div>
-      ${mySorties.length ? `<div>${mySorties.map(l=>{
-        const isR = l.motif === 'retrait', lab = l.motif === 'virement' ? '🏦 Virement' : l.motif === 'nonregle' ? '⏳ Non payée' : '💵 Remise → ' + esc(l.note || '');
-        if(ca_lim.editS === l.id){
-          return `<div style="border:1px solid var(--forest);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;margin-top:6px;"><div class="cg-sub">Modifier : ${lab}</div>
-            ${isR ? `<div class="cl-dest">${['Sidahmed','Soufyane'].map(n=>`<button type="button" class="${ca_lim.eDest===n?'on':''}" onclick="ca_limEDest('${n}')">${n}</button>`).join('')}</div>` : ''}
-            <input class="cg-in" type="text" inputmode="decimal" value="${esc(ca_lim.eMont)}" oninput="ca_lim.eMont=this.value">
-            ${isR ? '' : `<input class="cg-in" type="text" style="border-color:var(--rust);font-family:'Inter',sans-serif;" placeholder="Commentaire obligatoire" value="${esc(ca_lim.eCmt)}" oninput="ca_lim.eCmt=this.value">`}
-            <div style="display:flex;gap:8px;"><button class="btn t-add" style="flex:1;height:40px;" onclick="ca_limSaveS('${l.id}')">Enregistrer</button><button class="btn ghost" style="flex:1;height:40px;" onclick="ca_limCancelS()">Annuler</button></div></div>`;
-        }
-        const can = ca_canEditS(l);
-        return `<div class="cl-ln"><div>${lab}<small>${esc(l.heure || '')}${l.par ? ' · ' + esc(l.par) : ''}${!isR && l.note ? ' · ' + esc(l.note) : ''}</small>${can ? `<span style="display:flex;gap:8px;margin-top:4px;"><button class="btn ghost small" onclick="ca_limEditS('${l.id}')">✎ Modifier</button><button class="btn ghost small" style="color:var(--rust);" onclick="ca_limDelS('${l.id}')">🗑 Supprimer</button></span>` : ''}</div><b class="mono">${ca_fmtMoney(ca_parseNum(l.montant))}</b></div>`;
-      }).join('')}</div><div class="cg-sub" style="font-size:10.5px;">Tes lignes sont modifiables pendant 1 h après leur saisie.</div>` : ''}
+      <div class="cg-t">⇅ Mouvements de la caisse</div>
+      ${ca_mvHtml()}
+      ${(()=>{
+        const mine = [...(ca_session.sorties || []).filter(l=>l.par === currentUser).map(l=>({ l, key:'sorties' })), ...(ca_session.entrees || []).filter(l=>l.par === currentUser).map(l=>({ l, key:'entrees' }))].sort((x,y)=>String(x.l.at || '').localeCompare(String(y.l.at || '')));
+        if(!mine.length) return '';
+        return `<div>${mine.map(({ l, key })=>{
+          const isE = key === 'entrees', isR = !isE && l.motif === 'retrait';
+          const lab = isE ? 'Entrée diverse' : l.motif === 'virement' ? 'Virement' : l.motif === 'nonregle' ? 'Non payée' : 'Remise → ' + esc(l.note || '');
+          const col = isE ? 'var(--moss)' : isR ? 'var(--rust)' : 'var(--amber)';
+          const txt = isE ? (l.libelle || '') : isR ? (l.remarque || '') : (l.note || '');
+          if(ca_lim.editS === l.id){
+            return `<div style="border:1px solid var(--forest);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;margin-top:6px;"><div class="cg-sub">Modifier : ${lab}</div>
+              ${isR ? `<div class="cl-dest">${['Sidahmed','Soufyane'].map(n=>`<button type="button" class="${ca_lim.eDest===n?'on':''}" onclick="ca_limEDest('${n}')">${n}</button>`).join('')}</div>` : ''}
+              <input class="cg-in" type="text" inputmode="decimal" value="${esc(ca_lim.eMont)}" oninput="ca_lim.eMont=this.value">
+              <input class="cg-in" type="text" style="font-family:'Inter',sans-serif;" placeholder="Note, remarque ou motif (facultatif)" value="${esc(ca_lim.eCmt)}" oninput="ca_lim.eCmt=this.value">
+              <div style="display:flex;gap:8px;"><button class="btn t-add" style="flex:1;height:40px;" onclick="ca_limSaveS('${l.id}')">Enregistrer</button><button class="btn ghost" style="flex:1;height:40px;" onclick="ca_limCancelS()">Annuler</button></div></div>`;
+          }
+          const can = ca_canEditS(l);
+          return `<div class="cl-ln"><div style="color:${col};">${lab}<small>${esc(l.heure || '')}${l.par ? ' · ' + esc(l.par) : ''}${txt ? ' · ' + esc(txt) : ''}</small>${can ? `<span style="display:flex;gap:8px;margin-top:4px;"><button class="btn ghost small" onclick="ca_limEditS('${l.id}')">✎ Modifier</button><button class="btn ghost small" style="color:var(--rust);" onclick="ca_limDelS('${l.id}')">🗑 Supprimer</button></span>` : ''}</div><b class="mono" style="color:${col};">${ca_fmtMoney(ca_parseNum(l.montant))}</b></div>`;
+        }).join('')}</div><div class="cg-sub" style="font-size:10.5px;">Tes lignes sont modifiables pendant 1 h après leur saisie.</div>`;
+      })()}
     </div>
     ${(()=>{
       const myR = ca_myRestant(), rep = ca_repris(), att = ca_restantAttendu(), rr = String(ca_lim.rest).trim(), rm = ca_parseNum(rr), rec = rr === '' ? null : Math.round((rm - att) * 100) / 100;
@@ -2067,9 +2096,10 @@ function ca_histMenuToggle(id){ ca_histMenu = (ca_histMenu === id) ? null : id; 
 function ca_closeHist(){ ca_hist = null; ca_histEdit = null; ca_render(); }
 function ca_editHist(id){ ca_histEdit = (ca_histEdit === id) ? null : id; ca_histMenu = null; ca_render(); }
 function ca_delHist(id){
-  if(ca_lineLocked(ca_hist, id)) return;
+  const key = (ca_session.sorties || []).some(l=>l.id === id) ? 'sorties' : 'entrees';
+  if(ca_lineLocked(key, id)) return;
   if(!confirm('Supprimer cette ligne ?')) return;
-  ca_removeLine(ca_hist, id);
+  ca_removeLine(key, id);
 }
 function ca_removeLine(key, id){
   if(ca_lineLocked(key, id)) return;
@@ -2088,28 +2118,29 @@ function ca_updateLine(key, id, field, value){
 }
 function ca_renderHistModal(){
   if(!ca_hist) return '';
-  const k = ca_hist, vd = ca_histDate || ca_session.date, isWork = (vd === ca_session.date);
+  const vd = ca_histDate || ca_session.date, isWork = (vd === ca_session.date);
   const srcSess = isWork ? ca_session : (ca_allSessions[vd] ? ca_normalizeSession(ca_allSessions[vd], vd) : null);
-  const lines = srcSess ? (srcSess[k] || []) : [];
-  const title = k === 'sorties' ? '↗ Historique — Sorties de caisse' : '➕ Historique — Entrées diverses';
-  const noteField = k === 'sorties' ? 'note' : 'libelle';
-  const typeOf = (l)=> k === 'sorties' ? ((CA_SORTIE_MOTIFS.find(m=>m.value===l.motif) || {}).label || 'Sortie') : 'Entrée diverse';
+  const all = srcSess ? [...(srcSess.sorties || []).map(l=>({ l, key:'sorties' })), ...(srcSess.entrees || []).map(l=>({ l, key:'entrees' }))].sort((x,y)=>String(x.l.heure || '').localeCompare(String(y.l.heure || ''))) : [];
+  const isR = (r)=>r.key === 'sorties' && r.l.motif === 'retrait';
+  const typeOf = (r)=> r.key === 'entrees' ? 'Entrée diverse' : isR(r) ? 'Remise → ' + (r.l.note || '—') : ((CA_SORTIE_MOTIFS.find(m=>m.value===r.l.motif) || {}).label || 'Sortie');
+  const fieldOf = (r)=> r.key === 'entrees' ? 'libelle' : isR(r) ? 'remarque' : 'note';
+  const colOf = (r)=> r.key === 'entrees' ? 'var(--moss)' : isR(r) ? 'var(--rust)' : 'var(--amber)';
   const q = ca_histQ.trim().toLowerCase();
-  const total = lines.reduce((t, l)=>t + ca_parseNum(l.montant), 0);
-  const shown = lines.filter(l=>!q || (typeOf(l) + ' ' + (l[noteField] || '') + ' ' + (l.par || '') + ' ' + (l.heure || '') + ' ' + l.montant).toLowerCase().includes(q));
-  const rowHtml = (l)=>{
-    const note = (l[noteField] || '').trim();
+  const sumS = ca_sumLines(all.filter(r=>r.key === 'sorties').map(r=>r.l)), sumE = ca_sumLines(all.filter(r=>r.key === 'entrees').map(r=>r.l));
+  const shown = all.filter(r=>!q || (typeOf(r) + ' ' + (r.l[fieldOf(r)] || '') + ' ' + (r.l.par || '') + ' ' + (r.l.heure || '') + ' ' + r.l.montant).toLowerCase().includes(q));
+  const rowHtml = (r)=>{
+    const l = r.l, k = r.key, note = (l[fieldOf(r)] || '').trim();
     if(isWork && ca_histEdit === l.id){
       return `<div class="cg-hrow edit">
         <input id="hm-${l.id}" class="cg-in" type="text" inputmode="decimal" value="${esc(l.montant)}" placeholder="Montant" oninput="ca_updateLine('${k}','${l.id}','montant',this.value)">
-        ${k === 'sorties' ? `<select id="ht-${l.id}" class="cg-in" onchange="ca_updateLine('sorties','${l.id}','motif',this.value)">${CA_SORTIE_MOTIFS.map(m=>`<option value="${m.value}" ${l.motif===m.value?'selected':''}>${esc(m.label)}</option>`).join('')}</select>` : ''}
-        <input id="hn-${l.id}" class="cg-in" type="text" value="${esc(l[noteField] || '')}" placeholder="Motif" oninput="ca_updateLine('${k}','${l.id}','${noteField}',this.value)">
+        ${k === 'sorties' && !isR(r) ? `<select id="ht-${l.id}" class="cg-in" onchange="ca_updateLine('sorties','${l.id}','motif',this.value)">${CA_SORTIE_MOTIFS.filter(m=>m.value !== 'retrait').map(m=>`<option value="${m.value}" ${l.motif===m.value?'selected':''}>${esc(m.label)}</option>`).join('')}</select>` : ''}
+        <input id="hn-${l.id}" class="cg-in" type="text" value="${esc(l[fieldOf(r)] || '')}" placeholder="Note, remarque ou motif" oninput="ca_updateLine('${k}','${l.id}','${fieldOf(r)}',this.value)">
         <button class="cg-mini ok" onclick="ca_editHist('${l.id}')">✓ Terminé</button>
       </div>`;
     }
     return `<div class="cg-hrow">
-      <div class="cg-hmain"><div>${esc(typeOf(l))}</div><small>${note ? esc(note) : '—'}${l.heure ? ' · ' + esc(l.heure) : ''}${l.par ? ' · par ' + esc(l.par) : ''}</small></div>
-      <b>${ca_fmtMoney(ca_parseNum(l.montant))}</b>
+      <div class="cg-hmain"><div style="color:${colOf(r)};">${esc(typeOf(r))}</div><small>${note ? esc(note) : '—'}${l.heure ? ' · ' + esc(l.heure) : ''}${l.par ? ' · par ' + esc(l.par) : ''}</small></div>
+      <b style="color:${colOf(r)};">${ca_fmtMoney(ca_parseNum(l.montant))}</b>
       ${isWork ? (ca_histMenu === l.id
         ? `<button class="cg-mini" title="Modifier" onclick="ca_editHist('${l.id}')">✎</button><button class="cg-mini del" title="Supprimer" onclick="ca_delHist('${l.id}')">✕</button>`
         : `<button class="cg-mini" title="Actions" onclick="ca_histMenuToggle('${l.id}')">⋯</button>`) : ''}
@@ -2117,18 +2148,16 @@ function ca_renderHistModal(){
   };
   let rows = '';
   if(!shown.length){
-    rows = `<p style="font-size:12.5px;color:var(--ink-muted);margin:10px 0;">${lines.length ? 'Aucun résultat pour cette recherche.' : 'Aucun enregistrement pour cette date.'}</p>`;
-  } else if(k === 'sorties'){
-    const groups = {}; shown.forEach(l=>{ const t = typeOf(l); (groups[t] = groups[t] || []).push(l); });
-    rows = Object.keys(groups).map(t=>`<div class="cg-gh"><span>${esc(t)} (${groups[t].length})</span><b>${ca_fmtMoney(ca_sumLines(groups[t]))}</b></div>${groups[t].map(rowHtml).join('')}`).join('');
+    rows = `<p style="font-size:12.5px;color:var(--ink-muted);margin:10px 0;">${all.length ? 'Aucun résultat pour cette recherche.' : 'Aucun enregistrement pour cette date.'}</p>`;
   } else {
-    rows = `<div class="cg-gh"><span>Entrées (${shown.length})</span><b>${ca_fmtMoney(ca_sumLines(shown))}</b></div>${shown.map(rowHtml).join('')}`;
+    const groups = {}; shown.forEach(r=>{ const t = typeOf(r); (groups[t] = groups[t] || []).push(r); });
+    rows = Object.keys(groups).map(t=>`<div class="cg-gh"><span>${esc(t)} (${groups[t].length})</span><b>${ca_fmtMoney(ca_sumLines(groups[t].map(r=>r.l)))}</b></div>${groups[t].map(rowHtml).join('')}`).join('');
   }
   return `<div class="cg-overlay" onclick="ca_closeHist()"><div class="cg-sheet" onclick="event.stopPropagation()">
-    <div style="display:flex;justify-content:space-between;align-items:center;font-weight:700;margin-bottom:6px;"><span>${title}</span><button class="cg-mini xclose" onclick="ca_closeHist()" aria-label="Fermer">✕</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;font-weight:700;margin-bottom:6px;"><span>⇅ Historique — Mouvements de la caisse</span><button class="cg-mini xclose" onclick="ca_closeHist()" aria-label="Fermer">✕</button></div>
     <div class="cg-nav"><button class="cg-mini" title="Jour précédent" onclick="ca_histNav(-1)">‹</button><b>${fmtDateShort(vd)}</b><button class="cg-mini" title="Jour suivant" onclick="ca_histNav(1)">›</button></div>
     ${isWork ? '' : `<div style="font-size:11px;color:var(--ink-muted);text-align:center;margin-bottom:4px;">Consultation seule : ouvre ce jour dans « Caisse du jour » pour le modifier.</div>`}
-    <div class="cg-card" style="flex-direction:row;justify-content:space-between;align-items:center;margin:8px 0;"><div><div class="cg-t">Total du jour</div><div class="cg-big" style="color:var(--amber);">${ca_fmtMoney(total)}</div></div><div class="cg-sub">${lines.length} ligne${lines.length > 1 ? 's' : ''}</div></div>
+    <div class="cg-card" style="flex-direction:row;justify-content:space-between;align-items:center;margin:8px 0;"><div><div class="cg-t">Sorties du jour</div><div class="cg-big" style="color:var(--rust);">${ca_fmtMoney(sumS)}</div></div><div style="text-align:right;"><div class="cg-t">Entrées du jour</div><div class="cg-big" style="color:var(--moss);">${ca_fmtMoney(sumE)}</div></div></div>
     <input id="hist-q" class="cg-in" type="text" placeholder="🔍 Rechercher (motif, type, montant…)" value="${esc(ca_histQ)}" oninput="ca_histSearch(this.value)" style="margin-bottom:4px;font-family:'Inter',sans-serif;">
     ${rows}
   </div></div>`;
@@ -2243,17 +2272,7 @@ function ca_renderCaisseTab(){
 
       ${ca_cgCard('✓ Montant compté', `<input id="compte-input" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_session.montantCompte)}" placeholder="Comptage réel" oninput="ca_session.montantCompte=this.value;ca_render()">` + (ecart !== null ? `<div class="cg-sub">écart : <b style="color:var(${Math.abs(ecart) < 0.01 ? '--moss' : '--rust'});">${ecart > 0 ? '+' : ''}${ca_fmtMoney(ecart)}</b></div>` : ''), `<div class="cg-sub">saisie du comptage réel</div>`)}
 
-      ${ca_cgCard('↗ Sorties de caisse', `
-        <input id="cg-sorties-m" class="cg-in" type="text" inputmode="decimal" value="${esc(dS.montant)}" placeholder="Montant" oninput="ca_draftSet('sorties','montant',this.value)">
-        <select id="cg-sorties-t" class="cg-in" style="font-family:'Inter',sans-serif;font-size:13.5px;" onchange="ca_draftSet('sorties','motif',this.value)">${CA_SORTIE_MOTIFS.map(m=>`<option value="${m.value}" ${dS.motif===m.value?'selected':''}>${esc(CA_SORTIE_COURT[m.value] || m.label)}</option>`).join('')}</select>
-        <input id="cg-sorties-n" class="cg-in" type="text" value="${esc(dS.note)}" placeholder="Motif" oninput="ca_draftSet('sorties','note',this.value)" onkeydown="if(event.key==='Enter')ca_addEntry('sorties')">`,
-        `<div class="cg-act"><button class="cg-mod" onclick="ca_openHist('sorties')">Historique</button><button class="cg-plus" title="Ajouter" onclick="ca_addEntry('sorties')">+</button></div>`)}
-
-      ${ca_cgCard('➕ Entrées diverses', `
-        <input id="cg-entrees-m" class="cg-in" type="text" inputmode="decimal" value="${esc(dE.montant)}" placeholder="Montant" oninput="ca_draftSet('entrees','montant',this.value)">
-        ${staticSel('Entrée diverse')}
-        <input id="cg-entrees-n" class="cg-in" type="text" value="${esc(dE.note)}" placeholder="Motif" oninput="ca_draftSet('entrees','note',this.value)" onkeydown="if(event.key==='Enter')ca_addEntry('entrees')">`,
-        `<div class="cg-act"><button class="cg-mod" onclick="ca_openHist('entrees')">Historique</button><button class="cg-plus" title="Ajouter" onclick="ca_addEntry('entrees')">+</button></div>`)}
+      <div class="cg-card" style="grid-column:1/-1;"><div class="cg-t">⇅ Mouvements de la caisse</div><div class="cg-body">${ca_mvHtml()}</div><div class="cg-foot"><div class="cg-act"><button class="cg-mod" onclick="ca_openHist('mv')">Historique</button></div></div></div>
 
       ${ca_erpCard(existing)}
 
