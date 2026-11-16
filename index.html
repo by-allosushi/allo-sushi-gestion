@@ -1442,7 +1442,7 @@ async function ca_debutAdminSet(){
   const same = e.prevVal !== null && Math.abs(m - e.prevVal) < 0.005;
   try{
     const out = await ca_limTx(c=>({ ...c, debutManuel: same ? null : { montant:m, par:currentUser, at:iso, source:'admin' }, debutCaisse:String(m) }));
-    ca_session.debutManuel = out.debutManuel || null; ca_session.debutCaisse = String(m); ca_dEdit = false;
+    ca_session.debutManuel = out.debutManuel || null; ca_session.debutCaisse = String(m); ca_dEdit = false; ca_dEditVal = '';
   }catch(err){ console.error(err); alert('Erreur : début non enregistré (' + (err.message || err) + ').'); }
   ca_render();
 }
@@ -1474,7 +1474,7 @@ function ca_loadSessionForDate(date){
   ca_workingDate = date;
   const existing = ca_allSessions[date];
   ca_session = existing ? ca_normalizeSession(existing, date) : ca_blankSession(date);
-  ca_hist = null; ca_histEdit = null; ca_erpLive = false;
+  ca_hist = null; ca_histEdit = null; ca_erpLive = false; ca_dEditVal = '';
   ca_draft = { sorties:{ montant:'', motif:'virement', note:'' }, entrees:{ montant:'', note:'' } };
   ca_render();
 }
@@ -2271,20 +2271,27 @@ function ca_renderCaisseTab(){
 
     ${ca_restantAdminCard()}
 
-    <div class="cg-grid">
-      ${ca_cgCard('💵 Début de caisse', debutBody, debutFoot)}
-
-      ${ca_cgCard('✓ Montant compté', `<input id="compte-input" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_session.montantCompte)}" placeholder="Comptage réel" oninput="ca_session.montantCompte=this.value;ca_render()">` + (ecart !== null ? `<div class="cg-sub">écart : <b style="color:var(${Math.abs(ecart) < 0.01 ? '--moss' : '--rust'});">${ecart > 0 ? '+' : ''}${ca_fmtMoney(ecart)}</b></div>` : ''), `<div class="cg-sub">saisie du comptage réel</div>`)}
+    <div class="cg-grid" style="grid-template-columns:1fr;">
+      <div class="cg-card" style="grid-column:1/-1;"><div class="cg-t">💵 Début de caisse</div>
+        ${eff.none ? '<div class="cg-sub">Aucune clôture antérieure : saisis ce que tu comptes.</div>' : `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:stretch;">
+          <button class="btn t-save" style="min-height:52px;" onclick="ca_debutRevert()">✓ Je reprends</button>
+          <div style="border:1px solid var(--line,#2a312d);background:var(--paper);border-radius:8px;padding:6px 12px;display:flex;flex-direction:column;justify-content:center;"><div class="cg-sub">${srcTxt}</div><div style="font-size:20px;font-weight:800;color:var(--ink);font-family:'JetBrains Mono',monospace;">${ca_fmtMoney(eff.val)}</div></div>
+        </div>`}
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:stretch;">
+          <button class="btn t-del" style="min-height:52px;" onclick="ca_debutAdminSet()">Le montant est différent</button>
+          <input id="debut-edit" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_dEditVal)}" oninput="ca_dEditVal=this.value" onkeydown="if(event.key==='Enter')ca_debutAdminSet()">
+        </div>
+      </div>
 
       <div class="cg-card" style="grid-column:1/-1;"><div class="cg-t">⇅ Mouvements de la caisse</div><div class="cg-body">${ca_mvHtml()}</div><div class="cg-foot"><div class="cg-act"><button class="cg-mod" onclick="ca_openHist('mv')">Historique</button></div></div></div>
 
+      <div class="cg-card" style="grid-column:1/-1;"><div class="cg-t">🧮 Montant restant en caisse</div>
+        <input id="compte-input" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_session.montantCompte)}" placeholder="Montant que tu comptes" oninput="ca_session.montantCompte=this.value;ca_render()">
+        ${ecart !== null ? `<div class="cg-sub">écart : <b style="color:var(${Math.abs(ecart) < 0.01 ? '--moss' : '--rust'});">${ecart > 0 ? '+' : ''}${ca_fmtMoney(ecart)}</b></div>` : ''}
+        <input id="note-validation-input" class="cg-in" type="text" style="font-family:'Inter',sans-serif;" placeholder="Commentaire (facultatif)" value="${esc(ca_session.noteValidation||'')}" oninput="ca_session.noteValidation=this.value">
+      </div>
+
       ${ca_erpCard(existing)}
-
-      ${ca_cgCard('📌 Retenu pour demain', `<div class="cg-big">${ca_fmtMoney(ca_montantPourLendemain(ca_session))}</div><div class="cg-sub">montant compté, sinon montant théorique</div>`, `<div class="cg-sub">calculé automatiquement</div>`)}
-    </div>
-
-    <div class="ticket" style="padding:10px 12px;">
-      <input id="note-validation-input" type="text" value="${esc(ca_session.noteValidation||'')}" oninput="ca_session.noteValidation=this.value" placeholder="Note (optionnel)" />
     </div>
 
     <div class="actions-row" style="margin-top:6px;">
