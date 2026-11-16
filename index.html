@@ -2798,7 +2798,7 @@ function pt_loanBalance(code, asOf){
 function pt_validationFor(code, from, to){ return pt_entries.find(e=>e.kind === 'valid' && e.code === code && e.from === from && e.to === to) || null; }
 function pt_reportIn(code, from){
   if(!from) return 0;
-  { const dep = pt_departOf(code); if(dep && dep.soldeOk && dep.date && from > dep.date) return 0; }   // employé sorti et soldé : aucun report vers les périodes suivantes
+  { const dep = pt_departOf(code); if(dep && dep.date && from > dep.date) return 0; }   // employé sorti : aucun report vers les périodes postérieures à sa sortie (son solde de tout compte est calculé à part)
   let best = null, val = 0;
   pt_clotures.forEach(c=>{
     if((c.kind !== 'week' && c.kind !== 'period') || !c.from || !c.to || c.to >= from || !c.rows || !c.rows[code]) return;
