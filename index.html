@@ -7759,13 +7759,10 @@ function ck2_finKeys(id, p){
 const ck2_hint = (id, key)=>key === 'fc' && ck_kind(id) === 'escalope' ? 'k2_hThrow' : CK2_FL[key][1];
 const ck2_myRecs = (id, t, p)=>ck_recs(ck_myDoc(), id, t).filter(r=>ck2_P(r.p) === ck2_P(p));
 const ck2_myFin = (id, p)=>{ const r = ck_recOne(ck_myDoc(), id, ck2_fid(p)); return r ? (r.f || {}) : null; };
-function ck2_kitchens(){   // fenêtre globale : les ingrédients de chaque cuisine (poste), d'après les ingrédients attribués aux cuisiniers
-  const cooks = ck_cooks(), me = ck_cook(ck_who), pos = {}, order = [], list = ck_ingList().map(i=>i.id);
-  const add = (p)=>{ if(!pos[p]){ pos[p] = []; order.push(p); } };
-  if(me && me.poste) add(me.poste);
-  ['Sushi', 'Wok', 'Bar'].forEach(p=>{ if(cooks.some(c=>c.poste === p)) add(p); });
-  cooks.forEach(c=>{ const p = c.poste || ''; if(!p && c.code !== ck_who) return; add(p); c.ings.forEach(id=>{ if(ck_ingById(id) && ck_kind(id) !== 'poulet' && !pos[p].includes(id)) pos[p].push(id); }); });
-  return order.filter(p=>pos[p].length).map(p=>({ p, ids:pos[p].slice().sort((a, b)=>{ const x = list.indexOf(a), y = list.indexOf(b); return (x < 0 ? 999 : x) - (y < 0 ? 999 : y); }) }));
+function ck2_kitchens(){   // vue par cuisinier : seulement sa cuisine (son poste) et les ingrédients qui lui sont attribués dans les réglages
+  const me = ck_cook(ck_who); if(!me) return [];
+  const list = ck_ingList().map(i=>i.id), ids = me.ings.filter(id=>ck_ingById(id) && ck_kind(id) !== 'poulet').sort((a, b)=>{ const x = list.indexOf(a), y = list.indexOf(b); return (x < 0 ? 999 : x) - (y < 0 ? 999 : y); });
+  return ids.length ? [{ p:me.poste || '', ids }] : [];
 }
 function ck2_tileInfo(id, p, doc){
   const dc = ck_recs(doc, id, 'dc').filter(r=>ck2_P(r.p) === ck2_P(p)), fin = ck_recOne(doc, id, ck2_fid(p)), u = ck_unit(id);
@@ -8014,7 +8011,7 @@ function ck_tilesHtml(){
       const mark = info.st === 'ready' ? '<b>✓</b>' : '<b>○</b>';
       return `<button class="ck-tile ${info.st === 'ready' ? 'ready' : info.st === 'prog' ? 'prog' : ''}" style="--c:${ck_color(id)}" onclick="ck2_open(${ck_a(id)},${ck_a(K.p)})"><div class="nm">${ck_icon(ck_kind(id), 46)}<span>${esc(ck_ingName(id))}${alt && alt !== ck_ingName(id) ? `<small ${ck_lang === 'fr' ? 'dir="rtl"' : ''}>${esc(alt)}</small>` : ''}</span></div><div class="st">${mark}<span>${esc(info.text)}</span></div></button>`;
     }).join('');
-    return `<div class="ck2-sec">${esc(K.p || '—')}</div><div class="ck-grid">${tiles}</div>`;
+    return `${K.p ? `<div class="ck2-sec">${esc(K.p)}</div>` : ''}<div class="ck-grid">${tiles}</div>`;
   }).join('');
   const done = doc.done ? `<div class="ck-banner ok"><span>✓ ${esc(ck_s('finished', { t:ck_hm(doc.done) }))}</span></div>` : '';
   const err = ck_tErr ? `<div class="ck-banner er"><span>${esc(ck_tErr)}</span></div>` : '';
