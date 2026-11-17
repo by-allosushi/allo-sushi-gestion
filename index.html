@@ -824,6 +824,31 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .ck2-ring{display:flex;align-items:center;gap:14px;padding:12px;border-radius:12px;background:var(--moss-bg);border:1px solid #1f5a35;color:#86efac;margin:2px 0 6px;font-size:14px;}
     #module-cuisine .ck2-tot{display:flex;justify-content:space-between;padding:2px 4px 10px;font-size:14px;color:var(--ink-muted);}
     #module-cuisine .ck2-tot b{color:var(--ink);font-family:'IBM Plex Mono',monospace;}
+    #module-cuisine .ck2-wrap .ck-card{border-left:1px solid var(--line);border-radius:16px;padding:16px;}
+    #module-cuisine .ck2-wrap .ck-kp{max-width:none;width:100%;margin:0;gap:10px;}
+    #module-cuisine .ck2-wrap .ck-kp button{width:100%;height:76px;font-size:28px;border-radius:14px;}
+    #module-cuisine .ck2-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 12px;font-size:16px;font-weight:700;}
+    #module-cuisine .ck2-hd{display:flex;align-items:center;gap:10px;margin:0 0 12px;}
+    #module-cuisine .ck2-hd b{font:800 24px 'Manrope',sans-serif;}
+    #module-cuisine .ck2-rw{font-size:17px;}
+    #module-cuisine .ck2-rw b{font-size:26px;}
+    #module-cuisine .ck2-wrap .ck-card{background:transparent;border:0;padding:0;border-radius:0;}
+    #module-cuisine .ck2-wrap .ck2-bar{font-size:20px;font-weight:700;color:#f2f2f2;}
+    #module-cuisine .ck2-wrap .ck2-bar .ck-btn{background:transparent;border:0;color:#bdbdbd;font-size:17px;font-weight:500;min-height:0;padding:4px 0;}
+    #module-cuisine .ck2-wrap .ck2-hd b{font-size:28px;font-weight:700;color:#f2f2f2;}
+    #module-cuisine .ck2-wrap .ck-pill{background:#04204a;color:#6aa5ee;font-size:15px;font-weight:500;padding:5px 18px;}
+    #module-cuisine .ck2-wrap .ck2-tab{background:transparent;border:1.5px solid #474747;color:#cfcfcf;border-radius:16px;min-height:62px;font-size:19px;font-weight:600;}
+    #module-cuisine .ck2-wrap .ck2-tab.on{background:#031d44;border:3px solid #17407f;color:#5ea1ee;}
+    #module-cuisine .ck2-wrap .ck2-cap{color:#bdbdbd;font-size:16px;margin:0 0 10px;}
+    #module-cuisine .ck2-wrap .ck2-rw{background:#1b1b1b;border:1.5px solid #474747;border-radius:16px;padding:20px 22px;color:#f2f2f2;font-size:19px;}
+    #module-cuisine .ck2-wrap .ck2-rw.act{border:3px solid #17407f;padding:18.5px 20.5px;}
+    #module-cuisine .ck2-wrap .ck2-rw b{color:#f5f5f5;font-size:30px;font-weight:500;}
+    #module-cuisine .ck2-wrap .ck2-rw b.e{color:#8a8a8a;opacity:1;}
+    #module-cuisine .ck2-wrap .ck2-rw b i{color:#bdbdbd;font-size:18px;}
+    #module-cuisine .ck2-wrap .ck2-ring{background:#11200f;border:0;color:#0fa50f;border-radius:16px;padding:16px 20px;font-size:19px;margin:0 0 16px;}
+    #module-cuisine .ck2-wrap .ck-ok{background:#0fa50f;color:#0b240b !important;border-radius:16px;min-height:70px;font-size:22px;font-weight:600;}
+    #module-cuisine .ck2-wrap .ck-kp button{background:#1b1b1b;border:1.5px solid #474747;color:#eee;border-radius:18px;font-weight:400;height:84px;}
+    #module-cuisine .ck2-wrap .ck-kp{gap:14px;}
     #module-cuisine .ck2-sec{margin:18px 0 8px;font:800 17px 'Manrope',sans-serif;}
   </style>
   <main style="max-width:1000px;margin:0 auto;padding:12px 10px 50px;">
@@ -7650,7 +7675,7 @@ function ck2_ringHtml(c){
   if(!(b > 0) || n === null || n < 0 || n > b + 1e-9) return '';
   const r = n / b, prev = ck2_myRecs(c.id, 'dc', c.p).filter(x=>x.id !== c.edit).map(x=>(Number(x.f.n) || 0) / (Number(x.f.b) || 1)), avg = prev.length ? prev.reduce((a, x)=>a + x, 0) / prev.length : null;
   const me = ck_cook(ck_who) || { name:'' }, msg = ck_s(avg !== null && r > avg + 0.0005 ? 'k2_ring2' : 'k2_ring1', { n:me.name }), pct = ck_fmt(Math.round(r * 1000) / 10);
-  return `<div class="ck2-ring"><svg width="80" height="80" viewBox="0 0 80 80" role="img" aria-label="${esc(ck_s('k2_rend'))} ${pct} %" style="flex:none"><circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="8"/><circle cx="40" cy="40" r="34" fill="none" stroke="#4ADE80" stroke-width="8" stroke-dasharray="${(r * 213.63).toFixed(1)} 213.63" transform="rotate(-90 40 40)" stroke-linecap="round"/><text x="40" y="45" text-anchor="middle" font-size="15" font-weight="700" fill="#86efac">${pct} %</text></svg><div>${esc(msg)}</div></div>`;
+  return `<div class="ck2-ring"><svg width="96" height="96" viewBox="0 0 80 80" role="img" aria-label="${esc(ck_s('k2_rend'))} ${pct} %" style="flex:none"><circle cx="40" cy="40" r="34" fill="none" stroke="#0c3d0c" stroke-width="8"/><circle cx="40" cy="40" r="34" fill="none" stroke="#0fa50f" stroke-width="8" stroke-dasharray="${(r * 213.63).toFixed(1)} 213.63" transform="rotate(-90 40 40)" stroke-linecap="round"/><text x="40" y="45" text-anchor="middle" font-size="15" font-weight="500" fill="#0fa50f">${pct} %</text></svg><div>${esc(msg)}</div></div>`;
 }
 function ck2_html(){
   const c = ck2, id = c.id, p = c.p, u = ck_unit(id), k = ck_kind(id), tabs = ck2_tabs(id, p), it = ck_ingById(id) || {}, alt = ck_lang === 'ar' ? (it.n || '') : ((ck_cfg.ings[id] || {}).ar || '');
@@ -7674,9 +7699,10 @@ function ck2_html(){
   }
   const kp = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ','].map(x=>`<button onclick="ck2_press('${x}')">${x}</button>`).join('') + `<button onclick="ck2_press('0')">0</button><button onclick="ck2_press('del')" aria-label="Effacer">⌫</button>`;
   const tabsH = tabs.map(t=>`<button class="ck2-tab ${c.tab === t ? 'on' : ''}" onclick="ck2_setTab('${t}')">${esc(ck_s(TL[t]))}</button>`).join('');
-  return `<div class="ck2-wrap"><div class="ck-top"><button class="ck-btn" onclick="ck2_back()">‹ ${esc(ck_s('back'))}</button><div class="ck-tools">${ck_langBtn()}</div></div>${ck_alerts()}${ck_banHtml()}
-    <div class="ck-card" style="--c:${ck_color(id)}"><div class="ck-ihead">${ck_icon(k, 44)}<div><div class="ck-q" style="margin:0">${esc(ck_ingName(id))}</div>${alt && alt !== ck_ingName(id) ? `<div class="ck-ar" ${ck_lang === 'fr' ? '' : 'style="direction:ltr;"'}>${esc(alt)}</div>` : ''}</div>${p ? `<span class="ck-pill" style="margin-inline-start:auto">${esc(p)}</span>` : ''}</div>
-      <div class="ck2-tabs">${tabsH}</div><div class="ck2-grid"><div>${body}</div><div class="ck-kp" dir="ltr">${kp}</div></div></div></div>`;
+  const me = ck_cook(ck_who) || { name:'' };
+  return `<div class="ck2-wrap"><div class="ck2-bar"><span>${esc(me.name)}${p ? ' · ' + esc(p) : ''}</span><span style="display:flex;gap:8px;align-items:center">${ck_langBtn()}<button class="ck-btn" onclick="ck2_back()">‹ ${esc(ck_s('back'))}</button></span></div>${ck_alerts()}${ck_banHtml()}
+    <div class="ck-card"><div class="ck2-hd"><b>${esc(ck_ingName(id))}</b>${alt && alt !== ck_ingName(id) ? `<span class="ck-ar" ${ck_lang === 'fr' ? '' : 'style="direction:ltr;"'}>${esc(alt)}</span>` : ''}${p ? `<span class="ck-pill" style="margin-inline-start:auto">${esc(p)}</span>` : ''}</div>
+      <div class="ck2-tabs">${tabsH}</div><div class="ck2-grid"><div>${body}</div><div class="ck-kp" dir="ltr">${kp}</div></div></div></div></div></div>`;
 }
 function ck2_recText(id, r){
   const u = ck_unit(id), f = r.f || {}, v = (x)=>ck_fmt(Number(x) || 0) + ' ' + u, pp = r.p ? ' · ' + r.p : '';
