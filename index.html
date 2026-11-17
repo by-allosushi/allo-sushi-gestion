@@ -7739,7 +7739,7 @@ Object.assign(CK_T, {
   k2_needBrut:['Indique le poids brut pris dans le bac', 'أدخل الوزن الخام المأخوذ'], k2_netGt:['Le net ne peut pas dépasser le brut.', 'الصافي لا يمكن أن يتجاوز الخام.'], k2_needQ:['Indique le poids obtenu', 'أدخل الوزن المحصّل'],
   k2_ring1:['Belle découpe {n}. Continue comme ça.', 'تقطيع جميل يا {n}. واصل هكذا.'], k2_ring2:['Mieux que tes découpes précédentes, bravo {n}.', 'أفضل من تقطيعاتك السابقة، أحسنت يا {n}.'],
   k2_tileDc:['Brut {b} · net {n}', 'خام {b} · صافي {n}'], k2_tileFin:['Fin de service faite', 'نهاية الخدمة منجزة'],
-  k2_pq:['Perte', 'الخسارة'], k2_wd:['Déchet', 'النفايات'], k2_pqCap:['Perte : produit jeté (mauvaise qualité ou péremption)', 'الخسارة: منتوج مرمي (جودة سيئة أو انتهاء الصلاحية)'], k2_wdCap:['Déchets de la journée : une ligne à chaque pesée', 'نفايات اليوم: سطر لكل وزن'],
+  k2_pq:['Perte', 'الخسارة'], k2_wd:['Déchet', 'النفايات'], k2_pqCap:['Perte : produit jeté (qualité ou péremption)', 'الخسارة: منتوج مرمي (جودة سيئة أو انتهاء الصلاحية)'], k2_wdCap:['Déchets de la journée : une ligne à chaque pesée', 'نفايات اليوم: سطر لكل وزن'],
   k2_pqN:['Perte {n}', 'الخسارة {n}'], k2_wdN:['Déchet {n}', 'النفايات {n}'], k2_pqTot:['Total des pertes', 'مجموع الخسائر'], k2_wdTot:['Total des déchets', 'مجموع النفايات'], k2_valPq:['Valider la perte', 'تأكيد الخسارة'], k2_valWd:['Valider le déchet', 'تأكيد النفايات'],
   k2_mQ:['Mauvaise qualité', 'جودة سيئة'], k2_mP:['Périmé', 'منتهي الصلاحية'], k2_motif:['Motif', 'السبب'],
   k2_endSvc:['Terminer mon service', 'إنهاء خدمتي'], k2_missing:['Il reste {n} ingrédient(s) sans fin de service.', 'بقي {n} مكوّن بدون نهاية خدمة.']
@@ -7795,7 +7795,7 @@ function ck2_edit(rid){
   const c = ck2; if(!c) return; const r = ck_recOne(ck_myDoc(), c.id, rid); if(!r) return;
   c.edit = rid; c.err = ''; c.v = {}; c.fresh = {};
   if(c.tab === 'dc'){ c.v.b = ck_fmt(Number(r.f.b) || 0); c.v.n = ck_fmt(Number(r.f.n) || 0); c.fresh.b = true; c.fresh.n = true; c.act = 'b'; }
-  else { c.v.q = ck_fmt(Number(r.f.q) || 0); c.fresh.q = true; c.act = 'q'; if(c.tab === 'pq') c.m = r.m === 'per' ? 'per' : 'qual'; }
+  else { c.v.q = ck_fmt(Number(r.f.q) || 0); c.fresh.q = true; c.act = 'q'; }
   ck_render();
 }
 function ck2_del(rid){ if(!ck2) return; ck_delRec(ck2.id, rid); }
@@ -7816,7 +7816,7 @@ function ck2_save(){
   if(c.tab === 'fr' || c.tab === 'hc' || c.tab === 'wd' || c.tab === 'pq'){
     if(!has('q') || ck_num(c.v.q) <= 0) return fail(ck_s('k2_needQ'), 'q');
     const old = c.edit ? ck_recOne(ck_myDoc(), id, c.edit) : null, rid = c.edit || ck_rid(), prev = old ? Object.assign({}, old) : null; if(prev) delete prev.id;
-    const rec = { t:c.tab, f:{ q:ck_num(c.v.q) }, p, at:old ? old.at : ck_nowIso() }; if(c.tab === 'pq') rec.m = c.m === 'per' ? 'per' : 'qual';
+    const rec = { t:c.tab, f:{ q:ck_num(c.v.q) }, p, at:old ? old.at : ck_nowIso() };
     ck_putRec(id, rid, rec);
     ck_setBan({ id, rid, prev, msg:ck_s('saved') });
     c.edit = ''; c.v = {}; c.fresh = {}; c.act = 'q'; c.err = ''; return ck_render();
@@ -7856,8 +7856,8 @@ function ck2_html(){
     const LB = { fr:['k2_frCap', 'k2_frN', 'k2_crTot', 'k2_valFr'], hc:['k2_hcCap', 'k2_hcN', 'k2_hcTot', 'k2_valHc'], wd:['k2_wdCap', 'k2_wdN', 'k2_wdTot', 'k2_valWd'], pq:['k2_pqCap', 'k2_pqN', 'k2_pqTot', 'k2_valPq'] }[c.tab];
     const list = ck2_myRecs(id, c.tab, p), idx = c.edit ? list.findIndex(r=>r.id === c.edit) : -1, n = idx >= 0 ? idx + 1 : list.length + 1, tot = ck_sumF(list, 'q'), pqm = c.tab === 'pq';
     const mlab = (m)=>ck_s(m === 'per' ? 'k2_mP' : 'k2_mQ');
-    const saved = list.map((r, i)=>`<div class="ck2-rw" style="cursor:default"><span>${esc(ck_s(LB[1], { n:i + 1 }))}${pqm ? `<small>${esc(mlab(r.m))}</small>` : ''}</span><span class="ck2-mini"><b>${esc(f(Number(r.f.q) || 0))}</b>${mini(r)}</span></div>`).join('');
-    const motif = pqm ? `<div class="ck2-cap">${esc(ck_s('k2_motif'))}</div><div class="ck2-tabs">${['qual', 'per'].map(m=>`<button class="ck2-tab ${c.m === m ? 'on' : ''}" onclick="ck2_motif('${m}')">${esc(mlab(m))}</button>`).join('')}</div>` : '';
+    const saved = list.map((r, i)=>`<div class="ck2-rw" style="cursor:default"><span>${esc(ck_s(LB[1], { n:i + 1 }))}</span><span class="ck2-mini"><b>${esc(f(Number(r.f.q) || 0))}</b>${mini(r)}</span></div>`).join('');
+    const motif = '';
     body = `<div class="ck2-cap">${esc(ck_s(LB[0]))}</div>${saved}${row('q', ck_s(LB[1], { n }))}${motif}<div class="ck2-tot"><span>${esc(ck_s(LB[2]))}</span><b>${esc(f(tot))}</b></div><div class="ck-err">${esc(c.err)}</div><button class="ck-ok" onclick="ck2_save()">✓ ${esc(ck_s(LB[3]))}</button>`;
   } else {
     const rows = ck2_finKeys(id, p).map(key=>row(key, ck_s(CK2_FL[key][0]), ck_s(ck2_hint(id, key)))).join('');
@@ -7875,7 +7875,7 @@ function ck2_recText(id, r){
   if(r.t === 'dc'){ const b = Number(f.b) || 0, n = Number(f.n) || 0; return ck_s('k2_brutS') + ' ' + v(b) + ' → ' + ck_s('k2_netS') + ' ' + v(n) + (b > 0 ? ' (' + ck_fmt(Math.round(n / b * 1000) / 10) + ' %)' : '') + pp; }
   if(r.t === 'fr') return ck_s('k2_fr') + ' ' + v(f.q) + pp;
   if(r.t === 'wd') return ck_s('k2_wd') + ' ' + v(f.q) + pp;
-  if(r.t === 'pq') return ck_s('k2_pq') + ' ' + v(f.q) + ' · ' + ck_s(r.m === 'per' ? 'k2_mP' : 'k2_mQ') + pp;
+  if(r.t === 'pq') return ck_s('k2_pq') + ' ' + v(f.q) + pp;
   if(r.t === 'hc') return ck_s('k2_hc') + ' ' + v(f.q) + pp;
   return ck_s('fin') + ' : ' + ['fb', 'fn', 'fc', 'fh'].filter(k=>f[k] !== undefined).map(k=>ck_s(CK2_FL[k][0]) + ' ' + v(f[k])).join(' · ') + pp;
 }
@@ -7901,7 +7901,7 @@ function ck2_circuitHtml(docs, prev){
     ps.forEach(p=>{
       const b = ck2_sumP(docs, id, 'dc', p, 'b'), n = ck2_sumP(docs, id, 'dc', p, 'n'), q = ck2_sumP(docs, id, 'fr', p, 'q'), h = ck2_sumP(docs, id, 'hc', p, 'q'), x = [], wdT = ck2_sumP(docs, id, 'wd', p, 'q'), pqT = ck2_sumP(docs, id, 'pq', p, 'q');
       if(wdT > 0) x.push(`déchets ${f(wdT)}`);
-      if(pqT > 0){ const per = ck_r(Object.keys(docs || {}).reduce((a, kk)=>a + ck_recs(docs[kk], id, 'pq').filter(r=>ck2_P(r.p) === p && r.m === 'per').reduce((z, r)=>z + (Number(r.f.q) || 0), 0), 0)); x.push(`perte qualité/péremption ${f(pqT)} (périmé ${f(per)} · mauvaise qualité ${f(ck_r(pqT - per))})`); }
+      if(pqT > 0) x.push(`perte ${f(pqT)}`);
       if(b > 0) x.push(`brut ${f(b)} → net ${f(n)} (${pc(n / b)})`, k === 'escalope' ? `haché théorique ${f(ck_r(b - n))}` : `perte de découpe ${f(ck_r(b - n))}`);
       if(h > 0) x.push(`pris pour hachage ${f(h)}`);
       if(q > 0){
@@ -8142,7 +8142,7 @@ function ck_export(){
   const COL = { a:'À découper / sorti du stock', t:'Transféré', n:'Pour les nems', g:'Gyozas (poulet haché)', v:'Utilisée gyozas (viande hachée)', w:'Déchet', h:'Escalope hachée directement', b:'Viande hachée achetée directement', s:'Disponible au début', rc:'Restante coupée', rn:'Restante non coupée', r:'Restante', pc:'Perdue poulet crispy', pq:'Perdue mauvaise qualité', cr:'Crispée restante', pe:'Écart de reprise (perte)', rd:'Rendement du jour' };
   Object.keys(docs).forEach(k=>{ const d = docs[k]; Object.keys(d.recs || {}).forEach(id=>{ Object.keys(d.recs[id]).forEach(rid=>{ const r = d.recs[id][rid]; if(!r || r.del) return; const it = ck_ingById(id) || { n:id };
     const row = { Date:date, Cuisinier:d.name || ck_empName(d.emp), Poste:d.poste || '', Ingrédient:it.n, Saisie:TYPE[r.t] || r.t, Heure:ck_hm(r.at), Unité:ck_unit(id) };
-    const NEW = r.t === 'dc' || r.t === 'fr' || r.t === 'hc' || r.t === 'fin2' || r.t === 'wd' || r.t === 'pq', COLN = { b:'Brut pris', n:'Net obtenu', q:'Quantité obtenue / prise', fb:'Brut restant', fn:'Net restant', fc:'Crispy restant', fh:'Bac à haché' }; if(NEW && r.p) row['Cuisine'] = r.p; if(r.t === 'pq') row['Motif'] = r.m === 'per' ? 'Périmé' : 'Mauvaise qualité';
+    const NEW = r.t === 'dc' || r.t === 'fr' || r.t === 'hc' || r.t === 'fin2' || r.t === 'wd' || r.t === 'pq', COLN = { b:'Brut pris', n:'Net obtenu', q:'Quantité obtenue / prise', fb:'Brut restant', fn:'Net restant', fc:'Crispy restant', fh:'Bac à haché' }; if(NEW && r.p) row['Cuisine'] = r.p;
     Object.keys(NEW ? COLN : COL).forEach(c=>{ if(r.f && r.f[c] !== undefined) row[(NEW ? COLN : COL)[c]] = Number(r.f[c]) || 0; }); if(r.f && r.f.corr) row['Quantité corrigée'] = 'oui';
     rows.push(row); }); }); });
   if(!rows.length){ alert('Rien à exporter pour cette journée.'); return; }
