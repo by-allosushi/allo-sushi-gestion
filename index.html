@@ -7137,7 +7137,7 @@ const CK_T = {
   fg_rd:['Rendement du jour', 'مردود اليوم'], fg_eq:['Crispée restante, équivalent non décortiqué', 'المقرمش المتبقي، ما يعادله غير مقشّر']
 };
 let ck_started = false, ck_cfg = { settings:{}, ings:{}, cooks:{}, meta:{} }, ck_cfgReady = false, ck_saveT = null;
-let ck_ingsRaw = [], ck_ingsReady = false, ck_emp = {}, ck_empReady = false;
+let ck_btnsRaw = [], ck_ingsRaw = [], ck_ingsReady = false, ck_emp = {}, ck_empReady = false;
 let ck_docsSrv = {}, ck_unsub = null, ck_viewDate = '', ck_docsErr = '', ck_docsReady = false;
 let ck_prevSrv = {}, ck_unsubPrev = null, ck_prevDate = '', ck_prevReady = false;
 let ck_view = '', ck_tab = 'suivi', ck_who = null, ck_pinFor = null, ck_pin = '', ck_pinErr = '', ck_adate = '';
@@ -7206,7 +7206,7 @@ function ck_targetName(id){ const t = ck_targetId(id); if(t) return ck_ingName(t
 const ck_sources = (id)=>{ const k = ck_kind(id), sk = k === 'poulet' ? 'escalope' : k === 'viande' ? 'boeuf' : ''; return sk ? ck_ingList().filter(x=>ck_kind(x.id) === sk) : []; };
 function ck_empName(code){ const c = (ck_cfg.cooks || {})[code]; return (c && c.n) || (ck_emp[code] && ck_emp[code].name) || (typeof PT_DEFAULT_NAMES !== 'undefined' && PT_DEFAULT_NAMES[code]) || ('Code ' + code); }
 function ck_cooks(){
-  return Object.keys(ck_cfg.cooks || {}).map(code=>{ const c = ck_cfg.cooks[code] || {}; return { code:String(code), name:ck_empName(code), pin:c.pin ? String(c.pin) : '', poste:c.poste || '', ings:Array.isArray(c.ings) ? c.ings : [], stk:Array.isArray(c.stk) ? c.stk : [] }; })
+  return Object.keys(ck_cfg.cooks || {}).map(code=>{ const c = ck_cfg.cooks[code] || {}; return { code:String(code), name:ck_empName(code), pin:c.pin ? String(c.pin) : '', poste:c.poste || '', ings:Array.isArray(c.ings) ? c.ings : [], stk:Array.isArray(c.stk) ? c.stk : [], art:Array.isArray(c.art) ? c.art : null }; })
     .sort((a, b)=>a.name.localeCompare(b.name, 'fr'));
 }
 const ck_cook = (code)=>ck_cooks().find(c=>c.code === String(code));
@@ -7517,7 +7517,7 @@ function ck_syncMeta(){   // l'administrateur garde les noms d'ingrédients dans
 function ck_start(){
   if(ck_started) return; ck_started = true;
   CK_CFG_REF.onSnapshot((doc)=>{ if(!ck_saveT){ ck_cfg = doc.exists ? (doc.data() || {}) : {}; ck_cfgFix(); } ck_cfgReady = true; ck_restore(); ck_syncMeta(); ck_refresh(); }, (e)=>{ console.warn(e); ck_cfgReady = true; ck_refresh(); });
-  dp_cfgRef.onSnapshot((doc)=>{ ck_ingsRaw = (doc.exists && Array.isArray((doc.data() || {}).ingredients)) ? doc.data().ingredients : []; ck_ingsReady = true; ck_syncMeta(); ck_refresh(); }, (e)=>{ console.warn(e); ck_ingsReady = true; ck_refresh(); });
+  dp_cfgRef.onSnapshot((doc)=>{ ck_btnsRaw = (doc.exists && Array.isArray((doc.data() || {}).boutons)) ? doc.data().boutons : []; ck_ingsRaw = (doc.exists && Array.isArray((doc.data() || {}).ingredients)) ? doc.data().ingredients : []; ck_ingsReady = true; ck_syncMeta(); ck_refresh(); }, (e)=>{ console.warn(e); ck_ingsReady = true; ck_refresh(); });
   pt_configRef.onSnapshot((doc)=>{ ck_emp = doc.exists ? ((doc.data() || {}).emp || {}) : {}; ck_empReady = true; ck_refresh(); }, (e)=>{ console.warn(e); ck_empReady = true; });
   window.addEventListener('online', ()=>ck_flush());
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ ck_flush(); ck_wakeLock(); } });
@@ -7578,16 +7578,19 @@ function ck_setLang(){ ck_lang = ck_lang === 'ar' ? 'fr' : 'ar'; try{ localStora
 /* ==================== AFFICHAGE ==================== */
 /* ==================== SUIVI DU STOCK : canettes et eau, autres articles, ingrédients ==================== */
 Object.assign(CK_T, {
+  stk_next:['Valider et passer au suivant', 'تأكيد والانتقال إلى التالي'], stk_artN:['Article {a} sur {b}', 'المادة {a} من {b}'], stk_prev:['‹ Précédent', '‹ السابق'], stk_capA:['Combien en reste-t-il ?', 'كم تبقى؟'],
   stk_sec:['Stock', 'المخزون'], stk_can:['Canettes et eau', 'العلب والمياه'], stk_aut:['Autres articles', 'مواد أخرى'], stk_cnt:['Comptage', 'الجرد'], stk_loss:['Pertes', 'الخسائر'],
   stk_done:['Compté à {t}', 'تم الجرد على {t}'], stk_todo:['À compter', 'للجرد'], stk_need:['Indique le comptage de {n}', 'أدخل جرد {n}'],
   stk_capC:['Combien en reste-t-il ce soir ?', 'كم تبقى هذا المساء؟'], stk_capL:['Pertes du jour : cassé, offert, périmé', 'خسائر اليوم: مكسور، مقدّم، منتهي'], stk_none:['Aucun article à compter. L’administrateur les ajoute dans Réglages.', 'لا توجد مواد للجرد.']
 });
 let stkS = null;
 const stk = { date:'', adm:false, docs:{}, buy:[], rp:null, un:[] };
+const stk_autIds = (me)=>{ if(!me) return []; const all = stk_items('autre').map(i=>i.id); return Array.isArray(me.art) ? me.art.filter(id=>all.includes(id)) : ((me.stk || []).includes('autre') ? all : []); };
+const stk_has = (me)=>!!me && ((me.stk || []).includes('can') || stk_autIds(me).length > 0);
 const stk_items = (k)=>((ck_cfg.stk || {}).items || []).filter(i=>i && i.k === k);
 function stk_stop(){ stk.un.forEach(u=>{ try{ u(); }catch(e){} }); stk.un = []; stk.date = ''; stk.docs = {}; stk.buy = []; stk.rp = null; }
 function stk_sync(){
-  const adm = ck_isAdmin() && ck_view === 'admin' && ck_tab === 'stock', me = ck_who ? ck_cook(ck_who) : null, need = adm || (me && me.stk.length);
+  const adm = ck_isAdmin() && ck_view === 'admin' && ck_tab === 'stock', me = ck_who ? ck_cook(ck_who) : null, need = adm || stk_has(me);
   if(!need){ if(stk.un.length) stk_stop(); return; }
   const date = adm ? (ck_adate || ck_service()) : ck_service();
   if(stk.date === date && stk.adm === adm && stk.un.length) return;
@@ -7604,18 +7607,29 @@ const stk_num = (x)=>{ const n = Number(x && x.q); return x && x.q !== undefined
 
 /* ----- côté cuisinier désigné ----- */
 function stk_tilesHtml(me){
-  if(!me || !me.stk || !me.stk.length) return '';
-  const d = stk_doc(ck_service()), tiles = [['can', 'stk_can'], ['autre', 'stk_aut']].filter(t=>me.stk.includes(t[0])).map(t=>{
-    const its = stk_items(t[0]), done = its.length && its.every(i=>stk_num((d.c || {})[i.id]) !== null), last = its.map(i=>((d.c || {})[i.id] || {}).at || '').sort().pop();
+  if(!stk_has(me)) return '';
+  const d = stk_doc(ck_service()), kinds = [];
+  if((me.stk || []).includes('can')) kinds.push(['can', 'stk_can', stk_items('can').map(i=>i.id)]);
+  const aut = stk_autIds(me); if(aut.length) kinds.push(['autre', 'stk_aut', aut]);
+  const tiles = kinds.map(t=>{
+    const its = t[2], done = its.length && its.every(id=>stk_num((d.c || {})[id]) !== null), last = its.map(id=>((d.c || {})[id] || {}).at || '').sort().pop();
     return `<button class="ck-tile ${done ? 'ready' : ''}" onclick="stk_open('${t[0]}')"><div class="nm"><span>${esc(ck_s(t[1]))}</span></div><div class="st"><b>${done ? '✓' : '○'}</b><span>${esc(done ? ck_s('stk_done', { t:ck_hm(last) }) : ck_s('stk_todo'))}</span></div></button>`;
   }).join('');
   return `<div class="ck2-sec">${esc(ck_s('stk_sec'))}</div><div class="ck-grid">${tiles}</div>`;
 }
 function stk_open(kind){
-  const its = stk_items(kind), d = stk_doc(ck_service()), v = {}, fresh = {};
+  const me = ck_cook(ck_who), its = kind === 'autre' ? stk_autIds(me).map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean) : stk_items(kind), d = stk_doc(ck_service()), v = {}, fresh = {};
   its.forEach(i=>{ const q = stk_num((d.c || {})[i.id]); if(q !== null){ v[i.id] = ck_fmt(q); fresh[i.id] = true; } });
-  stkS = { kind, tab:'c', act:its.length ? its[0].id : '', v, fresh, err:'' }; ck_view = 'stk'; ck_render();
+  stkS = { kind, tab:'c', ids:its.map(i=>i.id), i:0, act:its.length ? its[0].id : '', v, fresh, err:'' }; ck_view = 'stk'; ck_render();
 }
+function stk_one(){   // article par article : valider enregistre cet article et passe au suivant
+  const S = stkS; if(!S) return; const id = S.ids[S.i], raw = S.v[id], me = ck_cook(ck_who) || { name:'' }, it = stk_items('autre').find(x=>x.id === id) || { n:'' };
+  if(raw === undefined || raw === ''){ S.err = ck_s('stk_need', { n:it.n }); return ck_render(); }
+  const date = ck_service(); ck_write('stk_' + date, { sdate:date, c:{ [id]:{ q:ck_num(raw) || 0, at:ck_nowIso(), by:me.name } } });
+  if(S.i >= S.ids.length - 1){ stkS = null; ck_view = 'tiles'; return ck_render(); }
+  S.i++; S.act = S.ids[S.i]; S.err = ''; ck_render();
+}
+function stk_prev(){ const S = stkS; if(!S || S.i <= 0) return; S.i--; S.act = S.ids[S.i]; S.err = ''; ck_render(); }
 function stk_back(){ stkS = null; ck_view = 'tiles'; ck_render(); }
 function stk_tab(t){
   const S = stkS; if(!S) return; S.tab = t; S.err = ''; S.v = {}; S.fresh = {};
@@ -7642,7 +7656,16 @@ function stk_save(){
   ck_write('stk_' + date, { sdate:date, [loss ? 'l' : 'c']:put });
   stkS = null; ck_view = 'tiles'; ck_render();
 }
+function stk_htmlOne(){
+  const S = stkS, id = S.ids[S.i], it = stk_items('autre').find(x=>x.id === id) || { n:'' }, me = ck_cook(ck_who) || { name:'' }, last = S.i >= S.ids.length - 1, e = S.v[id] === undefined || S.v[id] === '';
+  const kp = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ','].map(x=>`<button onclick="stk_press('${x}')">${x}</button>`).join('') + `<button onclick="stk_press('0')">0</button><button onclick="stk_press('del')" aria-label="Effacer">⌫</button>`;
+  return `<div class="ck2-wrap"><div class="ck2-bar"><span>${esc(me.name)}</span><span style="display:flex;gap:8px;align-items:center">${ck_langBtn()}<button class="ck-btn" onclick="stk_back()">‹ ${esc(ck_s('back'))}</button></span></div>${ck_alerts()}
+    <div class="ck-card"><div class="ck2-hd"><b>${esc(ck_s('stk_aut'))}</b></div><div class="ck2-grid"><div><div class="ck2-cap">${esc(ck_s('stk_artN', { a:S.i + 1, b:S.ids.length }))} · ${esc(ck_s('stk_capA'))}</div>
+    <div class="ck2-rw act"><span>${esc(it.n)}</span><b class="${e ? 'e' : ''}">${esc(e ? '0' : S.v[id])}</b></div><div class="ck-err">${esc(S.err)}</div>
+    <button class="ck-ok" onclick="stk_one()">✓ ${esc(ck_s(last ? 'k2_val' : 'stk_next'))}</button>${S.i > 0 ? `<button class="ck-btn" style="width:100%;margin-top:10px" onclick="stk_prev()">${esc(ck_s('stk_prev'))}</button>` : ''}</div><div class="ck-kp" dir="ltr">${kp}</div></div></div></div>`;
+}
 function stk_html(){
+  if(stkS.kind === 'autre') return stk_htmlOne();
   const S = stkS, its = stk_items(S.kind), me = ck_cook(ck_who) || { name:'' }, can = S.kind === 'can';
   const isE = (id)=>S.v[id] === undefined || S.v[id] === '';
   const rows = its.map(i=>`<div class="ck2-rw ${S.act === i.id ? 'act' : ''}" onclick="stk_focus(${ck_a(i.id)})"><span>${esc(i.n)}</span><b class="${isE(i.id) ? 'e' : ''}">${esc(isE(i.id) ? '0' : S.v[i.id])}</b></div>`).join('');
@@ -7668,10 +7691,11 @@ function stk_buyOf(name, targetUnit){
   let t = 0; (stk.buy || []).forEach(m=>{ if(st && D === st.date && m.heure && String(m.heure).slice(0, 5).padStart(5, '0') < st.hm.padStart(5, '0')) return; if(m.type !== 'Achat' || String(m.articleNom || '').trim().toLowerCase() !== String(name || '').trim().toLowerCase()) return; const q = Number(m.quantite) || 0, a = stk_unitF(m.unite), b = stk_unitF(targetUnit); t += (a && b) ? q * a / b : q; });
   return ck_r(t);
 }
-function stk_salesOf(names){
-  const want = String(names || '').split(';').map(x=>rp_normName(x)).filter(Boolean); if(!want.length || !stk.rp) return 0; let t = 0;
+function stk_rpList(it){ const x = it && it.rp; if(Array.isArray(x)) return x.filter(l=>l && l.n); return String(x || '').split(';').map(n=>n.trim()).filter(Boolean).map(n=>({ n, q:1 })); }
+function stk_salesOf(it){
+  const list = stk_rpList(it).map(l=>({ k:rp_normName(l.n), q:Number(l.q) > 0 ? Number(l.q) : 1 })); if(!list.length || !stk.rp) return 0; let t = 0;
   const st = stk_start(), D = ck_adate || ck_service();
-  (stk.rp.tickets || []).forEach(tk=>(st && D === st.date && tk.h && String(tk.h).slice(0, 5).padStart(5, '0') < st.hm.padStart(5, '0') ? [] : (Array.isArray(tk.l) ? tk.l : [])).forEach(l=>{ if(l.p && String(l.p) !== String(l.i)) return; if(want.includes(rp_normName(l.n))) t += Number(l.q) || 0; }));
+  (stk.rp.tickets || []).forEach(tk=>(st && D === st.date && tk.h && String(tk.h).slice(0, 5).padStart(5, '0') < st.hm.padStart(5, '0') ? [] : (Array.isArray(tk.l) ? tk.l : [])).forEach(l=>{ if(l.p && String(l.p) !== String(l.i)) return; const m = list.find(x=>x.k === rp_normName(l.n)); if(m) t += (Number(l.q) || 0) * m.q; }));
   return ck_r(t);
 }
 const stk_pill = (e)=>e === null ? '—' : `<span class="ck-pill ${e === 0 ? 'ok' : e < 0 ? 'ko' : 'wa'}">${e > 0 ? '+' : e < 0 ? '−' : ''}${ck_fmt(Math.abs(e))}</span>`;
@@ -7697,7 +7721,7 @@ function stk_ingTable(){
 function stk_canTable(){
   const date = ck_adate || ck_service(), d = stk_doc(date), p = stk_doc(ck_addDays(date, -1)), its = stk_items('can'), st0 = stk_start(), day0 = st0 && date === st0.date; let last = null;
   const rows = its.map(i=>{
-    const vei = day0 ? stk_init(i.id) : stk_num((p.c || {})[i.id]), cnt = stk_num((d.c || {})[i.id]), ach = stk_buyOf(i.dep, ''), ven = stk_salesOf(i.rp), per = stk_num((d.l || {})[i.id]) || 0, c0 = (d.c || {})[i.id];
+    const vei = day0 ? stk_init(i.id) : stk_num((p.c || {})[i.id]), cnt = stk_num((d.c || {})[i.id]), ach = stk_buyOf(i.dep, ''), ven = stk_salesOf(i), per = stk_num((d.l || {})[i.id]) || 0, c0 = (d.c || {})[i.id];
     if(c0 && c0.at && (!last || c0.at > last.at)) last = c0;
     const th = vei === null ? null : ck_r(vei + ach - ven - per), ec = (th === null || cnt === null) ? null : ck_r(cnt - th);
     return `<tr><td>${esc(i.n)}</td><td>${stk_c(vei)}</td><td>${stk_c(ach)}</td><td>${stk_c(ven)}</td><td>${stk_c(per)}</td><td>${stk_c(th)}</td><td>${stk_c(cnt)}</td><td>${stk_pill(ec)}</td></tr>`;
@@ -7710,8 +7734,9 @@ function stk_autTable(){
   const d = stk_doc(ck_adate || ck_service()), its = stk_items('autre');
   const rows = its.map(i=>{ const c = stk_num((d.c || {})[i.id]), s0 = Number(i.seuil) || 0; let st = '—';
     if(c !== null) st = s0 > 0 && c < s0 ? '<span class="ck-pill ko">À racheter</span>' : s0 > 0 && c <= s0 * 1.2 ? '<span class="ck-pill wa">Proche du seuil</span>' : '<span class="ck-pill ok">OK</span>';
-    return `<tr><td>${esc(i.n)}</td><td>${stk_c(c)}</td><td>${s0 ? ck_fmt(s0) : '—'}</td><td>${st}</td></tr>`; }).join('');
-  return `<div class="ck-box" id="stk-aut"><div class="ck3-h"><b>Autres articles</b><span>comptage quotidien</span></div>${rows ? `<div class="ck3-w"><table class="ck3-t"><tr><th>Article</th><th>Comptage</th><th>Seuil minimum</th><th>État</th></tr>${rows}</table></div>` : '<div class="ck-empty">Aucun article. Ajoute-les dans Réglages.</div>'}</div>`;
+    const c0 = (d.c || {})[i.id], who = c !== null && c0 && c0.at ? esc((c0.by || '') + ' · ' + ck_hm(c0.at)) : '—';
+    return `<tr><td>${esc(i.n)}</td><td>${stk_c(c)}</td><td>${s0 ? ck_fmt(s0) : '—'}</td><td>${st}</td><td style="font-family:inherit;color:var(--ink-muted)">${who}</td></tr>`; }).join('');
+  return `<div class="ck-box" id="stk-aut"><div class="ck3-h"><b>Autres articles</b><span>comptage quotidien</span></div>${rows ? `<div class="ck3-w"><table class="ck3-t"><tr><th>Article</th><th>Comptage</th><th>Seuil minimum</th><th>État</th><th>Compté par</th></tr>${rows}</table></div>` : '<div class="ck-empty">Aucun article. Ajoute-les dans Réglages.</div>'}</div>`;
 }
 function stk_adminHtml(){
   const date = ck_adate || ck_service(), go = (id)=>`document.getElementById('${id}').scrollIntoView({behavior:'smooth',block:'start'})`;
@@ -7723,12 +7748,38 @@ function stk_adminHtml(){
 }
 
 /* ----- réglages ----- */
+function ck_cookArt(code, id){ const c = ck_cook(code); if(!c || !ck_cfg.cooks[code]) return; const l = stk_autIds(c).slice(), i = l.indexOf(id); if(i >= 0) l.splice(i, 1); else l.push(id); ck_cfg.cooks[code].art = l; ck_cfgSave(); ck_render(); }
 function ck_cookStk(code, k){ const c = ck_cfg.cooks[code]; if(!c) return; const l = Array.isArray(c.stk) ? c.stk.slice() : [], i = l.indexOf(k); if(i >= 0) l.splice(i, 1); else l.push(k); c.stk = l; ck_cfgSave(); ck_render(); }
 function stk_setStart(k, v){ if(!ck_cfg.stk.start) ck_cfg.stk.start = {}; ck_cfg.stk.start[k] = String(v || ''); ck_cfgSave(); ck_render(); }
 function stk_setInit(id, v){ if(!ck_cfg.stk.init) ck_cfg.stk.init = {}; const n = ck_num(v); if(n === null || String(v).trim() === '') delete ck_cfg.stk.init[id]; else ck_cfg.stk.init[id] = n; ck_cfgSave(); ck_render(); }
 function stk_add(k){ ck_cfg.stk.items.push({ id:'s' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4), n:'', k, dep:'', rp:'', seuil:0 }); ck_cfgSave(); ck_render(); }
 function stk_del(id){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it || !confirm('Retirer « ' + (it.n || 'cet article') + ' » de la liste ? Les comptages déjà saisis restent enregistrés.')) return; ck_cfg.stk.items = ck_cfg.stk.items.filter(x=>x.id !== id); ck_cfgSave(); ck_render(); }
 function stk_set(id, key, val){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; if(key === 'seuil'){ const n = ck_num(val); val = n === null || n < 0 ? 0 : n; } else val = String(val).trim(); it[key] = val; ck_cfgSave(); ck_render(); }
+function stk_boissons(){ const b = (ck_btnsRaw || []).find(x=>x && /boisson/i.test(x.n || '')); return b && Array.isArray(b.items) ? b.items.filter(x=>x && x.n && !x.off).map(x=>x.n) : []; }
+function stk_rpNames(){
+  const set = {}; try{ (typeof rp_products === 'function' ? rp_products().list : []).forEach(p=>{ set[p.name] = 1; }); }catch(e){}
+  ((stk.rp || {}).tickets || []).forEach(tk=>(tk.l || []).forEach(l=>{ if(l.n) set[String(l.n).replace(/\s+/g, ' ').trim()] = 1; }));
+  return Object.keys(set).sort((a, b)=>a.localeCompare(b, 'fr'));
+}
+function stk_togBoisson(name){
+  const its = ck_cfg.stk.items, i = its.findIndex(x=>x.k === 'can' && x.dep === name);
+  if(i >= 0){ if(stk_rpList(its[i]).length && !confirm('Ne plus suivre « ' + name + ' » ? Ses produits Resto Pro reliés seront retirés (les comptages restent).')) return; its.splice(i, 1); }
+  else its.push({ id:'s' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4), n:name, k:'can', dep:name, rp:[], seuil:0 });
+  ck_cfgSave(); ck_render();
+}
+function stk_rpAdd(id){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; it.rp = stk_rpList(it).concat([{ n:'', q:1 }]); ck_cfgSave(); ck_render(); }
+function stk_rpDel(id, i){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; const l = stk_rpList(it); l.splice(i, 1); it.rp = l; ck_cfgSave(); ck_render(); }
+function stk_rpSet(id, i, key, val){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; const l = stk_rpList(it); if(!l[i]) l[i] = { n:'', q:1 }; if(key === 'q'){ const n = ck_num(val); l[i].q = n !== null && n > 0 ? n : 1; } else l[i].n = String(val).trim(); it.rp = l; ck_cfgSave(); ck_render(); }
+function stk_canRegHtml(){
+  const bo = stk_boissons(), its = stk_items('can'), names = stk_rpNames();
+  const dl = `<datalist id="stk-rpdl">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`;
+  const tog = bo.length ? bo.map(n=>{ const on = its.some(x=>x.dep === n); return `<button class="ck-tg ${on ? 'on' : ''}" onclick="stk_togBoisson(${ck_a(n)})">${on ? '✓ ' : ''}${esc(n)}</button>`; }).join('') : '<span class="ck-sub">Aucune boisson trouvée : crée un bouton de sortie « Boissons » avec sa liste dans Dépenses.</span>';
+  const links = its.map(i=>{
+    const l = stk_rpList(i), rows = l.map((x, k)=>`<div class="ck-fr"><input class="ck-in" list="stk-rpdl" style="width:230px" placeholder="Produit Resto Pro" value="${esc(x.n)}" onchange="stk_rpSet(${ck_a(i.id)},${k},'n',this.value)"><label>consomme</label><input class="ck-in" inputmode="decimal" style="width:70px" value="${esc(ck_fmt(Number(x.q) > 0 ? Number(x.q) : 1))}" onchange="stk_rpSet(${ck_a(i.id)},${k},'q',this.value)"><span class="ck-sub">par vente</span><button class="ck-btn sm danger" onclick="stk_rpDel(${ck_a(i.id)},${k})">✕</button></div>`).join('');
+    return `<div style="margin-top:12px;"><b>${esc(i.n)}</b>${i.dep && bo.indexOf(i.dep) < 0 ? ' <span class="ck-sub">(n’est plus dans Dépenses)</span> <button class="ck-btn sm danger" onclick="stk_del(${ck_a(i.id)})">Retirer</button>' : ''}${rows || '<div class="ck-sub">Aucun produit relié : les ventes seront à 0.</div>'}<div style="margin-top:6px"><button class="ck-btn sm" onclick="stk_rpAdd(${ck_a(i.id)})">+ Produit Resto Pro</button></div></div>`;
+  }).join('');
+  return dl + `<div class="ck-box"><h3>Stock : canettes et bouteilles d’eau</h3><div class="ck-sub" style="margin-bottom:8px;">Liste reprise de Dépenses › sortie « Boissons ». Touche une boisson pour la suivre ; les achats viennent de Dépenses (même nom). Relie ensuite les produits Resto Pro qui la consomment.</div><div class="ck-fr">${tog}</div>${links}</div>`;
+}
 function stk_regHtml(){
   const names = Array.from(new Set((ck_ingsRaw || []).filter(i=>i && i.n).map(i=>i.n))), dl = `<datalist id="stk-dl">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`;
   const block = (k, titre, can)=>{
@@ -7740,8 +7791,8 @@ function stk_regHtml(){
   const st = (ck_cfg.stk || {}).start || {}, ini = (id, u)=>`<div class="ck-fr"><label style="min-width:170px">${esc(id.n)}</label><input class="ck-in" inputmode="decimal" style="width:110px" value="${esc(stk_init(id.id) === null ? '' : ck_fmt(stk_init(id.id)))}" onchange="stk_setInit(${ck_a(id.id)},this.value)"><span class="ck-sub">${esc(u)}</span></div>`;
   const startBox = `<div class="ck-box"><h3>Début du suivi du stock</h3><div class="ck-fr"><label>Date</label><input class="ck-in" type="date" value="${esc(st.date || '')}" onchange="stk_setStart('date',this.value)"><label>Heure</label><input class="ck-in" type="time" value="${esc(st.hm || '')}" onchange="stk_setStart('hm',this.value)"></div>
     <div class="ck-sub" style="margin:6px 0 10px;">Avant ce moment, rien n’est compté dans le Suivi du stock (rien n’est effacé). Le jour du début, le « reste veille » est le stock de départ ci-dessous : le reste réel de chaque ingrédient (en cru) et le comptage de chaque article à cet instant.</div>
-    <h3 style="font-size:15px">Stock de départ</h3>${ck_ingList().filter(i=>ck_kind(i.id) !== 'poulet').map(i=>ini(i, ck_unit(i.id))).join('')}${stk_items('can').concat(stk_items('autre')).map(i=>ini(i, 'unité')).join('')}</div>`;
-  return startBox + dl + block('can', 'Stock : canettes et bouteilles d’eau', true) + block('autre', 'Stock : autres articles', false) + `<div class="ck-sub" style="margin:0 0 10px;">Les personnes qui comptent le stock se choisissent plus haut, dans la fiche de chaque cuisinier (« Comptage du stock »).</div>`;
+    <h3 style="font-size:15px">Stock de départ</h3>${ck_ingList().map(i=>ini(i, ck_unit(i.id))).join('')}${stk_items('can').concat(stk_items('autre')).map(i=>ini(i, 'unité')).join('')}</div>`;
+  return startBox + dl + stk_canRegHtml() + block('autre', 'Stock : autres articles', false) + `<div class="ck-sub" style="margin:0 0 10px;">Les personnes qui comptent les canettes et l’eau se choisissent plus haut, dans la fiche de chaque cuisinier (« Comptage du stock »). Les autres articles s’attribuent à chaque cuisinier de la même façon que les ingrédients.</div>`;
 }
 
 /* ==================== SAISIE v2 : brut → net → crispy / hachage → fin de service ==================== */
@@ -8020,7 +8071,7 @@ function ck_tileInfo(id, doc){
   return { st:'todo', text:ck_s('todo') };
 }
 function ck_tilesHtml(){
-  const code = ck_who, doc = ck_docs()[ck_docId(ck_viewDate, code)] || {}, me = ck_cook(code) || { poste:'' }, ks = (me.stk && me.stk.length && !(me.ings || []).length && !me.poste) ? [] : ck2_kitchens();
+  const code = ck_who, doc = ck_docs()[ck_docId(ck_viewDate, code)] || {}, me = ck_cook(code) || { poste:'' }, ks = (stk_has(me) && !(me.ings || []).length && !me.poste) ? [] : ck2_kitchens();
   let own = 0, ready = 0;
   const secs = ks.map(K=>{
     const mineK = !me.poste || K.p === me.poste;
@@ -8179,7 +8230,8 @@ function ck_regHtml(){
   const cookBoxes = cooks.map(c=>`<div class="ck-box"><h3>${esc(c.name)} <button class="ck-btn sm danger" style="margin-inline-start:auto" onclick="ck_cookDel(${ck_a(c.code)})">Retirer</button></h3>
     <div class="ck-fr"><label>Poste</label><select class="ck-in" onchange="ck_cookSet(${ck_a(c.code)},'poste',this.value)">${CK_POSTES.map(p=>ck_opt(p, p || '—', c.poste)).join('')}</select>
       <label>Code à 4 chiffres</label><input class="ck-in ck-pin" inputmode="numeric" maxlength="4" value="${esc(c.pin)}" placeholder="••••" onchange="ck_cookSet(${ck_a(c.code)},'pin',this.value)"></div>
-    <div class="ck-fr"><label>Comptage du stock</label><button class="ck-tg ${c.stk.includes('can') ? 'on' : ''}" onclick="ck_cookStk(${ck_a(c.code)},'can')">${c.stk.includes('can') ? '✓ ' : ''}Canettes et eau</button><button class="ck-tg ${c.stk.includes('autre') ? 'on' : ''}" onclick="ck_cookStk(${ck_a(c.code)},'autre')">${c.stk.includes('autre') ? '✓ ' : ''}Autres articles</button></div>
+    <div class="ck-fr"><label>Comptage du stock</label><button class="ck-tg ${c.stk.includes('can') ? 'on' : ''}" onclick="ck_cookStk(${ck_a(c.code)},'can')">${c.stk.includes('can') ? '✓ ' : ''}Canettes et eau</button></div>
+    <div class="ck-fr"><label>Autres articles à compter</label>${stk_items('autre').length ? stk_items('autre').map(i=>{ const on = stk_autIds(c).includes(i.id); return `<button class="ck-tg ${on ? 'on' : ''}" onclick="ck_cookArt(${ck_a(c.code)},${ck_a(i.id)})">${on ? '✓ ' : ''}${esc(i.n || 'sans nom')}</button>`; }).join('') : '<span class="ck-sub">Aucun article : ajoute-les dans « Stock : autres articles ».</span>'}</div>
     <div class="ck-fr"><label>Ingrédients attribués</label></div><div class="ck-fr">${ings.length ? ings.map(i=>`<button class="ck-tg ${c.ings.includes(i.id) ? 'on' : ''}" onclick="ck_cookIng(${ck_a(c.code)},${ck_a(i.id)})">${c.ings.includes(i.id) ? '✓ ' : ''}${esc(i.n)}</button>`).join('') : '<span class="ck-sub">Aucun ingrédient suivi.</span>'}</div></div>`).join('');
   const add = `<div class="ck-box"><h3>Cuisiniers</h3><div class="ck-sub" style="margin-bottom:8px;">Les prénoms viennent du module Pointage. Un même ingrédient peut être attribué à plusieurs cuisiniers : chacun a sa propre saisie.</div>
     <div class="ck-fr"><select class="ck-in" id="ck-addsel"><option value="">Choisir un employé…</option>${empCodes.map(c=>ck_opt(c, ck_empName(c), '')).join('')}</select><button class="ck-btn sm" onclick="ck_addCook()">+ Ajouter</button></div></div>`;
