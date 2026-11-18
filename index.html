@@ -1480,6 +1480,8 @@ function ca_normalizeSession(s, date){
     debutManuel: s.debutManuel || null,
     restant: s.restant || null,
     restants: Array.isArray(s.restants) ? s.restants : [],
+    restantCorrige: s.restantCorrige || null,
+    autoClos: !!s.autoClos,
     enregistreParEn: s.enregistreParEn,
     enregistreLe: s.enregistreLe,
   };
@@ -1573,6 +1575,7 @@ ca_caisseCol.onSnapshot((snap)=>{
       if(Array.isArray(srv.debutValidations)) ca_session.debutValidations = srv.debutValidations;
       if(Array.isArray(srv.restants)){ if(JSON.stringify(ca_session.restants || []) !== JSON.stringify(srv.restants)) ca_session.restants = srv.restants; }
       ca_session.debutManuel = srv.debutManuel || null;
+      if(JSON.stringify(ca_session.restantCorrige || null) !== JSON.stringify(srv.restantCorrige || null)){ ca_session.restantCorrige = srv.restantCorrige || null; if(srv.montantCompte !== undefined) ca_session.montantCompte = srv.montantCompte; }
       { const a = JSON.stringify(ca_session.restant || null), b = JSON.stringify(srv.restant || null);   // montant restant saisi / validé par un employé ou par l'admin
         if(a !== b){ ca_session.restant = srv.restant || null; if(srv.restant && srv.restant.statut === 'valide') ca_session.montantCompte = srv.montantCompte !== undefined ? srv.montantCompte : ''; } }
     } }
@@ -1675,7 +1678,7 @@ async function ca_mvAdd(){
 }
 const CA_EDIT_MS = 3600000;   // délai de modification / suppression par l'employé : 1 h
 function ca_inWindow(at){ const t = Date.parse(at || ''); return !isNaN(t) && (Date.now() - t) <= CA_EDIT_MS && (Date.now() - t) >= -60000; }
-function ca_canEditV(v){ const d = ca_allSessions[ca_session.date]; return !!(v && v.par === currentUser && ca_inWindow(v.saisieLe || v.at) && (!v.statut || v.statut === 'attente') && !(d && d.enregistreLe)); }
+function ca_canEditV(v){ const d = ca_allSessions[ca_session.date]; return !!(v && v.par === currentUser && ca_inWindow(v.saisieLe || v.at) && (!v.statut || v.statut === 'attente') && !(d && d.enregistreLe && !d.autoClos)); }
 function ca_canEditS(l){
   if(!(l && l.par === currentUser && ca_inWindow(l.at))) return false;
   const d = ca_retraitDocs[ca_retraitId(ca_session.date, l.id)];
@@ -1708,7 +1711,8 @@ async function ca_limValidateDebut(){
   const v = { id:uid(), par:currentUser, heure:ca_nowHM(), at:new Date().toISOString(), montant:m, attendu, ecart, theo:Math.round(ca_montantTheorique(ca_session) * 100) / 100, premier:!(ca_session.debutValidations || []).some(x=>x.par !== currentUser && !x.tardive) && !ca_restantsList(ca_session).length, note:'' };
   ca_lim.busy = true;
   try{
-    const out = await ca_limTx(c=>({ ...c, debutValidations:[...(Array.isArray(c.debutValidations) ? c.debutValidations : []), v] }));
+    const out = await ca_limTx(c=>{ const o = { ...c, debutValidations:[...(Array.isArray(c.debutValidations) ? c.debutValidations : []), v] }; if(c.autoClos){ delete o.enregistreLe; delete o.enregistreParEn; o.autoClos = false; } return o; });
+    if(out.autoClos === false){ ca_session.enregistreLe = undefined; ca_session.enregistreParEn = undefined; ca_session.autoClos = false; }
     ca_session.debutValidations = out.debutValidations; ca_lim.debut = ''; ca_lim.note = ''; ca_lim.dFirst = null; ca_lim.dConf = false; ca_lim.dalt = false;
   }catch(e){ console.error(e); alert('Erreur : validation non enregistrée (' + (e.message || e) + '). Réessaie.'); }
   ca_lim.busy = false; ca_render();
@@ -1788,7 +1792,7 @@ async function ca_limDelS(id){
 }
 /* Début de caisse attendu (accès limité) : calculé à l'affichage, jamais « 0 » par défaut */
 function ca_limDebut(){
-  const e = ca_debutEff(ca_session.date), closed = !!(ca_allSessions[ca_session.date] && ca_allSessions[ca_session.date].enregistreLe);
+  const e = ca_debutEff(ca_session.date), closed = !!(ca_allSessions[ca_session.date] && ca_allSessions[ca_session.date].enregistreLe && !ca_allSessions[ca_session.date].autoClos);
   const base = { dayVal:e.val, dayNone:!!e.none, closed };
   const rs = ca_restantsList(ca_session).filter(r=>r.statut !== 'refuse');
   const dvs = (ca_session.debutValidations || []).filter(x=>!x.tardive).sort(ca_cmpAt), P = dvs.length ? dvs[dvs.length - 1] : null;   // poste le plus récent
@@ -1849,7 +1853,7 @@ async function ca_limSubmitRestant(){
   if(ca_repris()){ alert('Un autre employé a déjà repris la caisse : son début vaut clôture de ton poste.'); return; }
   const m = ca_parseNum(raw), v = ca_myPoste(), prev = ca_myRestant();
   const attendu = ca_restantAttendu(), ecart = Math.round((m - attendu) * 100) / 100, note = String(ca_lim.rnote || '').trim(), at = new Date().toISOString(), heure = ca_nowHM();
-  const r = { id:(prev && prev.id && prev.id !== 'legacy') ? prev.id : uid(), vid:v ? v.id : null, par:currentUser, heure, at, montant:m, attendu, ecart, note, statut:Math.abs(ecart) > 0.004 ? 'attente' : 'valide' };
+  const r = { id:(prev && prev.id && prev.id !== 'legacy') ? prev.id : uid(), vid:v ? v.id : null, par:currentUser, heure, at, montant:m, attendu, ecart, note, statut:'valide', auto:true };
   ca_lim.busy = true;
   try{
     const out = await ca_limTx(c=>{
@@ -1857,9 +1861,12 @@ async function ca_limSubmitRestant(){
       if(!list.length && c.restant) list = [{ ...c.restant, id:c.restant.id || 'legacy' }];
       list = list.filter(x=>x.id !== r.id); list.push(r);
       const last = list.slice().sort(ca_cmpAt).pop();
-      return { ...c, restants:list, restant:last, ...(r.statut === 'valide' && last.id === r.id ? { montantCompte:String(m) } : {}) };
+      const o = { ...c, restants:list, restant:last, ...(last.id === r.id ? { montantCompte:String(m), restantCorrige:null } : {}) };
+      if(!c.enregistreLe || c.autoClos){ o.enregistreLe = at; o.enregistreParEn = currentUser; o.autoClos = true; }
+      return o;
     });
-    ca_session.restants = out.restants; ca_session.restant = out.restant; if(r.statut === 'valide' && out.restant && out.restant.id === r.id) ca_session.montantCompte = String(m);
+    ca_session.restants = out.restants; ca_session.restant = out.restant; if(out.restant && out.restant.id === r.id){ ca_session.montantCompte = String(m); ca_session.restantCorrige = null; }
+    if(out.autoClos){ ca_session.enregistreLe = out.enregistreLe; ca_session.enregistreParEn = out.enregistreParEn; ca_session.autoClos = true; }
     ca_lim.rest = ''; ca_lim.rnote = '';
   }catch(e){ console.error(e); alert('Erreur : montant non enregistré (' + (e.message || e) + '). Réessaie.'); }
   ca_lim.busy = false; ca_render();
@@ -1924,8 +1931,8 @@ async function ca_rouvrirJournee(){   // admin : rouvre une journée clôturée 
   const date = ca_session.date, ex = ca_allSessions[date]; if(!(ex && ex.enregistreLe)) return;
   if(!confirm('Rouvrir la journée du ' + fmtDateShort(date) + ' ?\nLes saisies sont conservées. Les employés pourront à nouveau valider leur début. Tu pourras clôturer de nouveau ensuite.')) return;
   try{
-    await ca_limTx(c=>{ const o = { ...c }; delete o.enregistreLe; delete o.enregistreParEn; return o; });
-    ca_session.enregistreLe = undefined; ca_session.enregistreParEn = undefined;
+    await ca_limTx(c=>{ const o = { ...c }; delete o.enregistreLe; delete o.enregistreParEn; o.autoClos = false; return o; });
+    ca_session.enregistreLe = undefined; ca_session.enregistreParEn = undefined; ca_session.autoClos = false;
   }catch(e){ console.error(e); alert('Erreur : la journée n’a pas été rouverte (' + (e.message || e) + ').'); }
   ca_render();
 }
@@ -1989,6 +1996,7 @@ function ca_passationsCard(){
     ${adm ? (pend ? `<button class="btn t-add" style="width:100%;height:42px;" onclick="ca_toutValider()">✓ Tout valider</button>` : (rows.length ? '<div class="cg-sub" style="color:var(--moss);">✓ Tout est validé</div>' : '')) : ''}
   </div>`;
 }
+function ca_restantAdminCard_ctl(){ return ca_passationsCard(); }
 function ca_restantAdminCard(){ return ca_passationsCard(); }
 function ca_renderLimited(){
   const today = todayISO();
@@ -2077,7 +2085,7 @@ async function ca_saveSession(){
   try{
     ca_setSyncLabel('Enregistrement…');
     const { debutCaisseAuto, debutCaisseManuel, ...cleanSession } = ca_session;
-    const saved = { ...cleanSession, enregistreParEn: currentUser, enregistreLe: new Date().toISOString() };
+    const saved = { ...cleanSession, autoClos:false, enregistreParEn: currentUser, enregistreLe: new Date().toISOString() };
     await ca_caisseCol.doc(ca_session.date).set(saved);
     try{ await ca_syncRetraits(saved); }catch(e){ console.warn('Sync retraits', e); }
     ca_allSessions = { ...ca_allSessions, [ca_session.date]: saved };
@@ -2321,6 +2329,84 @@ function ca_erpCard(existing){
   return ca_cgCard('🧾 Total ventes ERP', body, r.loaded ? refreshBtn : '');
 }
 
+
+/* ---------- Admin : correction du restant, message d'écart du lendemain, liste des mouvements ---------- */
+let ca_rEdit = false, ca_rEditVal = '';
+async function ca_restantAdminSet(){
+  const raw = String(ca_rEditVal).trim(); if(raw === ''){ alert('Saisis le montant restant en caisse.'); return; }
+  const m = ca_parseNum(raw), iso = new Date().toISOString(), ok = ca_restantsList(ca_session).filter(r=>r.statut === 'valide').sort(ca_cmpAt), last = ok.length ? ok[ok.length - 1] : null;
+  const same = last && Math.abs(m - ca_parseNum(last.montant)) < 0.005;
+  try{
+    const out = await ca_limTx(c=>({ ...c, montantCompte:String(m), restantCorrige: same || !last ? null : { montant:m, par:currentUser || '', at:iso, avant:ca_parseNum(last.montant), avantPar:last.par || '', avantHeure:last.heure || '' } }));
+    ca_session.montantCompte = String(m); ca_session.restantCorrige = out.restantCorrige || null; ca_rEdit = false; ca_rEditVal = '';
+  }catch(err){ console.error(err); alert('Erreur : montant non enregistré (' + (err.message || err) + ').'); }
+  ca_render();
+}
+function ca_ecartAlerts(){   // écarts constatés les jours précédents (validés par les employés sans accord), à acquitter avec « Vu »
+  const today = todayISO(), M = ca_fmtMoney, out = [];
+  Object.keys(ca_allSessions).filter(d=>d < today).sort().forEach(d=>{
+    ca_restantsList(ca_allSessions[d]).forEach(r=>{
+      const ec = Number(r.ecart);
+      if(r.auto && !r.vu && r.statut !== 'refuse' && !isNaN(ec) && Math.abs(ec) > 0.004) out.push({ d, r, ec });
+    });
+  });
+  return out;
+}
+function ca_ecartAlertsHtml(){
+  if(!ca_isAdminNow()) return '';
+  const M = ca_fmtMoney;
+  return ca_ecartAlerts().map(({ d, r, ec })=>{
+    const a = Math.abs(ec), col = ec > 0 ? 'var(--amber)' : 'var(--rust)', bg = ec > 0 ? 'var(--amber-bg)' : 'var(--rust-bg)';
+    return `<div class="ticket" style="border-left:3px solid ${col};background:${bg};display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><div><div style="font-weight:700;font-size:14px;color:${col};">⚠ Écart du ${fmtDateShort(d)} : ${M(a)} ${ec < 0 ? 'en moins' : 'en trop'}</div><div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Constaté par ${esc(r.par || '')} à ${esc(r.heure || '')} · attendu ${M(r.attendu)} · compté ${M(r.montant)}${r.note ? ' · « ' + esc(r.note) + ' »' : ''}</div></div><button class="btn ghost small" onclick="ca_ecartVu('${d}','${esc(String(r.id))}')">Vu</button></div>`;
+  }).join('');
+}
+async function ca_ecartVu(date, id){
+  const iso = new Date().toISOString(), mark = (x)=>String(x.id || 'legacy') === String(id) ? { ...x, vu:true, vuPar:currentUser || '', vuLe:iso } : x;
+  try{
+    await db.runTransaction(async (tx)=>{
+      const ref = ca_caisseCol.doc(date), snap = await tx.get(ref); if(!snap.exists) return;
+      const c = snap.data(), o = { ...c };
+      if(Array.isArray(c.restants) && c.restants.length) o.restants = c.restants.map(mark);
+      if(c.restant) o.restant = mark(c.restant);
+      tx.set(ref, o);
+    });
+  }catch(err){ console.error(err); alert('Erreur : ' + (err.message || err)); }
+}
+function ca_mvListHtml(){   // admin : tous les mouvements de la journée, de tous les employés
+  const M = ca_fmtMoney;
+  const all = [...(ca_session.sorties || []).map(l=>({ l, e:false })), ...(ca_session.entrees || []).map(l=>({ l, e:true }))].sort((x, y)=>String(x.l.at || x.l.heure || '').localeCompare(String(y.l.at || y.l.heure || '')));
+  if(!all.length) return '<div class="cg-sub">Aucun mouvement pour cette journée.</div>';
+  return all.map(({ l, e })=>{
+    const lab = e ? 'Entrée diverse' : l.motif === 'virement' ? 'Virement' : l.motif === 'nonregle' ? 'Non payée' : 'Remise → ' + esc(l.note || ''), col = e ? 'var(--moss)' : l.motif === 'retrait' ? 'var(--rust)' : 'var(--amber)', txt = e ? (l.libelle || l.note || '') : l.motif === 'retrait' ? (l.remarque || '') : (l.motif === 'retrait' ? '' : (l.note || ''));
+    return `<div style="border-top:1px solid var(--line,#2a312d);padding:6px 0;display:flex;justify-content:space-between;gap:8px;font-size:13px;"><span style="color:${col};">${lab}<small style="display:block;color:var(--ink-muted);font-size:11.5px;">${esc(l.heure || '')}${l.par ? ' · ' + esc(l.par) : ''}${txt ? ' · ' + esc(txt) : ''}</small></span><b style="font-family:'JetBrains Mono',monospace;">${M(ca_parseNum(l.montant))}</b></div>`;
+  }).join('');
+}
+function ca_adminDebutCard(eff, srcTxt, editUi){
+  const M = ca_fmtMoney, dv = (ca_session.debutValidations || []).filter(v=>!v.tardive && v.statut !== 'refuse').slice().sort(ca_cmpAt), f1 = dv[0] || null, ov = eff.src === 'manuel' ? eff.ov : null;
+  let val = null, sub = '';
+  if(ov && ca_nz(ov.montant) && ov.source !== 'employe'){ val = ca_parseNum(ov.montant); sub = '✎ Corrigé par l’admin' + (f1 ? ' · l’employé avait validé ' + M(f1.montant) + ' (' + esc(f1.par || '') + ' à ' + esc(f1.heure || '') + ')' : ''); }
+  else if(ov && ca_nz(ov.montant)){ val = ca_parseNum(ov.montant); sub = '✓ Validé par ' + esc(ov.par || (f1 && f1.par) || ''); }
+  else if(f1){ val = ca_parseNum(f1.montant); sub = '✓ Validé par ' + esc(f1.par || '') + ' à ' + esc(f1.heure || '') + (eff.prevVal !== null && eff.prevVal !== undefined && Math.abs(val - eff.prevVal) > 0.004 ? ' · report de la veille : ' + M(eff.prevVal) : ''); }
+  else if(!eff.none){ val = eff.val; sub = 'Pas encore validé par un employé · ' + srcTxt; }
+  else sub = 'Aucune clôture antérieure et aucun début validé.';
+  const edit = ca_dEdit ? editUi : `<div style="display:flex;gap:12px;flex-wrap:wrap;"><a href="#" style="color:var(--forest-light);" onclick="ca_dEdit=true;ca_dEditVal=${val !== null ? "String(" + val + ")" : "''"};ca_render();return false;">✎ Corriger</a>${eff.src === 'manuel' && eff.prevVal !== null ? '<a href="#" style="color:var(--forest-light);" onclick="ca_debutRevert();return false;">↩ Revenir au report de la veille</a>' : ''}</div>`;
+  return `<div class="cg-card" style="grid-column:1/-1;"><div class="cg-t">💵 Début de caisse</div>${val !== null ? `<div class="cg-big">${M(val)}</div>` : ''}<div class="cg-sub">${sub}</div>${edit}</div>`;
+}
+function ca_adminRestantCard(){
+  const M = ca_fmtMoney, ok = ca_restantsList(ca_session).filter(r=>r.statut === 'valide').sort(ca_cmpAt), last = ok.length ? ok[ok.length - 1] : null, rc = ca_session.restantCorrige, has = ca_nz(ca_session.montantCompte) || last;
+  let body;
+  if(!has) body = '<div class="cg-sub">Pas encore validé par un employé.</div>';
+  else {
+    const val = ca_nz(ca_session.montantCompte) ? ca_parseNum(ca_session.montantCompte) : ca_parseNum(last.montant);
+    const sub = rc ? '✎ Corrigé par l’admin · l’employé avait validé ' + M(rc.avant) + (rc.avantPar ? ' (' + esc(rc.avantPar) + ' à ' + esc(rc.avantHeure || '') + ')' : '') : last ? '✓ Validé par ' + esc(last.par || '') + ' à ' + esc(last.heure || '') + (last.note ? ' · « ' + esc(last.note) + ' »' : '') : '';
+    const edit = ca_rEdit
+      ? `<input id="restant-edit" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_rEditVal)}" placeholder="Montant" oninput="ca_rEditVal=this.value" onkeydown="if(event.key==='Enter')ca_restantAdminSet()"><div style="display:flex;gap:8px;"><button class="btn t-save" style="flex:1;height:40px;" onclick="ca_restantAdminSet()">Enregistrer</button><button class="btn ghost" style="flex:1;height:40px;" onclick="ca_rEdit=false;ca_render()">Annuler</button></div>`
+      : `<div><a href="#" style="color:var(--forest-light);" onclick="ca_rEdit=true;ca_rEditVal=String(${val});ca_render();return false;">✎ Corriger</a></div>`;
+    body = `<div class="cg-big">${M(val)}</div><div class="cg-sub">${sub}</div>${edit}`;
+  }
+  return `<div class="cg-card" style="grid-column:1/-1;"><div class="cg-t">🧮 Montant restant en caisse</div>${body}</div>`;
+}
+
 function ca_renderCaisseTab(){
   ca_ensureRpWatch();
   const existing = ca_allSessions[ca_workingDate];
@@ -2339,6 +2425,7 @@ function ca_renderCaisseTab(){
   const debutFoot = `<div class="cg-sub"><a href="#" style="color:var(--forest-light);" onclick="ca_refreshDebut();return false;">↻ Actualiser</a></div>`;
   const staticSel = (t)=>`<select class="cg-in" disabled style="font-family:'Inter',sans-serif;font-size:13.5px;opacity:.7;"><option>${t}</option></select>`;
   return `
+    ${ca_ecartAlertsHtml()}
     <div class="ticket">
       <div class="field">
         <label>Date de la caisse</label>
@@ -2349,32 +2436,18 @@ function ca_renderCaisseTab(){
       ${existing ? `<div style="margin-top:8px;font-size:11.5px;color:var(--amber);">⚠ Une clôture existe déjà pour cette date. L'enregistrer à nouveau la remplacera.</div>` : ''}
     </div>
 
-    ${ca_renderStatusBanner(existing, ecart)}
-
-    ${ca_restantAdminCard()}
-
     <div class="cg-grid" style="grid-template-columns:1fr;">
-      <div class="cg-card" style="grid-column:1/-1;"><div class="cg-t">💵 Début de caisse</div>
-        ${eff.none ? '<div class="cg-sub">Aucune clôture antérieure : saisis ce que tu comptes.</div>' : `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:stretch;">
-          <button class="btn t-save" style="min-height:52px;" onclick="ca_debutRevert()">✓ Je reprends</button>
-          <div style="border:1px solid var(--line,#2a312d);background:var(--paper);border-radius:8px;padding:6px 12px;display:flex;flex-direction:column;justify-content:center;"><div class="cg-sub">${srcTxt}</div><div style="font-size:20px;font-weight:800;color:var(--ink);font-family:'JetBrains Mono',monospace;">${ca_fmtMoney(eff.val)}</div></div>
-        </div>`}
-        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:stretch;">
-          <button class="btn t-del" style="min-height:52px;" onclick="ca_debutAdminSet()">Le montant est différent</button>
-          <input id="debut-edit" class="cg-in" type="text" inputmode="decimal" placeholder="Montant que tu comptes" value="${esc(ca_dEditVal)}" oninput="ca_dEditVal=this.value" onkeydown="if(event.key==='Enter')ca_debutAdminSet()">
-        </div>
-      </div>
+      ${ca_adminDebutCard(eff, srcTxt, editUi)}
 
-      <div class="cg-card" style="grid-column:1/-1;"><div class="cg-t">⇅ Mouvements de la caisse</div><div class="cg-body">${ca_mvHtml()}</div><div class="cg-foot"><div class="cg-act"><button class="cg-mod" onclick="ca_openHist('mv')">Historique</button></div></div></div>
+      <div class="cg-card" style="grid-column:1/-1;"><div class="cg-t">⇅ Mouvements de la caisse</div><div class="cg-body">${ca_mvListHtml()}${ca_mvHtml()}</div><div class="cg-foot"><div class="cg-act"><button class="cg-mod" onclick="ca_openHist('mv')">Historique</button></div></div></div>
 
-      <div class="cg-card" style="grid-column:1/-1;"><div class="cg-t">🧮 Montant restant en caisse</div>
-        <input id="compte-input" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_session.montantCompte)}" placeholder="Montant que tu comptes" oninput="ca_session.montantCompte=this.value;ca_render()">
-        ${ecart !== null ? `<div class="cg-sub">écart : <b style="color:var(${Math.abs(ecart) < 0.01 ? '--moss' : '--rust'});">${ecart > 0 ? '+' : ''}${ca_fmtMoney(ecart)}</b></div>` : ''}
-        <input id="note-validation-input" class="cg-in" type="text" style="font-family:'Inter',sans-serif;" placeholder="Commentaire (facultatif)" value="${esc(ca_session.noteValidation||'')}" oninput="ca_session.noteValidation=this.value">
-      </div>
-
-      ${ca_erpCard(existing)}
+      ${ca_adminRestantCard()}
     </div>
+
+    <div style="margin:10px 0;">${ca_renderStatusBanner(existing, ecart)}</div>
+
+    ${ca_restantAdminCard_ctl()}
+    ${(ca_erpCard(existing), '')}
 
     <div class="actions-row" style="margin-top:6px;">
       <button class="btn b-neutral" onclick="ca_saveSession()">✓ Enregistrer la clôture du ${fmtDateShort(ca_session.date)}</button>
