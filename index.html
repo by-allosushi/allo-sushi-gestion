@@ -851,6 +851,13 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .ck2-wrap .ck-kp{gap:14px;}
 
     #module-cuisine .ck2-tab .s,#module-cuisine .ck2-pc{display:none;}
+    #module-cuisine .ck2-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin:0 0 10px;}
+    #module-cuisine .ck2-wrap .ck2-bx{display:flex;flex-direction:column;justify-content:space-between;gap:10px;min-height:104px;padding:13px 15px;border:1.5px solid #474747;border-radius:16px;background:#1b1b1b;color:#f2f2f2;cursor:pointer;font-size:17px;}
+    #module-cuisine .ck2-wrap .ck2-bx.act{border:3px solid #17407f;padding:11.5px 13.5px;}
+    #module-cuisine .ck2-bx .l small{display:block;font-size:12px;color:#bdbdbd;margin-top:2px;}
+    #module-cuisine .ck2-wrap .ck2-bx b{font:500 30px 'IBM Plex Mono',monospace;text-align:right;color:#f5f5f5;white-space:nowrap;}
+    #module-cuisine .ck2-wrap .ck2-bx b.e{color:#8a8a8a;}
+    #module-cuisine .ck2-wrap .ck2-bx b i{font:500 16px 'Inter',sans-serif;font-style:normal;color:#bdbdbd;}
     @media (max-width:699px){
       body.ck-saisie header.top,body.ck-saisie #module-tabs{display:none;}
       #module-cuisine .ck2-wrap .ck2-bar{font-size:15px;margin:0 0 2px;}
@@ -877,6 +884,12 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
       #module-cuisine .ck2-wrap .ck-kp{gap:6px;}
       #module-cuisine .ck2-wrap .ck-kp button{height:46px;font-size:20px;border-radius:11px;border-width:1px;}
       #module-cuisine .ck2-grid{gap:2px;}
+      #module-cuisine .ck2-pair{gap:8px;margin:0 0 6px;}
+      #module-cuisine .ck2-wrap .ck2-bx{min-height:76px;padding:8px 10px;gap:4px;font-size:13px;border-radius:12px;border-width:1px;}
+      #module-cuisine .ck2-wrap .ck2-bx.act{border-width:2px;padding:7px 9px;}
+      #module-cuisine .ck2-bx .l small{font-size:11px;margin-top:1px;}
+      #module-cuisine .ck2-wrap .ck2-bx b{font-size:24px;}
+      #module-cuisine .ck2-wrap .ck2-bx b i{font-size:13px;}
     }
     #module-cuisine .ck-pill.ko{background:rgba(248,113,113,.16);color:#FCA5A5;}
     #module-cuisine .ck3-t{width:100%;border-collapse:collapse;font-size:14px;}
@@ -8048,7 +8061,8 @@ function ck2_html(){
   } else if(c.tab === 'hc'){
     const list = ck2_myRecs(id, 'hc', p), idx = c.edit ? list.findIndex(r=>r.id === c.edit) : -1, n = idx >= 0 ? idx + 1 : list.length + 1, tot = ck_r(ck_sumF(list, 'q') + ck_sumF(list, 'b'));
     const saved = list.map((r, i)=>`<div class="ck2-rw" style="cursor:default"><span>${esc(ck_s('k2_hcN', { n:i + 1 }))}</span><span class="ck2-mini"><b>${esc(f(Number(r.f.q) || 0))}${Number(r.f.b) > 0 ? ' + ' + esc(f(Number(r.f.b))) + ' ' + esc(ck_s('k2_hcBs')) : ''}</b>${mini(r)}</span></div>`).join('');
-    body = `<div class="ck2-cap">${esc(ck_s('k2_hcCap'))}</div>${saved}${row('q', ck_s('k2_hcN', { n }), ck_s('k2_hcQh'))}${row('b', ck_s('k2_hcB'), ck_s('k2_hcBh'))}<div class="ck2-tot"><span>${esc(ck_s('k2_hcTot'))}</span><b>${esc(f(tot))}</b></div><div class="ck-err">${esc(c.err)}</div><button class="ck-ok" onclick="ck2_save()">✓ ${esc(ck_s('k2_valHc'))}</button>`;
+    const bx = (key, label, hint)=>`<div class="ck2-bx ${c.act === key ? 'act' : ''}" onclick="ck2_focus('${key}')"><span class="l">${esc(label)}<small>${esc(hint)}</small></span><b class="${isE(key) ? 'e' : ''}">${esc(isE(key) ? '0' : c.v[key])} <i>${esc(u)}</i></b></div>`;
+    body = `${saved}<div class="ck2-pair">${bx('q', ck_s('k2_hcN', { n }), ck_s('k2_hcQh'))}${bx('b', ck_s('k2_hcB'), ck_s('k2_hcBh'))}</div><div class="ck-err">${esc(c.err)}</div><button class="ck-ok" onclick="ck2_save()">✓ ${esc(ck_s('k2_valHc'))}</button><div class="ck2-tot" style="margin-top:8px;"><span>${esc(ck_s('k2_hcTot'))}</span><b>${esc(f(tot))}</b></div>`;
   } else if(c.tab === 'fr' || c.tab === 'wd' || c.tab === 'pq'){
     const LB = { fr:['k2_frCap', 'k2_frN', 'k2_crTot', 'k2_valFr'], hc:['k2_hcCap', 'k2_hcN', 'k2_hcTot', 'k2_valHc'], wd:['k2_wdCap', 'k2_wdN', 'k2_wdTot', 'k2_valWd'], pq:['k2_pqCap', 'k2_pqN', 'k2_pqTot', 'k2_valPq'] }[c.tab];
     const list = ck2_myRecs(id, c.tab, p), idx = c.edit ? list.findIndex(r=>r.id === c.edit) : -1, n = idx >= 0 ? idx + 1 : list.length + 1, tot = ck_sumF(list, 'q'), pqm = c.tab === 'pq';
