@@ -7811,12 +7811,14 @@ const stk_c = (x)=>x === null || x === undefined ? '—' : ck_fmt(x);
 function stk_ingTable(){
   const D = ck_adate || ck_service(), st = stk_start(), day0 = st && D === st.date, docs = stk_docsFrom(ck_docs(), D), prev = ck_prevSrv, extra = [];
   const hache = ck_r(ck_ingList().filter(t=>ck_kind(t.id) === 'escalope').reduce((a, t)=>a + ck2_ps(docs, t.id).reduce((z, p)=>z + ck2_sumP(docs, t.id, 'dc', p, 'b') - ck2_sumP(docs, t.id, 'dc', p, 'n'), 0), 0));
+  const hbAll = ck_r(ck_ingList().filter(t=>ck_kind(t.id) === 'poulet').reduce((a, t)=>a + ck2_sumP(docs, t.id, 'hc', null, 'b'), 0)), escId = (ck_ingList().find(t=>ck_kind(t.id) === 'escalope') || {}).id;
   const rows = ck_ingList().map(it=>{
     const id = it.id, u = ck_unit(id), ps = ck2_ps(docs, id), pp = ck2_ps(prev, id), av = ck_kind(id) === 'avocat', po = ck_kind(id) === 'poulet', KB = po ? 'fh' : 'fb';
     const vei = day0 ? stk_init(id) : pp.length ? ck_r(pp.reduce((a, p)=>a + (ck2_finP(prev, id, p, KB) || 0), 0)) : null, ach = stk_buyOf(it.n, u), net = ck2_sumP(docs, id, 'dc', null, 'n');
     const pe = ps.filter(p=>ck2_finP(docs, id, p, KB) !== null), pes = pe.length ? ck_r(pe.reduce((a, p)=>a + ck2_finP(docs, id, p, KB), 0)) : null;
     const pq = ck2_sumP(docs, id, 'pq', null, 'q'), wd = ck2_sumP(docs, id, 'wd', null, 'q');
     let pris = po ? ck2_sumP(docs, id, 'hc', null, 'q') : ck2_sumP(docs, id, 'dc', null, 'b'), th, ec, pd = (!po && pris > 0) ? ck_r(pris - net) : null;
+    if(id === escId && hbAll > 0) pris = ck_r(pris + hbAll);   // escalope brute prise pour le hachage : déduite du stock de brut
     if(av){   // avocat : le brut utilisé est déduit du reste pesé ; le net utilisé = brut utilisé − déchets − pertes qualité
       pris = (vei === null || pes === null) ? null : ck_r(vei + ach - pes); th = null; ec = null; pd = wd > 0 ? wd : null;
       if(pris !== null){ const nu = ck_r(pris - wd - pq); extra.push(`${esc(it.n)} : brut utilisé ${ck_fmt(pris)} ${esc(u)} − déchets ${ck_fmt(wd)} − pertes qualité ${ck_fmt(pq)} = net utilisé ${ck_fmt(nu)} ${esc(u)}${pris > 0 ? ' (rendement ' + ck_fmt(Math.round(nu / pris * 1000) / 10) + ' %)' : ''}`); }
@@ -7825,6 +7827,7 @@ function stk_ingTable(){
   }).join('');
   return `<div class="ck-box" id="stk-ing"><div class="ck3-h"><b>Ingrédients : reste théorique et reste réel</b><span>bac brut, par ingrédient</span></div>${rows ? `<div class="ck3-w"><table class="ck3-t"><tr><th>Ingrédient</th><th>Reste veille</th><th>+ Achat</th><th>− Brut pris</th><th>− Perte qualité</th><th>Théorique</th><th>Reste pesé</th><th>Écart</th><th>Perte découpe</th></tr>${rows}</table></div>` : '<div class="ck-empty">Aucun ingrédient suivi.</div>'}
     <div class="ck3-n">Théorique = reste veille + achat (Dépenses) − brut pris pour les découpes (poulet haché : − pris pour hachage) − perte qualité déclarée. L’écart est la perte de stockage non expliquée ; il est enregistré chaque jour, sans rien écraser, et exportable. « — » : donnée non saisie.</div>
+    ${hbAll > 0 ? `<div class="ck3-n">Escalope : « Brut pris » inclut ${ck_fmt(hbAll)} g d’escalope brute prise pour le hachage (Poulet haché).</div>` : ''}
     ${hache > 0 ? `<div class="ck3-n">Poulet haché : le théorique ajoute le haché des découpes d’escalope (brut − net, Sushi et Wok) : ${ck_fmt(hache)} g.</div>` : ''}
     ${extra.length ? `<div class="ck3-n">* Avocat : brut utilisé calculé = reste veille + achat − reste pesé (pas d’écart de stockage possible ; la colonne « Perte découpe » montre les déchets).<br>${extra.join('<br>')}</div>` : ''}</div>`;
 }
@@ -7911,7 +7914,7 @@ Object.assign(CK_T, {
   k2_dcn:['Découpe n° {n}', 'التقطيع رقم {n}'], k2_brut:['Brut pris dans le bac', 'الخام المأخوذ من الحاوية'], k2_net:['Net obtenu après découpe', 'الصافي بعد التقطيع'],
   k2_brutS:['Brut pris', 'الخام المأخوذ'], k2_netS:['Net obtenu', 'الصافي'], k2_rend:['Rendement', 'المردود'],
   k2_frCap:['Crispy : une ligne à chaque friture', 'الكريسبي: سطر لكل قلي'], k2_frN:['Friture {n}', 'القلي {n}'], k2_crTot:['Total crispy obtenu', 'مجموع الكريسبي المحصّل'], k2_valFr:['Valider la friture', 'تأكيد القلي'],
-  k2_hcCap:['Hachage : escalope prise dans le bac à haché', 'الفرم: الإسكالوب المأخوذ من حاوية المفروم'], k2_hcN:['Hachage {n}', 'الفرم {n}'], k2_hcTot:['Total pris pour hachage', 'المجموع المأخوذ للفرم'], k2_valHc:['Valider le hachage', 'تأكيد الفرم'],
+  k2_hcCap:['Hachage : escalope prise dans le bac à haché', 'الفرم: الإسكالوب المأخوذ من حاوية المفروم'], k2_hcN:['Hachage {n}', 'الفرم {n}'], k2_hcQh:['Pris dans le bac à haché', 'مأخوذ من حاوية المفروم'], k2_hcB:['Escalope brute prise', 'الإسكالوب الخام المأخوذ'], k2_hcBh:['Prise dans le bac de brut', 'مأخوذة من حاوية الخام'], k2_hcBs:['de brut', 'خام'], k2_needHc:['Indique au moins une quantité', 'أدخل كمية واحدة على الأقل'], k2_hcTot:['Total pris pour hachage', 'المجموع المأخوذ للفرم'], k2_valHc:['Valider le hachage', 'تأكيد الفرم'],
   k2_finCap:['Fin de service : ce qui reste', 'نهاية الخدمة: ما تبقى'],
   k2_fb:['Brut restant dans le bac', 'الخام المتبقي في الحاوية'], k2_fn:['Net restant après découpe', 'الصافي المتبقي بعد التقطيع'], k2_fc:['Crispy restant', 'الكريسبي المتبقي'], k2_fh:['Bac à haché', 'حاوية المفروم'],
   k2_hCount:['Compté pour demain', 'يُحتسب للغد'], k2_hKeep:['Gardé pour demain', 'محفوظ للغد'], k2_hThrow:['Jeté en fin de service', 'يُرمى في نهاية الخدمة'],
@@ -7948,7 +7951,7 @@ function ck2_kitchens(){   // vue par cuisinier : seulement les ingrédients qui
 function ck2_tileInfo(id, p, doc){
   const dc = ck_recs(doc, id, 'dc').filter(r=>ck2_P(r.p) === ck2_P(p)), fin = ck_recOne(doc, id, ck2_fid(p)), u = ck_unit(id);
   if(fin) return { st:'ready', text:ck_s('k2_tileFin') };
-  const hcr = ck_recs(doc, id, 'hc').filter(r=>ck2_P(r.p) === ck2_P(p)); if(hcr.length) return { st:'prog', text:ck_s('k2_hcTot') + ' ' + ck_fmt(ck_sumF(hcr, 'q')) + ' ' + u };
+  const hcr = ck_recs(doc, id, 'hc').filter(r=>ck2_P(r.p) === ck2_P(p)); if(hcr.length) return { st:'prog', text:ck_s('k2_hcTot') + ' ' + ck_fmt(ck_r(ck_sumF(hcr, 'q') + ck_sumF(hcr, 'b'))) + ' ' + u };
   const wd = ck_recs(doc, id, 'wd').filter(r=>ck2_P(r.p) === ck2_P(p)); if(wd.length) return { st:'prog', text:ck_s('k2_wdTot') + ' ' + ck_fmt(ck_sumF(wd, 'q')) + ' ' + u };
   if(dc.length) return { st:'prog', text:ck_s('k2_tileDc', { b:ck_fmt(ck_sumF(dc, 'b')), n:ck_fmt(ck_sumF(dc, 'n')) }) + ' ' + u + (dc.length > 1 ? ' · ' + ck_s('cuts', { n:dc.length }) : '') };
   return { st:'todo', text:ck_s('todo') };
@@ -7977,6 +7980,7 @@ function ck2_edit(rid){
   const c = ck2; if(!c) return; const r = ck_recOne(ck_myDoc(), c.id, rid); if(!r) return;
   c.edit = rid; c.err = ''; c.v = {}; c.fresh = {};
   if(c.tab === 'dc'){ c.v.b = ck_fmt(Number(r.f.b) || 0); c.v.n = ck_fmt(Number(r.f.n) || 0); c.fresh.b = true; c.fresh.n = true; c.act = 'b'; }
+  else if(c.tab === 'hc'){ c.v.q = ck_fmt(Number(r.f.q) || 0); c.v.b = ck_fmt(Number(r.f.b) || 0); c.fresh.q = true; c.fresh.b = true; c.act = 'q'; }
   else { c.v.q = ck_fmt(Number(r.f.q) || 0); c.fresh.q = true; c.act = 'q'; }
   ck_render();
 }
@@ -7995,7 +7999,14 @@ function ck2_save(){
     if(tabs[1] === 'fr' || tabs[1] === 'hc') return ck2_setTab(tabs[1]);   // la découpe validée mène directement au crispy (ou au hachage)
     c.edit = ''; c.v = {}; c.fresh = {}; c.act = 'b'; c.err = ''; return ck_render();
   }
-  if(c.tab === 'fr' || c.tab === 'hc' || c.tab === 'wd' || c.tab === 'pq'){
+  if(c.tab === 'hc'){
+    if(!has('q') && !has('b')) return fail(ck_s('k2_needHc'), 'q');   // 0 accepté ; une case vide compte pour 0
+    const old = c.edit ? ck_recOne(ck_myDoc(), id, c.edit) : null, rid = c.edit || ck_rid(), prev = old ? Object.assign({}, old) : null; if(prev) delete prev.id;
+    ck_putRec(id, rid, { t:'hc', f:{ q:has('q') ? ck_num(c.v.q) : 0, b:has('b') ? ck_num(c.v.b) : 0 }, p, at:old ? old.at : ck_nowIso() });
+    ck_setBan({ id, rid, prev, msg:ck_s('saved') });
+    c.edit = ''; c.v = {}; c.fresh = {}; c.act = 'q'; c.err = ''; return ck_render();
+  }
+  if(c.tab === 'fr' || c.tab === 'wd' || c.tab === 'pq'){
     if(!has('q')) return fail(ck_s('k2_needQ'), 'q');   // 0 toujours accepté (aucune perte, aucun déchet, rien obtenu)
     const old = c.edit ? ck_recOne(ck_myDoc(), id, c.edit) : null, rid = c.edit || ck_rid(), prev = old ? Object.assign({}, old) : null; if(prev) delete prev.id;
     const rec = { t:c.tab, f:{ q:ck_num(c.v.q) }, p, at:old ? old.at : ck_nowIso() };
@@ -8034,7 +8045,11 @@ function ck2_html(){
     const go = tabs[1] === 'hc' ? 'k2_valGoH' : tabs[1] === 'fr' ? 'k2_valGo' : 'k2_val';
     const recs = list.map(r=>`<div class="ck-rec"><span class="tm">${esc(ck_hm(r.at))}</span><span class="tx">${esc(ck2_recText(id, r))}</span><button aria-label="Corriger" onclick="ck2_edit(${ck_a(r.id)})">✎</button><button class="rd" aria-label="Supprimer" onclick="ck2_del(${ck_a(r.id)})">✕</button></div>`).join('');
     body = `<div class="ck2-cap">${esc(ck_s('k2_dcn', { n }))}</div>${row('b', ck_s('k2_brut'))}${row('n', ck_s('k2_net'))}${ck2_ringHtml(c)}<div class="ck-err">${esc(c.err)}</div><button class="ck-ok" onclick="ck2_save()">✓ ${esc(ck_s(go))}</button>${recs ? `<div class="ck-recs" style="margin-top:14px;">${recs}</div>` : ''}`;
-  } else if(c.tab === 'fr' || c.tab === 'hc' || c.tab === 'wd' || c.tab === 'pq'){
+  } else if(c.tab === 'hc'){
+    const list = ck2_myRecs(id, 'hc', p), idx = c.edit ? list.findIndex(r=>r.id === c.edit) : -1, n = idx >= 0 ? idx + 1 : list.length + 1, tot = ck_r(ck_sumF(list, 'q') + ck_sumF(list, 'b'));
+    const saved = list.map((r, i)=>`<div class="ck2-rw" style="cursor:default"><span>${esc(ck_s('k2_hcN', { n:i + 1 }))}</span><span class="ck2-mini"><b>${esc(f(Number(r.f.q) || 0))}${Number(r.f.b) > 0 ? ' + ' + esc(f(Number(r.f.b))) + ' ' + esc(ck_s('k2_hcBs')) : ''}</b>${mini(r)}</span></div>`).join('');
+    body = `<div class="ck2-cap">${esc(ck_s('k2_hcCap'))}</div>${saved}${row('q', ck_s('k2_hcN', { n }), ck_s('k2_hcQh'))}${row('b', ck_s('k2_hcB'), ck_s('k2_hcBh'))}<div class="ck2-tot"><span>${esc(ck_s('k2_hcTot'))}</span><b>${esc(f(tot))}</b></div><div class="ck-err">${esc(c.err)}</div><button class="ck-ok" onclick="ck2_save()">✓ ${esc(ck_s('k2_valHc'))}</button>`;
+  } else if(c.tab === 'fr' || c.tab === 'wd' || c.tab === 'pq'){
     const LB = { fr:['k2_frCap', 'k2_frN', 'k2_crTot', 'k2_valFr'], hc:['k2_hcCap', 'k2_hcN', 'k2_hcTot', 'k2_valHc'], wd:['k2_wdCap', 'k2_wdN', 'k2_wdTot', 'k2_valWd'], pq:['k2_pqCap', 'k2_pqN', 'k2_pqTot', 'k2_valPq'] }[c.tab];
     const list = ck2_myRecs(id, c.tab, p), idx = c.edit ? list.findIndex(r=>r.id === c.edit) : -1, n = idx >= 0 ? idx + 1 : list.length + 1, tot = ck_sumF(list, 'q'), pqm = c.tab === 'pq';
     const mlab = (m)=>ck_s(m === 'per' ? 'k2_mP' : 'k2_mQ');
@@ -8058,7 +8073,7 @@ function ck2_recText(id, r){
   if(r.t === 'fr') return ck_s('k2_fr') + ' ' + v(f.q) + pp;
   if(r.t === 'wd') return ck_s('k2_wd') + ' ' + v(f.q) + pp;
   if(r.t === 'pq') return ck_s('k2_pq') + ' ' + v(f.q) + pp;
-  if(r.t === 'hc') return ck_s('k2_hc') + ' ' + v(f.q) + pp;
+  if(r.t === 'hc') return ck_s('k2_hc') + ' ' + v(f.q) + (Number(f.b) > 0 ? ' + ' + v(f.b) + ' ' + ck_s('k2_hcBs') : '') + pp;
   return ck_s('fin') + ' : ' + ['fb', 'fn', 'fc', 'fh'].filter(k=>f[k] !== undefined).map(k=>ck_s(CK2_FL[k][0]) + ' ' + v(f[k])).join(' · ') + pp;
 }
 function ck2_figs(id, doc){
@@ -8067,7 +8082,7 @@ function ck2_figs(id, doc){
   const fr = ck_recs(doc, id, 'fr'); if(fr.length) o.push([ck_s('k2_crTot'), f(ck_sumF(fr, 'q'))]);
   const wd = ck_recs(doc, id, 'wd'); if(wd.length) o.push([ck_s('k2_wdTot'), f(ck_sumF(wd, 'q'))]);
   const pq = ck_recs(doc, id, 'pq'); if(pq.length) o.push([ck_s('k2_pqTot'), f(ck_sumF(pq, 'q'))]);
-  const hc = ck_recs(doc, id, 'hc'); if(hc.length) o.push([ck_s('k2_hcTot'), f(ck_sumF(hc, 'q'))]);
+  const hc = ck_recs(doc, id, 'hc'); if(hc.length){ o.push([ck_s('k2_hcTot'), f(ck_sumF(hc, 'q'))]); if(ck_sumF(hc, 'b') > 0) o.push([ck_s('k2_hcB'), f(ck_sumF(hc, 'b'))]); }
   ck_recs(doc, id, 'fin2').forEach(r=>{ const fl = r.f || {}; ['fb', 'fn', 'fc', 'fh'].forEach(k=>{ if(fl[k] !== undefined) o.push([ck_s(CK2_FL[k][0]) + (r.p ? ' (' + r.p + ')' : ''), f(Number(fl[k]) || 0)]); }); });
   return o;
 }
@@ -8081,11 +8096,11 @@ function ck2_circuitHtml(docs, prev){
     const id = it.id, k = ck_kind(id), u = ck_unit(id), f = (x)=>ck_fmt(x) + ' ' + u, ps = ck2_ps(docs, id); if(!ps.length) return;
     const parts = [];
     ps.forEach(p=>{
-      const b = ck2_sumP(docs, id, 'dc', p, 'b'), n = ck2_sumP(docs, id, 'dc', p, 'n'), q = ck2_sumP(docs, id, 'fr', p, 'q'), h = ck2_sumP(docs, id, 'hc', p, 'q'), x = [], wdT = ck2_sumP(docs, id, 'wd', p, 'q'), pqT = ck2_sumP(docs, id, 'pq', p, 'q');
+      const b = ck2_sumP(docs, id, 'dc', p, 'b'), n = ck2_sumP(docs, id, 'dc', p, 'n'), q = ck2_sumP(docs, id, 'fr', p, 'q'), h = ck2_sumP(docs, id, 'hc', p, 'q'), hb = ck2_sumP(docs, id, 'hc', p, 'b'), x = [], wdT = ck2_sumP(docs, id, 'wd', p, 'q'), pqT = ck2_sumP(docs, id, 'pq', p, 'q');
       if(wdT > 0) x.push(`déchets ${f(wdT)}`);
       if(pqT > 0) x.push(`perte ${f(pqT)}`);
       if(b > 0) x.push(`brut ${f(b)} → net ${f(n)} (${pc(n / b)})`, k === 'escalope' ? `haché théorique ${f(ck_r(b - n))}` : `perte de découpe ${f(ck_r(b - n))}`);
-      if(h > 0) x.push(`pris pour hachage ${f(h)}`);
+      if(h > 0 || hb > 0) x.push(`pris pour hachage ${f(h)}${hb > 0 ? ' + brut ' + f(hb) : ''}`);
       if(q > 0){
         const fnPrev = ck2_finP(prev, id, p, 'fn'), fnNow = ck2_finP(docs, id, p, 'fn'), frit = ck_r((fnPrev || 0) + n - (fnNow || 0)), taux = frit > 0 ? q / frit : null, fc = ck2_finP(docs, id, p, 'fc');
         x.push(`crispy obtenu ${f(q)}`, `net passé en friture ${f(frit)}`, taux ? `taux du jour ${pc(taux)}` : 'taux du jour : données insuffisantes');
