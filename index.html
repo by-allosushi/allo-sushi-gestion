@@ -7836,6 +7836,7 @@ function stk_buyOf(name, targetUnit){
   let t = 0; (stk.buy || []).forEach(m=>{ if(st && D === st.date && m.heure && String(m.heure).slice(0, 5).padStart(5, '0') < st.hm.padStart(5, '0')) return; if(m.type !== 'Achat' || String(m.articleNom || '').trim().toLowerCase() !== String(name || '').trim().toLowerCase()) return; const q = Number(m.quantite) || 0, a = stk_unitF(m.unite), b = stk_unitF(targetUnit); t += (a && b) ? q * a / b : q; });
   return ck_r(t);
 }
+function stk_rpRaw(it){ const x = it && it.rp; if(Array.isArray(x)) return x.filter(l=>l && typeof l === 'object').map(l=>({ n:String(l.n || ''), q:Number(l.q) > 0 ? Number(l.q) : 1 })); return String(x || '').split(';').map(n=>n.trim()).filter(Boolean).map(n=>({ n, q:1 })); }   // liste complète, lignes vides comprises (pour l’écran de réglage)
 function stk_rpList(it){ const x = it && it.rp; if(Array.isArray(x)) return x.filter(l=>l && l.n); return String(x || '').split(';').map(n=>n.trim()).filter(Boolean).map(n=>({ n, q:1 })); }
 function stk_salesOf(it){
   const list = stk_rpList(it).map(l=>({ k:rp_normName(l.n), q:Number(l.q) > 0 ? Number(l.q) : 1 })); if(!list.length || !stk.rp) return 0; let t = 0;
@@ -8081,15 +8082,15 @@ function stk_togBoisson(name){
   else its.push({ id:'s' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4), n:name, k:'can', dep:name, rp:[], seuil:0 });
   ck_cfgSave(); ck_render();
 }
-function stk_rpAdd(id){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; it.rp = stk_rpList(it).concat([{ n:'', q:1 }]); ck_cfgSave(); ck_render(); }
-function stk_rpDel(id, i){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; const l = stk_rpList(it); l.splice(i, 1); it.rp = l; ck_cfgSave(); ck_render(); }
-function stk_rpSet(id, i, key, val){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; const l = stk_rpList(it); if(!l[i]) l[i] = { n:'', q:1 }; if(key === 'q'){ const n = ck_num(val); l[i].q = n !== null && n > 0 ? n : 1; } else l[i].n = String(val).trim(); it.rp = l; ck_cfgSave(); ck_render(); }
+function stk_rpAdd(id){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; it.rp = stk_rpRaw(it).concat([{ n:'', q:1 }]); ck_cfgSave(); ck_render(); }
+function stk_rpDel(id, i){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; const l = stk_rpRaw(it); l.splice(i, 1); it.rp = l; ck_cfgSave(); ck_render(); }
+function stk_rpSet(id, i, key, val){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; const l = stk_rpRaw(it); if(!l[i]) l[i] = { n:'', q:1 }; if(key === 'q'){ const n = ck_num(val); l[i].q = n !== null && n > 0 ? n : 1; } else l[i].n = String(val).trim(); it.rp = l; ck_cfgSave(); ck_render(); }
 function stk_canRegHtml(){
   const bo = stk_boissons(), its = stk_items('can'), names = stk_rpNames();
   const dl = `<datalist id="stk-rpdl">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`;
   const tog = bo.length ? bo.map(n=>{ const on = its.some(x=>x.dep === n); return `<button class="ck-tg ${on ? 'on' : ''}" onclick="stk_togBoisson(${ck_a(n)})">${on ? '✓ ' : ''}${esc(n)}</button>`; }).join('') : '<span class="ck-sub">Aucune boisson trouvée : crée un bouton de sortie « Boissons » avec sa liste dans Dépenses.</span>';
   const links = its.map(i=>{
-    const l = stk_rpList(i), rows = l.map((x, k)=>`<div class="ck-fr"><input class="ck-in" list="stk-rpdl" style="width:230px" placeholder="Produit Resto Pro" value="${esc(x.n)}" onchange="stk_rpSet(${ck_a(i.id)},${k},'n',this.value)"><label>consomme</label><input class="ck-in" inputmode="decimal" style="width:70px" value="${esc(ck_fmt(Number(x.q) > 0 ? Number(x.q) : 1))}" onchange="stk_rpSet(${ck_a(i.id)},${k},'q',this.value)"><span class="ck-sub">par vente</span><button class="ck-btn sm danger" onclick="stk_rpDel(${ck_a(i.id)},${k})">✕</button></div>`).join('');
+    const l = stk_rpRaw(i), rows = l.map((x, k)=>`<div class="ck-fr"><input class="ck-in" list="stk-rpdl" style="width:230px" placeholder="Produit Resto Pro" value="${esc(x.n)}" onchange="stk_rpSet(${ck_a(i.id)},${k},'n',this.value)"><label>consomme</label><input class="ck-in" inputmode="decimal" style="width:70px" value="${esc(ck_fmt(Number(x.q) > 0 ? Number(x.q) : 1))}" onchange="stk_rpSet(${ck_a(i.id)},${k},'q',this.value)"><span class="ck-sub">par vente</span><button class="ck-btn sm danger" onclick="stk_rpDel(${ck_a(i.id)},${k})">✕</button></div>`).join('');
     return `<div style="margin-top:12px;"><b>${esc(i.n)}</b>${i.dep && bo.indexOf(i.dep) < 0 ? ' <span class="ck-sub">(n’est plus dans Dépenses)</span> <button class="ck-btn sm danger" onclick="stk_del(${ck_a(i.id)})">Retirer</button>' : ''}${rows || '<div class="ck-sub">Aucun produit relié : les ventes seront à 0.</div>'}<div style="margin-top:6px"><button class="ck-btn sm" onclick="stk_rpAdd(${ck_a(i.id)})">+ Produit Resto Pro</button></div></div>`;
   }).join('');
   return dl + `<div class="ck-box"><h3>Stock : canettes et bouteilles d’eau</h3><div class="ck-sub" style="margin-bottom:8px;">Liste reprise de Dépenses › sortie « Boissons ». Touche une boisson pour la suivre ; les achats viennent de Dépenses (même nom). Relie ensuite les produits Resto Pro qui la consomment.</div><div class="ck-fr">${tog}</div>${links}</div>`;
