@@ -7800,7 +7800,8 @@ let stkS = null;
 const stk = { date:'', adm:false, docs:{}, buy:[], rp:null, un:[] };
 const stk_autIds = (me)=>{ if(!me) return []; const all = stk_items('autre').map(i=>i.id); return Array.isArray(me.art) ? me.art.filter(id=>all.includes(id)) : ((me.stk || []).includes('autre') ? all : []); };
 const stk_has = (me)=>!!me && ((me.stk || []).includes('can') || stk_autIds(me).length > 0);
-const stk_items = (k)=>((ck_cfg.stk || {}).items || []).filter(i=>i && i.k === k);
+const stk_itemsAll = (k)=>((ck_cfg.stk || {}).items || []).filter(i=>i && i.k === k);
+const stk_items = (k)=>stk_itemsAll(k).filter(i=>String(i.n || '').trim());   // un article sans nom n’est affiché nulle part (sauf dans Réglages, pour le nommer ou le retirer)
 function stk_stop(){ stk.un.forEach(u=>{ try{ u(); }catch(e){} }); stk.un = []; stk.date = ''; stk.docs = {}; stk.buy = []; stk.rp = null; }
 function stk_sync(){
   const adm = ck_isAdmin() && ck_view === 'admin' && (ck_tab === 'stock' || ck_tab === 'suivi' || ck_tab === 'fiche'), me = ck_who ? ck_cook(ck_who) : null, need = adm || stk_has(me);
@@ -8250,19 +8251,20 @@ function stk_rpAdd(id){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it
 function stk_rpDel(id, i){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; const l = stk_rpRaw(it); l.splice(i, 1); it.rp = l; ck_cfgSave(); ck_render(); }
 function stk_rpSet(id, i, key, val){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; const l = stk_rpRaw(it); if(!l[i]) l[i] = { n:'', q:1 }; if(key === 'q'){ const n = ck_num(val); l[i].q = n !== null && n > 0 ? n : 1; } else l[i].n = String(val).trim(); it.rp = l; ck_cfgSave(); ck_render(); }
 function stk_canRegHtml(){
-  const bo = stk_boissons(), its = stk_items('can'), names = stk_rpNames();
+  const bo = stk_boissons(), its = stk_itemsAll('can'), names = stk_rpNames();
   const dl = `<datalist id="stk-rpdl">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`;
   const tog = bo.length ? bo.map(n=>{ const on = its.some(x=>x.dep === n); return `<button class="ck-tg ${on ? 'on' : ''}" onclick="stk_togBoisson(${ck_a(n)})">${on ? '✓ ' : ''}${esc(n)}</button>`; }).join('') : '<span class="ck-sub">Aucune boisson trouvée : crée un bouton de sortie « Boissons » avec sa liste dans Dépenses.</span>';
   const links = its.map(i=>{
     const l = stk_rpRaw(i), rows = l.map((x, k)=>`<div class="ck-fr"><input class="ck-in" list="stk-rpdl" style="width:230px" placeholder="Produit Resto Pro" value="${esc(x.n)}" onchange="stk_rpSet(${ck_a(i.id)},${k},'n',this.value)"><label>consomme</label><input class="ck-in" inputmode="decimal" style="width:70px" value="${esc(ck_fmt(Number(x.q) > 0 ? Number(x.q) : 1))}" onchange="stk_rpSet(${ck_a(i.id)},${k},'q',this.value)"><span class="ck-sub">par vente</span><button class="ck-btn sm danger" onclick="stk_rpDel(${ck_a(i.id)},${k})">✕</button></div>`).join('');
-    return `<div style="margin-top:12px;"><b>${esc(i.n)}</b>${i.dep && bo.indexOf(i.dep) < 0 ? ' <span class="ck-sub">(n’est plus dans Dépenses)</span> <button class="ck-btn sm danger" onclick="stk_del(${ck_a(i.id)})">Retirer</button>' : ''}${rows || '<div class="ck-sub">Aucun produit relié : les ventes seront à 0.</div>'}<div style="margin-top:6px"><button class="ck-btn sm" onclick="stk_rpAdd(${ck_a(i.id)})">+ Produit Resto Pro</button></div></div>`;
+    const blank = !String(i.n || '').trim();
+    return `<div style="margin-top:12px;"><b>${blank ? '(article sans nom)' : esc(i.n)}</b>${blank || (i.dep && bo.indexOf(i.dep) < 0) ? ` <span class="ck-sub">${blank ? '(vide : à retirer)' : '(n’est plus dans Dépenses)'}</span> <button class="ck-btn sm danger" onclick="stk_del(${ck_a(i.id)})">Retirer</button>` : ''}${rows || '<div class="ck-sub">Aucun produit relié : les ventes seront à 0.</div>'}<div style="margin-top:6px"><button class="ck-btn sm" onclick="stk_rpAdd(${ck_a(i.id)})">+ Produit Resto Pro</button></div></div>`;
   }).join('');
   return dl + `<div class="ck-box"><h3>Stock : canettes et bouteilles d’eau</h3><div class="ck-sub" style="margin-bottom:8px;">Liste reprise de Dépenses › sortie « Boissons ». Touche une boisson pour la suivre ; les achats viennent de Dépenses (même nom). Relie ensuite les produits Resto Pro qui la consomment.</div><div class="ck-fr">${tog}</div>${links}</div>`;
 }
 function stk_regHtml(){
   const names = Array.from(new Set((ck_ingsRaw || []).filter(i=>i && i.n).map(i=>i.n))), dl = `<datalist id="stk-dl">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`;
   const block = (k, titre, can)=>{
-    const its = stk_items(k).map(i=>`<div class="ck-fr" style="align-items:flex-end;flex-wrap:wrap"><div><label>Nom</label><br><input class="ck-in" style="width:170px" value="${esc(i.n)}" onchange="stk_set(${ck_a(i.id)},'n',this.value)"></div>
+    const its = stk_itemsAll(k).map(i=>`<div class="ck-fr" style="align-items:flex-end;flex-wrap:wrap"><div><label>Nom</label><br><input class="ck-in" style="width:170px" value="${esc(i.n)}" onchange="stk_set(${ck_a(i.id)},'n',this.value)"></div>
       ${can ? `<div><label>Nom dans Dépenses</label><br><input class="ck-in" list="stk-dl" style="width:170px" value="${esc(i.dep || '')}" onchange="stk_set(${ck_a(i.id)},'dep',this.value)"></div><div><label>Nom dans Resto Pro (séparer par ;)</label><br><input class="ck-in" style="width:210px" value="${esc(i.rp || '')}" onchange="stk_set(${ck_a(i.id)},'rp',this.value)"></div>` : `<div><label>Seuil minimum</label><br><input class="ck-in" inputmode="decimal" style="width:90px" value="${esc(i.seuil ? ck_fmt(i.seuil) : '')}" onchange="stk_set(${ck_a(i.id)},'seuil',this.value)"></div>`}
       <button class="ck-btn sm danger" onclick="stk_del(${ck_a(i.id)})">Retirer</button></div>`).join('');
     return `<div class="ck-box"><h3>${titre}</h3>${its || '<div class="ck-sub">Aucun article.</div>'}<div style="margin-top:8px"><button class="ck-btn sm" onclick="stk_add('${k}')">+ Ajouter un article</button></div></div>`;
