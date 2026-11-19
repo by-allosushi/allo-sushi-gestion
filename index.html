@@ -7843,7 +7843,8 @@ function stk_html(){
 /* ----- côté administrateur ----- */
 const stk_unitF = (u)=>({ kg:1000, g:1, l:1000, cl:10, ml:1 })[String(u || '').toLowerCase()] || null;
 /* début du suivi (réglages) : avant cette date et cette heure rien n'est compté ; le jour du début, le « reste veille » est le stock de départ saisi par l'administrateur */
-function stk_start(){ const st = (ck_cfg.stk || {}).start; if(!st || !st.date) return null; const hm = /^\d{1,2}:\d{2}$/.test(st.hm || '') ? st.hm : '00:00'; return { date:st.date, hm, ts:new Date(st.date + 'T' + hm.padStart(5, '0') + ':00').getTime() }; }
+const ck_okDate = (v)=>/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && Number(String(v).slice(0, 4)) >= 2020 && Number(String(v).slice(0, 4)) <= 2100;   // ignore une année en cours de frappe (0002, 0020…)
+function stk_start(){ const st = (ck_cfg.stk || {}).start; if(!st || !ck_okDate(st.date)) return null; const hm = /^\d{1,2}:\d{2}$/.test(st.hm || '') ? st.hm : '00:00'; return { date:st.date, hm, ts:new Date(st.date + 'T' + hm.padStart(5, '0') + ':00').getTime() }; }
 const stk_init = (id)=>{ const v = ((ck_cfg.stk || {}).init || {})[id]; return v === undefined || v === null || v === '' || !isFinite(Number(v)) ? null : Number(v); };
 function stk_docsFrom(docs, date){   // le jour du début : on ne garde que les saisies faites à partir de l'heure de début
   const st = stk_start(); if(!st || date !== st.date) return docs; const o = {};
@@ -8147,7 +8148,7 @@ function stk_adminHtml(){
 /* ----- réglages ----- */
 function ck_cookArt(code, id){ const c = ck_cook(code); if(!c || !ck_cfg.cooks[code]) return; const l = stk_autIds(c).slice(), i = l.indexOf(id); if(i >= 0) l.splice(i, 1); else l.push(id); ck_cfg.cooks[code].art = l; ck_cfgSave(); ck_render(); }
 function ck_cookStk(code, k){ const c = ck_cfg.cooks[code]; if(!c) return; const l = Array.isArray(c.stk) ? c.stk.slice() : [], i = l.indexOf(k); if(i >= 0) l.splice(i, 1); else l.push(k); c.stk = l; ck_cfgSave(); ck_render(); }
-function stk_setStart(k, v){ if(!ck_cfg.stk.start) ck_cfg.stk.start = {}; ck_cfg.stk.start[k] = String(v || ''); ck_cfgSave(); ck_render(); }
+function stk_setStart(k, v){ if(k === 'date' && v && !ck_okDate(v)) return; if(!ck_cfg.stk.start) ck_cfg.stk.start = {}; ck_cfg.stk.start[k] = String(v || ''); ck_cfgSave(); ck_render(); }
 function stk_setInit(id, v){ if(!ck_cfg.stk.init) ck_cfg.stk.init = {}; const n = ck_num(v); if(n === null || String(v).trim() === '') delete ck_cfg.stk.init[id]; else ck_cfg.stk.init[id] = n; ck_cfgSave(); ck_render(); }
 function stk_add(k){ ck_cfg.stk.items.push({ id:'s' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4), n:'', k, dep:'', rp:'', seuil:0 }); ck_cfgSave(); ck_render(); }
 function stk_del(id){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it || !confirm('Retirer « ' + (it.n || 'cet article') + ' » de la liste ? Les comptages déjà saisis restent enregistrés.')) return; ck_cfg.stk.items = ck_cfg.stk.items.filter(x=>x.id !== id); ck_cfgSave(); ck_render(); }
@@ -8187,7 +8188,7 @@ function stk_regHtml(){
     return `<div class="ck-box"><h3>${titre}</h3>${its || '<div class="ck-sub">Aucun article.</div>'}<div style="margin-top:8px"><button class="ck-btn sm" onclick="stk_add('${k}')">+ Ajouter un article</button></div></div>`;
   };
   const st = (ck_cfg.stk || {}).start || {}, ini = (id, u)=>`<div class="ck-fr"><label style="min-width:170px">${esc(id.n)}</label><input class="ck-in" inputmode="decimal" style="width:110px" value="${esc(stk_init(id.id) === null ? '' : ck_fmt(stk_init(id.id)))}" onchange="stk_setInit(${ck_a(id.id)},this.value)"><span class="ck-sub">${esc(u)}</span></div>`;
-  const startBox = `<div class="ck-box"><h3>Début du suivi du stock</h3><div class="ck-fr"><label>Date</label><input class="ck-in" type="date" value="${esc(st.date || '')}" onchange="stk_setStart('date',this.value)"><label>Heure</label><input class="ck-in" type="time" value="${esc(st.hm || '')}" onchange="stk_setStart('hm',this.value)"></div>
+  const startBox = `<div class="ck-box"><h3>Début du suivi du stock</h3><div class="ck-fr"><label>Date</label><input class="ck-in" type="date" value="${esc(ck_okDate(st.date) ? st.date : '')}" onchange="stk_setStart('date',this.value)"><label>Heure</label><input class="ck-in" type="time" value="${esc(st.hm || '')}" onchange="stk_setStart('hm',this.value)"></div>
     <div class="ck-sub" style="margin:6px 0 10px;">Avant ce moment, rien n’est compté dans le Suivi du stock (rien n’est effacé). Le jour du début, le « reste veille » est le stock de départ ci-dessous : le reste réel de chaque ingrédient (en cru) et le comptage de chaque article à cet instant.</div>
     <h3 style="font-size:15px">Stock de départ</h3>${ck_ingList().map(i=>ini(i, ck_unit(i.id))).join('')}${stk_items('can').concat(stk_items('autre')).map(i=>ini(i, 'unité')).join('')}</div>`;
   return startBox + dl + stk_canRegHtml() + block('autre', 'Stock : autres articles', false) + `<div class="ck-sub" style="margin:0 0 10px;">Les personnes qui comptent les canettes et l’eau se choisissent plus haut, dans la fiche de chaque cuisinier (« Comptage du stock »). Les autres articles s’attribuent à chaque cuisinier de la même façon que les ingrédients.</div>`;
@@ -8579,7 +8580,7 @@ function ck_adminHtml(){
   return `<div class="ck-top"><div class="ck-who"><div><div class="ck-h1" style="margin:0;">🍳 Cuisine</div><div class="ck-sub">Administration</div></div></div><div class="ck-tools"><button class="ck-btn" onclick="ck_kiosk()">Mode cuisiniers</button></div></div>
     <div class="ck-tabs">${tabs}</div>${ck_alerts()}${ck_tab === 'reg' ? ck_regHtml() : ck_tab === 'stock' ? stk_adminHtml() : ck_tab === 'fiche' ? fi_tabHtml() : ck_suiviHtml()}`;
 }
-function ck_adateSet(d){ ck_adate = d || ck_service(); ck_syncSub(); ck_render(); }
+function ck_adateSet(d){ if(d && !ck_okDate(d)) return; ck_adate = d || ck_service(); ck_syncSub(); ck_render(); }
 function ck_adateMove(n){ const p = (ck_adate || ck_service()).split('-').map(Number), d = new Date(p[0], p[1] - 1, p[2] + n); ck_adateSet(ck_ymd(d)); }
 const CK_KLAB = { escalope:'Escalope', saumon:'Saumon', avocat:'Avocat', crevette:'Crevette', gamba:'Crevette gamba', poulet:'Poulet haché', viande:'Viande hachée', boeuf:'Bœuf', simple:'Fiche générique (comme le saumon)' };
 function ck_suiviHtml(){
