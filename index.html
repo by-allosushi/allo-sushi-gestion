@@ -925,6 +925,13 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .ck3-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:0 0 8px;flex-wrap:wrap;}
     #module-cuisine .ck3-h b{font-size:17px;}#module-cuisine .ck3-h span{font-size:13px;color:var(--ink-muted);}
     #module-cuisine .ck3-n{font-size:12px;color:var(--ink-muted);margin:8px 0 0;}
+    #module-cuisine .stk-z{color:var(--ink-muted);opacity:.45;}
+    #module-cuisine .ck3-t tr.stk-g td{font-weight:500;padding-top:14px;padding-bottom:4px;border-bottom:0;}
+    #module-cuisine .ck3-t tr.stk-s td{padding-top:6px;padding-bottom:6px;}
+    #module-cuisine .ck3-t tr.stk-s td:first-child{padding-left:16px;color:var(--ink-muted);}
+    #module-cuisine .stk-q{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink-muted);margin-inline-start:8px;cursor:pointer;font-size:12px;padding:0;}
+    #module-cuisine .stk-f{margin-top:10px;border-top:1px solid var(--line);padding-top:8px;font-size:13px;color:var(--ink-muted);}
+    #module-cuisine .stk-f summary{cursor:pointer;}
     #module-cuisine .ck2-sec{margin:18px 0 8px;font:800 17px 'Manrope',sans-serif;}
   </style>
   <main style="max-width:1000px;margin:0 auto;padding:12px 10px 50px;">
@@ -7850,7 +7857,7 @@ function stk_ingTable(){
   const D = ck_adate || ck_service(), st = stk_start(), day0 = st && D === st.date, docs = stk_docsFrom(ck_docs(), D), prev = ck_prevSrv, extra = [];
   const hache = ck_r(ck_ingList().filter(t=>ck_kind(t.id) === 'escalope').reduce((a, t)=>a + ck2_ps(docs, t.id).reduce((z, p)=>z + ck2_sumP(docs, t.id, 'dc', p, 'b') - ck2_sumP(docs, t.id, 'dc', p, 'n'), 0), 0));
   const hbAll = ck_r(ck_ingList().filter(t=>ck_kind(t.id) === 'poulet').reduce((a, t)=>a + ck2_sumP(docs, t.id, 'hc', null, 'b'), 0)), escId = (ck_ingList().find(t=>ck_kind(t.id) === 'escalope') || {}).id;
-  const rows = ck_ingList().map(it=>{
+  const brut = ck_ingList().map(it=>{
     const id = it.id, u = ck_unit(id), ps = ck2_ps(docs, id), pp = ck2_ps(prev, id), av = ck_kind(id) === 'avocat', po = ck_kind(id) === 'poulet', KB = po ? 'fh' : 'fb';
     const vei = day0 ? stk_init(id) : pp.length ? ck_r(pp.reduce((a, p)=>a + (ck2_finP(prev, id, p, KB) || 0), 0)) : null, ach = stk_buyOf(it.n, u), net = ck2_sumP(docs, id, 'dc', null, 'n');
     const pe = ps.filter(p=>ck2_finP(docs, id, p, KB) !== null), pes = pe.length ? ck_r(pe.reduce((a, p)=>a + ck2_finP(docs, id, p, KB), 0)) : null;
@@ -7861,13 +7868,23 @@ function stk_ingTable(){
       pris = (vei === null || pes === null) ? null : ck_r(vei + ach - pes); th = null; ec = null; pd = wd > 0 ? wd : null;
       if(pris !== null){ const nu = ck_r(pris - wd - pq); extra.push(`${esc(it.n)} : brut utilisé ${ck_fmt(pris)} ${esc(u)} − déchets ${ck_fmt(wd)} − pertes qualité ${ck_fmt(pq)} = net utilisé ${ck_fmt(nu)} ${esc(u)}${pris > 0 ? ' (rendement ' + ck_fmt(Math.round(nu / pris * 1000) / 10) + ' %)' : ''}`); }
     } else { th = vei === null ? null : ck_r(vei + ach + (po ? hache : 0) - pris - pq); ec = (th === null || pes === null) ? null : ck_r(pes - th); }
-    return `<tr><td>${esc(it.n)} <small style="color:var(--ink-muted)">${esc(u)}</small></td><td>${stk_c(vei)}</td><td>${stk_c(ach)}</td><td>${stk_c(pris)}${av && pris !== null ? '*' : ''}</td><td>${stk_c(pq)}</td><td>${stk_c(th)}</td><td>${stk_c(pes)}</td><td>${stk_pill(ec)}</td><td>${stk_c(pd)}</td></tr>`;
-  }).join('');
-  return `<div class="ck-box" id="stk-ing"><div class="ck3-h"><b>Ingrédients : reste théorique et reste réel</b><span>bac brut, par ingrédient</span></div>${rows ? `<div class="ck3-w"><table class="ck3-t"><tr><th>Ingrédient</th><th>Reste veille</th><th>+ Achat</th><th>− Brut pris</th><th>− Perte qualité</th><th>Théorique</th><th>Reste pesé</th><th>Écart</th><th>Perte découpe</th></tr>${rows}</table></div>` : '<div class="ck-empty">Aucun ingrédient suivi.</div>'}
-    <div class="ck3-n">Théorique = reste veille + achat (Dépenses) − brut pris pour les découpes (poulet haché : − pris pour hachage) − perte déclarée en brut (les pertes déclarées en net ou en crispy sont dans le bilan ci-dessous). L’écart est la perte de stockage non expliquée ; il est enregistré chaque jour, sans rien écraser, et exportable. « — » : donnée non saisie.</div>
-    ${hbAll > 0 ? `<div class="ck3-n">Escalope : « Brut pris » inclut ${ck_fmt(hbAll)} g d’escalope brute prise pour le hachage (Poulet haché).</div>` : ''}
-    ${hache > 0 ? `<div class="ck3-n">Poulet haché : le théorique ajoute le haché des découpes d’escalope (brut − net, Sushi et Wok) : ${ck_fmt(hache)} g.</div>` : ''}
-    ${extra.length ? `<div class="ck3-n">* Avocat : brut utilisé calculé = reste veille + achat − reste pesé (pas d’écart de stockage possible ; la colonne « Perte découpe » montre les déchets).<br>${extra.join('<br>')}</div>` : ''}</div>`;
+    return { id, name:it.n, u, vei, ach, pris, pq, th, pes, ec, av };
+  });
+  const D2 = D, stages = (st && D2 < st.date) ? [] : fi_stages(D2), z = (x)=>x === 0 ? '<span class="stk-z">0</span>' : stk_c(x), lab1 = (t)=>t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
+  const rowB = (b)=>`<tr class="stk-s"><td>Brut</td><td>${z(b.vei)}</td><td>${z(b.ach)}</td><td>${z(b.pris)}${b.av && b.pris !== null ? '*' : ''}</td><td>${z(b.pq)}</td><td>${z(b.th)}</td><td>${z(b.pes)}</td><td>${stk_pill(b.ec)}</td></tr>`;
+  const rowS = (r)=>`<tr class="stk-s"><td>${esc(lab1(r.lab))}</td><td>${z(r.veille)}</td><td>${z(r.obt)}</td><td>${z(r.vend)}${r.fritNote ? '<small style="display:block;color:var(--ink-muted)">net frit</small>' : ''}</td><td>${z(r.perte)}</td><td>${z(r.th)}</td><td>${z(r.pese)}</td><td>${stk_pill(r.ec)}${r.ec !== null && r.inc ? '<small style="display:block;color:var(--ink-muted)">incomplet</small>' : ''}</td></tr>`;
+  const quiet = (b, ss)=>[b.vei, b.ach, b.pris, b.pq, b.pes].concat(ss.reduce((a, r)=>a.concat([r.veille, r.obt, r.vend, r.perte, r.pese]), [])).every(x=>x === null || x === 0);
+  let act = '', calm = [], calmRows = '';
+  brut.forEach(b=>{
+    const ss = stages.filter(r=>r.id === b.id), head = `<tr class="stk-g"><td colspan="8">${esc(b.name)} <small style="color:var(--ink-muted);font-weight:400">${esc(b.u)}</small></td></tr>`, body = head + rowB(b) + ss.map(rowS).join('');
+    if(quiet(b, ss)){ calm.push(b.name); calmRows += body; } else act += body;
+  });
+  const th = '<tr><th>Ingrédient</th><th>Reste veille</th><th>+ Entrée</th><th>− Sortie</th><th>− Perte</th><th>Théorique</th><th>Reste pesé</th><th>Écart</th></tr>';
+  const help = `<div class="ck3-n" id="stk-help" style="display:none;background:var(--cream-dark,rgba(127,127,127,.12));padding:8px 10px;border-radius:8px;line-height:1.5;">Entrée = achat (Dépenses) pour le brut, ou quantité obtenue après la découpe (net) ou la friture (crispy). Sortie = brut pris pour les découpes (poulet haché : pris pour hachage), ou vendu d’après les fiches pour le net et le crispy. Perte = pertes déclarées à cette étape. Théorique = reste veille + entrée − sortie − perte. L’écart (reste pesé − théorique) est la perte de stockage non expliquée ; il est enregistré chaque jour, sans rien écraser, et exportable. « — » : donnée non saisie (reste veille inconnu, pas de fin de service, ou pas de fiche). Escalope Sushi : le net frit est déduit des saisies (reste veille + obtenu − reste pesé), il n’a donc pas d’écart ; le crispy restant est jeté en fin de service et n’est pas reporté au lendemain. Le premier jour du suivi, le reste veille net et crispy est 0.${hbAll > 0 ? `<br>Escalope : « Sortie » du brut inclut ${ck_fmt(hbAll)} g d’escalope brute prise pour le hachage (Poulet haché).` : ''}${hache > 0 ? `<br>Poulet haché : le théorique ajoute le haché des découpes d’escalope (brut − net, Sushi et Wok) : ${ck_fmt(hache)} g.` : ''}</div>`;
+  const fold = calm.length ? `<details class="stk-f"><summary>${calm.length} ingrédient${calm.length > 1 ? 's' : ''} sans mouvement : ${esc(calm.join(', '))}</summary><div class="ck3-w"><table class="ck3-t">${calmRows}</table></div></details>` : '';
+  return `<div class="ck-box" id="stk-ing"><div class="ck3-h"><b>Ingrédients : reste théorique et reste réel</b><span>par ingrédient et par étape<button class="stk-q" onclick="var e=document.getElementById('stk-help');e.style.display=e.style.display==='none'?'block':'none'" aria-label="Comment lire ce tableau">?</button></span></div>${brut.length ? `<div class="ck3-w"><table class="ck3-t">${th}${act}</table></div>${fold}` : '<div class="ck-empty">Aucun ingrédient suivi.</div>'}
+    ${help}
+    ${extra.length ? `<div class="ck3-n">* Avocat : brut utilisé calculé = reste veille + achat − reste pesé (pas d’écart de stockage possible).<br>${extra.join('<br>')}</div>` : ''}</div>`;
 }
 function stk_canTable(){
   const date = ck_adate || ck_service(), d = stk_doc(date), p = stk_doc(ck_addDays(date, -1)), its = stk_items('can'), st0 = stk_start(), day0 = st0 && date === st0.date; let last = null;
@@ -8098,7 +8115,7 @@ function stk_adminHtml(){
   const st = stk_start(), fd = (d)=>String(d).split('-').reverse().join('/');
   if(st && date < st.date) return nav + `<div class="ck-box"><div class="ck-empty">Le suivi du stock commence le ${esc(fd(st.date))} à ${esc(st.hm)}. Rien n’est compté avant. Tu peux changer ce début dans Réglages.</div></div>`;
   const note = st && date === st.date ? `<div class="ck-sub" style="margin:0 0 10px;">Jour de départ (${esc(fd(st.date))}, ${esc(st.hm)}) : le « reste veille » est le stock de départ saisi dans Réglages ; seules les saisies, achats et ventes à partir de ${esc(st.hm)} sont comptés.</div>` : (st ? '' : `<div class="ck-sub" style="margin:0 0 10px;">Aucun début de suivi choisi : tout est compté. Tu peux en fixer un dans Réglages.</div>`);
-  return nav + note + stk_ingTable() + fi_stageHtml() + fi_bilanHtml() + stk_canTable() + stk_autTable();
+  return nav + note + stk_ingTable() + fi_bilanHtml() + stk_canTable() + stk_autTable();
 }
 
 /* ----- réglages ----- */
