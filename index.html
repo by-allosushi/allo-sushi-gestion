@@ -8053,13 +8053,52 @@ function fi_regBox(){
   return `<div class="ck-box"><h3>Mesure comparée aux ventes</h3><div class="ck-sub" style="margin-bottom:6px;">Fixée pour chaque ingrédient : c’est l’étape où il est vendu. Les grammes des fiches techniques sont comparés à cette mesure dans le Suivi du stock.</div>${rows.map(r=>`<div class="ck-fr"><label style="min-width:170px">${esc(r[0])}</label><span class="ck-pill">${esc(r[1])}</span></div>`).join('')}</div>`;
 }
 
+/* tableau « Reste net et crispy » : mêmes colonnes que le bac brut, pour les étapes après la découpe */
+function fi_stages(D){
+  const docs = stk_docsFrom(ck_docs(), D), prev = ck_prevSrv, S = fi_sales(D), st = stk_start(), day0 = !!(st && D === st.date), rows = [], cks = ck_cooks();
+  const sum = (d, id, key, ps)=>{ const l = ps.filter(p=>ck2_finP(d, id, p, key) !== null); return l.length ? ck_r(l.reduce((a, p)=>a + ck2_finP(d, id, p, key), 0)) : null; };
+  ck_ingList().forEach(it=>{
+    const id = it.id, k = ck_kind(id), u = ck_unit(id), ps = ck2_ps(docs, id), pp = ck2_ps(prev, id), sold = (sl)=>ck_r(fi_toUnit(id, S.g[sl] || 0));
+    const mk = (o)=>{ const R = Object.assign({ id, name:it.n, u, inc:S.no > 0, noEc:false }, o);
+      if(!R.noEc && R.veille !== null){ R.th = ck_r(R.veille + R.obt - R.vend - R.perte); R.ec = R.pese === null ? null : ck_r(R.pese - R.th); } else { R.th = null; R.ec = null; } rows.push(R); };
+    const veilleOf = (key, plist)=>day0 ? 0 : (plist.length ? sum(prev, id, key, plist) : null);
+    if(k === 'saumon' || k === 'gamba'){
+      if(!(ps.length || pp.length || cks.some(c=>c.ings.includes(id)))) return;
+      mk({ lab:k === 'gamba' ? 'décortiquée' : 'net', veille:veilleOf('fn', pp), obt:ck2_sumP(docs, id, 'dc', null, 'n'), vend:sold(id), perte:ck2_pqS(docs, id, null, 'n'), pese:sum(docs, id, 'fn', ps) });
+    }
+    else if(k === 'escalope'){
+      ['Sushi', 'Wok'].forEach(K=>{
+        if(!(ps.includes(K) || pp.includes(K) || cks.some(c=>c.ingsK[K].includes(id)))) return;
+        const pv = pp.filter(x=>x === K), pl = ps.filter(x=>x === K), veille = veilleOf('fn', pv), obt = ck2_sumP(docs, id, 'dc', K, 'n'), fnNow = ck2_finP(docs, id, K, 'fn'), perte = ck2_pqS(docs, id, K, 'n');
+        if(K === 'Wok') mk({ lab:'net · Wok', veille, obt, vend:sold(id + '|Wok'), perte, pese:fnNow });
+        else {
+          const frit = veille === null || fnNow === null ? null : ck_r(veille + obt - fnNow);
+          mk({ lab:'net · Sushi', veille, obt, vend:frit, perte, pese:fnNow, noEc:true, fritNote:true });
+          mk({ lab:'crispy · Sushi', veille:0, obt:ck2_sumP(docs, id, 'fr', 'Sushi', 'q'), vend:sold(id + '|Sushi'), perte:ck2_pqS(docs, id, 'Sushi', 'c'), pese:ck2_finP(docs, id, 'Sushi', 'fc') });
+        }
+      });
+    }
+    else if(k === 'crevette'){
+      if(!(ps.length || pp.length || cks.some(c=>c.ings.includes(id)))) return;
+      mk({ lab:'crispy', veille:veilleOf('fc', pp), obt:ck2_sumP(docs, id, 'fr', null, 'q'), vend:sold(id), perte:ck2_pqS(docs, id, null, 'c'), pese:sum(docs, id, 'fc', ps) });
+    }
+  });
+  return rows;
+}
+function fi_stageHtml(){
+  const D = ck_adate || ck_service(), st = stk_start(); if(st && D < st.date) return '';
+  const rows = fi_stages(D); if(!rows.length) return '';
+  const body = rows.map(r=>`<tr><td>${esc(r.name)} <small style="color:var(--ink-muted)">${esc(r.u)}</small><small style="display:block;color:var(--ink-muted)">${esc(r.lab)}</small></td><td>${stk_c(r.veille)}</td><td>${stk_c(r.obt)}</td><td>${stk_c(r.vend)}${r.fritNote ? '<small style="display:block;color:var(--ink-muted)">net frit</small>' : ''}</td><td>${stk_c(r.perte)}</td><td>${stk_c(r.th)}</td><td>${stk_c(r.pese)}</td><td>${stk_pill(r.ec)}${r.ec !== null && r.inc ? '<small style="display:block;color:var(--ink-muted)">incomplet</small>' : ''}</td></tr>`).join('');
+  return `<div class="ck-box" id="stk-net"><div class="ck3-h"><b>Reste net et crispy</b><span>étapes après la découpe, par ingrédient</span></div><div class="ck3-w"><table class="ck3-t"><tr><th>Ingrédient (étape)</th><th>Reste veille</th><th>+ Obtenu</th><th>− Vendu</th><th>− Perte</th><th>Théorique</th><th>Reste pesé</th><th>Écart</th></tr>${body}</table></div>
+    <div class="ck3-n">Théorique = reste veille + obtenu (net de la découpe, ou crispy de la friture) − vendu d’après les fiches − pertes déclarées à cette étape. « — » : donnée non saisie (reste veille inconnu, pas de fin de service, ou pas de fiche). Escalope Sushi : le net frit est déduit des saisies (reste veille + obtenu − reste pesé), il n’a donc pas d’écart ; le crispy restant est jeté en fin de service et n’est pas reporté au lendemain. Le premier jour du suivi, le reste veille net et crispy est 0.</div></div>`;
+}
 function stk_adminHtml(){
   const date = ck_adate || ck_service(), go = (id)=>`document.getElementById('${id}').scrollIntoView({behavior:'smooth',block:'start'})`;
   const nav = `<div class="ck-date"><button class="ck-btn on" onclick="${go('stk-ing')}">Ingrédients</button><button class="ck-btn" onclick="${go('stk-can')}">Canettes et eau</button><button class="ck-btn" onclick="${go('stk-aut')}">Autres articles</button><span style="margin-inline-start:auto;display:flex;gap:6px;align-items:center"><button class="ck-btn sm" onclick="ck_adateMove(-1)">‹</button><input type="date" class="ck-in" value="${esc(date)}" onchange="ck_adateSet(this.value)"><button class="ck-btn sm" onclick="ck_adateMove(1)">›</button></span></div>`;
   const st = stk_start(), fd = (d)=>String(d).split('-').reverse().join('/');
   if(st && date < st.date) return nav + `<div class="ck-box"><div class="ck-empty">Le suivi du stock commence le ${esc(fd(st.date))} à ${esc(st.hm)}. Rien n’est compté avant. Tu peux changer ce début dans Réglages.</div></div>`;
   const note = st && date === st.date ? `<div class="ck-sub" style="margin:0 0 10px;">Jour de départ (${esc(fd(st.date))}, ${esc(st.hm)}) : le « reste veille » est le stock de départ saisi dans Réglages ; seules les saisies, achats et ventes à partir de ${esc(st.hm)} sont comptés.</div>` : (st ? '' : `<div class="ck-sub" style="margin:0 0 10px;">Aucun début de suivi choisi : tout est compté. Tu peux en fixer un dans Réglages.</div>`);
-  return nav + note + stk_ingTable() + fi_bilanHtml() + stk_canTable() + stk_autTable();
+  return nav + note + stk_ingTable() + fi_stageHtml() + fi_bilanHtml() + stk_canTable() + stk_autTable();
 }
 
 /* ----- réglages ----- */
@@ -8074,6 +8113,7 @@ function stk_boissons(){ const b = (ck_btnsRaw || []).find(x=>x && /boisson/i.te
 function stk_rpNames(){
   const set = {}; try{ (typeof rp_products === 'function' ? rp_products().list : []).forEach(p=>{ set[p.name] = 1; }); }catch(e){}
   ((stk.rp || {}).tickets || []).forEach(tk=>(tk.l || []).forEach(l=>{ if(l.n) set[String(l.n).replace(/\s+/g, ' ').trim()] = 1; }));
+  try{ fi_load(); if(fi.prods) Object.keys(fi.prods).forEach(k=>{ const n = fi.prods[k].name; if(n) set[n] = 1; }); }catch(e){}   // produits vendus ces 30 derniers jours (lus une fois, comme dans Fiche technique)
   return Object.keys(set).sort((a, b)=>a.localeCompare(b, 'fr'));
 }
 function stk_togBoisson(name){
