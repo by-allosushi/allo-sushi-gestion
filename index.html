@@ -7279,7 +7279,7 @@ let ck_started = false, ck_cfg = { settings:{}, ings:{}, cooks:{}, meta:{} }, ck
 let ck_btnsRaw = [], ck_ingsRaw = [], ck_ingsReady = false, ck_emp = {}, ck_empReady = false;
 let ck_docsSrv = {}, ck_unsub = null, ck_viewDate = '', ck_docsErr = '', ck_docsReady = false;
 let ck_prevSrv = {}, ck_unsubPrev = null, ck_prevDate = '', ck_prevReady = false;
-let ck_view = '', ck_tab = 'suivi', ck_who = null, ck_pinFor = null, ck_pin = '', ck_pinErr = '', ck_adate = '';
+let ck_view = '', ck_tab = 'stock', ck_who = null, ck_pinFor = null, ck_pin = '', ck_pinErr = '', ck_adate = '';
 let ck_form = null, ck_ingOpen = null, ck_err = '', ck_ban = null, ck_banT = null, ck_restored = false, ck_metaSent = '';
 let ck_lang = (()=>{ try{ return localStorage.getItem(CK_LGK) === 'ar' ? 'ar' : 'fr'; }catch(e){ return 'fr'; } })();
 let ck_last = Date.now(), ck_wl = null, ck_obBusy = false, ck_obFull = false;
@@ -7453,9 +7453,9 @@ function ck_setPrev(d){
     (e)=>{ console.warn(e); });
 }
 function ck_syncSub(){
-  const want = (ck_isAdmin() && ck_view === 'admin' && (ck_tab === 'suivi' || ck_tab === 'stock')) ? (ck_adate || ck_service()) : ck_service();
+  const want = (ck_isAdmin() && ck_view === 'admin' && (ck_tab === 'suivi' || ck_tab === 'stock' || ck_tab === 'reg')) ? (ck_adate || ck_service()) : ck_service();
   if(want !== ck_viewDate) ck_setViewDate(want);
-  const admSuivi = ck_isAdmin() && ck_view === 'admin' && (ck_tab === 'suivi' || ck_tab === 'stock');
+  const admSuivi = ck_isAdmin() && ck_view === 'admin' && (ck_tab === 'suivi' || ck_tab === 'stock' || ck_tab === 'reg');
   stk_sync();
   if(!ck_isAdmin() || ck_who || admSuivi){ const pd = ck_addDays(admSuivi ? want : ck_service(), -1); if(pd !== ck_prevDate) ck_setPrev(pd); }
 }
@@ -8491,7 +8491,7 @@ function ck_entryHtml(){
 
 /* ==================== ADMINISTRATION ==================== */
 function ck_adminHtml(){
-  const tabs = [['suivi', 'Suivi'], ['stock', 'Suivi du stock'], ['fiche', 'Fiche technique'], ['reg', 'Réglages']].map(t=>`<button class="ck-btn ${ck_tab === t[0] ? 'on' : ''}" onclick="ck_tab='${t[0]}';ck_syncSub();ck_render()">${t[1]}</button>`).join('');
+  const tabs = [['stock', 'Suivi du stock'], ['fiche', 'Fiche technique'], ['reg', 'Réglages']].map(t=>`<button class="ck-btn ${ck_tab === t[0] ? 'on' : ''}" onclick="ck_tab='${t[0]}';ck_syncSub();ck_render()">${t[1]}</button>`).join('');
   return `<div class="ck-top"><div class="ck-who"><div><div class="ck-h1" style="margin:0;">🍳 Cuisine</div><div class="ck-sub">Administration</div></div></div><div class="ck-tools"><button class="ck-btn" onclick="ck_kiosk()">Mode cuisiniers</button></div></div>
     <div class="ck-tabs">${tabs}</div>${ck_alerts()}${ck_tab === 'reg' ? ck_regHtml() : ck_tab === 'stock' ? stk_adminHtml() : ck_tab === 'fiche' ? fi_tabHtml() : ck_suiviHtml()}`;
 }
@@ -8563,6 +8563,69 @@ function ck_export(){
   const ws = XLSX.utils.json_to_sheet(rows), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Cuisine'); XLSX.writeFile(wb, 'cuisine-' + date + '.xlsx');
 }
 
+/* ---------- Réglages : saisie des cuisiniers (date, export, vider, rouvrir, corriger) ---------- */
+let ck_rc = '', ck_corr = false, ck_cr = null, ck_crErr = '';
+function ck_rcSet(v){ ck_rc = v; ck_corr = false; ck_cr = null; ck_crErr = ''; ck_render(); }
+function ck_rcCorr(){ ck_corr = !ck_corr; ck_cr = null; ck_crErr = ''; ck_render(); }
+function ck_crFields(id, p, t){
+  if(t === 'dc') return [['b', 'Brut pris dans le bac'], ['n', 'Net obtenu après découpe']];
+  if(t === 'fr') return [['q', 'Crispy obtenu']];
+  if(t === 'hc') return [['q', 'Pris dans le bac à haché'], ['b', 'Escalope brute prise']];
+  if(t === 'wd') return [['q', 'Déchet']];
+  if(t === 'pq') return [['q', 'Perte']];
+  if(t === 'fin2') return ck2_finKeys(id, p).map(k=>[k, ck2_flab(id, k)]);
+  return [];
+}
+function ck_crEdit(id, rid, p, t, isNew){ ck_cr = { id, rid, p:ck2_P(p), t, isNew:!!isNew }; ck_crErr = ''; ck_render(); }
+function ck_crCancel(){ ck_cr = null; ck_crErr = ''; ck_render(); }
+function ck_crSave(){
+  const x = ck_cr; if(!x || !ck_rc) return; const code = ck_rc, date = ck_adate || ck_service(), doc = ck_docs()[ck_docId(date, code)] || {}, old = ck_recOne(doc, x.id, x.rid), f = {};
+  let empty = 0, n = 0; document.querySelectorAll('#ck-root .ck-corr-form input[data-f]').forEach(el=>{ n++; const v = ck_num(el.value); if(String(el.value).trim() === '' || v === null) empty++; else f[el.getAttribute('data-f')] = v; });
+  if(x.t === 'hc'){ if(empty === n){ ck_crErr = 'Indique au moins une quantité.'; return ck_render(); } ['q', 'b'].forEach(k=>{ if(f[k] === undefined) f[k] = 0; }); }
+  else if(empty){ ck_crErr = 'Remplis toutes les cases (0 est accepté).'; return ck_render(); }
+  if(x.t === 'dc' && f.n > f.b + 1e-9){ ck_crErr = 'Le net ne peut pas dépasser le brut.'; return ck_render(); }
+  const sel = document.querySelector('#ck-root .ck-corr-form select[data-st]'); if(x.t === 'pq' && sel && ck2_stages(x.id, x.p).length > 1) f.s = sel.value;
+  const c = ck_cook(code) || { name:ck_empName(code), poste:'' }, rec = { t:x.t, f, p:x.p, at:old ? old.at : ck_nowIso(), del:false, adm:true };
+  if(old) rec.prevF = old.adm && old.prevF ? old.prevF : old.f;
+  ck_write(ck_docId(date, code), { ckdate:date, emp:String(code), name:doc.name || c.name, poste:doc.poste || c.poste, recs:{ [x.id]:{ [x.rid]:rec } } });
+  ck_cr = null; ck_crErr = ''; ck_render();
+}
+function ck_corrHtml(date, code, doc){
+  const c = ck_cook(code), items = [], seen = {}, add = (id, p)=>{ const k = id + '|' + p; if(seen[k] || !ck_ingById(id)) return; seen[k] = 1; items.push({ id, p }); };
+  if(c) ['Sushi', 'Wok'].forEach(K=>c.ingsK[K].forEach(id=>add(id, K)));
+  Object.keys(doc.recs || {}).forEach(id=>ck_allRecs(doc, id).forEach(r=>add(id, ck2_P(r.p))));
+  const EDIT = ['dc', 'fr', 'hc', 'wd', 'pq', 'fin2'];
+  const form = (it, r, t, rid)=>{
+    const u = ck_unit(it.id), cur = r && r.f ? r.f : {}, stg = t === 'pq' ? ck2_stages(it.id, it.p) : [];
+    const ins = ck_crFields(it.id, it.p, t).map(fl=>`<div class="fi-fr"><label>${esc(fl[1])}</label><input class="ck-in" inputmode="decimal" style="width:100px" data-f="${esc(fl[0])}" value="${cur[fl[0]] !== undefined ? esc(ck_fmt(Number(cur[fl[0]]) || 0)) : ''}" placeholder="0"><span class="ck-sub">${esc(u)}</span></div>`).join('');
+    const st = stg.length > 1 ? `<div class="fi-fr"><label>Perte sur</label><select class="ck-in" data-st="1">${stg.map(z=>ck_opt(z, ck_s('k2_st' + z.toUpperCase()), cur.s || 'b')).join('')}</select></div>` : '';
+    return `<div class="fi-form ck-corr-form">${ins}${st}<div class="ck-err">${esc(ck_crErr)}</div><div class="ck-fr"><button class="ck-btn on" onclick="ck_crSave()">Enregistrer</button><button class="ck-btn" onclick="ck_crCancel()">Annuler</button></div></div>`;
+  };
+  const html = items.map(it=>{
+    const kd = ck_kind(it.id), recs = ck_allRecs(doc, it.id).filter(r=>ck2_P(r.p) === it.p), fin = recs.find(r=>r.t === 'fin2'), ed = ck_cr && ck_cr.id === it.id && ck_cr.p === it.p ? ck_cr : null;
+    const rows = recs.map(r=>{
+      const open = ed && ed.rid === r.id, can = EDIT.includes(r.t), mark = r.adm ? ' <span class="ck-pill wa">saisie par l’admin</span>' : '';
+      const orig = r.adm && r.prevF ? `<div class="ck-sub">valeur du cuisinier : ${esc(ck2_recText(it.id, { t:r.t, f:r.prevF, p:'' }))}</div>` : '';
+      return `<div class="ck-rec" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="tm">${esc(ck_hm(r.at))}</span><span class="tx" style="flex:1;min-width:160px">${esc(ck_recText(it.id, r))}${mark}${orig}</span>${can ? `<button class="ck-btn sm" aria-label="Corriger" onclick="ck_crEdit(${ck_a(it.id)},${ck_a(r.id)},${ck_a(it.p)},${ck_a(r.t)},false)">✎</button>` : ''}<button class="ck-btn sm danger" aria-label="Supprimer" onclick="ck_adminDel(${ck_a(code)},${ck_a(it.id)},${ck_a(r.id)})">✕</button></div>${open ? form(it, r, r.t, r.id) : ''}`;
+    }).join('');
+    const newFin = !fin ? (ed && ed.isNew ? form(it, null, 'fin2', ck2_fid(it.p)) : `<div class="ck-rec" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="tx" style="flex:1"><span class="ck-pill wa">Fin de service non saisie</span></span><button class="ck-btn sm" onclick="ck_crEdit(${ck_a(it.id)},${ck_a(ck2_fid(it.p))},${ck_a(it.p)},'fin2',true)">Saisir la fin de service</button></div>`) : '';
+    return `<div class="ck-sitem" style="--c:${ck_color(it.id)}"><div class="ck-ihead">${ck_icon(kd, 30)}<b>${esc((ck_ingById(it.id) || { n:it.id }).n)}</b> <small style="color:var(--ink-muted)">${esc(ck_unit(it.id))}</small>${it.p ? ` <span class="ck-pill">${esc(it.p)}</span>` : ''}</div>${rows || '<div class="ck-sub">rien saisi</div>'}${newFin}</div>`;
+  }).join('');
+  return `<div style="margin-top:12px;"><div class="ck-sub" style="margin-bottom:6px;">Corrige ou supprime les saisies du ${esc(ck_frDate(date))}. Une fin de service oubliée se saisit ici. Les corrections sont marquées « saisie par l’admin », la valeur du cuisinier reste visible, et le reste veille du lendemain ainsi que le bilan se recalculent tout seuls.</div>${html || '<div class="ck-empty">Aucun ingrédient pour ce cuisinier.</div>'}</div>`;
+}
+function ck_saisieBox(){
+  const date = ck_adate || ck_service(), docs = ck_docs(), codes = ck_cooks().map(c=>c.code);
+  Object.keys(docs).forEach(k=>{ const e = String(docs[k].emp); if(!codes.includes(e)) codes.push(e); });
+  if(ck_rc && !codes.includes(ck_rc)) ck_rc = '';
+  const doc = ck_rc ? (docs[ck_docId(date, ck_rc)] || {}) : {}, off = ck_rc ? '' : 'disabled';
+  const pill = !ck_rc ? '' : doc.done ? `<span class="ck-pill ok">Fin de service ${esc(ck_hm(doc.done))}</span>` : (doc.emp ? '<span class="ck-pill wa">Fin de service non faite</span>' : '<span class="ck-pill">rien saisi ce jour</span>');
+  return `<div class="ck-box"><h3>Saisie des cuisiniers</h3>
+    <div class="ck-date"><button class="ck-btn sm" onclick="ck_adateMove(-1)">‹</button><input type="date" class="ck-in" value="${esc(date)}" onchange="ck_adateSet(this.value)"><button class="ck-btn sm" onclick="ck_adateMove(1)">›</button><button class="ck-btn sm" onclick="ck_adateSet('')">Aujourd’hui</button><button class="ck-btn sm" onclick="ck_export()">⬇ Export Excel</button></div>
+    <div class="ck-fr" style="flex-wrap:wrap"><select class="ck-in" style="min-width:200px" onchange="ck_rcSet(this.value)"><option value="">Choisir un cuisinier…</option>${codes.map(c=>ck_opt(c, ck_empName(c), ck_rc)).join('')}</select>
+      <button class="ck-btn sm danger" ${off} onclick="ck_adminClear(${ck_a(ck_rc)})">Vider</button><button class="ck-btn sm ${ck_corr ? 'on' : ''}" ${off} onclick="ck_rcCorr()">Corriger</button><button class="ck-btn sm" ${ck_rc && doc.done ? '' : 'disabled'} onclick="ck_adminReopen(${ck_a(ck_rc)})">Rouvrir</button>${pill}</div>
+    ${ck_rc && ck_corr ? ck_corrHtml(date, ck_rc, doc) : ''}</div>`;
+}
+
 /* ---------- Réglages ---------- */
 const ck_opt = (v, l, cur)=>`<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(l)}</option>`;
 function ck_regHtml(){
@@ -8584,7 +8647,7 @@ function ck_regHtml(){
       <div class="ck-fr"><span class="ck-pill ${k === 'simple' ? 'wa' : 'ok'}">${esc(k === 'simple' ? 'nom non reconnu : ' + CK_KLAB.simple : 'fiche : ' + CK_KLAB[k])}</span>
       <label>Nom en arabe</label><input class="ck-in" dir="rtl" style="width:130px" value="${esc(c.ar || '')}" onchange="ck_ingSet(${ck_a(i.id)},'ar',this.value)"></div>${ck_qHtml(i.id)}</div>`; }).join('')}</div>`
     : '<div class="ck-box"><h3>Ingrédients</h3><div class="ck-empty">Aucun ingrédient suivi. Cochez « Suivi » dans Dépenses › Ingrédients.</div></div>';
-  return general + add + cookBoxes + stk_regHtml() + fi_regBox() + ingBoxes;
+  return ck_saisieBox() + general + add + cookBoxes + stk_regHtml() + fi_regBox() + ingBoxes;
 }
 function ck_setSet(k, v){ const n = Number(v); if(k === 'lockMin') ck_cfg.settings.lockMin = Math.max(1, Math.min(30, Math.round(n) || 3)); else if(k === 'cutoff') ck_cfg.settings.cutoff = Math.max(0, Math.min(10, Math.round(n) || 0)); ck_cfgSave(); ck_render(); }
 function ck_addCook(){ const el = document.getElementById('ck-addsel'), code = el && el.value; if(!code) return; ck_cfg.cooks[code] = { n:ck_empName(code), pin:'', poste:'', ings:[] }; ck_cfgSave(); ck_render(); }
