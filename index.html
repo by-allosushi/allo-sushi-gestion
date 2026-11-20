@@ -739,12 +739,14 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .ck-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
     @media (min-width:700px){#module-cuisine .ck-grid{grid-template-columns:repeat(3,minmax(0,1fr));}#module-cuisine .ck-names{grid-template-columns:repeat(3,minmax(0,1fr));}}
     @media (min-width:1000px){#module-cuisine .ck-grid{grid-template-columns:repeat(4,minmax(0,1fr));}#module-cuisine .ck-names{grid-template-columns:repeat(4,minmax(0,1fr));}}
-    #module-cuisine .ck-tile{position:relative;text-align:start;min-height:124px;border:1px solid var(--line);border-left:8px solid var(--c);border-radius:0 16px 16px 0;background:var(--surface);padding:12px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;}
+    #module-cuisine .ck-tile{position:relative;text-align:start;min-height:124px;border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:12px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;}
     #module-cuisine .ck-tile .nm{font:800 20px 'Manrope',sans-serif;line-height:1.15;}
     #module-cuisine .ck-tile .nm small{display:block;font:500 12px 'Inter',sans-serif;color:var(--ink-muted);margin-top:2px;}
     #module-cuisine .ck-tile .st{font-size:13px;color:var(--ink-muted);display:flex;align-items:center;gap:7px;line-height:1.3;}
     #module-cuisine .ck-tile .st b{font-size:20px;line-height:1;}
-    #module-cuisine .ck-tile.ready{background:var(--moss-bg);border-color:#1f5a35;border-left-color:var(--c);}
+    #module-cuisine .ck-tile.ready{background:var(--moss-bg);border-color:#1f5a35;}
+    #module-cuisine .ck-tile .ico{width:62px;height:62px;border-radius:16px;display:flex;align-items:center;justify-content:center;flex:none;border:1px solid rgba(255,255,255,.10);background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--c,#60A5FA) 42%,transparent),color-mix(in srgb,var(--c,#60A5FA) 12%,transparent));}
+    #module-cuisine .ck-tile .ico svg{width:48px;height:48px;}
     #module-cuisine .ck-tile.ready .st{color:#86efac;}
     #module-cuisine .ck-tile.prog{border-color:var(--c);}
     #module-cuisine .ck-tile.next{box-shadow:0 0 0 2px var(--forest);animation:ckp 2s ease-in-out infinite;}
@@ -7301,7 +7303,7 @@ const CK_COL = db.collection('mise_en_place');
 const CK_CFG_REF = CK_COL.doc('ckcfg');
 const CK_OBK = 'ck_outbox_v2', CK_SSK = 'ck_session_v1', CK_LGK = 'ck_lang_v1';
 const CK_POSTES = ['', 'Sushi', 'Wok', 'Bar'];
-const CK_KCOL = { escalope:'#F4A7C0', saumon:'#F28B6E', avocat:'#6FBF73', crevette:'#E879A6', gamba:'#F0765F', poulet:'#E8B93A', viande:'#C0504D', boeuf:'#B5485A', simple:'#60A5FA' };
+const CK_KCOL = { escalope:'#FF8FB1', saumon:'#FF7A59', avocat:'#7ED957', crevette:'#FF5C8A', gamba:'#FF6B4A', poulet:'#FFC93C', viande:'#FF4D4D', boeuf:'#FF5A6E', simple:'#60A5FA' };
 const CK_T = {
   who:['Qui êtes-vous ?', 'من أنت؟'], pinAsk:['Tapez votre code', 'أدخل رمزك'], pinBad:['Code incorrect. Réessayez.', 'الرمز غير صحيح. أعد المحاولة.'],
   pinNone:['Aucun code n’est défini pour vous. Voyez l’administrateur.', 'لم يتم تحديد رمز لك. راجع المسؤول.'], hello:['Bonjour {n}', 'مرحباً {n}'],
@@ -7441,15 +7443,15 @@ function ck_myIngs(code){ const c = ck_cook(code); if(!c) return []; return c.in
 function ck_icon(kind, px){
   const s = px || 44, o = `<svg width="${s}" height="${s}" viewBox="0 0 48 48" aria-hidden="true" style="flex:none">`;
   const shrimp = (b, t)=>`<path d="M33 14 C17 11 8 25 15 34 C20 40 30 38 32 30" stroke="${b}" stroke-width="8" fill="none" stroke-linecap="round"/><path d="M21 13 L23 22 M14 21 L22 25 M15 31 L22 29" stroke="${t}" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M31 29 L41 27 L39 35 L32 37 Z" fill="${t}" stroke="${b}" stroke-width="1.5" stroke-linejoin="round"/><path d="M36 11 C40 6 44 6 46 3 M37 14 C41 12 45 13 46 10" stroke="${b}" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="35" cy="13" r="1.8" fill="#2C2C2A"/>`;
-  const mound = (m, s1, s2)=>`<ellipse cx="24" cy="40" rx="21" ry="4" fill="#5F5E5A"/><path d="M5 38 C6 26 15 16 24 16 C33 16 42 26 43 38 Z" fill="${m}"/><path d="M12 34 C15 28 19 28 22 32 S29 36 33 30 M16 26 C20 22 24 24 26 27 S33 26 36 22 M20 37 C23 35 27 36 30 38 M9 38 C12 36 15 37 17 39 M32 34 C35 32 38 33 40 36" stroke="${s1}" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M22 20 C24 18 27 20 28 22 M14 31 C14 28 16 27 18 27 M30 28 C32 26 35 27 36 29" stroke="${s2}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+  const mound = (m, s1, s2)=>`<ellipse cx="24" cy="40" rx="21" ry="4" fill="#3A4150"/><path d="M5 38 C6 26 15 16 24 16 C33 16 42 26 43 38 Z" fill="${m}"/><path d="M12 34 C15 28 19 28 22 32 S29 36 33 30 M16 26 C20 22 24 24 26 27 S33 26 36 22 M20 37 C23 35 27 36 30 38 M9 38 C12 36 15 37 17 39 M32 34 C35 32 38 33 40 36" stroke="${s1}" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M22 20 C24 18 27 20 28 22 M14 31 C14 28 16 27 18 27 M30 28 C32 26 35 27 36 29" stroke="${s2}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
   const g = {
-    escalope:`<path d="M4 34 C3 28 9 22 17 17 C26 11 36 8 42 10 C46 12 45 17 41 22 C35 30 25 38 15 40 C9 41 5 38 4 34 Z" fill="#F4C0D1" stroke="#D4537E" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 30 C12 25 18 20 25 16" stroke="#FBEAF0" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M12 35 C19 33 27 28 34 22 M16 38 C23 37 31 32 38 26 M17 27 C23 23 29 19 36 15" stroke="#ED93B1" stroke-width="1.6" fill="none" stroke-linecap="round"/>`,
-    saumon:`<path d="M5 24 C13 11 30 11 37 24 C30 37 13 37 5 24 Z" fill="#F0997B" stroke="#D85A30" stroke-width="1.5"/><path d="M35 24 L46 14 L46 34 Z" fill="#D85A30"/><path d="M17 15 C19 21 19 27 17 33 M24 14 C26 21 26 27 24 34 M30 17 C31 22 31 26 30 31" stroke="#F5C4B3" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="12" cy="22" r="1.8" fill="#2C2C2A"/>`,
-    avocat:`<path d="M24 4 C32 4 36 14 36 22 C43 28 43 39 35 43 C29 46 19 46 13 43 C5 39 5 28 12 22 C12 14 16 4 24 4 Z" fill="#3B6D11"/><path d="M24 9 C30 9 32 16 32 23 C38 28 38 37 32 40 C27 42 21 42 16 40 C10 37 10 28 16 23 C16 16 18 9 24 9 Z" fill="#97C459"/><circle cx="24" cy="31" r="7" fill="#854F0B"/><circle cx="22" cy="29" r="2" fill="#BA7517"/>`,
-    crevette:shrimp('#D4537E', '#ED93B1'), gamba:shrimp('#D85A30', '#F0997B'),
-    poulet:mound('#FAC775', '#BA7517', '#FAEEDA'), viande:mound('#E24B4A', '#A32D2D', '#F09595'),
-    boeuf:`<path d="M7 22 C5 11 18 6 28 8 C41 10 45 22 41 31 C37 40 22 43 14 37 C10 34 8 28 7 22 Z" fill="#E24B4A" stroke="#F7C1C1" stroke-width="3.5" stroke-linejoin="round"/><path d="M14 18 C19 15 24 17 28 15 M13 27 C18 25 22 28 27 26 M24 33 C28 31 32 33 36 30" stroke="#F7C1C1" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="31" cy="23" r="4.5" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="1.3"/>`,
-    simple:`<ellipse cx="24" cy="28" rx="19" ry="9" fill="#888780"/><ellipse cx="24" cy="25" rx="19" ry="9" fill="#D3D1C7"/>`
+    escalope:`<path d="M4 34 C3 28 9 22 17 17 C26 11 36 8 42 10 C46 12 45 17 41 22 C35 30 25 38 15 40 C9 41 5 38 4 34 Z" fill="#FF9EBB" stroke="#FF4F86" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 30 C12 25 18 20 25 16" stroke="#FFE0EA" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M12 35 C19 33 27 28 34 22 M16 38 C23 37 31 32 38 26 M17 27 C23 23 29 19 36 15" stroke="#FF4F86" stroke-width="1.8" fill="none" stroke-linecap="round"/>`,
+    saumon:`<path d="M5 24 C13 11 30 11 37 24 C30 37 13 37 5 24 Z" fill="#FF8A65" stroke="#FF5722" stroke-width="1.6"/><path d="M35 24 L46 14 L46 34 Z" fill="#FF5722"/><path d="M17 15 C19 21 19 27 17 33 M24 14 C26 21 26 27 24 34 M30 17 C31 22 31 26 30 31" stroke="#FFD2C2" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="12" cy="22" r="1.9" fill="#1B1B1B"/>`,
+    avocat:`<path d="M24 4 C32 4 36 14 36 22 C43 28 43 39 35 43 C29 46 19 46 13 43 C5 39 5 28 12 22 C12 14 16 4 24 4 Z" fill="#2E9E3A"/><path d="M24 9 C30 9 32 16 32 23 C38 28 38 37 32 40 C27 42 21 42 16 40 C10 37 10 28 16 23 C16 16 18 9 24 9 Z" fill="#B6F26B"/><circle cx="24" cy="31" r="7" fill="#C2651B"/><circle cx="22" cy="29" r="2" fill="#F0A04B"/>`,
+    crevette:shrimp('#FF4F86', '#FFB3CC'), gamba:shrimp('#FF6B4A', '#FFB199'),
+    poulet:mound('#FFC93C', '#E08A00', '#FFF1C2'), viande:mound('#FF4D4D', '#C62828', '#FF9E9E'),
+    boeuf:`<path d="M7 22 C5 11 18 6 28 8 C41 10 45 22 41 31 C37 40 22 43 14 37 C10 34 8 28 7 22 Z" fill="#FF4D4D" stroke="#FFB3B3" stroke-width="3.5" stroke-linejoin="round"/><path d="M14 18 C19 15 24 17 28 15 M13 27 C18 25 22 28 27 26 M24 33 C28 31 32 33 36 30" stroke="#FFB3B3" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="31" cy="23" r="4.5" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="1.3"/>`,
+    simple:`<ellipse cx="24" cy="28" rx="19" ry="9" fill="#9AA0A6"/><ellipse cx="24" cy="25" rx="19" ry="9" fill="#E3E6EA"/>`
   };
   return o + (g[kind] || g.simple) + '</svg>';
 }
@@ -7836,6 +7838,12 @@ function stk_doc(d){ const id = 'stk_' + d, o = ck_ob[id]; return o ? ck_deepMer
 const stk_num = (x)=>{ const n = Number(x && x.q); return x && x.q !== undefined && x.q !== null && x.q !== '' && isFinite(n) ? n : null; };
 
 /* ==================== RESTE DU DERNIER SERVICE (lecture seule pour le cuisinier) ==================== */
+const CK_TICO = {
+  can:'<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="12" y="8" width="24" height="34" rx="5" fill="#7DD3FC" stroke="#0EA5E9" stroke-width="1.8"/><rect x="12" y="8" width="24" height="6" rx="3" fill="#0284C7"/><rect x="12" y="36" width="24" height="6" rx="3" fill="#0284C7"/><path d="M20 20 C23 18 27 22 30 20 M20 27 C23 25 27 29 30 27" stroke="#E6F1FB" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>',
+  autre:'<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 17 L39 17 L36 43 L12 43 Z" fill="#FFD54F" stroke="#FF9800" stroke-width="1.8" stroke-linejoin="round"/><path d="M17 17 C17 8 31 8 31 17" stroke="#E65100" stroke-width="2.8" fill="none" stroke-linecap="round"/><path d="M12 25 L36 25" stroke="#FF9800" stroke-width="1.5"/><circle cx="19" cy="17" r="1.9" fill="#E65100"/><circle cx="29" cy="17" r="1.9" fill="#E65100"/></svg>',
+  rst:'<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="9" y="7" width="30" height="36" rx="4" fill="#BDE6FF" stroke="#0EA5E9" stroke-width="1.8"/><rect x="17" y="3" width="14" height="8" rx="3" fill="#38BDF8" stroke="#0284C7" stroke-width="1.5"/><path d="M16 26 L22 32 L33 19" stroke="#0284C7" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+const CK_TCOL = { can:'#38BDF8', autre:'#FFC107', rst:'#38BDF8' };
 const RST = { key:'', un:[], un2:[], docs:{}, stk:{}, rp:null, buy:[], bd:'' };
 function rst_stop(){ RST.un.concat(RST.un2).forEach(u=>{ try{ u(); }catch(e){} }); RST.un = []; RST.un2 = []; RST.key = ''; RST.docs = {}; RST.stk = {}; RST.rp = null; RST.buy = []; RST.bd = ''; }
 const rst_doc = (d)=>{ const id = 'stk_' + d, o = ck_ob[id]; return o ? ck_deepMerge(JSON.parse(JSON.stringify(RST.stk[d] || {})), o.data) : (RST.stk[d] || {}); };
@@ -7914,7 +7922,7 @@ function rst_html(){
 }
 function rst_tileHtml(me){
   if(!rst_has(me)) return '';
-  return `<button class="ck-tile" onclick="rst_open()"><div class="nm"><span>${esc(ck_s('rs_tile'))}</span></div><div class="st"><b>↺</b><span>${esc(ck_s(ck2_kitchens().length ? 'rs_tileSub' : 'rs_tileStk'))}</span></div></button>`;
+  return `<button class="ck-tile" style="--c:${CK_TCOL.rst}" onclick="rst_open()"><div class="nm"><span class="ico">${CK_TICO.rst}</span><span>${esc(ck_s('rs_tile'))}</span></div><div class="st"><b>↺</b><span>${esc(ck_s(ck2_kitchens().length ? 'rs_tileSub' : 'rs_tileStk'))}</span></div></button>`;
 }
 
 /* ----- côté cuisinier désigné ----- */
@@ -7925,7 +7933,7 @@ function stk_tilesHtml(me){
   const aut = stk_autIds(me); if(aut.length) kinds.push(['autre', 'stk_aut', aut]);
   const tiles = kinds.map(t=>{
     const its = t[2], done = its.length && its.every(id=>stk_num((d.c || {})[id]) !== null), last = its.map(id=>((d.c || {})[id] || {}).at || '').sort().pop();
-    return `<button class="ck-tile ${done ? 'ready' : ''}" onclick="stk_open('${t[0]}')"><div class="nm"><span>${esc(ck_s(t[1]))}</span></div><div class="st"><b>${done ? '✓' : '○'}</b><span>${esc(done ? ck_s('stk_done', { t:ck_hm(last) }) : ck_s('stk_todo'))}</span></div></button>`;
+    return `<button class="ck-tile ${done ? 'ready' : ''}" style="--c:${CK_TCOL[t[0]]}" onclick="stk_open('${t[0]}')"><div class="nm"><span class="ico">${CK_TICO[t[0]]}</span><span>${esc(ck_s(t[1]))}</span></div><div class="st"><b>${done ? '✓' : '○'}</b><span>${esc(done ? ck_s('stk_done', { t:ck_hm(last) }) : ck_s('stk_todo'))}</span></div></button>`;
   }).join('');
   return tiles;
 }
@@ -8689,7 +8697,7 @@ function ck_tilesHtml(){
     const it = ck_ingById(id) || {}, info = ck2_tileInfo(id, K.p, doc), alt = ck_lang === 'ar' ? (it.n || '') : ((ck_cfg.ings[id] || {}).ar || '');
     own++; if(info.st === 'ready') ready++;
     const mark = info.st === 'ready' ? '<b>✓</b>' : '<b>○</b>';
-    return `<button class="ck-tile ${info.st === 'ready' ? 'ready' : info.st === 'prog' ? 'prog' : ''}" style="--c:${ck_color(id)}" onclick="ck2_open(${ck_a(id)},${ck_a(K.p)})"><div class="nm">${ck_icon(ck_kind(id), 46)}<span>${esc(ck_ingName(id))}${alt && alt !== ck_ingName(id) ? `<small ${ck_lang === 'fr' ? 'dir="rtl"' : ''}>${esc(alt)}</small>` : ''}<small class="ck2-k">${esc(K.p.toLowerCase())}</small></span></div><div class="st">${mark}<span>${esc(info.text)}</span></div></button>`;
+    return `<button class="ck-tile ${info.st === 'ready' ? 'ready' : info.st === 'prog' ? 'prog' : ''}" style="--c:${ck_color(id)}" onclick="ck2_open(${ck_a(id)},${ck_a(K.p)})"><div class="nm"><span class="ico">${ck_icon(ck_kind(id), 48)}</span><span>${esc(ck_ingName(id))}${alt && alt !== ck_ingName(id) ? `<small ${ck_lang === 'fr' ? 'dir="rtl"' : ''}>${esc(alt)}</small>` : ''}<small class="ck2-k">${esc(K.p.toLowerCase())}</small></span></div><div class="st">${mark}<span>${esc(info.text)}</span></div></button>`;
   }).join('')).join('');
   const stkTiles = stk_tilesHtml(me) + rst_tileHtml(me), tiles = ingTiles + stkTiles;
   const secs = tiles ? `<div class="ck-grid">${tiles}</div>` : '';
