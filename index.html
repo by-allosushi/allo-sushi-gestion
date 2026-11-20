@@ -7822,7 +7822,7 @@ const stk_itemsAll = (k)=>((ck_cfg.stk || {}).items || []).filter(i=>i && i.k ==
 const stk_items = (k)=>stk_itemsAll(k).filter(i=>String(i.n || '').trim());   // un article sans nom n’est affiché nulle part (sauf dans Réglages, pour le nommer ou le retirer)
 function stk_stop(){ stk.un.forEach(u=>{ try{ u(); }catch(e){} }); stk.un = []; stk.date = ''; stk.docs = {}; stk.buy = []; stk.rp = null; }
 function stk_sync(){
-  const adm = ck_isAdmin() && ck_view === 'admin' && (ck_tab === 'stock' || ck_tab === 'suivi' || ck_tab === 'fiche'), me = ck_who ? ck_cook(ck_who) : null, need = adm || stk_has(me);
+  const adm = ck_isAdmin() && ck_view === 'admin' && (ck_tab === 'stock' || ck_tab === 'suivi' || ck_tab === 'fiche' || ck_tab === 'reg'), me = ck_who ? ck_cook(ck_who) : null, need = adm || stk_has(me);
   if(!need){ if(stk.un.length) stk_stop(); return; }
   const date = adm ? (ck_adate || ck_service()) : ck_service();
   if(stk.date === date && stk.adm === adm && stk.un.length) return;
@@ -8079,8 +8079,8 @@ function stk_ingTable(){
     }
     ss.forEach((r, n)=>{
       rows += rowH(lab1(r.lab), r.th, r.pese, Ls[n], false);
-      const fl = flow(r.veille, [['obtenu', r.obt, '+'], [r.fritNote ? 'frit' : 'vendu', r.vend, '−'], ['perte', r.perte, '−']], r.th, r.pese);
-      calc += `<div class="sc-f">${esc(lab1(r.lab))} : ${fl}${r.fritNote ? ' · net frit déduit des saisies, sans écart' : ''}${r.jete ? ' · jeté en fin de service : ' + esc(f(r.jete)) + ' (compté en perte)' : ''}</div>`;
+      const fl = flow(r.veille, r.fritNote ? [['obtenu', r.obt, '+']] : [['obtenu', r.obt, '+'], ['vendu', r.vend, '−'], ['perte', r.perte, '−']], r.th, r.pese);
+      calc += `<div class="sc-f">${esc(lab1(r.lab))} : ${r.fritNote && r.veille === null ? 'reste veille inconnu' : (r.fritNote ? 'disponible ' : '') + fl}${r.fritNote ? (r.vend !== null ? ' · net frit déduit des saisies : ' + esc(f(r.vend)) : ' · net frit connu après la fin de service') + ', sans écart' : ''}${r.jete ? ' · jeté en fin de service : ' + esc(f(r.jete)) + ' (compté en perte)' : ''}</div>`;
     });
     sr.forEach(x=>{
       rows += rowH(lab1(x.r.mes), x.den, x.real, x.L, x.wait);
@@ -8298,7 +8298,7 @@ function fi_stages(D){
   ck_ingList().forEach(it=>{
     const id = it.id, k = ck_kind(id), u = ck_unit(id), ps = ck2_ps(docs, id), pp = ck2_ps(prev, id), sold = (sl)=>ck_r(fi_toUnit(id, S.g[sl] || 0));
     const mk = (o)=>{ const R = Object.assign({ id, name:it.n, u, inc:S.no > 0, noEc:false }, o);
-      if(!R.noEc && R.veille !== null){ R.th = ck_r(R.veille + R.obt - R.vend - R.perte); R.ec = R.pese === null ? null : ck_r(R.pese - R.th); } else { R.th = null; R.ec = null; } rows.push(R); };
+      if(!R.noEc && R.veille !== null){ R.th = ck_r(R.veille + R.obt - R.vend - R.perte); R.ec = R.pese === null ? null : ck_r(R.pese - R.th); } else { R.th = R.fritNote && R.veille !== null ? ck_r(R.veille + R.obt) : null; R.ec = null; } rows.push(R); };   // net frit du Sushi : « Attendu » = net disponible (reste veille + obtenu), sans écart
     const veilleOf = (key, plist)=>day0 ? 0 : (plist.length ? sum(prev, id, key, plist) : null);
     if(k === 'saumon' || k === 'gamba'){
       if(!(ps.length || pp.length || cks.some(c=>c.ings.includes(id)))) return;
@@ -8861,7 +8861,7 @@ function ck_export(){
 
 /* ---------- Réglages : saisie des cuisiniers (date, export, vider, rouvrir, corriger) ---------- */
 let ck_rc = '', ck_corr = false, ck_cr = null, ck_crErr = '';
-function ck_rcSet(v){ ck_rc = v; ck_corr = false; ck_cr = null; ck_crErr = ''; ck_render(); }
+function ck_rcSet(v){ ck_rc = v; ck_corr = false; ck_cr = null; ck_crErr = ''; stkCr = null; stkCrErr = ''; ck_render(); }
 function ck_rcCorr(){ ck_corr = !ck_corr; ck_cr = null; ck_crErr = ''; ck_render(); }
 function ck_crFields(id, p, t){
   if(t === 'dc') return [['b', 'Brut pris dans le bac'], ['n', 'Net obtenu après découpe']];
@@ -8909,6 +8909,32 @@ function ck_corrHtml(date, code, doc){
   }).join('');
   return `<div style="margin-top:12px;"><div class="ck-sub" style="margin-bottom:6px;">Corrige ou supprime les saisies du ${esc(ck_frDate(date))}. Une fin de service oubliée se saisit ici. Les corrections sont marquées « saisie par l’admin », la valeur du cuisinier reste visible, et le reste veille du lendemain ainsi que le bilan se recalculent tout seuls.</div>${html || '<div class="ck-empty">Aucun ingrédient pour ce cuisinier.</div>'}</div>`;
 }
+/* ----- correction par l’admin des comptages du stock (canettes, eau, autres articles) d’une journée ----- */
+let stkCr = null, stkCrErr = '';
+function stk_crEdit(id){ stkCr = id; stkCrErr = ''; ck_render(); }
+function stk_crCancel(){ stkCr = null; stkCrErr = ''; ck_render(); }
+function stk_crSave(){
+  const id = stkCr, it = stk_itemsAll('can').concat(stk_itemsAll('autre')).find(x=>x.id === id); if(!it) return; const date = ck_adate || ck_service(), d = stk_doc(date), can = it.k === 'can';
+  const iq = document.querySelector('#ck-root input[data-sq]'), il = document.querySelector('#ck-root input[data-sl]');
+  const q = iq ? ck_num(iq.value) : null; if(!iq || String(iq.value).trim() === '' || q === null){ stkCrErr = 'Indique la quantité comptée (0 est accepté).'; return ck_render(); }
+  const put = { c:{ [id]:{ q, at:((d.c || {})[id] || {}).at || ck_nowIso(), by:((d.c || {})[id] || {}).by || 'Admin', adm:true } } };
+  const oq = stk_num((d.c || {})[id]); if(oq !== null) put.c[id].prevQ = (d.c[id].adm && d.c[id].prevQ !== undefined) ? d.c[id].prevQ : oq;
+  if(can && il){ const l = String(il.value).trim() === '' ? 0 : ck_num(il.value); if(l === null){ stkCrErr = 'La perte doit être un nombre.'; return ck_render(); } put.l = { [id]:{ q:l, at:((d.l || {})[id] || {}).at || ck_nowIso(), by:((d.l || {})[id] || {}).by || 'Admin', adm:true } }; }
+  ck_write('stk_' + date, Object.assign({ sdate:date }, put)); stkCr = null; stkCrErr = ''; ck_render();
+}
+function stk_crHtml(date){
+  const d = stk_doc(date), can = stk_items('can'), aut = stk_items('autre'); if(!can.length && !aut.length) return '';
+  const row = (i, isCan)=>{
+    const c0 = (d.c || {})[i.id], q = stk_num(c0), l0 = (d.l || {})[i.id], lq = stk_num(l0), ed = stkCr === i.id;
+    const mark = c0 && c0.adm ? ` <span class="ck-pill wa">saisie par l’admin</span>${c0.prevQ !== undefined ? `<div class="ck-sub">valeur du cuisinier : ${esc(ck_fmt(c0.prevQ))}</div>` : ''}` : '';
+    const who = c0 && c0.at && !c0.adm ? `<div class="ck-sub">compté par ${esc(c0.by || '')} · ${esc(ck_hm(c0.at))}</div>` : '';
+    const form = ed ? `<tr><td colspan="4"><div class="fi-form ck-corr-form"><div class="fi-fr"><label>Quantité comptée</label><input class="ck-in" inputmode="decimal" style="width:100px" data-sq="1" value="${q !== null ? esc(ck_fmt(q)) : ''}" placeholder="0"></div>${isCan ? `<div class="fi-fr"><label>Pertes du jour</label><input class="ck-in" inputmode="decimal" style="width:100px" data-sl="1" value="${lq !== null ? esc(ck_fmt(lq)) : ''}" placeholder="0"></div>` : ''}<div class="ck-err">${esc(stkCrErr)}</div><div class="ck-fr"><button class="ck-btn on" onclick="stk_crSave()">Enregistrer</button><button class="ck-btn" onclick="stk_crCancel()">Annuler</button></div></div></td></tr>` : '';
+    return `<tr><td>${esc(i.n)}${mark}${who}</td><td>${q === null ? '—' : esc(ck_fmt(q))}</td><td>${isCan ? (lq === null ? '—' : esc(ck_fmt(lq))) : ''}</td><td><button class="ck-btn sm" aria-label="Corriger" onclick="stk_crEdit(${ck_a(i.id)})">✎</button></td></tr>${form}`;
+  };
+  const tb = (its, isCan, title)=>its.length ? `<div class="ck-sub" style="margin:10px 0 4px;">${esc(title)}</div><div class="ck3-w"><table class="ck3-t"><tr><th>Article</th><th>Comptage</th><th>${isCan ? 'Pertes' : ''}</th><th></th></tr>${its.map(i=>row(i, isCan)).join('')}</table></div>` : '';
+  return `<div style="margin-top:14px;"><b>Stock du jour · ${esc(ck_frDate(date))}</b><div class="ck-sub" style="margin-top:2px;">Corrige un comptage : le suivi du stock, le théorique du lendemain et « Reste du dernier service » se recalculent tout seuls.</div>${tb(can, true, 'Canettes et eau')}${tb(aut, false, 'Autres articles')}</div>`;
+}
+
 function ck_saisieBox(){
   const date = ck_adate || ck_service(), docs = ck_docs(), codes = ck_cooks().map(c=>c.code);
   Object.keys(docs).forEach(k=>{ const e = String(docs[k].emp); if(!codes.includes(e)) codes.push(e); });
@@ -8919,7 +8945,7 @@ function ck_saisieBox(){
     <div class="ck-date"><button class="ck-btn sm" onclick="ck_adateMove(-1)">‹</button><input type="date" class="ck-in" value="${esc(date)}" onchange="ck_adateSet(this.value)"><button class="ck-btn sm" onclick="ck_adateMove(1)">›</button><button class="ck-btn sm" onclick="ck_adateSet('')">Aujourd’hui</button><button class="ck-btn sm" onclick="ck_export()">⬇ Export Excel</button></div>
     <div class="ck-fr" style="flex-wrap:wrap"><select class="ck-in" style="min-width:200px" onchange="ck_rcSet(this.value)"><option value="">Choisir un cuisinier…</option>${codes.map(c=>ck_opt(c, ck_empName(c), ck_rc)).join('')}</select>
       <button class="ck-btn sm danger" ${off} onclick="ck_adminClear(${ck_a(ck_rc)})">Vider</button><button class="ck-btn sm ${ck_corr ? 'on' : ''}" ${off} onclick="ck_rcCorr()">Corriger</button><button class="ck-btn sm" ${ck_rc && doc.done ? '' : 'disabled'} onclick="ck_adminReopen(${ck_a(ck_rc)})">Rouvrir</button><button class="ck-btn sm" ${ck_rc && doc.emp && !doc.done ? '' : 'disabled'} onclick="ck_adminClose(${ck_a(ck_rc)})">Clôturer</button>${pill}</div>
-    ${ck_rc && ck_corr ? ck_corrHtml(date, ck_rc, doc) : ''}</div>`;
+    ${ck_rc && ck_corr ? ck_corrHtml(date, ck_rc, doc) + stk_crHtml(date) : ''}</div>`;
 }
 
 /* ---------- Réglages ---------- */
