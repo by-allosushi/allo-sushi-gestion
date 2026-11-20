@@ -2703,7 +2703,7 @@ function pt_start(){
   }, onErr);
   pt_configRef.onSnapshot((doc)=>{
     const data = doc.exists ? (doc.data() || {}) : {};
-    pt_emp = data.emp || {}; pt_ready.cfg = true; pt_scheduleRender();
+    pt_emp = data.emp || {}; pt_dpRateV = Number(data.dpRate) > 0 ? Number(data.dpRate) : 200; pt_ready.cfg = true; pt_scheduleRender();
   }, onErr);
   pt_ignoreRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
@@ -2949,6 +2949,64 @@ function pt_entriesOf(kind, code){
   return pt_entries.filter(e=>e.kind === kind && e.code === code && pt_inRange(e.date))
     .map(e=>({ id:e.id, date:e.date, amount:Number(e.amount)||0, note:e.note || '', src:'local', av:e.source === 'depenses' }));
 }
+
+/* ---------- double poste : périodes où un employé du groupe est seul, prime à validation ---------- */
+let pt_dpRateV = 200, pt_dpList = [];
+const pt_dpRate = ()=>pt_dpRateV;
+function pt_dpOn(c){ const e = pt_emp[c] || {}; if(e.dp !== undefined) return !!e.dp; return /^(marwa|meriem|hamid)$/i.test(String(pt_name(c)).trim()); }
+function pt_dpCodes(){ return pt_codes().filter(c=>pt_isActive(c) && pt_dpOn(c)); }
+const pt_toMin = (v)=>{ const m = /^(\d{1,2}):(\d{2})$/.exec(String(v || '').trim()); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+const pt_minHM = (d)=>d.getHours() * 60 + d.getMinutes();
+function pt_dpDetect(sessions){   // { jour : { code : [{ from:Date, to:Date }] } } : moments où un seul employé du groupe est présent
+  const grp = pt_dpCodes(), byDay = {}, out = {};
+  (sessions || []).filter(x=>grp.includes(x.code) && x.end > x.start).forEach(x=>{ const d = pt_day(x.date); (byDay[d] = byDay[d] || []).push(x); });
+  Object.keys(byDay).forEach(day=>{
+    const ss = byDay[day], pts = Array.from(new Set(ss.reduce((a, x)=>a.concat([+x.start, +x.end]), []))).sort((a, b)=>a - b);
+    for(let i = 0; i < pts.length - 1; i++){
+      const a = pts[i], b = pts[i + 1], who = Array.from(new Set(ss.filter(x=>+x.start <= a && +x.end >= b).map(x=>x.code)));
+      if(who.length !== 1 || b - a < 60000) continue;
+      const o = out[day] = out[day] || {}, L = o[who[0]] = o[who[0]] || [], last = L[L.length - 1];
+      if(last && +last.to === a) last.to = new Date(b); else L.push({ from:new Date(a), to:new Date(b) });
+    }
+  });
+  return out;
+}
+function pt_dpValid(c){ return pt_entries.filter(e=>e.kind === 'prime' && e.dp && e.code === c && pt_inRange(e.date)).sort((a, b)=>String(a.date).localeCompare(String(b.date)) || String(a.dpFrom).localeCompare(String(b.dpFrom))); }
+const pt_dpDayLab = (iso)=>{ const d = new Date(iso + 'T12:00:00'), w = d.toLocaleDateString('fr-FR', { weekday:'long' }); return w.charAt(0).toUpperCase() + w.slice(1) + ' ' + pt_dm(d); };
+const pt_dpDur = (m)=>Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
+function pt_dpHtml(c, sessions){
+  const det = pt_dpDetect(sessions), rate = pt_dpRate(), valid = pt_dpValid(c), pend = [], names = pt_dpCodes().map(x=>pt_name(x));
+  Object.keys(det).sort().forEach(day=>(det[day][c] || []).forEach(x=>{
+    const a = pt_minHM(x.from), b = pt_minHM(x.to);
+    if(!valid.some(v=>v.date === day && pt_toMin(v.dpFrom) < b && pt_toMin(v.dpTo) > a)) pend.push({ day, from:pt_hhmm(x.from), to:pt_hhmm(x.to) });
+  }));
+  pt_dpList = pend;
+  const amt = (f, t)=>{ const a = pt_toMin(f), b = pt_toMin(t); return a === null || b === null || b <= a ? 0 : Math.round((b - a) * rate / 60); };
+  const pRows = pend.map((r, i)=>`<div class="pt-an" style="align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>${pt_e(pt_dpDayLab(r.day))}</b>${pt_dayClosed(r.day, c) ? ' <span class="pt-badge pt-b-prime">🔒 Clôturé</span>' : ''}<div class="pt-an-reason">seul(e) de <input type="time" id="pt-dp-f-${i}" class="pt-draft" value="${r.from}" onchange="pt_dpCalc(${i})"> à <input type="time" id="pt-dp-t-${i}" class="pt-draft" value="${r.to}" onchange="pt_dpCalc(${i})"> · <span id="pt-dp-a-${i}">${pt_fmtMoney(amt(r.from, r.to))}</span></div></div><button class="btn small b-add" onclick="pt_dpValidate(${i})">Valider</button></div>`).join('');
+  const vRows = valid.map(v=>{
+    const a = pt_toMin(v.dpFrom), b = pt_toMin(v.dpTo), stale = !((det[v.date] || {})[c] || []).some(x=>pt_minHM(x.from) < b && pt_minHM(x.to) > a);
+    return `<div class="pt-an" style="align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>${pt_e(pt_dpDayLab(v.date))}</b> <span class="pt-badge pt-b-off">✓ Validée</span><div class="pt-an-reason">de ${pt_e(v.dpFrom)} jusqu’à ${pt_e(v.dpTo)} · ${pt_fmtMoney(v.amount)}${stale ? ' · <span style="color:var(--rust)">pointage modifié depuis la validation</span>' : ''}</div></div><button class="btn ghost small t-del" onclick="pt_dpUndo('${v.id}')">Annuler la validation</button></div>`;
+  }).join('');
+  const nMin = pend.reduce((t, r)=>t + Math.max(0, pt_toMin(r.to) - pt_toMin(r.from)), 0), vMin = valid.reduce((t, v)=>t + Math.max(0, pt_toMin(v.dpTo) - pt_toMin(v.dpFrom)), 0), vAmt = valid.reduce((t, v)=>t + (Number(v.amount) || 0), 0);
+  return `<div class="pt-muted" style="margin-bottom:8px;">A travaillé en double poste : seul(e) présent(e) parmi ${pt_e(names.join(', ') || '—')}. Prime ${pt_fmtMoney(rate)} par heure, ajoutée à la paie (Primes) quand tu valides. Corrige les heures si besoin avant de valider.</div>
+    ${pRows || ''}${vRows || ''}${!pRows && !vRows ? '<div class="pt-muted">Aucune période seul(e) sur la période.</div>' : ''}
+    <div class="pt-muted" style="margin-top:8px;">À valider : ${pend.length} · ${pt_dpDur(nMin)} · Validé : ${valid.length} · ${pt_dpDur(vMin)} · ${pt_fmtMoney(vAmt)}</div>`;
+}
+function pt_dpCalc(i){ const f = document.getElementById('pt-dp-f-' + i), t = document.getElementById('pt-dp-t-' + i), o = document.getElementById('pt-dp-a-' + i); if(!f || !t || !o) return; const a = pt_toMin(f.value), b = pt_toMin(t.value); o.textContent = pt_fmtMoney(a === null || b === null || b <= a ? 0 : (b - a) * pt_dpRate() / 60); }
+async function pt_dpValidate(i){
+  const r = pt_dpList[i]; if(!r || pt_sel === null) return;
+  const f = document.getElementById('pt-dp-f-' + i).value, t = document.getElementById('pt-dp-t-' + i).value, a = pt_toMin(f), b = pt_toMin(t);
+  if(a === null || b === null){ alert('Indique l’heure de début et l’heure de fin.'); return; }
+  if(b <= a){ alert('L’heure de fin doit être après l’heure de début.'); return; }
+  if(pt_guardDay(r.day, 'Cette prime', pt_sel)) return;
+  try{ await pt_addEntryDoc({ kind:'prime', code:pt_sel, date:r.day, amount:Math.round((b - a) * pt_dpRate() / 60), note:'Travaille double poste de ' + f + ' jusqu’à ' + t, dp:true, dpFrom:f, dpTo:t }); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+async function pt_dpUndo(id){
+  const en = pt_entries.find(x=>x.id === id); if(!en) return;
+  if(pt_guardDay(en.date, 'Cette annulation', en.code)) return;
+  if(confirm('Annuler la validation du ' + fmtDateShort(en.date) + ' (' + pt_fmtMoney(en.amount) + ') ? La prime sera retirée de la paie.')) pt_delEntry(id);
+}
+function pt_dpSetRate(v){ const n = pt_num(v); if(!(n > 0)){ alert('Indique un tarif en DA par heure.'); pt_render(true); return; } pt_configRef.set({ dpRate:n }, { merge:true }).catch(e=>alert('Erreur : ' + (e.message || e))); }
 /* ---------- verrou des jours clôturés ---------- */
 function pt_addDays(iso, n){ const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return toLocalISO(d); }
 function pt_dayDiff(a, b){ return Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000); }
@@ -3298,7 +3356,7 @@ function pt_restoreInputs(st, withValues){
     if(el){ el.focus(); if(st.focus.s != null && el.setSelectionRange){ try{ el.setSelectionRange(st.focus.s, st.focus.e); }catch(e){} } }
   }
 }
-let pt_open = { pointages:true, prets:false, conge:false, clotures:false, manual:false, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
+let pt_open = { pointages:true, dp:true, prets:false, conge:false, clotures:false, manual:false, anomEmp:false, paie:false }; // sections repliables de l'onglet Employés
 function pt_toggleSec(key){ pt_open[key] = !pt_open[key]; pt_render(true); }
 function pt_accordion(key, title, innerHtml){
   const open = !!pt_open[key];
@@ -4114,6 +4172,7 @@ function pt_tabEmployes(codes, sessions, anoms, overlaps){
     ${isAdmin ? `<div class="pt-muted" style="margin-top:8px;">Fiche de paie · ${pa_vueLine(c)}</div>` : ''}
   </div>`;
   html += pt_accordion('pointages', 'Pointages de l’employé', pt_pointagesSection(c, sessions, myAn, myOv));
+  if(isAdmin && pt_dpOn(c)) html += pt_accordion('dp', 'Double poste', pt_dpHtml(c, sessions));
   if(isAdmin) html += pt_accordion('paie', 'Paie', pt_paieSection(c, sessions, codes));
   if(isAdmin) html += pt_accordion('prets', 'Prêts', pt_pretsHtml(c));
   if(isAdmin) html += pt_accordion('clotures', 'Clôtures', pt_cloturesSection());
@@ -4165,6 +4224,7 @@ function pt_tabReglages(codes){
         <div class="field"><label>Taux (DA)</label><input type="text" inputmode="decimal" value="${pt_rate(c) || ''}" placeholder="0" onchange="pt_setRate(${c},this.value)"></div>
       </div>
       <div class="perm-row" style="margin-top:8px;"><span>Employé actif</span><label class="switch"><input type="checkbox" checked onchange="pt_setActive(${c},false)"><span class="slider"></span></label></div>
+      <div class="perm-row" style="margin-top:8px;"><span>Prime double poste (quand seul(e) présent(e))</span><label class="switch"><input type="checkbox" ${pt_dpOn(c)?'checked':''} onchange="pt_setEmp(${c},{dp:this.checked})"><span class="slider"></span></label></div>
       <div class="perm-row" style="margin-top:8px;"><span>Prime de transport par jour travaillé</span><label class="switch"><input type="checkbox" ${tr.enabled?'checked':''} onchange="pt_setTransport(${c},{enabled:this.checked})"><span class="slider"></span></label></div>
       ${tr.enabled ? `<div class="field" style="margin-top:8px;max-width:220px;"><label>Montant / jour (DA)</label><input type="text" inputmode="decimal" value="${tr.amount || ''}" placeholder="0" onchange="pt_setTransport(${c},{amount:pt_num(this.value)})"></div>` : ''}
     </div>`;
@@ -4182,6 +4242,7 @@ function pt_tabReglages(codes){
     <div class="pt-muted" style="margin-bottom:8px;">Pour quelqu’un géré sans pointeur, ou dont tu saisis toujours le pointage à la main : choisis un numéro de code libre.</div>
     <div class="pt-row"><input type="text" inputmode="numeric" id="pt-new-code" class="pt-draft pt-w90" value="${suggestion}"><button class="btn small b-add t-add" onclick="pt_addEmployee()">Ajouter</button></div>
   </div>
+  ${isAdmin ? `<div class="ticket"><div class="section-label">Double poste</div><div class="field" style="max-width:220px;"><label>Prime par heure (DA)</label><input type="text" inputmode="decimal" value="${pt_dpRate()}" onchange="pt_dpSetRate(this.value)"></div><div class="pt-muted" style="margin-top:6px;">Prime pour les heures où l’employé est le seul présent parmi les employés cochés ci-dessous. Elle ne s’applique qu’au double poste.</div></div>` : ''}
   <h2 class="section">Employés</h2>
   ${cards || pt_empty('Importe un export ZKBio ou ajoute un employé ci-dessus.')}
   ${inactiveHtml}
