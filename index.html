@@ -2974,32 +2974,66 @@ function pt_dpDetect(sessions){   // { jour : { code : [{ from:Date, to:Date }] 
 function pt_dpValid(c){ return pt_entries.filter(e=>e.kind === 'prime' && e.dp && e.code === c && pt_inRange(e.date)).sort((a, b)=>String(a.date).localeCompare(String(b.date)) || String(a.dpFrom).localeCompare(String(b.dpFrom))); }
 const pt_dpDayLab = (iso)=>{ const d = new Date(iso + 'T12:00:00'), w = d.toLocaleDateString('fr-FR', { weekday:'long' }); return w.charAt(0).toUpperCase() + w.slice(1) + ' ' + pt_dm(d); };
 const pt_dpDur = (m)=>Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
+let pt_dpEd = '';
+function pt_dpSkips(c){ return pt_entries.filter(e=>e.kind === 'dpskip' && e.code === c && pt_inRange(e.date)); }
 function pt_dpHtml(c, sessions){
-  const det = pt_dpDetect(sessions), rate = pt_dpRate(), valid = pt_dpValid(c), pend = [], names = pt_dpCodes().map(x=>pt_name(x));
+  const det = pt_dpDetect(sessions), rate = pt_dpRate(), valid = pt_dpValid(c), skips = pt_dpSkips(c), pend = [], names = pt_dpCodes().map(x=>pt_name(x));
   Object.keys(det).sort().forEach(day=>(det[day][c] || []).forEach(x=>{
-    const a = pt_minHM(x.from), b = pt_minHM(x.to);
-    if(!valid.some(v=>v.date === day && pt_toMin(v.dpFrom) < b && pt_toMin(v.dpTo) > a)) pend.push({ day, from:pt_hhmm(x.from), to:pt_hhmm(x.to) });
+    const a = pt_minHM(x.from), b = pt_minHM(x.to), hit = (v, f, t)=>v.date === day && pt_toMin(v[f]) < b && pt_toMin(v[t]) > a;
+    if(!valid.some(v=>hit(v, 'dpFrom', 'dpTo')) && !skips.some(v=>hit(v, 'dpFrom', 'dpTo'))) pend.push({ day, from:pt_hhmm(x.from), to:pt_hhmm(x.to) });
   }));
   pt_dpList = pend;
   const amt = (f, t)=>{ const a = pt_toMin(f), b = pt_toMin(t); return a === null || b === null || b <= a ? 0 : Math.round((b - a) * rate / 60); };
-  const pRows = pend.map((r, i)=>`<div class="pt-an" style="align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>${pt_e(pt_dpDayLab(r.day))}</b>${pt_dayClosed(r.day, c) ? ' <span class="pt-badge pt-b-prime">🔒 Clôturé</span>' : ''}<div class="pt-an-reason">seul(e) de <input type="time" id="pt-dp-f-${i}" class="pt-draft" value="${r.from}" onchange="pt_dpCalc(${i})"> à <input type="time" id="pt-dp-t-${i}" class="pt-draft" value="${r.to}" onchange="pt_dpCalc(${i})"> · <span id="pt-dp-a-${i}">${pt_fmtMoney(amt(r.from, r.to))}</span></div></div><button class="btn small b-add" onclick="pt_dpValidate(${i})">Valider</button></div>`).join('');
+  const inputs = (id, f, t)=>`seul(e) de <input type="time" id="pt-dp-f-${id}" class="pt-draft" value="${pt_e(f)}" onchange="pt_dpCalc('${id}')"> à <input type="time" id="pt-dp-t-${id}" class="pt-draft" value="${pt_e(t)}" onchange="pt_dpCalc('${id}')"> · <span id="pt-dp-a-${id}">${pt_fmtMoney(amt(f, t))}</span>`;
+  const pRows = pend.map((r, i)=>{
+    const ed = pt_dpEd === 'n|' + i, lock = pt_dayClosed(r.day, c) ? ' <span class="pt-badge pt-b-prime">🔒 Clôturé</span>' : '';
+    const btns = ed ? `<button class="btn small b-add" onclick="pt_dpValidate(${i})">Valider</button><button class="btn ghost small" onclick="pt_dpEdSet('')">Annuler</button>`
+      : `<button class="btn small b-add" onclick="pt_dpValidate(${i})">Valider</button><button class="btn ghost small" onclick="pt_dpEdSet('n|${i}')">Corriger</button><button class="btn ghost small t-del" onclick="pt_dpSkip(${i})">Supprimer</button>`;
+    return `<div class="pt-an" style="align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>${pt_e(pt_dpDayLab(r.day))}</b>${lock}<div class="pt-an-reason">${ed ? inputs('n' + i, r.from, r.to) : 'seul(e) de ' + pt_e(r.from) + ' à ' + pt_e(r.to) + ' · ' + pt_fmtMoney(amt(r.from, r.to))}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">${btns}</div></div>`;
+  }).join('');
   const vRows = valid.map(v=>{
-    const a = pt_toMin(v.dpFrom), b = pt_toMin(v.dpTo), stale = !((det[v.date] || {})[c] || []).some(x=>pt_minHM(x.from) < b && pt_minHM(x.to) > a);
-    return `<div class="pt-an" style="align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>${pt_e(pt_dpDayLab(v.date))}</b> <span class="pt-badge pt-b-off">✓ Validée</span><div class="pt-an-reason">de ${pt_e(v.dpFrom)} jusqu’à ${pt_e(v.dpTo)} · ${pt_fmtMoney(v.amount)}${stale ? ' · <span style="color:var(--rust)">pointage modifié depuis la validation</span>' : ''}</div></div><button class="btn ghost small t-del" onclick="pt_dpUndo('${v.id}')">Annuler la validation</button></div>`;
+    const a = pt_toMin(v.dpFrom), b = pt_toMin(v.dpTo), stale = !((det[v.date] || {})[c] || []).some(x=>pt_minHM(x.from) < b && pt_minHM(x.to) > a), ed = pt_dpEd === 'v|' + v.id;
+    const btns = ed ? `<button class="btn small b-add" onclick="pt_dpSave('${v.id}')">Enregistrer</button><button class="btn ghost small" onclick="pt_dpEdSet('')">Annuler</button>`
+      : `<button class="btn ghost small" onclick="pt_dpEdSet('v|${v.id}')">Corriger</button><button class="btn ghost small t-del" onclick="pt_dpUndo('${v.id}')">Annuler la validation</button>`;
+    return `<div class="pt-an" style="align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>${pt_e(pt_dpDayLab(v.date))}</b> <span class="pt-badge pt-b-off">✓ Validée</span><div class="pt-an-reason">${ed ? inputs('v' + v.id, v.dpFrom, v.dpTo) : 'de ' + pt_e(v.dpFrom) + ' jusqu’à ' + pt_e(v.dpTo) + ' · ' + pt_fmtMoney(v.amount)}${stale && !ed ? ' · <span style="color:var(--rust)">pointage modifié depuis la validation</span>' : ''}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">${btns}</div></div>`;
   }).join('');
   const nMin = pend.reduce((t, r)=>t + Math.max(0, pt_toMin(r.to) - pt_toMin(r.from)), 0), vMin = valid.reduce((t, v)=>t + Math.max(0, pt_toMin(v.dpTo) - pt_toMin(v.dpFrom)), 0), vAmt = valid.reduce((t, v)=>t + (Number(v.amount) || 0), 0);
-  return `<div class="pt-muted" style="margin-bottom:8px;">A travaillé en double poste : seul(e) présent(e) parmi ${pt_e(names.join(', ') || '—')}. Prime ${pt_fmtMoney(rate)} par heure, ajoutée à la paie (Primes) quand tu valides. Corrige les heures si besoin avant de valider.</div>
-    ${pRows || ''}${vRows || ''}${!pRows && !vRows ? '<div class="pt-muted">Aucune période seul(e) sur la période.</div>' : ''}
-    <div class="pt-muted" style="margin-top:8px;">À valider : ${pend.length} · ${pt_dpDur(nMin)} · Validé : ${valid.length} · ${pt_dpDur(vMin)} · ${pt_fmtMoney(vAmt)}</div>`;
+  const skipLine = skips.length ? `<div class="pt-muted" style="margin-top:6px;">${skips.length} période${skips.length > 1 ? 's' : ''} supprimée${skips.length > 1 ? 's' : ''} · <a href="#" class="pt-link" onclick="pt_dpRestore();return false;">Restaurer</a></div>` : '';
+  return `<div class="pt-muted" style="margin-bottom:8px;">A travaillé en double poste : seul(e) présent(e) parmi ${pt_e(names.join(', ') || '—')}. Prime ${pt_fmtMoney(rate)} par heure, ajoutée à la paie (Primes) quand tu valides.</div>
+    ${pRows || ''}${vRows || ''}${!pRows && !vRows ? '<div class="pt-muted">Aucune période seul(e) à traiter sur la période.</div>' : ''}
+    <div class="pt-muted" style="margin-top:8px;">À traiter : ${pend.length} · ${pt_dpDur(nMin)} · Validé : ${valid.length} · ${pt_dpDur(vMin)} · ${pt_fmtMoney(vAmt)}</div>${skipLine}`;
 }
-function pt_dpCalc(i){ const f = document.getElementById('pt-dp-f-' + i), t = document.getElementById('pt-dp-t-' + i), o = document.getElementById('pt-dp-a-' + i); if(!f || !t || !o) return; const a = pt_toMin(f.value), b = pt_toMin(t.value); o.textContent = pt_fmtMoney(a === null || b === null || b <= a ? 0 : (b - a) * pt_dpRate() / 60); }
+function pt_dpEdSet(k){ pt_dpEd = k; pt_render(true); }
+function pt_dpCalc(id){ const f = document.getElementById('pt-dp-f-' + id), t = document.getElementById('pt-dp-t-' + id), o = document.getElementById('pt-dp-a-' + id); if(!f || !t || !o) return; const a = pt_toMin(f.value), b = pt_toMin(t.value); o.textContent = pt_fmtMoney(a === null || b === null || b <= a ? 0 : (b - a) * pt_dpRate() / 60); }
+function pt_dpRead(id){
+  const f = document.getElementById('pt-dp-f-' + id), t = document.getElementById('pt-dp-t-' + id); if(!f || !t) return null;
+  const a = pt_toMin(f.value), b = pt_toMin(t.value);
+  if(a === null || b === null){ alert('Indique l’heure de début et l’heure de fin.'); return false; }
+  if(b <= a){ alert('L’heure de fin doit être après l’heure de début.'); return false; }
+  return { f:f.value, t:t.value, amount:Math.round((b - a) * pt_dpRate() / 60) };
+}
 async function pt_dpValidate(i){
   const r = pt_dpList[i]; if(!r || pt_sel === null) return;
-  const f = document.getElementById('pt-dp-f-' + i).value, t = document.getElementById('pt-dp-t-' + i).value, a = pt_toMin(f), b = pt_toMin(t);
-  if(a === null || b === null){ alert('Indique l’heure de début et l’heure de fin.'); return; }
-  if(b <= a){ alert('L’heure de fin doit être après l’heure de début.'); return; }
+  let v = pt_dpRead('n' + i); if(v === false) return; if(v === null) v = { f:r.from, t:r.to, amount:Math.round((pt_toMin(r.to) - pt_toMin(r.from)) * pt_dpRate() / 60) };
   if(pt_guardDay(r.day, 'Cette prime', pt_sel)) return;
-  try{ await pt_addEntryDoc({ kind:'prime', code:pt_sel, date:r.day, amount:Math.round((b - a) * pt_dpRate() / 60), note:'Travaille double poste de ' + f + ' jusqu’à ' + t, dp:true, dpFrom:f, dpTo:t }); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+  pt_dpEd = '';
+  try{ await pt_addEntryDoc({ kind:'prime', code:pt_sel, date:r.day, amount:v.amount, note:'Travaille double poste de ' + v.f + ' jusqu’à ' + v.t, dp:true, dpFrom:v.f, dpTo:v.t }); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+async function pt_dpSave(id){
+  const en = pt_entries.find(x=>x.id === id); if(!en) return;
+  const v = pt_dpRead('v' + id); if(!v) return;
+  if(pt_guardDay(en.date, 'Cette correction', en.code)) return;
+  pt_dpEd = '';
+  try{ await pt_entriesCol.doc(id).update({ amount:v.amount, note:'Travaille double poste de ' + v.f + ' jusqu’à ' + v.t, dpFrom:v.f, dpTo:v.t }); }catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
+}
+async function pt_dpSkip(i){
+  const r = pt_dpList[i]; if(!r || pt_sel === null) return;
+  if(pt_guardDay(r.day, 'Cette suppression', pt_sel)) return;
+  try{ await pt_addEntryDoc({ kind:'dpskip', code:pt_sel, date:r.day, dpFrom:r.from, dpTo:r.to, amount:0 }); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
+}
+async function pt_dpRestore(){
+  const list = pt_dpSkips(pt_sel).filter(e=>!pt_dayClosed(e.date, e.code)); if(!list.length){ alert('Ces périodes sont dans un jour clôturé : rouvre-le d’abord.'); return; }
+  try{ await Promise.all(list.map(e=>pt_entriesCol.doc(e.id).delete())); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
 async function pt_dpUndo(id){
   const en = pt_entries.find(x=>x.id === id); if(!en) return;
