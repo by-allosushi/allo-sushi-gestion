@@ -691,12 +691,6 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
   </main>
 </div>
 
-<div id="module-mep" class="module">
-  <main style="max-width:760px;margin:0 auto;padding:18px 16px 50px;">
-    <div id="mep-body"></div>
-  </main>
-</div>
-
 <div id="module-cuisine" class="module">
   <style>
     #module-cuisine .ck{max-width:1000px;margin:0 auto;font-family:'Inter',sans-serif;color:var(--ink);}
@@ -1072,7 +1066,6 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
         <div class="perm-row"><span>↳ Dépenses : saisie du solde réel</span><label class="switch"><input type="checkbox" id="nu-perm-solde-reel" checked><span class="slider"></span></label></div>
         <div class="perm-row"><span>↳ Dépenses : vérification / écart</span><label class="switch"><input type="checkbox" id="nu-perm-verification" checked><span class="slider"></span></label></div>
         <div class="perm-row"><span>Accès Pointage</span><label class="switch"><input type="checkbox" id="nu-perm-pointage"><span class="slider"></span></label></div>
-        <div class="perm-row"><span>Accès Mise en place</span><label class="switch"><input type="checkbox" id="nu-perm-mep"><span class="slider"></span></label></div>
         <div class="perm-row"><span>Accès Ma fiche de paie</span><label class="switch"><input type="checkbox" id="nu-perm-paie"><span class="slider"></span></label></div>
         <div style="padding:2px 0 8px;"><div style="font-size:12px;color:var(--ink-muted);">Employé correspondant (pointage) — nécessaire pour « Ma fiche de paie »</div><select id="nu-emp" class="pa-emp"><option value="">— Aucun employé —</option></select></div>
       </div>
@@ -1119,7 +1112,6 @@ const MODULE_DEFS = [
   { key:'caisse',   label:'Caisse',    ic:'💰', desc:'Sessions de caisse' },
   { key:'depenses', label:'Dépenses',  ic:'🧾', desc:'Dépenses & pointage' },
   { key:'pointage', label:'Pointage',  ic:'⏱️', desc:'Heures, anomalies & paie' },
-  { key:'mep',      label:'Mise en place', ic:'🧑‍🍳', desc:'Inventaire de fin de service' },
   { key:'cuisine', label:'Cuisine', ic:'🍳', desc:'Saisie des cuisiniers' },
   { key:'restopro', label:'CA Resto Pro', ic:'📈', desc:'Chiffre d’affaires & remises' },
   { key:'paie',     label:'Ma fiche de paie', ic:'💵', desc:'Ma paie de la semaine' },
@@ -1333,7 +1325,6 @@ async function uu_createUser(){
       caisse: document.getElementById('nu-perm-caisse').checked,
       caisseLim: document.getElementById('nu-perm-caisselim').checked,
       pointage: document.getElementById('nu-perm-pointage').checked,
-      mep: document.getElementById('nu-perm-mep').checked,
       paie: document.getElementById('nu-perm-paie').checked
     },
     empCode: (document.getElementById('nu-emp').value === '') ? null : Number(document.getElementById('nu-emp').value),
@@ -1344,7 +1335,7 @@ async function uu_createUser(){
   document.getElementById('nu-username').value = '';
   document.getElementById('nu-password').value = '';
   document.getElementById('nu-admin').checked = false;
-  ['caisse', 'caisselim', 'pointage', 'mep', 'paie'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
+  ['caisse', 'caisselim', 'pointage', 'paie'].forEach(k=>{ document.getElementById('nu-perm-' + k).checked = false; });
   document.getElementById('nu-emp').value = '';
   uu_toggleAdminFields();
 }
@@ -1418,14 +1409,6 @@ function uu_viewPassword(userId){
   }
   uu_render();
 }
-function uu_mepRows(u, perms){
-  if(u.isAdmin) return '';
-  const secs = (typeof mep_secList === 'function') ? mep_secList() : [];
-  const on = !!perms.mep;
-  const sw = (x)=>`<div class="perm-row"><span>↳ ${esc(x.n)}</span><label class="switch"><input type="checkbox" ${perms['mepSec_' + x.id] ? 'checked' : ''} onchange="uu_togglePerm('${u.id}','mepSec_${esc(x.id)}',this.checked)"><span class="slider"></span></label></div>`;
-  const noEmp = (u.empCode === undefined || u.empCode === null || u.empCode === '');
-  return `<div style="padding:2px 0 0 10px;font-size:12px;color:var(--ink-muted);">Sections visibles (aucune cochée = toutes)</div>${secs.map(sw).join('')}` + (on && noEmp ? `<div style="padding:4px 0 6px 10px;font-size:12px;color:var(--rust);">⚠ Aucun employé relié : il ne pourra pas valider d’inventaire (choisis l’employé ci-dessous).</div>` : '');
-}
 function uu_depPermRows(u, perms){
   if(!u.isAdmin && !perms.depenses) return '';   // sous-réglages sans effet tant que « Dépenses » n’est pas coché
   const row = (ic, lab, key, on, dis)=>`<div class="perm-row"><span>${ic} ${lab}</span><label class="switch"><input type="checkbox" ${on?'checked':''} ${dis?'disabled':''} onchange="uu_togglePerm('${u.id}','${key}',this.checked)"><span class="slider"></span></label></div>`;
@@ -1444,7 +1427,7 @@ function uu_render(){
             onchange="uu_togglePerm('${u.id}','${m.key}',this.checked)">
           <span class="slider"></span>
         </label>
-      </div>` + (m.key === 'paie' ? uu_empSelect(u) : '') + (m.key === 'depenses' ? uu_depPermRows(u, perms) : '') + (m.key === 'mep' ? uu_mepRows(u, perms) : '') + (m.key === 'caisse' ? `<div class="perm-row"><span>↳ Caisse : accès limité (début de caisse, sorties, retenu)</span><label class="switch"><input type="checkbox" ${perms.caisseLim?'checked':''} ${u.isAdmin?'disabled':''} onchange="uu_togglePerm('${u.id}','caisseLim',this.checked)"><span class="slider"></span></label></div>` : '')).join('');
+      </div>` + (m.key === 'paie' ? uu_empSelect(u) : '') + (m.key === 'depenses' ? uu_depPermRows(u, perms) : '') + (m.key === 'caisse' ? `<div class="perm-row"><span>↳ Caisse : accès limité (début de caisse, sorties, retenu)</span><label class="switch"><input type="checkbox" ${perms.caisseLim?'checked':''} ${u.isAdmin?'disabled':''} onchange="uu_togglePerm('${u.id}','caisseLim',this.checked)"><span class="slider"></span></label></div>` : '')).join('');
     return `<div class="user-card">
       <div class="uh">
         <div class="uname">${esc(u.username||u.id)}${u.isAdmin?'<span class="badge-admin">Admin</span>':''}</div>
@@ -1502,12 +1485,11 @@ function showModule(name){
   });
   if(name==='home') renderHome();
   if(name==='cuisine' && typeof ck_show==='function') ck_show();
-  if(name==='users'){ if(typeof pt_start==='function') pt_start(); if(typeof mep_start==='function') mep_start(); uu_render(); uu_fillNewEmp(); }
+  if(name==='users'){ if(typeof pt_start==='function') pt_start(); uu_render(); uu_fillNewEmp(); }
   if(name==='caisse' && typeof ca_render==='function') ca_render();
   if(name==='depenses'){ if(typeof dp_start==='function') dp_start(); if(typeof dp_render==='function') dp_render(); }
   if(name==='pointage'){ if(typeof pt_start==='function') pt_start(); if(typeof pt_render==='function') pt_render(); }
   if(name==='restopro'){ if(typeof rp_start==='function') rp_start(); }
-  if(name==='mep'){ if(typeof pt_start==='function') pt_start(); if(typeof mep_start==='function') mep_start(); if(typeof mep_render==='function') mep_render(); }
   if(name==='dettes'){ if(typeof dt_start==='function') dt_start(); if(typeof dt_render==='function') dt_render(); }
   if(name==='paie'){ if(typeof pt_start==='function') pt_start(); if(typeof pa_render==='function') pa_render(); }
 }
@@ -2712,7 +2694,7 @@ function pt_start(){
   }, onErr);
   pt_configRef.onSnapshot((doc)=>{
     const data = doc.exists ? (doc.data() || {}) : {};
-    pt_emp = data.emp || {}; pt_ready.cfg = true; pt_scheduleRender(); try{ if(typeof mep_render === 'function' && document.getElementById('mep-body') && !mep_typing()) mep_render(); }catch(e){}
+    pt_emp = data.emp || {}; pt_ready.cfg = true; pt_scheduleRender();
   }, onErr);
   pt_ignoreRef.onSnapshot((doc)=>{
     const d = doc.exists ? (doc.data() || {}) : {};
@@ -3141,7 +3123,7 @@ function pt_conge(code, asOf){
 /* solde de tout compte d'un employé sorti : paie de la dernière période jusqu'à la date de sortie + congé restant à verser */
 function pt_departDefaultFrom(code, date){
   let best = ''; pt_clotures.forEach(c=>{ if((c.kind === 'week' || c.kind === 'period') && c.to && c.to < date && c.rows && c.rows[code] && c.to > best) best = c.to; });
-  if(best){ const d = new Date(best + 'T12:00:00'); d.setDate(d.getDate() + 1); return mep_ymd(d); }
+  if(best){ const d = new Date(best + 'T12:00:00'); d.setDate(d.getDate() + 1); return ck_ymd(d); }
   return date.slice(0, 8) + '01';
 }
 function pt_departSolde(code){
@@ -4880,406 +4862,6 @@ function rp_render(){
   h += `<div class="stat-label" style="margin-top:14px;text-align:center;">Source : Resto Pro (tickets BON1) — montants après remises, comme l’écran Statistiques.</div>`;
   body.innerHTML = h;
   rp_renderProd();
-}
-
-/* ==================== MODULE MISE EN PLACE ==================== */
-/* Listes d'ingrédients par section (doc unique) + saisies de fin de service (une par cuisinier et par service).
-   Cuisiniers : saisie seulement (ils ne lisent jamais les saisies). Administrateur : historique, suppression, gestion des listes. */
-const mep_listsRef = db.collection('mise_en_place').doc('listes');
-const mep_saisiesCol = db.collection('mise_en_place_saisies');
-const MEP_DEFAULT_SECS = [{ id:'sushi', n:'Sushi' }, { id:'chaud', n:'Chaud' }, { id:'bar', n:'Bar' }];
-const MEP_UNITS = ['pièces', 'kg', 'g', 'L', 'cl', 'boîte', 'carton', 'bouteille', 'canette', 'sachet'];
-let mep_adminStarted = false, mep_started = false, mep_listsReady = false, mep_lists = { sushi:[], chaud:[], bar:[], cooks:[] }, mep_saisies = [], mep_saisiesReady = false;
-let mep_tab = 'hist', mep_sec = 'sushi', mep_date = '', mep_form = null, mep_draft = null, mep_busy = false;
-const mep_e = (v)=>esc(v == null ? '' : String(v));
-const mep_isAdmin = ()=>!!(session && session.isAdmin);
-const mep_secList = ()=>(mep_lists.sections && mep_lists.sections.length ? mep_lists.sections : MEP_DEFAULT_SECS);
-function mep_allowedIds(){   // sections visibles : l'administrateur voit tout ; sinon les sections cochées dans Utilisateurs (aucune cochée = toutes)
-  const all = mep_secList().map(x=>x.id); if(mep_isAdmin()) return all;
-  const p = (session && session.permissions) || {}, sel = all.filter(id=>p['mepSec_' + id]);
-  return sel.length ? sel : all;
-}
-const mep_secs = ()=>{ const ok = mep_allowedIds(); return mep_secList().filter(x=>ok.includes(x.id)).map(x=>[x.id, x.n]); };
-const mep_secName = (k)=>(mep_secs().find(x=>x[0] === k) || [k, k])[1];
-function mep_secOk(){ const l = mep_secs(); if(!l.some(x=>x[0] === mep_sec)) mep_sec = l.length ? l[0][0] : ''; }
-const mep_hasSaisies = (id)=>mep_saisies.some(x=>x.section === id);
-function mep_ymd(d){ d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
-function mep_frDate(ymd){ const p = String(ymd || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : ymd; }
-function mep_hm(iso){ const d = new Date(iso); return isNaN(d) ? '' : String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
-function mep_newId(){ return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
-/* cuisiniers : les employés du pointage. Un employé connecté n'a que son propre nom (l'employé relié à son compte dans Utilisateurs). */
-function mep_myCode(){ const c = session && session.empCode; return (c === null || c === undefined || c === '') ? null : c; }
-function mep_empName(c){ const e = (typeof pt_emp !== 'undefined' && pt_emp) ? pt_emp[c] : null; return (e && e.name) || (typeof PT_DEFAULT_NAMES !== 'undefined' && PT_DEFAULT_NAMES[c]) || (session && session.username) || ('Code ' + c); }
-function mep_empList(){
-  if(!mep_isAdmin()){ const c = mep_myCode(); return c === null ? [] : [{ code:c, name:mep_empName(c) }]; }
-  const codes = (typeof pt_codes === 'function') ? pt_codes() : [];
-  return codes.filter(c=>(typeof pt_isActive !== 'function' || pt_isActive(c)) && ((pt_emp[c] && pt_emp[c].name) || PT_DEFAULT_NAMES[c]) && !(typeof pt_departDate === 'function' && pt_departDate(c))).map(c=>({ code:c, name:mep_empName(c) })).sort((a, b)=>a.name.localeCompare(b.name, 'fr'));
-}
-function mep_canCorrect(st){   // l'administrateur corrige le dernier inventaire ; un cuisinier seulement le sien, du jour en cours
-  if(!st) return false; if(mep_isAdmin()) return true;
-  const c = mep_myCode(); return c !== null && String(st.emp) === String(c) && mep_ymd(new Date(st.at)) === mep_ymd();
-}
-function mep_typing(){ try{ const a = document.activeElement, b = document.getElementById('mep-body'); return !!(a && b && b.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); }catch(e){ return false; } }
-function mep_start(){
-  if(mep_isAdmin() && !mep_adminStarted){ mep_adminStarted = true; mep_watchSaisies(); mep_watchRp(); }
-  if(mep_started) return; mep_started = true;
-  mep_listsRef.onSnapshot((doc)=>{
-    const d = doc.exists ? (doc.data() || {}) : {};
-    mep_lists = Object.assign({ sushi:[], chaud:[], bar:[], cooks:[] }, d); mep_listsReady = true;
-    if((mep_tab !== 'listes' || !mep_draft) && !mep_typing()) mep_render();
-    if(activeModule === 'users' && typeof uu_render === 'function') uu_render();
-  }, (e)=>{ console.error(e); mep_listsReady = true; mep_render(); });
-  mep_stockRef.onSnapshot((doc)=>{ const d = doc.exists ? (doc.data() || {}) : {}; mep_stock = d.s || {}; mep_stockReady = true; if(!mep_typing()) mep_render(); mep_maybeBoot(); }, (e)=>{ console.error(e); mep_stockReady = true; });
-}
-function mep_watchSaisies(){
-  // seul l'administrateur lit les saisies
-  {
-    const since = new Date(); since.setDate(since.getDate() - 400);
-    mep_saisiesCol.where('date', '>=', mep_ymd(since)).onSnapshot((snap)=>{
-      const l = []; snap.forEach(d=>l.push({ id:d.id, ...d.data() })); mep_saisies = l; mep_saisiesReady = true; mep_render(); mep_maybeBoot();
-    }, (e)=>{ console.error(e); mep_saisiesReady = true; mep_render(); });
-  }
-}
-/* ---------- dernier inventaire de chaque section (un petit document lu par tous) ---------- */
-/* mise_en_place/stock : { s: { <section>: { at, name, emp, items:[{id,n,u,q}], correctedBy, correctedAt } } } */
-const mep_stockRef = db.collection('mise_en_place').doc('stock');
-let mep_stock = {}, mep_stockReady = false, mep_boot = false, mep_viewId = '', mep_edit = null;
-const mep_stockOf = (sec)=>{ const x = mep_stock[sec]; return x && Array.isArray(x.items) ? x : null; };
-const mep_fmtIn = (q)=>String(q).replace('.', ',');
-const mep_byAt = (a, b)=>String(a.at).localeCompare(String(b.at));
-const mep_who = ()=>(typeof currentUser !== 'undefined' && currentUser) ? currentUser : 'administrateur';
-function mep_fdt(iso){ const d = new Date(iso); return isNaN(d) ? '' : String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ' ' + mep_hm(iso); }
-const mep_fq = (q)=>ft_fmtQ(Number(q), '').replace(/\s/g, ' ');
-const mep_counts = (x, id)=>!x.changed || x.changed.includes(id); // anciennes saisies partielles
-/* heure « d'origine » d'une saisie (une correction garde l'heure de l'inventaire corrigé) */
-const mep_shownAt = (x)=>x.origAt || x.at;
-function mep_snapshotOf(x){ return { at:mep_shownAt(x), name:x.name, emp:String(x.emp), items:(x.items || []).map(i=>({ id:i.id, n:i.n, u:i.u || '', q:i.q })), correctedBy:x.correctedBy || '', correctedAt:x.correctedAt || '' }; }
-/* recalcule le « dernier inventaire » de chaque section à partir des saisies (administrateur) */
-function mep_stockFrom(exceptId, override){
-  const s = {};
-  mep_saisies.filter(x=>x.id !== exceptId).map(x=>override && override[x.id] ? { ...x, ...override[x.id] } : x).sort(mep_byAt).forEach(x=>{
-    const sn = mep_snapshotOf(x), prev = s[x.section];
-    if(prev) prev.items.forEach(p=>{ if(!sn.items.some(i=>i.id === p.id)) sn.items.push(p); }); // ligne retirée d'une saisie : on garde la valeur précédente
-    s[x.section] = sn;
-  });
-  return s;
-}
-async function mep_rebuildStock(exceptId, override){ await mep_stockRef.set({ s:mep_stockFrom(exceptId, override), rebuiltAt:new Date().toISOString() }); }
-const MEP_SNAP_KEYS = ['at', 'name', 'emp', 'items', 'correctedBy', 'correctedAt'];
-function mep_stockStale(from){ // le dernier inventaire stocké ne correspond pas à la dernière saisie (ou ancien format mélangé)
-  const secs = new Set([...Object.keys(from), ...Object.keys(mep_stock)]);
-  for(const sec of secs){
-    const f = from[sec], c = mep_stock[sec];
-    if(!f) continue;
-    if(!c || !Array.isArray(c.items)) return true;
-    if(Object.keys(c).some(k=>!MEP_SNAP_KEYS.includes(k))) return true;
-    if(String(c.at) !== String(f.at) || String(c.correctedAt || '') !== String(f.correctedAt || '')) return true;
-    if(c.items.map(i=>i.id + ':' + i.q).join('|') !== f.items.map(i=>i.id + ':' + i.q).join('|')) return true;
-  }
-  return false;
-}
-let mep_healSig = '';
-function mep_maybeBoot(){ // administrateur : garde le « dernier inventaire » aligné sur les saisies (à chaque mise à jour)
-  if(!mep_isAdmin() || mep_busy || !mep_stockReady || !mep_saisiesReady) return;
-  const from = mep_stockFrom('');
-  if(!mep_stockStale(from)){ mep_healSig = ''; return; }
-  const sig = JSON.stringify(from);
-  if(sig === mep_healSig) return; // déjà tenté avec ces mêmes données
-  mep_healSig = sig;
-  mep_rebuildStock('').catch(e=>console.error(e));
-}
-/* ---------- saisie (cuisinier ; administrateur : onglet « Saisie ») ---------- */
-/* ---- brouillon local (survit à la fermeture de la page) et file d'envoi en attente (mauvaise connexion) ---- */
-const MEP_LS_DRAFT = 'mep_draft_v1', MEP_LS_PEND = 'mep_pending_v1';
-function mep_lsGet(k, d){ try{ const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }catch(e){ return d; } }
-function mep_lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
-function mep_draftSave(){ const f = mep_form; if(!f || f.mode !== 'new') return; const all = mep_lsGet(MEP_LS_DRAFT, {}); all[f.sec] = { emp:f.emp, vals:f.vals, t:Date.now() }; mep_lsSet(MEP_LS_DRAFT, all); }
-function mep_draftClear(sec){ const all = mep_lsGet(MEP_LS_DRAFT, {}); delete all[sec]; mep_lsSet(MEP_LS_DRAFT, all); }
-function mep_pending(){ return mep_lsGet(MEP_LS_PEND, []); }
-let mep_flushing = false;
-const mep_timeout = (ms)=>new Promise((_, rej)=>setTimeout(()=>rej(new Error('délai dépassé (connexion trop lente)')), ms));
-async function mep_flush(){
-  if(mep_flushing) return; let list = mep_pending(); if(!list.length) return; mep_flushing = true; let sent = 0;
-  try{
-    for(const p of list){
-      try{
-        const cur = mep_stock[p.sec], withStock = !cur || String(cur.at) <= String(p.snap.at), b = db.batch();
-        b.set(mep_saisiesCol.doc(p.id), p.doc); if(withStock) b.set(mep_stockRef, { s:{ [p.sec]:p.snap } }, { merge:true });
-        await Promise.race([b.commit(), mep_timeout(15000)]);
-        if(withStock) mep_stock[p.sec] = p.snap;
-        mep_lsSet(MEP_LS_PEND, mep_pending().filter(x=>x.id !== p.id)); sent++;
-      }catch(e){ console.warn('Mise en place : envoi en attente', e); break; }
-    }
-  } finally { mep_flushing = false; }
-  if(sent && typeof pt_toast === 'function') pt_toast('✓ Enregistré sur le serveur' + (sent > 1 ? ' (' + sent + ' saisies)' : '') + '.');
-  if(activeModule === 'mise_en_place' || document.getElementById('mep-body')) mep_render();
-}
-function mep_pendBanner(){
-  const n = mep_pending().length; if(!n) return '';
-  return `<div class="ticket" style="border-color:var(--rust);background:rgba(200,60,40,.12);"><div style="font-weight:700;">⚠ Non enregistré sur le serveur (${n})</div><div class="pt-muted" style="margin-top:4px;">Mauvaise connexion : ta saisie est gardée sur ce téléphone et sera envoyée automatiquement dès que le réseau revient. Ne vide pas les données du navigateur.</div><div class="actions-row"><button class="btn small t-save" onclick="mep_flush()">Réessayer maintenant</button></div></div>`;
-}
-window.addEventListener('online', ()=>{ mep_flush(); });
-setInterval(()=>{ if(mep_pending().length) mep_flush(); }, 20000);
-window.addEventListener('beforeunload', (e)=>{ if(mep_pending().length){ e.preventDefault(); e.returnValue = ''; } });
-function mep_resetForm(){ mep_form = { sec:mep_sec, emp:'', vals:{}, mode:'new' }; const d = mep_lsGet(MEP_LS_DRAFT, {})[mep_sec]; if(d && d.vals){ mep_form.emp = d.emp || ''; mep_form.vals = d.vals; } if(!mep_isAdmin()){ const c = mep_myCode(); mep_form.emp = c === null ? '' : String(c); } }
-function mep_pickSec(k){ mep_sec = k; mep_resetForm(); mep_render(); }
-function mep_setEmp(v){ if(!mep_form) mep_resetForm(); mep_form.emp = v; mep_draftSave(); }
-function mep_setVal(id, v){ if(!mep_form) mep_resetForm(); mep_form.vals[id] = v; mep_draftSave(); }
-function mep_correctStart(){ // repart du dernier inventaire (administrateur ; cuisinier : le sien, du jour)
-  const st = mep_stockOf(mep_sec); if(!st || !mep_canCorrect(st)) return;
-  mep_form = { sec:mep_sec, emp:'', vals:{}, mode:'correct', base:{} };
-  (mep_lists[mep_sec] || []).forEach(i=>{ const it = st.items.find(x=>x.id === i.id); const v = it ? mep_fmtIn(it.q) : ''; mep_form.vals[i.id] = v; mep_form.base[i.id] = v; });
-  mep_render();
-}
-function mep_correctCancel(){ mep_resetForm(); mep_render(); }
-function mep_lastHead(st){
-  if(!st) return '<div class="pt-muted" style="font-weight:500;">—</div>';
-  const d = new Date(st.at), dm = isNaN(d) ? '' : String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
-  return `<div class="mep2-who">${mep_e(st.name)}</div><div class="pt-muted" style="font-weight:500;">${mep_e(dm)}</div><div class="pt-muted" style="font-weight:500;">${mep_e(mep_hm(st.at))}</div>${st.correctedBy ? `<div class="mep2-corr">✎ ${mep_e(st.correctedBy)} · ${mep_e(mep_hm(st.correctedAt))}</div>` : ''}`;
-}
-function mep_entryView(){
-  if(!mep_form) mep_resetForm();
-  const list = mep_lists[mep_sec] || [], emps = mep_empList(), st = mep_stockOf(mep_sec), f = mep_form, correct = f.mode === 'correct' && !!st;
-  const lastQ = (id)=>{ const it = st && st.items.find(x=>x.id === id); return it ? mep_e(mep_fq(it.q)) : '<span class="pt-muted">—</span>'; };
-  const rows = list.map((i, k)=>`<tr><td><span class="mep-num s">${k + 1}</span>${mep_e(i.n)}${i.u ? ` <span class="pt-muted">(${mep_e(i.u)})</span>` : ''}</td><td class="i"><input id="mep-in-${i.id}" class="ft-in ${correct && !mep_same(f.vals[i.id], f.base && f.base[i.id]) ? 'chg' : ''}" type="text" inputmode="decimal" placeholder="0" value="${mep_e(f.vals[i.id] || '')}" oninput="mep_setVal('${i.id}', this.value)"></td><td class="l">${lastQ(i.id)}</td></tr>`).join('');
-  const table = list.length ? `<div style="overflow-x:auto;"><table class="mep-g mep-in"><tr><th>Article</th><th>${correct ? 'Correction' : 'En cours'}</th><th class="l">${mep_lastHead(st)}</th></tr>${rows}</table></div>` : `<div class="pt-muted">Aucun ingrédient défini pour cette section.${mep_isAdmin() ? ' Ajoute-les dans « Listes ».' : ''}</div>`;
-  const nameBox = correct ? `<div class="ticket"><div class="pt-muted">Tu corriges le dernier inventaire de <b>${mep_e(st.name)}</b> (${mep_e(mep_fdt(st.at))}). Change les quantités en erreur, puis enregistre.</div></div>`
-    : !mep_isAdmin() ? (emps.length ? `<div class="ticket"><div class="field"><label>Cuisinier</label><div class="ft-in" style="display:flex;align-items:center;gap:8px;">🔒 ${mep_e(emps[0].name)}</div></div></div>` : `<div class="ticket" style="border-color:var(--rust);"><div style="color:var(--rust);font-weight:600;">Ton compte n’est pas relié à un employé.</div><div class="pt-muted" style="margin-top:4px;">Demande à l’administrateur de le relier à ton nom (rubrique Utilisateurs).</div></div>`)
-    : `<div class="ticket"><div class="field"><label>Cuisinier</label><select class="ft-in" id="mep-emp" onchange="mep_setEmp(this.value)"><option value="">Choisis ton nom</option>${emps.map(x=>`<option value="${mep_e(x.code)}" ${String(f.emp) === String(x.code) ? 'selected' : ''}>${mep_e(x.name)}</option>`).join('')}</select></div></div>`;
-  const btns = !list.length ? '' : correct
-    ? `<div style="display:flex;gap:10px;margin-top:10px;"><button class="btn t-edit" style="flex:1 1 0;height:48px;" onclick="mep_submit()">Enregistrer la correction</button><button class="btn ghost t-cancel" style="flex:1 1 0;height:48px;" onclick="mep_correctCancel()">Annuler</button></div>`
-    : `<div style="display:flex;gap:10px;margin-top:10px;"><button class="btn t-save" style="flex:1 1 0;height:48px;" onclick="mep_submit()">Valider l’inventaire</button>${mep_canCorrect(st) ? `<button class="btn t-edit" style="flex:1 1 0;height:48px;" onclick="mep_correctStart()">${mep_isAdmin() ? '✎ Corriger la saisie' : '✎ Corriger ma saisie'}</button>` : ''}</div>`;
-  return `<div class="mep-seg">${mep_secs().map(x=>`<button class="${mep_sec === x[0] ? 'on' : ''}" onclick="mep_pickSec('${x[0]}')">${x[1]}</button>`).join('')}</div>
-    ${nameBox}<div class="ticket"><div class="section-label">${mep_e(mep_secName(mep_sec))} — ${correct ? 'correction' : 'inventaire'}</div>${table}</div>${btns}`;
-}
-function mep_same(a, b){ const x = ft_parseQ(a), y = ft_parseQ(b); return (x !== null && y !== null) ? x === y : String(a || '').trim() === String(b || '').trim(); }
-function mep_readItems(list, vals){ // toutes les quantités sont obligatoires
-  const items = [], missing = [];
-  for(const i of list){
-    const raw = String(vals[i.id] == null ? '' : vals[i.id]).trim();
-    if(!raw){ missing.push(i.n); continue; }
-    const q = ft_parseQ(raw);
-    if(q === null || q < 0){ alert('Quantité non valide pour « ' + i.n + ' » : « ' + raw + ' ».'); return null; }
-    items.push({ id:i.id, n:i.n, u:i.u || '', q });
-  }
-  if(missing.length){ alert('Il manque ' + missing.length + ' quantité' + (missing.length > 1 ? 's' : '') + ' : ' + missing.slice(0, 5).join(', ') + (missing.length > 5 ? '…' : '') + '\nMets 0 si tu n’en as plus.'); return null; }
-  return items.length ? items : null;
-}
-async function mep_submit(){
-  if(mep_busy || !mep_form) return;
-  const f = mep_form, list = mep_lists[f.sec] || [], st = mep_stockOf(f.sec), correct = f.mode === 'correct' && !!st;
-  let emp = null;
-  if(!correct){
-    if(!mep_isAdmin() && mep_myCode() === null){ alert('Ton compte n’est pas relié à un employé : demande à l’administrateur.'); return; }
-    if(!f.emp){ alert('Choisis ton nom avant de valider.'); return; }
-    emp = mep_empList().find(x=>String(x.code) === String(f.emp)); if(!emp){ alert('Choisis ton nom avant de valider.'); return; }
-  }
-  const items = mep_readItems(list, f.vals); if(!items) return;
-  const now = new Date(), nowIso = now.toISOString();
-  let doc, snap;
-  if(correct){
-    if(!mep_canCorrect(st)){ alert('Tu ne peux corriger que ta propre saisie du jour en cours.'); return; }
-    if(!items.some(i=>{ const o = st.items.find(x=>x.id === i.id); return !o || Number(o.q) !== i.q; })){ alert('Aucune quantité n’a changé.'); return; }
-    doc = { section:f.sec, date:mep_ymd(new Date(st.at)), at:nowIso, origAt:st.at, emp:String(st.emp), name:st.name, items, kind:'correction', correctedBy:mep_who(), correctedAt:nowIso, by:mep_who() };
-    snap = { at:st.at, name:st.name, emp:String(st.emp), items, correctedBy:mep_who(), correctedAt:nowIso };
-  }else{
-    doc = { section:f.sec, date:mep_ymd(now), at:nowIso, emp:String(emp.code), name:emp.name, items, kind:'full', by:mep_who() };
-    snap = { at:nowIso, name:emp.name, emp:String(emp.code), items, correctedBy:'', correctedAt:'' };
-  }
-  mep_busy = true;
-  /* 1) la saisie est d'abord gardée sur le téléphone, 2) puis envoyée ; elle n'est « enregistrée » qu'une fois le serveur confirmé */
-  const pend = mep_pending(); pend.push({ id:mep_saisiesCol.doc().id, sec:f.sec, doc, snap, ts:Date.now() }); mep_lsSet(MEP_LS_PEND, pend);
-  const sec0 = f.sec; mep_draftClear(sec0); mep_resetForm(); mep_render(); window.scrollTo && window.scrollTo(0, 0);
-  mep_busy = false;
-  await mep_flush();
-  if(mep_pending().length) alert('⚠ Connexion trop faible : ta saisie n’est PAS encore enregistrée sur le serveur.\nElle est gardée sur ce téléphone et sera envoyée automatiquement dès que le réseau revient. Garde l’application ouverte et regarde le bandeau rouge.');
-}
-/* ---------- administrateur : historique ---------- */
-function mep_setTab(t){ mep_tab = t; mep_edit = null; if(t === 'listes' && !mep_draft) mep_draft = JSON.parse(JSON.stringify({ cooks:[], ...mep_lists, sections:mep_secList() })); if(t !== 'listes') mep_draft = null; if(t === 'saisie') mep_resetForm(); mep_render(); }
-function mep_setDate(v){ mep_date = v || mep_ymd(); mep_viewId = ''; mep_edit = null; mep_render(); }
-function mep_histSec(k){ mep_sec = k; mep_viewId = ''; mep_edit = null; mep_render(); }
-function mep_daySaisies(sec, date){ return mep_saisies.filter(x=>x.section === sec && x.date === date).sort(mep_byAt); }
-/* valeurs successives de chaque article (une entrée par inventaire) */
-function mep_events(sec){
-  const ev = {};
-  mep_saisies.filter(x=>x.section === sec).sort(mep_byAt).forEach(x=>(x.items || []).forEach(it=>{ if(!mep_counts(x, it.id)) return; (ev[it.id] = ev[it.id] || []).push({ q:it.q, by:x.name, at:mep_shownAt(x), corr:x.correctedBy || '' }); }));
-  return ev;
-}
-/* pour chaque saisie : articles dont la valeur diffère de l'inventaire précédent */
-function mep_flags(sec){
-  const run = {}, out = {};
-  mep_saisies.filter(x=>x.section === sec).sort(mep_byAt).forEach(x=>{
-    out[x.id] = {};
-    (x.items || []).forEach(it=>{ if(run[it.id] !== undefined && run[it.id] !== it.q) out[x.id][it.id] = true; if(mep_counts(x, it.id)) run[it.id] = it.q; });
-  });
-  return out;
-}
-function mep_kindLabel(x){ const n = (x.items || []).length; return x.kind === 'correction' ? 'correction par ' + x.correctedBy : (n + ' article' + (n > 1 ? 's' : '')) + (x.correctedBy ? ' · modifié par ' + x.correctedBy + ' ' + mep_hm(x.correctedAt) : ''); }
-function mep_view(id){ mep_viewId = mep_viewId === id ? '' : id; mep_render(); }
-/* modifier une saisie en place */
-function mep_editStart(id){ const x = mep_saisies.find(s=>s.id === id); if(!x || !mep_isAdmin()) return; mep_edit = { id, vals:{}, removed:{} }; (x.items || []).forEach(i=>{ mep_edit.vals[i.id] = mep_fmtIn(i.q); }); mep_viewId = ''; mep_render(); }
-function mep_editVal(itemId, v){ if(mep_edit) mep_edit.vals[itemId] = v; }
-function mep_editRemove(id){ if(!mep_edit) return; mep_edit.removed[id] = !mep_edit.removed[id]; mep_render(); }
-function mep_editCancel(){ mep_edit = null; mep_render(); }
-async function mep_editSave(){
-  if(!mep_edit || !mep_isAdmin() || mep_busy) return;
-  const x = mep_saisies.find(s=>s.id === mep_edit.id); if(!x) return;
-  const rm = mep_edit.removed || {}, nRm = (x.items || []).filter(i=>rm[i.id]).length;
-  if(nRm >= (x.items || []).length){ alert('Tu retires toutes les lignes : utilise plutôt « Supprimer » pour effacer toute la saisie.'); return; }
-  const items = mep_readItems((x.items || []).filter(i=>!rm[i.id]).map(i=>({ id:i.id, n:i.n, u:i.u })), mep_edit.vals); if(!items) return;
-  if(!nRm && !items.some(i=>{ const o = (x.items || []).find(y=>y.id === i.id); return !o || Number(o.q) !== i.q; })){ alert('Aucune quantité n’a changé.'); return; }
-  const nowIso = new Date().toISOString();
-  const patch = { items, origItems:x.origItems || x.items, correctedBy:mep_who(), correctedAt:nowIso };
-  mep_busy = true;
-  try{ await mep_saisiesCol.doc(x.id).set(patch, { merge:true }); await mep_rebuildStock('', { [x.id]:patch }); mep_edit = null; mep_render(); if(typeof pt_toast === 'function') pt_toast('Saisie modifiée.'); }
-  catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
-  mep_busy = false;
-}
-function mep_editView(){
-  const x = mep_saisies.find(s=>s.id === mep_edit.id); if(!x){ mep_edit = null; return ''; }
-  const list = mep_lists[x.section] || [];
-  return `<div class="ticket"><div class="section-label">Modifier la saisie de ${mep_e(x.name)} · ${mep_e(mep_fdt(mep_shownAt(x)))}</div><div class="pt-muted" style="margin-bottom:6px;">La saisie est modifiée en place et porte la mention « modifié par ${mep_e(mep_who())} ». Les quantités d’origine sont conservées. « Retirer » enlève seulement cette ligne de la saisie : elle n’est ni comptée ni remplacée par 0, et le contrôle reprend le pesé précédent de cet article.</div>
-    ${(x.items || []).map(i=>{ const pos = list.findIndex(l=>l.id === i.id); return `<div class="mep2-row"><div class="mep2-name"><span class="mep-num">${pos >= 0 ? pos + 1 : '–'}</span><span>${mep_e(i.n)} <span class="pt-muted">(${mep_e(i.u || '')})</span></span></div><div class="mep2-cols"><input class="ft-in" type="text" inputmode="decimal" ${mep_edit.removed && mep_edit.removed[i.id] ? 'disabled style="opacity:.4;"' : ''} value="${mep_e(mep_edit.vals[i.id] || '')}" oninput="mep_editVal('${i.id}', this.value)"><div class="mep2-last pt-muted">${mep_edit.removed && mep_edit.removed[i.id] ? '<b>retirée de la saisie</b>' : 'avant : ' + mep_e(mep_fq(i.q))} <button class="btn ghost small ${mep_edit.removed && mep_edit.removed[i.id] ? 't-edit' : 't-del'}" onclick="mep_editRemove('${i.id}')">${mep_edit.removed && mep_edit.removed[i.id] ? 'Annuler' : 'Retirer'}</button></div></div></div>`; }).join('')}
-    <div class="actions-row"><button class="btn t-save" onclick="mep_editSave()">Enregistrer la modification</button><button class="btn ghost t-cancel" onclick="mep_editCancel()">Annuler</button></div></div>`;
-}
-function mep_histView(){
-  if(!mep_date) mep_date = mep_ymd();
-  const sec = mep_sec, list = mep_lists[sec] || [], all = mep_daySaisies(sec, mep_date), cnt = (sec2, d)=>mep_daySaisies(sec2, d).length;
-  const secBtns = `<div class="mep-seg">${mep_secs().map(x=>`<button class="${sec === x[0] ? 'on' : ''}" onclick="mep_histSec('${x[0]}')">${x[1]}${cnt(x[0], mep_date) ? ' · ' + cnt(x[0], mep_date) : ''}</button>`).join('')}</div>`;
-  // situation actuelle : dernier et avant-dernier inventaire de chaque article
-  const ev = mep_events(sec), has = mep_saisies.some(x=>x.section === sec), anyRp = list.some(i=>i.rp);
-  const cell = (x, u, d)=>x ? `<div class="mep-q">${mep_e(mep_fq(x.q))}<span class="pt-muted"> ${mep_e(u)}</span>${d ? ' <span class="mep-d ' + (d > 0 ? 'up' : 'dn') + '">' + (d > 0 ? '▲ +' : '▼ ') + mep_fq(d) + '</span>' : ''}</div><div class="mep-w">${mep_e(x.by)} · ${mep_e(mep_fdt(x.at))}${x.corr ? ' ✎' : ''}</div>` : '<span class="pt-muted">—</span>';
-  const situ = !list.length ? '<div class="pt-muted">Aucun ingrédient défini pour cette section.</div>' : !has ? '<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucun inventaire pour cette section.</div>'
-    : `<div style="overflow-x:auto;"><table class="mep-g"><tr><th>Article</th><th>Dernier inventaire</th>${anyRp ? '<th>Resto Pro</th>' : '<th>Avant</th>'}</tr>${list.map((i, k)=>{ const e = ev[i.id] || [], last = e[e.length - 1], prev = e[e.length - 2]; return `<tr><td><span class="mep-num s">${k + 1}</span>${mep_e(i.n)}</td><td>${cell(last, i.u || '', last && prev ? Number(last.q) - Number(prev.q) : 0)}</td><td>${anyRp ? mep_rpCell(i, last) : cell(prev, i.u || '', 0)}</td></tr>`; }).join('')}</table></div>${anyRp ? mep_rpBar() : ''}`;
-  // historique de la date : une colonne par saisie
-  const flags = mep_flags(sec), rowsIds = [], seen = {}, info = {};
-  list.forEach(i=>{ rowsIds.push(i.id); seen[i.id] = 1; info[i.id] = i; });
-  all.forEach(x=>(x.items || []).forEach(i=>{ if(!seen[i.id]){ seen[i.id] = 1; rowsIds.push(i.id); info[i.id] = i; } }));
-  const qOf = (x, id)=>{ const it = (x.items || []).find(y=>y.id === id); return it ? it.q : null; };
-  const table = all.length ? `<div style="overflow-x:auto;"><table class="mep-g mep-sticky"><tr><th>Article</th>${all.map(x=>`<th>${mep_e(x.name)}<div class="pt-muted" style="font-weight:500;">${mep_e(mep_hm(mep_shownAt(x)))}${x.correctedBy ? ' ✎' : ''}</div></th>`).join('')}</tr>${rowsIds.map(id=>{ const pos = list.findIndex(i=>i.id === id); return `<tr><td>${pos >= 0 ? '<span class="mep-num s">' + (pos + 1) + '</span>' : '<span class="mep-num s off">–</span>'}${mep_e(info[id].n)}<span class="pt-muted"> (${mep_e(info[id].u || '')})</span></td>${all.map(x=>{ const q = qOf(x, id); return `<td class="${q !== null && flags[x.id] && flags[x.id][id] ? 'mep-chg' : ''}">${q === null ? '<span class="pt-muted">—</span>' : mep_e(mep_fq(q))}</td>`; }).join('')}</tr>`; }).join('')}</table></div><div class="pt-muted" style="margin-top:6px;"><span class="mep-d up">orange</span> = différent de l’inventaire précédent · ✎ = corrigé</div>`
-    : '<div class="pt-muted"><span class="ft-dot"></span>&nbsp; Aucune saisie à cette date.</div>';
-  const detail = all.length ? `<div class="ticket"><div class="section-label">Saisies du ${mep_e(mep_frDate(mep_date))} — ${mep_e(mep_secName(sec))}</div>${all.map(x=>`<div style="padding:8px 0;border-top:1px solid var(--line);"><div style="margin-bottom:6px;"><b>${mep_e(x.name)}</b> <span class="pt-muted">${mep_e(mep_hm(mep_shownAt(x)))} · ${mep_e(mep_kindLabel(x))}</span></div><div class="pt-row" style="gap:6px;flex-wrap:wrap;"><button class="btn ghost small t-view" onclick="mep_view('${x.id}')">${mep_viewId === x.id ? 'Masquer' : 'Voir'}</button><button class="btn ghost small t-edit" onclick="mep_editStart('${x.id}')">Modifier</button><button class="btn ghost small t-del" onclick="mep_delSaisie('${x.id}')">Supprimer</button></div>${mep_viewId === x.id ? `<div style="margin-top:8px;">${(x.items || []).map(it=>{ const pos = list.findIndex(i=>i.id === it.id); const c = flags[x.id] && flags[x.id][it.id]; return `<div class="row-between" style="padding:5px 0;border-top:1px solid var(--line);"><span><span class="mep-num s">${pos >= 0 ? pos + 1 : '–'}</span>${mep_e(it.n)}</span><span class="${c ? 'mep-d up' : ''}">${mep_e(mep_fq(it.q))} <span class="pt-muted">${mep_e(it.u || '')}</span></span></div>`; }).join('')}</div>` : ''}</div>`).join('')}</div>` : '';
-  if(mep_edit) return secBtns + mep_editView();
-  return `${secBtns}<div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — situation actuelle</div>${situ}</div>
-    <div class="ticket"><div class="field"><label>Historique — date</label><input type="date" class="ft-in" value="${mep_e(mep_date)}" onchange="mep_setDate(this.value)"></div></div>
-    <div class="ticket"><div class="section-label">${mep_e(mep_secName(sec))} — saisies du ${mep_e(mep_frDate(mep_date))}</div>${table}</div>${detail}`;
-}
-async function mep_delSaisie(id){
-  if(!mep_isAdmin()) return; const x = mep_saisies.find(s=>s.id === id); if(!x) return;
-  if(!confirm('Supprimer la saisie de ' + x.name + ' (' + mep_hm(mep_shownAt(x)) + ') ? Le dernier inventaire est recalculé.')) return;
-  try{ await mep_saisiesCol.doc(id).delete(); await mep_rebuildStock(id); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
-}
-/* ---------- stock Resto Pro (administrateur) : restopro_meta/stock = { at, items:[{c:code, n:nom, f:famille, s:stock, a:dernier achat AAAA-MM-JJ}] } ---------- */
-const MEP_RP_FRESH_DAYS = 30;
-let mep_rp = { at:'', items:[] }, mep_rpReady = false, mep_rpSearch = {}, mep_rpPending = false, mep_rpNoReply = false, mep_rpPrevAt = '', mep_rpReqId = 0;
-function mep_watchRp(){
-  db.collection('restopro_meta').doc('stock').onSnapshot((doc)=>{ const d = doc.exists ? (doc.data() || {}) : {}; mep_rp = { at:d.at || '', items:Array.isArray(d.items) ? d.items : [] }; mep_rpReady = true; if(mep_rpPending && mep_rp.at && mep_rp.at !== mep_rpPrevAt){ mep_rpPending = false; mep_rpNoReply = false; } if(!mep_typing()) mep_render(); }, (e)=>{ console.error(e); mep_rpReady = true; });
-}
-function mep_refreshRp(){
-  if(mep_rpPending) return;
-  mep_rpPending = true; mep_rpNoReply = false; mep_rpPrevAt = mep_rp.at || ''; const id = ++mep_rpReqId;
-  try{ rp_requestSync(true); }catch(e){ console.warn(e); }
-  mep_render();
-  setTimeout(()=>{ if(mep_rpPending && mep_rpReqId === id){ mep_rpPending = false; mep_rpNoReply = true; mep_render(); } }, 180000); // sans réponse du PC au bout de 3 minutes
-}
-function mep_rpBar(){
-  const up = mep_rp.at ? 'Stock Resto Pro mis à jour le ' + mep_fdt(mep_rp.at) : 'Aucun stock reçu de Resto Pro pour l’instant';
-  const msg = mep_rpPending ? '⏳ Mise à jour demandée au PC du restaurant… (moins d’une minute)' : mep_rpNoReply ? '⚠ Le PC du restaurant n’a pas répondu (éteint, sans internet ou écoute arrêtée ?). ' + up + '.' : up + '.';
-  return `<div class="rp2-bar"><span class="${mep_rpNoReply ? 'rp2-bad' : 'pt-muted'}">${mep_e(msg)}</span><button type="button" class="btn ghost small" onclick="mep_refreshRp()" ${mep_rpPending ? 'disabled' : ''}>↻ Actualiser</button></div>`;
-}
-const mep_rpItem = (code)=>mep_rp.items.find(x=>String(x.c) === String(code)) || null;
-function mep_rpDm(iso){ const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : ''; }
-function mep_rpState(it){ // { ok, label, sub }
-  if(!it) return { ok:false, none:true, label:'Introuvable', sub:'article absent de la dernière synchro' };
-  const s = Number(it.s), hasS = it.s !== null && it.s !== undefined && it.s !== '' && !isNaN(s);
-  const days = it.a ? Math.floor((Date.now() - new Date(it.a + 'T12:00:00').getTime()) / 86400000) : null;
-  const sub = (hasS ? mep_fq(s) : '—') + ' · ' + (it.a ? 'achat ' + mep_rpDm(it.a) : 'aucun achat');
-  const ok = hasS && s >= 0 && days !== null && days <= MEP_RP_FRESH_DAYS;
-  return { ok, label:ok ? '● à jour' : '⚠ peu fiable', sub, s:hasS ? s : null, a:it.a || '' };
-}
-function mep_rpDraftSet(sec, i, code){ const it = mep_rpItem(code); const r = mep_draft[sec][i]; r.rp = String(code); r.rpn = it ? it.n : (r.rpn || ''); mep_rpSearch = {}; mep_render(); }
-function mep_rpDraftClear(sec, i){ const r = mep_draft[sec][i]; r.rp = ''; r.rpn = ''; mep_rpSearch = {}; mep_render(); setTimeout(()=>{ const el = document.getElementById('mep-rpq-' + sec + '-' + i); if(el) el.focus(); }, 0); }
-function mep_rpQuery(sec, i, v){
-  const q = String(v || '').trim().toLowerCase(), box = document.getElementById('mep-rpres-' + sec + '-' + i); if(!box) return;
-  if(q.length < 2){ box.innerHTML = ''; return; }
-  const words = q.split(/\s+/);
-  const res = mep_rp.items.filter(x=>{ const t = (String(x.n) + ' ' + String(x.f || '')).toLowerCase(); return words.every(w=>t.includes(w)); }).slice(0, 8);
-  box.innerHTML = res.length ? res.map(x=>`<button type="button" class="rp2-res" onclick="mep_rpDraftSet('${sec}',${i},'${mep_e(String(x.c).replace(/'/g, ''))}')"><b>${mep_e(x.n)}</b><span class="pt-muted"> · ${mep_e(x.f || '')}</span></button>`).join('') : '<div class="pt-muted" style="padding:6px 2px;">Aucun article trouvé.</div>';
-}
-function mep_rpBlock(sec, i, r){
-  if(r.rp){
-    const it = mep_rpItem(r.rp), st = mep_rpState(it);
-    const stateHtml = !mep_rpReady || !mep_rp.items.length ? '<span class="pt-muted">stock non reçu</span>' : `<span class="${st.ok ? 'rp2-ok' : 'rp2-bad'}">${mep_e(st.label)}</span><br><span class="pt-muted">${mep_e(st.sub)}</span>`;
-    return `<div class="g2 rp2-r2"><div><label>Article Resto Pro</label><div class="rp2-linked"><span>${mep_e(it ? it.n : r.rpn || r.rp)}</span><button type="button" class="btn ghost small" onclick="mep_rpDraftClear('${sec}',${i})">Changer</button></div></div><div><label>État du stock</label><div class="rp2-box"><div>${stateHtml}</div></div></div></div>`;
-  }
-  return `<div class="g2 rp2-r2"><div><label>Article Resto Pro</label><input type="text" id="mep-rpq-${sec}-${i}" class="ft-in" placeholder="🔎 Chercher…" autocomplete="off" oninput="mep_rpQuery('${sec}',${i},this.value)"></div><div><label>État du stock</label><div class="rp2-box pt-muted">Non lié</div></div></div><div id="mep-rpres-${sec}-${i}"></div>`;
-}
-function mep_unitSelect(sec, i, cur){ // zone de saisie libre (ex. : kg, g, pièces, boîte…)
-  return `<input type="text" class="ft-in" maxlength="20" autocomplete="off" placeholder="ex. : kg, g, pièces" value="${mep_e(cur || '')}" oninput="mep_dUnit('${sec}',${i},this.value)">`;
-}
-function mep_ingCard(sec, i, r){
-  return `<div class="rp2-ing"><div class="rp2-top"><span class="mep-num">${i + 1}</span><div class="rp2-act"><button class="btn ghost small" onclick="mep_dMove('${sec}',${i},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_dMove('${sec}',${i},1)" aria-label="Descendre">↓</button><button class="btn ghost small t-del" onclick="mep_dDel('${sec}',${i})" aria-label="Retirer">✕</button></div></div>
-    <div class="g2"><div><label>Ingrédient</label><input type="text" class="ft-in mep-name-${sec}" placeholder="Ingrédient" value="${mep_e(r.n)}" oninput="mep_dName('${sec}',${i},this.value)"></div><div><label>Unité</label>${mep_unitSelect(sec, i, r.u)}</div></div>${mep_rpBlock(sec, i, r)}</div>`;
-}
-/* colonne « Resto Pro » de la situation actuelle : quantité Resto Pro + écart en dessous (article peu fiable : grisé) */
-function mep_rpCell(i, last){
-  if(!i.rp) return '<span class="pt-muted">—</span>';
-  const it = mep_rpItem(i.rp), rs = mep_rpState(it);
-  if(!it || rs.s === null) return '<span class="pt-muted">—</span>';
-  const ec = last ? Math.round((rs.s - Number(last.q)) * 100) / 100 : null;
-  const ecTxt = ec === null ? '' : ec === 0 ? '<span class="rp2-ok">✓ écart 0</span>' : `<span class="mep-d ${ec > 0 ? 'up' : 'dn'}">${ec > 0 ? '▲ +' : '▼ −'}${mep_e(mep_fq(Math.abs(ec)))}</span> d’écart`;
-  return `<div class="${rs.ok ? '' : 'rp2-dim'}"><div class="mep-q">${mep_e(mep_fq(rs.s))}<span class="pt-muted"> ${mep_e(i.u || '')}</span></div><div class="mep-w">${ecTxt}</div></div>`;
-}
-/* ---------- administrateur : listes ---------- */
-function mep_sName(i, v){ if(mep_draft && mep_draft.sections[i]) mep_draft.sections[i].n = v; }
-function mep_sAdd(){ const id = 'sec_' + mep_newId(); mep_draft.sections.push({ id, n:'' }); mep_draft[id] = []; mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-secs'); if(els.length) els[els.length - 1].focus(); }, 0); }
-function mep_sDel(i){
-  const sc = mep_draft.sections[i]; if(!sc) return;
-  if(mep_hasSaisies(sc.id)){ alert('Cette section a déjà des saisies : tu peux la renommer, pas la supprimer.'); return; }
-  if(mep_draft.sections.length <= 1){ alert('Garde au moins une section.'); return; }
-  if((mep_draft[sc.id] || []).length && !confirm('Supprimer la section « ' + (sc.n || 'sans nom') + ' » et sa liste d’ingrédients ?')) return;
-  mep_draft.sections.splice(i, 1); delete mep_draft[sc.id]; mep_render();
-}
-function mep_sMove(i, d){ const j = i + d, l = mep_draft.sections; if(j < 0 || j >= l.length) return; const t = l[i]; l[i] = l[j]; l[j] = t; mep_render(); }
-function mep_cName(i, v){ if(mep_draft && mep_draft.cooks[i]) mep_draft.cooks[i].n = v; }
-function mep_cAdd(){ mep_draft.cooks.push({ id:mep_newId(), n:'' }); mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-cooks'); if(els.length) els[els.length - 1].focus(); }, 0); }
-function mep_cDel(i){ mep_draft.cooks.splice(i, 1); mep_render(); }
-function mep_dName(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].n = v; }
-function mep_dUnit(sec, i, v){ if(mep_draft && mep_draft[sec][i]) mep_draft[sec][i].u = v; }
-function mep_dAdd(sec){ mep_draft[sec].push({ id:mep_newId(), n:'', u:'', rp:'', rpn:'' }); mep_render(); setTimeout(()=>{ const els = document.querySelectorAll('.mep-name-' + sec); if(els.length) els[els.length - 1].focus(); }, 0); }
-function mep_dDel(sec, i){ mep_draft[sec].splice(i, 1); mep_render(); }
-function mep_dMove(sec, i, d){ const j = i + d, l = mep_draft[sec]; if(j < 0 || j >= l.length) return; const t = l[i]; l[i] = l[j]; l[j] = t; mep_render(); }
-async function mep_saveLists(){
-  if(!mep_isAdmin() || !mep_draft) return;
-  const secs = (mep_draft.sections || []).map(x=>({ id:x.id, n:String(x.n || '').trim() }));
-  if(!secs.length){ alert('Garde au moins une section.'); return; }
-  if(secs.some(x=>!x.n)){ alert('Donne un nom à chaque section.'); return; }
-  if(new Set(secs.map(x=>x.n.toLowerCase())).size !== secs.length){ alert('Deux sections portent le même nom.'); return; }
-  const out = { sections:secs };
-  secs.forEach(x=>{ out[x.id] = (mep_draft[x.id] || []).map(i=>({ id:i.id, n:String(i.n || '').trim(), u:String(i.u || '').trim(), rp:String(i.rp || ''), rpn:i.rp ? String(i.rpn || '') : '' })).filter(i=>i.n); });
-  out.cooks = (mep_draft.cooks || []).map(c=>({ id:c.id, n:String(c.n || '').trim() })).filter(c=>c.n);
-  try{ await mep_listsRef.set({ ...out, updatedAt:new Date().toISOString(), updatedBy:(typeof currentUser !== 'undefined' ? currentUser : '') }); mep_draft = null; mep_tab = 'hist'; mep_render(); if(typeof pt_toast === 'function') pt_toast('Listes enregistrées.'); }
-  catch(e){ console.error(e); alert('Erreur d’enregistrement : ' + (e.message || e)); }
-}
-function mep_listsView(){
-  const d = mep_draft || { ...mep_lists, sections:mep_secList() };
-  return `<div class="pt-muted" style="margin-bottom:8px;">Les ingrédients que les cuisiniers doivent compter à la fin de leur service. Les anciennes saisies gardent le nom et l’unité d’origine.</div>
-    <div class="pt-muted" style="margin-bottom:8px;">Les noms des cuisiniers viennent de la liste des employés (Pointage) ; chaque employé est relié à son compte dans « Utilisateurs », où l’on choisit aussi les sections qu’il voit.</div>
-    <div class="ticket"><div class="section-label">Sections</div><div class="pt-muted" style="margin-bottom:8px;">Une section qui a déjà des saisies peut être renommée mais pas supprimée (🔒).</div>${(d.sections || []).map((x, n)=>`<div class="ft-edrow"><input type="text" class="ft-in mep-name-secs" style="flex:1 1 calc(100% - 56px);min-width:0;" placeholder="Nom de la section" value="${mep_e(x.n)}" oninput="mep_sName(${n},this.value)">${mep_hasSaisies(x.id) ? '<button class="btn ghost small" disabled title="Historique conservé" aria-label="Verrouillée">🔒</button>' : `<button class="btn ghost small t-del" onclick="mep_sDel(${n})" aria-label="Retirer">✕</button>`}
-      <div class="ft-mv" style="flex:1 1 100%;"><button class="btn ghost small" onclick="mep_sMove(${n},-1)" aria-label="Monter">↑</button><button class="btn ghost small" onclick="mep_sMove(${n},1)" aria-label="Descendre">↓</button></div></div>`).join('')}<div class="actions-row"><button class="btn small t-add" onclick="mep_sAdd()">＋ Section</button></div></div>
-    ${(d.sections || []).map(sc=>{ const k = sc.id; return `<div class="ticket"><div class="section-label">Ingrédients — ${mep_e(sc.n || 'Nouvelle section')}</div>${mep_rpBar()}${(d[k] || []).map((i, n)=>mep_ingCard(k, n, i)).join('') || '<div class="pt-muted">Aucun ingrédient.</div>'}<div class="actions-row"><button class="btn small t-add" onclick="mep_dAdd('${k}')">＋ Ingrédient</button></div></div>`; }).join('')}
-    <div class="actions-row"><button class="btn t-save" onclick="mep_saveLists()">Enregistrer les listes</button><button class="btn ghost t-cancel" onclick="mep_setTab('hist')">Annuler</button></div>`;
-}
-function mep_render(){
-  const body = document.getElementById('mep-body'); if(!body) return;
-  mep_secOk();
-  if(!mep_listsReady){ body.innerHTML = '<div class="empty-state">Chargement…</div>'; return; }
-  const admin = mep_isAdmin();
-  const head = `<div style="font-weight:700;font-size:18px;margin-bottom:10px;">Mise en place</div>`;
-  if(!admin){ body.innerHTML = head + mep_pendBanner() + mep_entryView(); return; }
-  const tabs = `<div class="mep-seg">${[['hist', 'Historique'], ['saisie', 'Saisie'], ['listes', 'Listes']].map(t=>`<button class="${mep_tab === t[0] ? 'on' : ''}" onclick="mep_setTab('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
-  const view = mep_tab === 'listes' ? mep_listsView() : mep_tab === 'saisie' ? mep_entryView() : (mep_saisiesReady ? mep_histView() : '<div class="empty-state">Chargement…</div>');
-  body.innerHTML = head + mep_pendBanner() + tabs + view;
 }
 
 /* ==================== MODULE DÉPENSES & POINTAGE (gérant) — repris de l'ancienne application ====================
@@ -7835,6 +7417,17 @@ function stk_sync(){
   }
 }
 function stk_doc(d){ const id = 'stk_' + d, o = ck_ob[id]; return o ? ck_deepMerge(JSON.parse(JSON.stringify(stk.docs[id] || {})), o.data) : (stk.docs[id] || {}); }
+/* « Autres articles » : un comptage par cuisinier (doc.ca[code][id]) ; l’ancien format (doc.c[id]) est rattaché au cuisinier du même nom */
+function stk_autQ(d, id, code){ const a = ((d.ca || {})[String(code)] || {})[id]; if(a && stk_num(a) !== null) return a; const o = (d.c || {})[id]; return o && stk_num(o) !== null && String(o.by || '') === String(ck_empName(code)) ? o : null; }
+function stk_autLines(d, id){   // tous les comptages d’un article « autre » ce jour-là : [{ code, rec }]
+  const out = [], seen = {}; const codes = Object.keys(ck_cfg.cooks || {}).map(String).concat(Object.keys(d.ca || {}).map(String));
+  codes.forEach(code=>{ if(seen[code]) return; seen[code] = 1; const r = stk_autQ(d, id, code); if(r) out.push({ code, rec:r }); });
+  const o = (d.c || {})[id]; if(o && stk_num(o) !== null && !out.some(x=>x.rec === o)) out.push({ code:'', rec:o });
+  return out;
+}
+const stk_cookLabel = (code)=>{ const c = ck_cook(code); return c ? (c.poste ? ck_empName(code) + ' · ' + c.poste : ck_empName(code)) : ''; };
+function stk_seuil(code, id){ const c = (ck_cfg.cooks || {})[code] || {}, v = Number((c.seuils || {})[id]); if(v > 0) return v; const it = stk_itemsAll('autre').find(x=>x.id === id); return Number(it && it.seuil) || 0; }
+function stk_setSeuil(code, id, val){ const c = (ck_cfg.cooks || {})[code]; if(!c) return; const n = ck_num(val); if(!c.seuils) c.seuils = {}; if(n === null || n <= 0) delete c.seuils[id]; else c.seuils[id] = n; ck_cfgSave(); ck_render(); }
 const stk_num = (x)=>{ const n = Number(x && x.q); return x && x.q !== undefined && x.q !== null && x.q !== '' && isFinite(n) ? n : null; };
 
 /* ==================== RESTE DU DERNIER SERVICE (lecture seule pour le cuisinier) ==================== */
@@ -7849,8 +7442,8 @@ function rst_stop(){ RST.un.concat(RST.un2).forEach(u=>{ try{ u(); }catch(e){} }
 const rst_doc = (d)=>{ const id = 'stk_' + d, o = ck_ob[id]; return o ? ck_deepMerge(JSON.parse(JSON.stringify(RST.stk[d] || {})), o.data) : (RST.stk[d] || {}); };
 const rst_has = (me)=>!!me && (ck2_kitchens().length > 0 || stk_has(me));
 const rst_canOn = (me)=>!!me && (me.stk || []).includes('can');
-function rst_cntDates(ids, n){   // dates (récentes d’abord) où au moins un des articles a été compté
-  return Object.keys(RST.stk).filter(d=>{ const c = (rst_doc(d).c || {}); return ids.some(id=>stk_num(c[id]) !== null); }).sort().reverse().slice(0, n);
+function rst_cntDates(ids, n, code){   // dates (récentes d’abord) où au moins un des articles a été compté (code : comptage « autres articles » de ce cuisinier)
+  return Object.keys(RST.stk).filter(d=>{ const dd = rst_doc(d), c = dd.c || {}; return ids.some(id=>stk_num(code !== undefined ? stk_autQ(dd, id, code) : c[id]) !== null); }).sort().reverse().slice(0, n);
 }
 function rst_sync(){
   const me = ck_who ? ck_cook(ck_who) : null, on = ck_view === 'rst' && me && rst_has(me);
@@ -7908,9 +7501,9 @@ function rst_sushiBrut(id, before){   // dernier brut d’escalope saisi en fin 
 }
 function rst_autHtml(me, n){
   const its = stk_autIds(me).map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean); if(!its.length) return '';
-  const ds = rst_cntDates(its.map(i=>i.id), n); if(!ds.length) return `<div class="rs-box"><h3>${esc(ck_s('rs_aut'))}</h3><div class="rs-e">${esc(ck_s('rs_noStk'))}</div></div>`;
-  const w = Math.floor(78 / ds.length), hd = (d)=>{ const c = rst_doc(d).c || {}, a = its.map(i=>c[i.id]).filter(x=>x && x.at).sort((x, y)=>String(y.at).localeCompare(String(x.at)))[0] || {}; return `<th style="width:${w}%">${esc(a.by || '')}<small>${esc(rst_dl(a.at || d + 'T12:00:00'))}</small></th>`; };
-  const rows = its.map(i=>`<tr><td class="i">${esc(i.n)}</td>${ds.map(d=>{ const q = stk_num((rst_doc(d).c || {})[i.id]); return `<td><b>${q === null ? '—' : esc(ck_fmt(q))}</b></td>`; }).join('')}</tr>`).join('');
+  const ds = rst_cntDates(its.map(i=>i.id), n, ck_who); if(!ds.length) return `<div class="rs-box"><h3>${esc(ck_s('rs_aut'))}</h3><div class="rs-e">${esc(ck_s('rs_noStk'))}</div></div>`;
+  const w = Math.floor(78 / ds.length), hd = (d)=>{ const dd = rst_doc(d), a = its.map(i=>stk_autQ(dd, i.id, ck_who)).filter(x=>x && x.at).sort((x, y)=>String(y.at).localeCompare(String(x.at)))[0] || {}; return `<th style="width:${w}%">${esc(a.by || '')}<small>${esc(rst_dl(a.at || d + 'T12:00:00'))}</small></th>`; };
+  const rows = its.map(i=>`<tr><td class="i">${esc(i.n)}</td>${ds.map(d=>{ const q = stk_num(stk_autQ(rst_doc(d), i.id, ck_who)); return `<td><b>${q === null ? '—' : esc(ck_fmt(q))}</b></td>`; }).join('')}</tr>`).join('');
   return `<div class="rs-box"><h3>${esc(ck_s('rs_aut'))}</h3><table class="rs-t"><tr><th style="width:${100 - w * ds.length}%"></th>${ds.map(hd).join('')}</tr>${rows}</table></div>`;
 }
 function rst_canHtml(me){
@@ -7939,20 +7532,20 @@ function stk_tilesHtml(me){
   if((me.stk || []).includes('can')) kinds.push(['can', 'stk_can', stk_items('can').map(i=>i.id)]);
   const aut = stk_autIds(me); if(aut.length) kinds.push(['autre', 'stk_aut', aut]);
   const tiles = kinds.map(t=>{
-    const its = t[2], done = its.length && its.every(id=>stk_num((d.c || {})[id]) !== null), last = its.map(id=>((d.c || {})[id] || {}).at || '').sort().pop();
+    const its = t[2], recOf = (id)=>t[0] === 'autre' ? stk_autQ(d, id, ck_who) : (d.c || {})[id], done = its.length && its.every(id=>stk_num(recOf(id)) !== null), last = its.map(id=>(recOf(id) || {}).at || '').sort().pop();
     return `<button class="ck-tile ${done ? 'ready' : ''}" style="--c:${CK_TCOL[t[0]]}" onclick="stk_open('${t[0]}')"><div class="nm"><span class="ico">${CK_TICO[t[0]]}</span><span>${esc(ck_s(t[1]))}</span></div><div class="st"><b>${done ? '✓' : '○'}</b><span>${esc(done ? ck_s('stk_done', { t:ck_hm(last) }) : ck_s('stk_todo'))}</span></div></button>`;
   }).join('');
   return tiles;
 }
 function stk_open(kind){
   const me = ck_cook(ck_who), its = kind === 'autre' ? stk_autIds(me).map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean) : stk_items(kind), d = stk_doc(ck_service()), v = {}, fresh = {};
-  its.forEach(i=>{ const q = stk_num((d.c || {})[i.id]); if(q !== null){ v[i.id] = ck_fmt(q); fresh[i.id] = true; } });
+  its.forEach(i=>{ const q = stk_num(kind === 'autre' ? stk_autQ(d, i.id, ck_who) : (d.c || {})[i.id]); if(q !== null){ v[i.id] = ck_fmt(q); fresh[i.id] = true; } });
   stkS = { kind, tab:'c', ids:its.map(i=>i.id), i:0, act:its.length ? its[0].id : '', v, fresh, err:'' }; ck_view = 'stk'; ck_render();
 }
 function stk_one(){   // article par article : valider enregistre cet article et passe au suivant
   const S = stkS; if(!S) return; const id = S.ids[S.i], raw = S.v[id], me = ck_cook(ck_who) || { name:'' }, it = stk_items('autre').find(x=>x.id === id) || { n:'' };
   if(raw === undefined || raw === ''){ S.err = ck_s('stk_need', { n:it.n }); return ck_render(); }
-  const date = ck_service(); ck_write('stk_' + date, { sdate:date, c:{ [id]:{ q:ck_num(raw) || 0, at:ck_nowIso(), by:me.name } } });
+  const date = ck_service(); ck_write('stk_' + date, { sdate:date, ca:{ [String(ck_who)]:{ [id]:{ q:ck_num(raw) || 0, at:ck_nowIso(), by:me.name } } } });
   if(S.i >= S.ids.length - 1){ stkS = null; ck_view = 'tiles'; return ck_render(); }
   S.i++; S.act = S.ids[S.i]; S.err = ''; ck_render();
 }
@@ -8120,12 +7713,19 @@ function stk_canTable(){
     <div class="ck3-n">Ventes issues de Resto Pro (Actualiser dans CA Resto Pro). Achats issus de Dépenses.</div></div>`;
 }
 function stk_autTable(){
-  const d = stk_doc(ck_adate || ck_service()), its = stk_items('autre');
-  const rows = its.map(i=>{ const c = stk_num((d.c || {})[i.id]), s0 = Number(i.seuil) || 0; let st = '—';
-    if(c !== null) st = s0 > 0 && c < s0 ? '<span class="ck-pill ko">À racheter</span>' : s0 > 0 && c <= s0 * 1.2 ? '<span class="ck-pill wa">Proche du seuil</span>' : '<span class="ck-pill ok">OK</span>';
-    const c0 = (d.c || {})[i.id], who = c !== null && c0 && c0.at ? esc((c0.by || '') + ' · ' + ck_hm(c0.at)) : '—';
-    return `<tr><td>${esc(i.n)}</td><td>${stk_c(c)}</td><td>${s0 ? ck_fmt(s0) : '—'}</td><td>${st}</td><td style="font-family:inherit;color:var(--ink-muted)">${who}</td></tr>`; }).join('');
-  return `<div class="ck-box" id="stk-aut"><div class="ck3-h"><b>Autres articles</b><span>comptage quotidien</span></div>${rows ? `<div class="ck3-w"><table class="ck3-t"><tr><th>Article</th><th>Comptage</th><th>Seuil minimum</th><th>État</th><th>Compté par</th></tr>${rows}</table></div>` : '<div class="ck-empty">Aucun article. Ajoute-les dans Réglages.</div>'}</div>`;
+  const d = stk_doc(ck_adate || ck_service()), its = stk_items('autre'), rows = [];
+  its.forEach(i=>{
+    const lines = stk_autLines(d, i.id), codes = lines.map(x=>x.code);
+    ck_cooks().forEach(c=>{ if(!codes.includes(c.code) && stk_autIds(c).includes(i.id)) lines.push({ code:c.code, rec:null }); });
+    if(!lines.length) lines.push({ code:'', rec:null, none:true });
+    lines.sort((a, b)=>String(stk_cookLabel(a.code)).localeCompare(String(stk_cookLabel(b.code)), 'fr')).forEach(L=>{
+      const c = L.rec ? stk_num(L.rec) : null, s0 = L.code ? stk_seuil(L.code, i.id) : (Number(i.seuil) || 0); let st = '—';
+      if(c !== null) st = s0 > 0 && c < s0 ? '<span class="ck-pill ko">À racheter</span>' : s0 > 0 && c <= s0 * 1.2 ? '<span class="ck-pill wa">Proche du seuil</span>' : '<span class="ck-pill ok">OK</span>';
+      const lab = L.code ? stk_cookLabel(L.code) : (L.rec ? (L.rec.by || '') : ''), who = c !== null && L.rec && L.rec.at ? esc((L.rec.by || '') + ' · ' + ck_hm(L.rec.at)) : '—';
+      rows.push(`<tr><td>${esc(i.n)}${lines.length > 1 || lab ? ` <span class="ck-pill">${esc(lab)}</span>` : ''}</td><td>${stk_c(c)}</td><td>${s0 ? ck_fmt(s0) : '—'}</td><td>${st}</td><td style="font-family:inherit;color:var(--ink-muted)">${who}</td></tr>`);
+    });
+  });
+  return `<div class="ck-box" id="stk-aut"><div class="ck3-h"><b>Autres articles</b><span>un comptage par cuisinier</span></div>${rows.length ? `<div class="ck3-w"><table class="ck3-t"><tr><th>Article</th><th>Comptage</th><th>Seuil minimum</th><th>État</th><th>Compté par</th></tr>${rows.join('')}</table></div>` : '<div class="ck-empty">Aucun article. Ajoute-les dans Réglages.</div>'}</div>`;
 }
 /* ==================== FICHES TECHNIQUES et BILAN DES VENTES ==================== */
 const fi = { q:'', only:false, open:'', max:30, err:'', prods:null, tried:false, loading:false, loadedAt:0 };
@@ -8378,8 +7978,8 @@ function stk_regHtml(){
   const names = Array.from(new Set((ck_ingsRaw || []).filter(i=>i && i.n).map(i=>i.n))), dl = `<datalist id="stk-dl">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`;
   const block = (k, titre, can)=>{
     const its = stk_itemsAll(k).map(i=>`<div class="ck-fr" style="align-items:flex-end;flex-wrap:wrap"><div><label>Nom</label><br><input class="ck-in" style="width:170px" value="${esc(i.n)}" onchange="stk_set(${ck_a(i.id)},'n',this.value)"></div>
-      ${can ? `<div><label>Nom dans Dépenses</label><br><input class="ck-in" list="stk-dl" style="width:170px" value="${esc(i.dep || '')}" onchange="stk_set(${ck_a(i.id)},'dep',this.value)"></div><div><label>Nom dans Resto Pro (séparer par ;)</label><br><input class="ck-in" style="width:210px" value="${esc(i.rp || '')}" onchange="stk_set(${ck_a(i.id)},'rp',this.value)"></div>` : `<div><label>Seuil minimum</label><br><input class="ck-in" inputmode="decimal" style="width:90px" value="${esc(i.seuil ? ck_fmt(i.seuil) : '')}" onchange="stk_set(${ck_a(i.id)},'seuil',this.value)"></div>`}
-      <button class="ck-btn sm danger" onclick="stk_del(${ck_a(i.id)})">Retirer</button></div>`).join('');
+      ${can ? `<div><label>Nom dans Dépenses</label><br><input class="ck-in" list="stk-dl" style="width:170px" value="${esc(i.dep || '')}" onchange="stk_set(${ck_a(i.id)},'dep',this.value)"></div><div><label>Nom dans Resto Pro (séparer par ;)</label><br><input class="ck-in" style="width:210px" value="${esc(i.rp || '')}" onchange="stk_set(${ck_a(i.id)},'rp',this.value)"></div>` : `<div><label>Seuil par défaut</label><br><input class="ck-in" inputmode="decimal" style="width:90px" value="${esc(i.seuil ? ck_fmt(i.seuil) : '')}" onchange="stk_set(${ck_a(i.id)},'seuil',this.value)"></div>`}
+      <button class="ck-btn sm danger" onclick="stk_del(${ck_a(i.id)})">Retirer</button></div>${can ? '' : ck_cooks().filter(c=>stk_autIds(c).includes(i.id)).map(c=>`<div class="ck-fr" style="margin:2px 0 8px 14px"><span class="ck-sub" style="min-width:200px">${esc(stk_cookLabel(c.code))} : seuil minimum</span><input class="ck-in" inputmode="decimal" style="width:90px" placeholder="${i.seuil ? esc(ck_fmt(i.seuil)) : ''}" value="${esc(((((ck_cfg.cooks || {})[c.code] || {}).seuils || {})[i.id]) ? ck_fmt(ck_cfg.cooks[c.code].seuils[i.id]) : '')}" onchange="stk_setSeuil(${ck_a(c.code)},${ck_a(i.id)},this.value)"></div>`).join('')}`).join('');
     return `<div class="ck-box"><h3>${titre}</h3>${its || '<div class="ck-sub">Aucun article.</div>'}<div style="margin-top:8px"><button class="ck-btn sm" onclick="stk_add('${k}')">+ Ajouter un article</button></div></div>`;
   };
   const st = (ck_cfg.stk || {}).start || {}, ini = (id, u)=>`<div class="ck-fr"><label style="min-width:170px">${esc(id.n)}</label><input class="ck-in" inputmode="decimal" style="width:110px" value="${esc(stk_init(id.id) === null ? '' : ck_fmt(stk_init(id.id)))}" onchange="stk_setInit(${ck_a(id.id)},this.value)"><span class="ck-sub">${esc(u)}</span></div>`;
@@ -8914,25 +8514,28 @@ let stkCr = null, stkCrErr = '';
 function stk_crEdit(id){ stkCr = id; stkCrErr = ''; ck_render(); }
 function stk_crCancel(){ stkCr = null; stkCrErr = ''; ck_render(); }
 function stk_crSave(){
-  const id = stkCr, it = stk_itemsAll('can').concat(stk_itemsAll('autre')).find(x=>x.id === id); if(!it) return; const date = ck_adate || ck_service(), d = stk_doc(date), can = it.k === 'can';
+  const id = stkCr, code = ck_rc, it = stk_itemsAll('can').concat(stk_itemsAll('autre')).find(x=>x.id === id); if(!it || !code) return; const date = ck_adate || ck_service(), d = stk_doc(date), can = it.k === 'can';
   const iq = document.querySelector('#ck-root input[data-sq]'), il = document.querySelector('#ck-root input[data-sl]');
   const q = iq ? ck_num(iq.value) : null; if(!iq || String(iq.value).trim() === '' || q === null){ stkCrErr = 'Indique la quantité comptée (0 est accepté).'; return ck_render(); }
-  const put = { c:{ [id]:{ q, at:((d.c || {})[id] || {}).at || ck_nowIso(), by:((d.c || {})[id] || {}).by || 'Admin', adm:true } } };
-  const oq = stk_num((d.c || {})[id]); if(oq !== null) put.c[id].prevQ = (d.c[id].adm && d.c[id].prevQ !== undefined) ? d.c[id].prevQ : oq;
-  if(can && il){ const l = String(il.value).trim() === '' ? 0 : ck_num(il.value); if(l === null){ stkCrErr = 'La perte doit être un nombre.'; return ck_render(); } put.l = { [id]:{ q:l, at:((d.l || {})[id] || {}).at || ck_nowIso(), by:((d.l || {})[id] || {}).by || 'Admin', adm:true } }; }
+  const old = can ? (d.c || {})[id] : stk_autQ(d, id, code), oq = stk_num(old), put = {};
+  const rec = { q, at:(old || {}).at || ck_nowIso(), by:(old || {}).by || ck_empName(code), adm:true }; if(oq !== null) rec.prevQ = (old.adm && old.prevQ !== undefined) ? old.prevQ : oq;
+  if(can) put.c = { [id]:rec }; else put.ca = { [String(code)]:{ [id]:rec } };
+  if(can && il){ const l = String(il.value).trim() === '' ? 0 : ck_num(il.value); if(l === null){ stkCrErr = 'La perte doit être un nombre.'; return ck_render(); } put.l = { [id]:{ q:l, at:((d.l || {})[id] || {}).at || ck_nowIso(), by:((d.l || {})[id] || {}).by || ck_empName(code), adm:true } }; }
   ck_write('stk_' + date, Object.assign({ sdate:date }, put)); stkCr = null; stkCrErr = ''; ck_render();
 }
-function stk_crHtml(date){
-  const d = stk_doc(date), can = stk_items('can'), aut = stk_items('autre'); if(!can.length && !aut.length) return '';
+function stk_crHtml(date, code){
+  const d = stk_doc(date), nm = String(ck_empName(code)), can = stk_items('can').filter(i=>{ const c0 = (d.c || {})[i.id]; return stk_num(c0) !== null && String(c0.by || '') === nm; }), aut = stk_items('autre').filter(i=>stk_autQ(d, i.id, code) !== null);
+  const head = `<div style="margin-top:14px;"><b>Stock du jour · ${esc(ck_frDate(date))} · saisi par ${esc(nm)}</b><div class="ck-sub" style="margin-top:2px;">Seuls les comptages saisis par ce cuisinier apparaissent. Une correction recalcule tout toute seule : suivi du stock, théorique du lendemain, « Reste du dernier service ».</div>`;
+  if(!can.length && !aut.length) return head + `<div class="ck-sub" style="margin-top:8px;">Aucun comptage du stock saisi par ce cuisinier ce jour-là.</div></div>`;
   const row = (i, isCan)=>{
-    const c0 = (d.c || {})[i.id], q = stk_num(c0), l0 = (d.l || {})[i.id], lq = stk_num(l0), ed = stkCr === i.id;
+    const c0 = isCan ? (d.c || {})[i.id] : stk_autQ(d, i.id, code), q = stk_num(c0), l0 = (d.l || {})[i.id], lq = stk_num(l0), ed = stkCr === i.id;
     const mark = c0 && c0.adm ? ` <span class="ck-pill wa">saisie par l’admin</span>${c0.prevQ !== undefined ? `<div class="ck-sub">valeur du cuisinier : ${esc(ck_fmt(c0.prevQ))}</div>` : ''}` : '';
     const who = c0 && c0.at && !c0.adm ? `<div class="ck-sub">compté par ${esc(c0.by || '')} · ${esc(ck_hm(c0.at))}</div>` : '';
     const form = ed ? `<tr><td colspan="4"><div class="fi-form ck-corr-form"><div class="fi-fr"><label>Quantité comptée</label><input class="ck-in" inputmode="decimal" style="width:100px" data-sq="1" value="${q !== null ? esc(ck_fmt(q)) : ''}" placeholder="0"></div>${isCan ? `<div class="fi-fr"><label>Pertes du jour</label><input class="ck-in" inputmode="decimal" style="width:100px" data-sl="1" value="${lq !== null ? esc(ck_fmt(lq)) : ''}" placeholder="0"></div>` : ''}<div class="ck-err">${esc(stkCrErr)}</div><div class="ck-fr"><button class="ck-btn on" onclick="stk_crSave()">Enregistrer</button><button class="ck-btn" onclick="stk_crCancel()">Annuler</button></div></div></td></tr>` : '';
     return `<tr><td>${esc(i.n)}${mark}${who}</td><td>${q === null ? '—' : esc(ck_fmt(q))}</td><td>${isCan ? (lq === null ? '—' : esc(ck_fmt(lq))) : ''}</td><td><button class="ck-btn sm" aria-label="Corriger" onclick="stk_crEdit(${ck_a(i.id)})">✎</button></td></tr>${form}`;
   };
   const tb = (its, isCan, title)=>its.length ? `<div class="ck-sub" style="margin:10px 0 4px;">${esc(title)}</div><div class="ck3-w"><table class="ck3-t"><tr><th>Article</th><th>Comptage</th><th>${isCan ? 'Pertes' : ''}</th><th></th></tr>${its.map(i=>row(i, isCan)).join('')}</table></div>` : '';
-  return `<div style="margin-top:14px;"><b>Stock du jour · ${esc(ck_frDate(date))}</b><div class="ck-sub" style="margin-top:2px;">Corrige un comptage : le suivi du stock, le théorique du lendemain et « Reste du dernier service » se recalculent tout seuls.</div>${tb(can, true, 'Canettes et eau')}${tb(aut, false, 'Autres articles')}</div>`;
+  return head + tb(can, true, 'Canettes et eau') + tb(aut, false, 'Autres articles') + '</div>';
 }
 
 function ck_saisieBox(){
@@ -8945,7 +8548,7 @@ function ck_saisieBox(){
     <div class="ck-date"><button class="ck-btn sm" onclick="ck_adateMove(-1)">‹</button><input type="date" class="ck-in" value="${esc(date)}" onchange="ck_adateSet(this.value)"><button class="ck-btn sm" onclick="ck_adateMove(1)">›</button><button class="ck-btn sm" onclick="ck_adateSet('')">Aujourd’hui</button><button class="ck-btn sm" onclick="ck_export()">⬇ Export Excel</button></div>
     <div class="ck-fr" style="flex-wrap:wrap"><select class="ck-in" style="min-width:200px" onchange="ck_rcSet(this.value)"><option value="">Choisir un cuisinier…</option>${codes.map(c=>ck_opt(c, ck_empName(c), ck_rc)).join('')}</select>
       <button class="ck-btn sm danger" ${off} onclick="ck_adminClear(${ck_a(ck_rc)})">Vider</button><button class="ck-btn sm ${ck_corr ? 'on' : ''}" ${off} onclick="ck_rcCorr()">Corriger</button><button class="ck-btn sm" ${ck_rc && doc.done ? '' : 'disabled'} onclick="ck_adminReopen(${ck_a(ck_rc)})">Rouvrir</button><button class="ck-btn sm" ${ck_rc && doc.emp && !doc.done ? '' : 'disabled'} onclick="ck_adminClose(${ck_a(ck_rc)})">Clôturer</button>${pill}</div>
-    ${ck_rc && ck_corr ? ck_corrHtml(date, ck_rc, doc) + stk_crHtml(date) : ''}</div>`;
+    ${ck_rc && ck_corr ? ck_corrHtml(date, ck_rc, doc) + stk_crHtml(date, ck_rc) : ''}</div>`;
 }
 
 /* ---------- Réglages ---------- */
