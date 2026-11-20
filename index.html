@@ -7808,7 +7808,7 @@ Object.assign(CK_T, {
   rs_tile:['Reste du dernier service', 'المتبقي من آخر خدمة'], rs_tileSub:['Voir les 2 dernières fins de service', 'عرض آخر خدمتين'], rs_tileStk:['Voir le dernier comptage', 'عرض آخر جرد'],
   rs_fb:['Brut', 'خام'], rs_fn:['Net', 'صافي'], rs_fc:['Crispy', 'كريسبي'], rs_fh:['Bac à haché', 'وعاء المفروم'], rs_aut:['Autres articles', 'مواد أخرى'], rs_can:['Canettes et eau', 'العلب والمياه'],
   rs_none:['Aucune fin de service enregistrée pour le moment.', 'لا توجد نهاية خدمة مسجلة بعد.'], rs_noStk:['Aucun comptage pour le moment.', 'لا يوجد جرد بعد.'], rs_load:['Chargement…', 'جارٍ التحميل…'],
-  rs_escS:['{n} : brut pesé par le Sushi', '{n} : الوزن الخام المسجل من السوشي'], rs_escN:['Pas encore de pesée du Sushi.', 'لا يوجد وزن من السوشي بعد.'], rs_cnt:['Compté', 'المعدود'], rs_theo:['Théorique', 'النظري'], rs_gap:['Écart', 'الفرق'], rs_miss:['Manque', 'نقص'], rs_exact:['Exact', 'مطابق'], rs_sur:['Surplus', 'فائض'], rs_last:['Dernier comptage', 'آخر جرد'],
+  rs_dec:['Découpé', 'مقطّع'], rs_cnt:['Compté', 'المعدود'], rs_theo:['Théorique', 'النظري'], rs_gap:['Écart', 'الفرق'], rs_miss:['Manque', 'نقص'], rs_exact:['Exact', 'مطابق'], rs_sur:['Surplus', 'فائض'], rs_last:['Dernier comptage', 'آخر جرد'],
   stk_next:['Valider et passer au suivant', 'تأكيد والانتقال إلى التالي'], stk_artN:['Article {a} sur {b}', 'المادة {a} من {b}'], stk_prev:['‹ Précédent', '‹ السابق'], stk_capA:['Combien en reste-t-il ?', 'كم تبقى؟'],
   stk_sec:['Stock', 'المخزون'], stk_can:['Canettes et eau', 'العلب والمياه'], stk_aut:['Autres articles', 'مواد أخرى'], stk_cnt:['Comptage', 'الجرد'], stk_loss:['Pertes', 'الخسائر'],
   stk_done:['Compté à {t}', 'تم الجرد على {t}'], stk_todo:['À compter', 'للجرد'], stk_need:['Indique le comptage de {n}', 'أدخل جرد {n}'],
@@ -7894,19 +7894,17 @@ function rst_kitchen(K){
   const rows = ids.map(id=>{
     const u = ck_unit(id), keys = ck2_finKeys(id, K.p);
     const cells = vals.map(d=>{ const r = ck_recOne(d, id, ck2_fid(K.p)), f = r && r.f; if(!f) return '<td>—</td>';
+      if(K.p === 'Wok' && ck_kind(id) === 'escalope'){   // Chaud : le découpé du Wok en haut, puis le brut restant pesé par le Sushi (sans dire par qui)
+        const dec = Number(f.fn) || 0, br = rst_sushiBrut(id, d.done);
+        return `<td><b>${esc(ck_fmt(dec))} ${esc(u)}</b><small>${esc(ck_s('rs_dec'))} ${esc(ck_fmt(dec))}<br>${esc(ck_s('rs_fb'))} ${br === null ? '—' : esc(ck_fmt(br))}</small></td>`; }
       const tot = ck_r(keys.filter(k=>k !== 'fc').reduce((a, k)=>a + (Number(f[k]) || 0), 0));
       return `<td><b>${esc(ck_fmt(tot))} ${esc(u)}</b><small>${keys.filter(k=>f[k] !== undefined && f[k] !== null).map(k=>esc(ck_s('rs_' + k)) + ' ' + esc(ck_fmt(Number(f[k]) || 0))).join('<br>')}</small></td>`; }).join('');
     return `<tr><td class="i">${esc(ck_ingName(id))}</td>${cells}</tr>`; }).join('');
   return `<div class="rs-box"><h3>${esc(K.p)}</h3><table class="rs-t">${head}${rows}</table></div>`;
 }
-function rst_escSushi(K){   // le Chaud lit le brut d’escalope pesé en fin de service par le Sushi (2 dernières fins de service du Sushi)
-  if(K.p !== 'Wok') return '';
-  return K.ids.filter(id=>ck_kind(id) === 'escalope').map(id=>{
-    const u = ck_unit(id), list = Object.keys(RST.docs).map(k=>RST.docs[k]).filter(d=>{ const r = d && d.done ? ck_recOne(d, id, ck2_fid('Sushi')) : null; return r && r.f && r.f.fb !== undefined && r.f.fb !== null; })
-      .sort((a, b)=>String(b.done).localeCompare(String(a.done))).slice(0, 2);
-    const rows = list.map(d=>`<tr><td class="i">${esc(d.name || ck_empName(d.emp))}<small>${esc(rst_dl(d.done))}</small></td><td><b>${esc(ck_fmt(Number(ck_recOne(d, id, ck2_fid('Sushi')).f.fb) || 0))} ${esc(u)}</b></td></tr>`).join('');
-    return `<div class="rs-box"><h3>${esc(ck_s('rs_escS', { n:ck_ingName(id) }))}</h3>${rows ? `<table class="rs-t">${rows}</table>` : `<div class="rs-e">${esc(ck_s('rs_escN'))}</div>`}</div>`;
-  }).join('');
+function rst_sushiBrut(id, before){   // dernier brut d’escalope saisi en fin de service par le Sushi, avant la fin de service donnée
+  let best = null; Object.keys(RST.docs).forEach(k=>{ const d = RST.docs[k]; if(!d || !d.done || String(d.done) > String(before)) return; const r = ck_recOne(d, id, ck2_fid('Sushi')); if(r && r.f && r.f.fb !== undefined && r.f.fb !== null && (!best || String(d.done) > String(best.done))) best = { done:d.done, fb:Number(r.f.fb) || 0 }; });
+  return best ? best.fb : null;
 }
 function rst_autHtml(me, n){
   const its = stk_autIds(me).map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean); if(!its.length) return '';
@@ -7926,7 +7924,7 @@ function rst_canHtml(me){
 }
 function rst_html(){
   const me = ck_cook(ck_who) || {}, ks = ck2_kitchens();
-  const body = ks.length ? ks.map(K=>rst_kitchen(K) + rst_escSushi(K)).join('') + rst_autHtml(me, 2) : (rst_canOn(me) ? rst_canHtml(me) : '') + rst_autHtml(me, 1);
+  const body = ks.length ? ks.map(rst_kitchen).join('') + rst_autHtml(me, 2) : (rst_canOn(me) ? rst_canHtml(me) : '') + rst_autHtml(me, 1);
   return ck_topHtml() + ck_alerts() + `<h2 style="font-size:18px;margin:6px 0 12px">${esc(ck_s('rs_tile'))}</h2>` + (body || `<div class="ck-empty">${esc(ck_s('rs_none'))}</div>`) + `<div style="margin-top:14px"><button class="ck-btn" onclick="ck_backToTiles()">‹ ${esc(ck_s('back'))}</button></div>`;
 }
 function rst_tileHtml(me){
