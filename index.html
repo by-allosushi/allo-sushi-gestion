@@ -1022,6 +1022,7 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .bl-ed{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
     #module-cuisine .bl-in{width:76px;background:var(--bg,transparent);color:inherit;border:1px solid rgba(61,139,255,.6);border-radius:6px;padding:3px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:14px;}
     #module-cuisine .bl-bs{border:1px solid rgba(248,113,113,.4);background:transparent;color:#FCA5A5;border-radius:7px;padding:3px 10px;font-size:12px;cursor:pointer;font-family:inherit;}
+    #module-cuisine .bl-ad{flex:1 1 100%;font-size:12px;color:var(--ink-muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}#module-cuisine .bl-sel,#module-cuisine .bl-tm{background:transparent;color:inherit;border:1px solid var(--line);border-radius:7px;padding:3px 6px;font-size:13px;font-family:inherit;}
     #module-cuisine .bl-ac{display:flex;gap:6px;justify-content:flex-end;align-items:center;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line);}#module-cuisine .bl-er{flex:1;color:#FCA5A5;font-size:12px;}
     @media(max-width:700px){#module-cuisine .bl-t .hs{display:none;}#module-cuisine .bl-t col.c0{width:30%;}#module-cuisine .bl-t col.c4,#module-cuisine .bl-t col.c5{width:20%;}#module-cuisine .bl-t col.c6{width:19%;}#module-cuisine .bl-t col.c7{width:11%;}#module-cuisine .bl-b{width:34px;}#module-cuisine .bl-b .ds{display:none;}#module-cuisine .bl-b .ph{display:inline;}#module-cuisine .bl-pn{grid-template-columns:1fr;}#module-cuisine .bl-t td,#module-cuisine .bl-t th{padding-left:3px;padding-right:3px;font-size:13px;}#module-cuisine .bl-p{min-width:0;width:100%;}#module-cuisine .bl-kp{gap:6px;}}
     #module-cuisine .ck-ig{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;}#module-cuisine .ck-ig .ck-row{margin:0;}
@@ -7924,18 +7925,38 @@ function sx_box(key, list, extra, force){
 /* ----- escalope : saisies rangées comme sur la feuille (J-1 fin de service · J pendant le service · J fin de service) ----- */
 let sxs = {}, sxsErr = '', sxsErrK = '';
 function sxs_tog(key){ sxs[key] = !sxs[key]; sxsErr = ''; sxsErrK = ''; ck_render(); }
+function sxs_at(date, hm){   // « hh:mm » d’un service -> date/heure ISO (avant l’heure de coupure = après minuit, donc le lendemain)
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hm || '').trim()); if(!m) return ck_nowIso();
+  const h = Number(m[1]), c = Number((ck_cfg.settings || {}).cutoff), d = h < (isNaN(c) ? 5 : c) ? ck_addDays(date, 1) : date, p = d.split('-').map(Number), x = new Date(p[0], p[1] - 1, p[2], h, Number(m[2]));
+  return isNaN(x) ? ck_nowIso() : x.toISOString();
+}
+function sxs_err(key, m){ sxsErr = m; sxsErrK = key; ck_render(); }
 function sxs_save(key){
-  const by = {}; let empty = 0;
-  document.querySelectorAll('#ck-root .bl-sec[data-key="' + key + '"] input[data-sxs]').forEach(el=>{ const a = el.getAttribute('data-sxs').split('|'), id = a.slice(0, 4).join('|'); (by[id] = by[id] || { a, f:{} }).f[a[4]] = String(el.value).trim(); });
-  const jobs = [];
+  const root = document.querySelector('#ck-root .bl-sec[data-key="' + key + '"]'); if(!root) return;
+  const by = {}, adds = {}, jobs = [];
+  root.querySelectorAll('input[data-sxs]').forEach(el=>{ const a = el.getAttribute('data-sxs').split('|'), id = a.slice(0, 4).join('|'); (by[id] = by[id] || { a, f:{} }).f[a[4]] = String(el.value).trim(); });
+  root.querySelectorAll('input[data-sxa]').forEach(el=>{ const a = el.getAttribute('data-sxa').split('|'), id = a.slice(0, 5).join('|'); (adds[id] = adds[id] || { a, f:{} }).f[a[5]] = String(el.value).trim(); });
   for(const id of Object.keys(by)){
     const a = by[id].a, doc = (sx_docs(a[0]) || {})[ck_docId(a[0], a[1])] || {}, old = ck_recOne(doc, a[2], a[3]); if(!old) continue;
     const f = Object.assign({}, old.f || {}); let changed = false;
-    for(const k of Object.keys(by[id].f)){ const raw = by[id].f[k], v = ck_num(raw); if(raw === '' || v === null){ sxsErr = 'Remplis toutes les cases (0 est accepté).'; sxsErrK = key; return ck_render(); } if(f[k] === undefined || Number(f[k]) !== v) changed = true; f[k] = v; }
-    if(old.t === 'dc' && f.n > f.b + 1e-9){ sxsErr = 'Le net ne peut pas dépasser le brut.'; sxsErrK = key; return ck_render(); }
+    for(const k of Object.keys(by[id].f)){ const raw = by[id].f[k], v = ck_num(raw); if(raw === '' && f[k] === undefined) continue; if(raw === '' || v === null) return sxs_err(key, 'Remplis toutes les cases (0 est accepté).'); if(f[k] === undefined || Number(f[k]) !== v) changed = true; f[k] = v; }
+    if(old.t === 'dc' && f.n > f.b + 1e-9) return sxs_err(key, 'Le net ne peut pas dépasser le brut.');
     if(!changed) continue;
     const rec = { t:old.t, f, p:ck2_P(old.p), at:old.at || ck_nowIso(), del:false, adm:true }; rec.prevF = old.adm && old.prevF ? old.prevF : old.f;
     jobs.push([ck_docId(a[0], a[1]), { ckdate:a[0], emp:String(a[1]), name:doc.name || ck_empName(a[1]), poste:doc.poste || '', recs:{ [a[2]]:{ [a[3]]:rec } } }]);
+  }
+  const ck = root.querySelector('select[data-sxcook]'), tm = root.querySelector('input[data-sxtime]'), code = ck ? ck.value : '';
+  let n = 0;
+  for(const id of Object.keys(adds)){
+    const a = adds[id].a, fv = adds[id].f, ks = Object.keys(fv), filled = ks.filter(k=>fv[k] !== '');
+    if(!filled.length) continue;
+    const t = a[3], f = {};
+    for(const k of ks){ if(fv[k] === '' && t === 'hc'){ f[k] = 0; continue; } const v = ck_num(fv[k]); if(fv[k] === '' || v === null) return sxs_err(key, 'Remplis toutes les cases de la ligne ajoutée (0 est accepté).'); f[k] = v; }
+    if(t === 'dc' && f.n > f.b + 1e-9) return sxs_err(key, 'Le net ne peut pas dépasser le brut.');
+    if(!code) return sxs_err(key, 'Choisis le cuisinier de la ligne ajoutée.');
+    const date = a[0], rid = t === 'fin2' ? ck2_fid(a[2]) : 'adm_' + Date.now().toString(36) + (n++), cook = ck_cook(code) || { name:ck_empName(code), poste:'' };
+    const rec = { t, f, p:a[2], at:sxs_at(date, tm ? tm.value : ''), del:false, adm:true };
+    jobs.push([ck_docId(date, code), { ckdate:date, emp:String(code), name:cook.name, poste:cook.poste, recs:{ [a[1]]:{ [rid]:rec } } }]);
   }
   jobs.forEach(j=>ck_write(j[0], j[1])); sxs[key] = false; sxsErr = ''; sxsErrK = ''; ck_render();
 }
@@ -7947,38 +7968,48 @@ function sx_escPanel(L, D, dT, dP, dPrev, pouIds, escIds){
     const fs = sx_latest(sx_get(docs, date, [[L.id, ['fin2']]]), true), wk = fs.find(e=>ck2_P(e.r.p) === 'Wok'), su = fs.find(e=>ck2_P(e.r.p) === 'Sushi');
     const hs = sx_latest(pouIds.reduce((a, pid)=>a.concat(sx_get(docs, date, [[pid, ['fin2']]])), []).filter(e=>e.r.f && e.r.f.fh !== undefined), true);
     const sb = (e)=>e ? e.name + ' · ' + ck_hm(e.r.at) : '';
-    const lines = [{ lab:'Wok net', sub:sb(wk), e:wk, f:['fn'] }, { lab:'Sushi net', sub:sb(su), e:su, f:['fn'] }, { lab:'Brut', sub:sb(su), e:su, f:['fb'] }];
-    if(hs.length) hs.forEach(e=>lines.push({ lab:'Bac à haché', sub:sb(e), e, f:['fh'] })); else lines.push({ lab:'Bac à haché', e:null, f:['fh'] });
+    const ad = (id, p, key)=>({ id, p, t:'fin2', key, row:'fin' }), lines = [{ lab:'Wok net', sub:sb(wk), e:wk, f:['fn'], add:ad(L.id, 'Wok', 'fn') }, { lab:'Sushi net', sub:sb(su), e:su, f:['fn'], add:ad(L.id, 'Sushi', 'fn') }, { lab:'Brut', sub:sb(su), e:su, f:['fb'], add:ad(L.id, 'Sushi', 'fb') }];
+    if(hs.length) hs.forEach(e=>lines.push({ lab:'Bac à haché', sub:sb(e), e, f:['fh'] })); else lines.push({ lab:'Bac à haché', e:null, f:['fh'], add:pouIds.length ? ad(pouIds[0], 'Wok', 'fh') : null });
     if(withJ){
       const pq = sx_get(docs, date, [[L.id, ['pq']]]);
-      if(pq.length) pq.forEach(e=>lines.push({ lab:'Perte qualité', sub:e.name + ' · ' + ck_hm(e.r.at), e, f:['q'] })); else lines.push({ lab:'Perte qualité', e:null, f:['q'], zero:true });
-      lines.push({ lab:'Reste crispy', sub:sb(su), e:su, f:['fc'] });
+      if(pq.length) pq.forEach(e=>lines.push({ lab:'Perte qualité', sub:e.name + ' · ' + ck_hm(e.r.at), e, f:['q'] })); else lines.push({ lab:'Perte qualité', e:null, f:['q'], zero:true, add:{ id:L.id, p:'Sushi', t:'pq', key:'q', row:'pq' } });
+      lines.push({ lab:'Reste crispy', sub:sb(su), e:su, f:['fc'], add:ad(L.id, 'Sushi', 'fc') });
     }
     return { lines, who:who([wk, su].concat(hs)) };
   };
   const delMsg = (e)=>e.r.t === 'fin2' ? 'Supprimer cette fin de service (' + e.r.p + ') avec toutes ses valeurs ?' : 'Supprimer cette saisie ?';
-  const lineHtml = (ln, key)=>{
+  const lineHtml = (ln, key, date)=>{
     const open = !!sxs[key], e = ln.e, f = ln.f;
     const disp = ln.fmt && e ? ln.fmt(e) : ln.zero && !e ? '0' : f.length === 2 ? (e ? 'brut ' + val(e, f[0]) + ' → net ' + val(e, f[1]) : '—') : val(e, f[0]);
     const lab = `<span>${esc(ln.lab)}${ln.sub ? `<small>${esc(ln.sub)}</small>` : ''}</span>`;
+    if(open && !e && ln.add){ const a = ln.add; return `<div class="bl-sl">${lab}<span class="bl-ed"><input class="bl-in" inputmode="decimal" placeholder="0" data-sxa="${esc([date, a.id, a.p, a.t, a.row || a.key, a.key].join('|'))}"></span></div>`; }
     if(!open || !e) return `<div class="bl-sl">${lab}<b>${esc(disp)}</b></div>`;
     const inp = f.map(k=>`<input class="bl-in" inputmode="decimal" data-sxs="${esc([e.date, e.code, e.id, e.rid, k].join('|'))}" value="${esc(ck_fmtOrEmpty((e.r.f || {})[k]))}">`).join(ln.sep || (f.length === 2 ? ' → ' : ' · '));
     return `<div class="bl-sl">${lab}<span class="bl-ed">${inp}<button class="bl-bs" onclick="sx_del(${[e.date, e.code, e.id, e.rid, delMsg(e)].map(ck_a).join(',')})">Supprimer</button></span></div>`;
   };
-  const sec = (key, title, sub, groups, which)=>{
-    const open = !!sxs[key];
-    return `<div class="bl-sec" data-key="${esc(key)}"><div class="bl-sh"><span><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span><button class="bl-bt ${open ? 'on' : ''}" onclick="sxs_tog(${ck_a(key)})">Corriger${open ? ' ▴' : ''}</button></div>` +
-      groups.map(g=>(g.head ? `<div class="bl-sub">${esc(g.head)}</div>` : '') + g.lines.map(l=>lineHtml(l, key)).join('')).join('') +
-      (open ? `<div class="bl-ac"><span class="bl-er">${sxsErrK === key ? esc(sxsErr) : ''}</span>${which ? `<button class="bl-bt" onclick="ckc_open(${ck_a(L.id)},'${which}')">Saisir ce qui manque</button>` : ''}<button class="bl-bt" onclick="sxs_tog(${ck_a(key)})">Annuler</button><button class="bl-bt bp" onclick="sxs_save(${ck_a(key)})">Enregistrer</button></div>` : '') + `</div>`;
+  const cookOpts = (date, adds, groups)=>{
+    const all = ck_cooks(), mine = all.filter(c=>c.ings.includes(L.id)), list = mine.length ? mine : all;
+    const lastE = sx_get(sx_docs(date), date, [[L.id, ['dc', 'fr', 'hc', 'wd', 'pq', 'fin2']]]).pop(), def = lastE ? lastE.code : (list[0] || {}).code;
+    return list.map(c=>`<option value="${esc(c.code)}"${String(c.code) === String(def) ? ' selected' : ''}>${esc(c.name)}</option>`).join('');
   };
+  const sec = (key, title, sub, groups, adds, date, hm)=>{
+    const open = !!sxs[key], hasAdd = (adds || []).length > 0 || groups.some(g=>g.lines.some(l=>l.add && !l.e));
+    const addRows = open && (adds || []).length ? '<div class="bl-sub">Ajouter une saisie oubliée</div>' + adds.map((x, i)=>`<div class="bl-sl"><span>${esc(x.lab)}</span><span class="bl-ed">${x.fields.map(fd=>`<input class="bl-in" inputmode="decimal" placeholder="${esc(fd[1])}" data-sxa="${esc([date, x.id, x.p, x.t, 'r' + i, fd[0]].join('|'))}">`).join(x.fields.length === 2 ? ' → ' : ' · ')}</span></div>`).join('') : '';
+    const who = open && hasAdd ? `<span class="bl-ad">Lignes ajoutées par <select class="bl-sel" data-sxcook>${cookOpts(date, adds, groups)}</select> à <input class="bl-tm" type="time" data-sxtime value="${esc(hm || '')}"></span>` : '';
+    return `<div class="bl-sec" data-key="${esc(key)}"><div class="bl-sh"><span><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span><button class="bl-bt ${open ? 'on' : ''}" onclick="sxs_tog(${ck_a(key)})">Corriger${open ? ' ▴' : ''}</button></div>` +
+      groups.map(g=>(g.head ? `<div class="bl-sub">${esc(g.head)}</div>` : '') + g.lines.map(l=>lineHtml(l, key, date)).join('')).join('') + addRows +
+      (open ? `<div class="bl-ac">${who}<span class="bl-er">${sxsErrK === key ? esc(sxsErr) : ''}</span><button class="bl-bt" onclick="sxs_tog(${ck_a(key)})">Annuler</button><button class="bl-bt bp" onclick="sxs_save(${ck_a(key)})">Enregistrer</button></div>` : '') + `</div>`;
+  };
+  const nowHm = ()=>{ const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  const isNow = D === ck_service(), hmJ = (def)=>isNow ? nowHm() : def;
+  const cks0 = ck_cooks(), postes = ['Sushi', 'Wok'].filter(K=>cks0.some(c=>(c.ingsK[K] || []).includes(L.id))), defP = postes[0] || 'Sushi';
   if(!L.es){
     const nn = (x)=>ck_fmt(Number(x) || 0), sb = (e)=>e.name + ' · ' + ck_hm(e.r.at);
     const kd0 = ck_kind(L.id), cutI = kd0 === 'saumon' || kd0 === 'boeuf' || kd0 === 'crevette';
     const gfin = (docs, date, withP)=>{
-      const fs = sx_latest(sx_get(docs, date, [[L.id, ['fin2']]]), true), lines = [];
-      fs.forEach(e=>['fb', 'fn', 'fc', 'fh'].filter(k=>e.r.f[k] !== undefined && e.r.f[k] !== null).forEach(k=>lines.push({ lab:CKC_LAB[k] + (e.r.p ? ' · ' + e.r.p : ''), sub:sb(e), e, f:[k] })));
-      if(!lines.length) lines.push({ lab:'Fin de service', e:null, f:['fn'] });
-      if(withP && cutI){ const pq = sx_get(docs, date, [[L.id, ['pq']]]); if(pq.length) pq.forEach(e=>lines.push({ lab:'Perte', sub:sb(e) + ck2_stLab(e.r), e, f:['q'] })); else lines.push({ lab:'Perte', e:null, f:['q'], zero:true }); }
+      const fs = sx_latest(sx_get(docs, date, [[L.id, ['fin2']]]), true), lines = [], pl = postes.length ? postes : fs.map(e=>ck2_P(e.r.p)).filter((x, i, a)=>a.indexOf(x) === i), pl2 = pl.length ? pl : ['Sushi'];
+      pl2.forEach(P=>{ const e = fs.find(x=>ck2_P(x.r.p) === P); ck2_finKeys(L.id, P).forEach(k=>{ const has = e && e.r.f[k] !== undefined && e.r.f[k] !== null; lines.push({ lab:CKC_LAB[k] + ' · ' + P, sub:has ? sb(e) : '', e:e || null, f:[k], add:{ id:L.id, p:P, t:'fin2', key:k, row:'fin' + P } }); }); });
+      if(withP && cutI){ const pq = sx_get(docs, date, [[L.id, ['pq']]]); if(pq.length) pq.forEach(e=>lines.push({ lab:'Perte', sub:sb(e) + ck2_stLab(e.r), e, f:['q'] })); else lines.push({ lab:'Perte', e:null, f:['q'], zero:true, add:{ id:L.id, p:defP, t:'pq', key:'q', row:'pq' } }); }
       return { lines, who:who(fs) };
     };
     const grp = (head, types, mk)=>{ const l = sx_get(dT, D, [[L.id, types]]).map(mk); return l.length ? { head, lines:l } : null; };
@@ -7993,9 +8024,13 @@ function sx_escPanel(L, D, dT, dP, dPrev, pouIds, escIds){
     if(escIds.length && pouIds.indexOf(L.id) >= 0){ const x = grp('Découpes d’escalope (haché)', ['dc'], e=>({ lab:ck2_P(e.r.p) || 'Découpe', sub:sb(e), e, f:['b', 'n'], fmt:y=>'brut ' + nn(y.r.f.b) + ' → net ' + nn(y.r.f.n) })); const el = sx_get(dT, D, escIds.map(i=>[i, ['dc']])).map(e=>({ lab:ck2_P(e.r.p) || 'Découpe', sub:sb(e), e, f:['b', 'n'], fmt:y=>'brut ' + nn(y.r.f.b) + ' → net ' + nn(y.r.f.n) })); if(el.length) g.unshift({ head:'Découpes d’escalope (haché)', lines:el }); }
     if(!g.length) g.push({ lines:[{ lab:'Aucune saisie', e:null, f:['q'] }] });
     const a = gfin(dP, dPrev, false), b = gfin(dT, D, true);
-    return sec(L.id + '|j1', 'J-1 · Fin de service', ck_frDate(dPrev) + (a.who ? ' · ' + a.who : ''), [{ lines:a.lines }], 'veille') +
-           sec(L.id + '|jp', 'J · Pendant le service', '', g, '') +
-           sec(L.id + '|jf', 'J · Fin de service', b.who, [{ lines:b.lines }], 'final');
+    const adds = [];
+    if(kd === 'avocat') adds.push({ lab:'Déchets pesés par le Sushi', id:L.id, p:defP, t:'wd', fields:[['q', 'quantité']] });
+    else if(kd === 'poulet') adds.push({ lab:'Poulet haché', id:L.id, p:'Wok', t:'hc', fields:[['q', 'bac'], ['b', 'brut pris']] });
+    else { adds.push({ lab:cut ? 'Brut pris et net obtenu' : 'Découpe', id:L.id, p:defP, t:'dc', fields:[['b', cut ? 'brut pris' : 'brut'], ['n', cut ? 'net obtenu' : 'net']] }); if(kd === 'crevette') adds.push({ lab:'Opérations de crispy', id:L.id, p:defP, t:'fr', fields:[['q', 'crispy']] }); }
+    return sec(L.id + '|j1', 'J-1 · Fin de service', ck_frDate(dPrev) + (a.who ? ' · ' + a.who : ''), [{ lines:a.lines }], [], dPrev, '22:00') +
+           sec(L.id + '|jp', 'J · Pendant le service', '', g, adds, D, hmJ('12:00')) +
+           sec(L.id + '|jf', 'J · Fin de service', b.who, [{ lines:b.lines }], [], D, hmJ('22:00'));
   }
   const j1 = finLines(dP, dPrev, false), jf = finLines(dT, D, true);
   const dcs = sx_get(dT, D, [[L.id, ['dc']]]).map(e=>({ lab:ck2_P(e.r.p) || '—', sub:e.name + ' · ' + ck_hm(e.r.at), e, f:['b', 'n'] }));
@@ -8005,9 +8040,11 @@ function sx_escPanel(L, D, dT, dP, dPrev, pouIds, escIds){
   const jp = [{ head:'Découpe · pris dans le bac', lines:dcs.length ? dcs : none('Aucune saisie') }];
   if(hcs.length) jp.push({ head:'Hachage', lines:hcs });
   jp.push({ head:'Opérations de crispy', lines:frs.length ? frs : none('Aucune saisie') });
-  return sec(L.id + '|j1', 'J-1 · Fin de service', ck_frDate(dPrev) + (j1.who ? ' · ' + j1.who : ''), [{ lines:j1.lines }], 'veille') +
-         sec(L.id + '|jp', 'J · Pendant le service', '', jp, '') +
-         sec(L.id + '|jf', 'J · Fin de service', jf.who, [{ lines:jf.lines }], 'final');
+  const eadds = [{ lab:'Découpe · Sushi', id:L.id, p:'Sushi', t:'dc', fields:[['b', 'brut pris'], ['n', 'net obtenu']] }, { lab:'Découpe · Wok', id:L.id, p:'Wok', t:'dc', fields:[['b', 'brut pris'], ['n', 'net obtenu']] }, { lab:'Opérations de crispy', id:L.id, p:'Sushi', t:'fr', fields:[['q', 'crispy']] }];
+  if(L.id === escIds[0] && pouIds.length) eadds.splice(2, 0, { lab:'Brut pris pour le hachage', id:pouIds[0], p:'Wok', t:'hc', fields:[['b', 'brut pris']] });
+  return sec(L.id + '|j1', 'J-1 · Fin de service', ck_frDate(dPrev) + (j1.who ? ' · ' + j1.who : ''), [{ lines:j1.lines }], [], dPrev, '22:00') +
+         sec(L.id + '|jp', 'J · Pendant le service', '', jp, eadds, D, hmJ('12:00')) +
+         sec(L.id + '|jf', 'J · Fin de service', jf.who, [{ lines:jf.lines }], [], D, hmJ('22:00'));
 }
 let stk_det = '';
 function stk_detTog(id){ stk_det = stk_det === id ? '' : id; sxe = null; sxErr = ''; ckc = null; ckcErr = ''; ck_render(); }
