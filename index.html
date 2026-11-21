@@ -7973,10 +7973,12 @@ function sx_escPanel(L, D, dT, dP, dPrev, pouIds, escIds){
   };
   if(!L.es){
     const nn = (x)=>ck_fmt(Number(x) || 0), sb = (e)=>e.name + ' · ' + ck_hm(e.r.at);
-    const gfin = (docs, date)=>{
+    const kd0 = ck_kind(L.id), cutI = kd0 === 'saumon' || kd0 === 'boeuf' || kd0 === 'crevette';
+    const gfin = (docs, date, withP)=>{
       const fs = sx_latest(sx_get(docs, date, [[L.id, ['fin2']]]), true), lines = [];
       fs.forEach(e=>['fb', 'fn', 'fc', 'fh'].filter(k=>e.r.f[k] !== undefined && e.r.f[k] !== null).forEach(k=>lines.push({ lab:CKC_LAB[k] + (e.r.p ? ' · ' + e.r.p : ''), sub:sb(e), e, f:[k] })));
       if(!lines.length) lines.push({ lab:'Fin de service', e:null, f:['fn'] });
+      if(withP && cutI){ const pq = sx_get(docs, date, [[L.id, ['pq']]]); if(pq.length) pq.forEach(e=>lines.push({ lab:'Perte', sub:sb(e) + ck2_stLab(e.r), e, f:['q'] })); else lines.push({ lab:'Perte', e:null, f:['q'], zero:true }); }
       return { lines, who:who(fs) };
     };
     const grp = (head, types, mk)=>{ const l = sx_get(dT, D, [[L.id, types]]).map(mk); return l.length ? { head, lines:l } : null; };
@@ -7990,7 +7992,7 @@ function sx_escPanel(L, D, dT, dP, dPrev, pouIds, escIds){
     ].filter(Boolean).filter(x=>!cut || x.head === 'Brut pris et net obtenu' || x.head === 'Opérations de crispy');
     if(escIds.length && pouIds.indexOf(L.id) >= 0){ const x = grp('Découpes d’escalope (haché)', ['dc'], e=>({ lab:ck2_P(e.r.p) || 'Découpe', sub:sb(e), e, f:['b', 'n'], fmt:y=>'brut ' + nn(y.r.f.b) + ' → net ' + nn(y.r.f.n) })); const el = sx_get(dT, D, escIds.map(i=>[i, ['dc']])).map(e=>({ lab:ck2_P(e.r.p) || 'Découpe', sub:sb(e), e, f:['b', 'n'], fmt:y=>'brut ' + nn(y.r.f.b) + ' → net ' + nn(y.r.f.n) })); if(el.length) g.unshift({ head:'Découpes d’escalope (haché)', lines:el }); }
     if(!g.length) g.push({ lines:[{ lab:'Aucune saisie', e:null, f:['q'] }] });
-    const a = gfin(dP, dPrev), b = gfin(dT, D);
+    const a = gfin(dP, dPrev, false), b = gfin(dT, D, true);
     return sec(L.id + '|j1', 'J-1 · Fin de service', ck_frDate(dPrev) + (a.who ? ' · ' + a.who : ''), [{ lines:a.lines }], 'veille') +
            sec(L.id + '|jp', 'J · Pendant le service', '', g, '') +
            sec(L.id + '|jf', 'J · Fin de service', b.who, [{ lines:b.lines }], 'final');
