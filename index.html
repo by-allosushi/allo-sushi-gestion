@@ -1006,6 +1006,16 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .bl-rd{margin-top:8px;background:rgba(127,127,127,.1);border-radius:10px;padding:8px 12px;}#module-cuisine .bl-rd small{display:block;font-size:12px;color:var(--ink-muted);}#module-cuisine .bl-rd b{font-size:20px;font-family:'IBM Plex Mono',monospace;}
     #module-cuisine .bl-n{font-size:12px;color:var(--ink-muted);margin-top:6px;}#module-cuisine .bl-all{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
     #module-cuisine .bl-cd .lg-sx{background:transparent;padding:0;margin:0;}
+    #module-cuisine .bl-sec{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+    #module-cuisine .bl-sh{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;background:rgba(127,127,127,.14);}#module-cuisine .bl-sh b{font-size:13px;font-weight:600;}#module-cuisine .bl-sh small{color:var(--ink-muted);font-size:11px;margin-left:6px;}
+    #module-cuisine .bl-bt{border:1px solid var(--line);background:transparent;color:inherit;border-radius:8px;padding:4px 14px;font-size:12px;min-width:76px;cursor:pointer;font-family:inherit;}#module-cuisine .bl-bt.on{background:rgba(61,139,255,.2);border-color:rgba(61,139,255,.5);}#module-cuisine .bl-bt.bp{background:#1f4a8a;border-color:#2b6cb0;color:#fff;}
+    #module-cuisine .bl-sub{padding:7px 12px 2px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-muted);}
+    #module-cuisine .bl-sl{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--line);font-size:14px;}#module-cuisine .bl-sh + .bl-sl,#module-cuisine .bl-sub + .bl-sl{border-top:0;}
+    #module-cuisine .bl-sl small{display:block;color:var(--ink-muted);font-size:11px;}#module-cuisine .bl-sl b{font-family:'IBM Plex Mono',monospace;font-weight:500;text-align:right;}
+    #module-cuisine .bl-ed{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+    #module-cuisine .bl-in{width:76px;background:var(--bg,transparent);color:inherit;border:1px solid rgba(61,139,255,.6);border-radius:6px;padding:3px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:14px;}
+    #module-cuisine .bl-bs{border:1px solid rgba(248,113,113,.4);background:transparent;color:#FCA5A5;border-radius:7px;padding:3px 10px;font-size:12px;cursor:pointer;font-family:inherit;}
+    #module-cuisine .bl-ac{display:flex;gap:6px;justify-content:flex-end;align-items:center;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line);}#module-cuisine .bl-er{flex:1;color:#FCA5A5;font-size:12px;}
     @media(max-width:700px){#module-cuisine .bl-t .hs{display:none;}#module-cuisine .bl-t col.c0{width:30%;}#module-cuisine .bl-t col.c4,#module-cuisine .bl-t col.c5{width:20%;}#module-cuisine .bl-t col.c6{width:19%;}#module-cuisine .bl-t col.c7{width:11%;}#module-cuisine .bl-b{width:34px;}#module-cuisine .bl-b .ds{display:none;}#module-cuisine .bl-b .ph{display:inline;}#module-cuisine .bl-pn{grid-template-columns:1fr;}#module-cuisine .bl-t td,#module-cuisine .bl-t th{padding-left:3px;padding-right:3px;font-size:13px;}#module-cuisine .bl-p{min-width:0;width:100%;}#module-cuisine .bl-kp{gap:6px;}}
     #module-cuisine .ck-ig{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;}#module-cuisine .ck-ig .ck-row{margin:0;}
     #module-cuisine .ck-qd summary{font-size:13px;color:#7CB4F5;cursor:pointer;padding:6px 0;}
@@ -7870,8 +7880,8 @@ function sx_tog(key){ sxo[key] = !sxo[key]; if(!sxo[key] && sxe && sxe.key === k
 function sx_docs(date){ return date === (ck_adate || ck_service()) ? ck_docs() : ck_prevSrv; }
 function sx_edit(key, date, code, id, rid){ const r = ck_recOne((sx_docs(date) || {})[ck_docId(date, code)], id, rid); if(!r) return; sxe = { key, date, code, id, rid, p:ck2_P(r.p), t:r.t }; sxErr = ''; ck_render(); }
 function sx_cancel(){ sxe = null; sxErr = ''; ck_render(); }
-function sx_del(date, code, id, rid){
-  if(!confirm('Supprimer cette saisie ?')) return;
+function sx_del(date, code, id, rid, msg){
+  if(!confirm(msg || 'Supprimer cette saisie ?')) return;
   ck_write(ck_docId(date, code), { ckdate:date, emp:String(code), recs:{ [id]:{ [rid]:{ del:true } } } }); if(sxe && sxe.rid === rid) sxe = null; ck_render();
 }
 function sx_save(){
@@ -7896,6 +7906,68 @@ function sx_box(key, list, extra, force){
     return `<div class="sx-r"><span class="sx-t">${esc(sx_text(e))}</span><span class="sx-a"><button class="ck-btn sm" onclick="sx_edit(${a.join(',')})">Corriger</button><button class="ck-btn sm" onclick="sx_del(${a.slice(1).join(',')})">Supprimer</button></span></div>`;
   };
   return `<div class="lg-sx">${list.length ? list.map(row).join('') : '<div class="ck-sub">Aucune saisie de cuisinier pour cette ligne.</div>'}${extra || ''}</div>`;
+}
+
+/* ----- escalope : saisies rangées comme sur la feuille (J-1 fin de service · J pendant le service · J fin de service) ----- */
+let sxs = {}, sxsErr = '', sxsErrK = '';
+function sxs_tog(key){ sxs[key] = !sxs[key]; sxsErr = ''; sxsErrK = ''; ck_render(); }
+function sxs_save(key){
+  const by = {}; let empty = 0;
+  document.querySelectorAll('#ck-root .bl-sec[data-key="' + key + '"] input[data-sxs]').forEach(el=>{ const a = el.getAttribute('data-sxs').split('|'), id = a.slice(0, 4).join('|'); (by[id] = by[id] || { a, f:{} }).f[a[4]] = String(el.value).trim(); });
+  const jobs = [];
+  for(const id of Object.keys(by)){
+    const a = by[id].a, doc = (sx_docs(a[0]) || {})[ck_docId(a[0], a[1])] || {}, old = ck_recOne(doc, a[2], a[3]); if(!old) continue;
+    const f = Object.assign({}, old.f || {}); let changed = false;
+    for(const k of Object.keys(by[id].f)){ const raw = by[id].f[k], v = ck_num(raw); if(raw === '' || v === null){ sxsErr = 'Remplis toutes les cases (0 est accepté).'; sxsErrK = key; return ck_render(); } if(f[k] === undefined || Number(f[k]) !== v) changed = true; f[k] = v; }
+    if(old.t === 'dc' && f.n > f.b + 1e-9){ sxsErr = 'Le net ne peut pas dépasser le brut.'; sxsErrK = key; return ck_render(); }
+    if(!changed) continue;
+    const rec = { t:old.t, f, p:ck2_P(old.p), at:old.at || ck_nowIso(), del:false, adm:true }; rec.prevF = old.adm && old.prevF ? old.prevF : old.f;
+    jobs.push([ck_docId(a[0], a[1]), { ckdate:a[0], emp:String(a[1]), name:doc.name || ck_empName(a[1]), poste:doc.poste || '', recs:{ [a[2]]:{ [a[3]]:rec } } }]);
+  }
+  jobs.forEach(j=>ck_write(j[0], j[1])); sxs[key] = false; sxsErr = ''; sxsErrK = ''; ck_render();
+}
+function sx_latest(list, byP){ const m = {}; list.forEach(e=>{ if(!e.r.f) return; const k = e.id + '|' + (byP ? ck2_P(e.r.p) : ''); if(!m[k] || String(e.r.at) > String(m[k].r.at)) m[k] = e; }); return Object.keys(m).map(k=>m[k]); }
+function sx_escPanel(L, D, dT, dP, dPrev, pouIds, escIds){
+  const val = (e, k)=>e && e.r.f && e.r.f[k] !== undefined && e.r.f[k] !== null ? ck_fmt(Number(e.r.f[k]) || 0) : '—';
+  const who = (es)=>Array.from(new Set(es.filter(Boolean).map(e=>e.name))).join(', ');
+  const finLines = (docs, date, withJ)=>{
+    const fs = sx_latest(sx_get(docs, date, [[L.id, ['fin2']]]), true), wk = fs.find(e=>ck2_P(e.r.p) === 'Wok'), su = fs.find(e=>ck2_P(e.r.p) === 'Sushi');
+    const hs = sx_latest(pouIds.reduce((a, pid)=>a.concat(sx_get(docs, date, [[pid, ['fin2']]])), []).filter(e=>e.r.f && e.r.f.fh !== undefined), true);
+    const lines = [{ lab:'Wok net', e:wk, f:['fn'] }, { lab:'Sushi net', e:su, f:['fn'] }, { lab:'Brut', e:su, f:['fb'] }];
+    if(hs.length) hs.forEach(e=>lines.push({ lab:'Bac à haché', e, f:['fh'] })); else lines.push({ lab:'Bac à haché', e:null, f:['fh'] });
+    if(withJ){
+      const pq = sx_get(docs, date, [[L.id, ['pq']]]);
+      if(pq.length) pq.forEach(e=>lines.push({ lab:'Perte qualité', sub:e.name + ' · ' + ck_hm(e.r.at), e, f:['q'] })); else lines.push({ lab:'Perte qualité', e:null, f:['q'], zero:true });
+      lines.push({ lab:'Reste crispy', e:su, f:['fc'] });
+    }
+    return { lines, who:who([wk, su].concat(hs)) };
+  };
+  const delMsg = (e)=>e.r.t === 'fin2' ? 'Supprimer cette fin de service (' + e.r.p + ') avec toutes ses valeurs ?' : 'Supprimer cette saisie ?';
+  const lineHtml = (ln, key)=>{
+    const open = !!sxs[key], e = ln.e, f = ln.f;
+    const disp = ln.zero && !e ? '0' : f.length === 2 ? (e ? 'brut ' + val(e, f[0]) + ' → net ' + val(e, f[1]) : '—') : val(e, f[0]);
+    const lab = `<span>${esc(ln.lab)}${ln.sub ? `<small>${esc(ln.sub)}</small>` : ''}</span>`;
+    if(!open || !e) return `<div class="bl-sl">${lab}<b>${esc(disp)}</b></div>`;
+    const inp = f.map(k=>`<input class="bl-in" inputmode="decimal" data-sxs="${esc([e.date, e.code, e.id, e.rid, k].join('|'))}" value="${esc(ck_fmtOrEmpty((e.r.f || {})[k]))}">`).join(f.length === 2 ? ' → ' : '');
+    return `<div class="bl-sl">${lab}<span class="bl-ed">${inp}<button class="bl-bs" onclick="sx_del(${[e.date, e.code, e.id, e.rid, delMsg(e)].map(ck_a).join(',')})">Supprimer</button></span></div>`;
+  };
+  const sec = (key, title, sub, groups, which)=>{
+    const open = !!sxs[key];
+    return `<div class="bl-sec" data-key="${esc(key)}"><div class="bl-sh"><span><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span><button class="bl-bt ${open ? 'on' : ''}" onclick="sxs_tog(${ck_a(key)})">Corriger${open ? ' ▴' : ''}</button></div>` +
+      groups.map(g=>(g.head ? `<div class="bl-sub">${esc(g.head)}</div>` : '') + g.lines.map(l=>lineHtml(l, key)).join('')).join('') +
+      (open ? `<div class="bl-ac"><span class="bl-er">${sxsErrK === key ? esc(sxsErr) : ''}</span>${which ? `<button class="bl-bt" onclick="ckc_open(${ck_a(L.id)},'${which}')">Saisir ce qui manque</button>` : ''}<button class="bl-bt" onclick="sxs_tog(${ck_a(key)})">Annuler</button><button class="bl-bt bp" onclick="sxs_save(${ck_a(key)})">Enregistrer</button></div>` : '') + `</div>`;
+  };
+  const j1 = finLines(dP, dPrev, false), jf = finLines(dT, D, true);
+  const dcs = sx_get(dT, D, [[L.id, ['dc']]]).map(e=>({ lab:ck2_P(e.r.p) || '—', sub:e.name + ' · ' + ck_hm(e.r.at), e, f:['b', 'n'] }));
+  const hcs = L.id === escIds[0] ? sx_get(dT, D, pouIds.map(i=>[i, ['hc']])).filter(e=>Number((e.r.f || {}).b) > 0).map(e=>({ lab:'Brut pris pour le hachage', sub:e.name + ' · ' + ck_hm(e.r.at), e, f:['b'] })) : [];
+  const frs = sx_get(dT, D, [[L.id, ['fr']]]).map(e=>({ lab:ck2_P(e.r.p) || 'Sushi', sub:e.name + ' · ' + ck_hm(e.r.at), e, f:['q'], pre:'crispy ' }));
+  const none = (t)=>[{ lab:t, e:null, f:['q'] }];
+  const jp = [{ head:'Découpe · pris dans le bac', lines:dcs.length ? dcs : none('Aucune saisie') }];
+  if(hcs.length) jp.push({ head:'Hachage', lines:hcs });
+  jp.push({ head:'Opérations de crispy', lines:frs.length ? frs : none('Aucune saisie') });
+  return sec(L.id + '|j1', 'J-1 · Fin de service', ck_frDate(dPrev) + (j1.who ? ' · ' + j1.who : ''), [{ lines:j1.lines }], 'veille') +
+         sec(L.id + '|jp', 'J · Pendant le service', '', jp, '') +
+         sec(L.id + '|jf', 'J · Fin de service', jf.who, [{ lines:jf.lines }], 'final');
 }
 let stk_det = '';
 function stk_detTog(id){ stk_det = stk_det === id ? '' : id; sxe = null; sxErr = ''; ckc = null; ckcErr = ''; ck_render(); }
@@ -7937,7 +8009,7 @@ function stk_ingTable(){
       const specs = [[L.id, ['dc', 'fr', 'hc', 'wd', 'pq', 'fin2']]].concat(L.es && L.id === escIds[0] ? pouIds.map(i=>[i, ['hc']]) : []).concat(L.po ? escIds.map(i=>[i, ['dc']]) : []);
       const list = sx_get(dP, dPrev, [[L.id, ['fin2']]]).concat(sx_get(dT, D, specs)).map(e=>Object.assign(e, { ctx:L.id })).sort((a, b)=>String(a.r.at).localeCompare(String(b.r.at)));
       const all = `<div class="bl-all"><button class="ck-btn sm" onclick="ckc_open(${ck_a(L.id)},'veille')">Saisir / corriger la veille</button><button class="ck-btn sm" onclick="ckc_open(${ck_a(L.id)},'final')">Saisir / corriger la fin de service</button></div>`;
-      tr += `<tr class="bl-d"><td colspan="8"><div class="bl-pn"><div class="bl-cd"><h5><span>Calcul</span><span>${esc(L.u)}</span></h5>${c}</div><div class="bl-cd"><h5><span>Saisies des cuisiniers</span><span>${list.length}</span></h5>${sx_box('det|' + L.id, list, '', true)}${all}${form('veille')}${form('final')}</div></div></td></tr>`;
+      tr += `<tr class="bl-d"><td colspan="8"><div class="bl-pn"><div class="bl-cd"><h5><span>Calcul</span><span>${esc(L.u)}</span></h5>${c}</div><div class="bl-cd"><h5><span>Saisies des cuisiniers</span><span>${L.es ? '' : list.length}</span></h5>${L.es ? sx_escPanel(L, D, dT, dP, dPrev, pouIds, escIds) : sx_box('det|' + L.id, list, '', true) + all}${form('veille')}${form('final')}</div></div></td></tr>`;
     }
     return { W:lv, quiet:L.quiet, name:L.name, html:tr };
   });
