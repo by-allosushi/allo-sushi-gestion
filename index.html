@@ -936,6 +936,7 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .rs-v td.n{text-align:start;font-family:inherit;font-size:16px;font-weight:600;}#module-cuisine .rs-v td.n small{display:block;font-weight:400;font-size:12px;color:var(--ink-muted);margin-top:2px;}
     #module-cuisine .rs-v td.c{font-size:18px;font-weight:600;}#module-cuisine .rs-v td.p{font-size:15px;color:var(--ink-muted);}#module-cuisine .rs-v td small{font-size:11px;font-weight:400;color:var(--ink-muted);font-family:inherit;}
     #module-cuisine .rs-v .rs-todo{font-family:inherit;font-size:14px;font-weight:400;font-style:italic;color:var(--ink-muted);}
+    #module-cuisine .rs-va td.c .q{display:block;font-size:18px;font-weight:600;}#module-cuisine .rs-va td.p .q{display:block;font-size:15px;}#module-cuisine .rs-va td small{display:block;margin-top:2px;line-height:1.35;}
     #module-cuisine .rs-e{font-size:14px;color:var(--ink-muted);padding:6px 0;}
     #module-cuisine .ck3-t{width:100%;border-collapse:collapse;font-size:14px;}
     #module-cuisine .ck3-t th{font-weight:400;color:var(--ink-muted);text-align:right;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap;}
@@ -7672,10 +7673,15 @@ function rst_sushiBrut(id, before){   // dernier brut d’escalope saisi en fin 
 }
 function rst_autHtml(me){
   const its = stk_autIds(me).map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean); if(!its.length) return '';
-  const ds = rst_cntDates(its.map(i=>i.id), 1, ck_who); if(!ds.length) return `<div class="rs-box"><h3>${esc(ck_s('rs_aut'))}</h3><div class="rs-e">${esc(ck_s('rs_noStk'))}</div></div>`;
-  const d = ds[0], dd = rst_doc(d), a = its.map(i=>stk_autQ(dd, i.id, ck_who)).filter(x=>x && x.at).sort((x, y)=>String(y.at).localeCompare(String(x.at)))[0] || {};
-  const rows = its.map(i=>{ const q = stk_num(stk_autQ(dd, i.id, ck_who)); return `<div class="rs-r"><span>${esc(i.n)}</span><b>${q === null ? '—' : esc(ck_fmt(q))}</b></div>`; }).join('');
-  return `<div class="rs-box rs-k"><div class="rs-kh"><b>${esc(ck_s('rs_aut'))}</b><small>${esc(a.by || '')} · ${esc(rst_dl(a.at || d + 'T12:00:00'))}</small></div>${rows}</div>`;
+  const dates = Object.keys(RST.stk).sort().reverse();
+  const cnts = (id)=>{   // les comptages de cet article, par n’importe quel cuisinier : les plus récents d’abord
+    const out = []; dates.forEach(d=>{ stk_autLines(rst_doc(d), id).forEach(x=>{ const q = stk_num(x.rec); if(q !== null) out.push({ q, by:x.rec.by || (x.code !== '' ? ck_empName(x.code) : ''), at:x.rec.at || d + 'T12:00:00', d }); }); });
+    return out.sort((p, q)=>String(q.at).localeCompare(String(p.at))).slice(0, 2);
+  };
+  const rows = its.map(i=>({ i, c:cnts(i.id) })); if(!rows.some(r=>r.c.length)) return `<div class="rs-box"><h3>${esc(ck_s('rs_aut'))}</h3><div class="rs-e">${esc(ck_s('rs_noStk'))}</div></div>`;
+  const cell = (x, cls)=>x ? `<span class="${cls}">${esc(ck_fmt(x.q))}</span><small>${esc(x.by || '')} · ${esc(rst_dl(x.at))}</small>` : '—';
+  const body = rows.map(r=>`<tr><td class="n">${esc(r.i.n)}</td><td class="c">${r.c[0] ? cell(r.c[0], 'q') : `<span class="rs-todo">${esc(ck_s('rs_todo'))}</span>`}</td><td class="p">${r.c[1] ? cell(r.c[1], 'q') : '—'}</td></tr>`).join('');
+  return `<div class="rs-box rs-k"><div class="rs-kh"><b>${esc(ck_s('rs_aut'))}</b></div><table class="rs-v rs-va"><colgroup><col style="width:36%"><col style="width:34%"><col style="width:30%"></colgroup><thead><tr><th>${esc(ck_s('rs_art'))}</th><th>${esc(ck_s('rs_now'))}</th><th>${esc(ck_s('rs_prev'))}</th></tr></thead><tbody>${body}</tbody></table></div>`;
 }
 function rst_canHtml(me){
   const its = stk_items('can'), bd = RST.bd || rst_cntDates(its.map(i=>i.id), 1)[0] || ''; if(!its.length) return '';
