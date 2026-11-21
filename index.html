@@ -7980,13 +7980,14 @@ function sx_escPanel(L, D, dT, dP, dPrev, pouIds, escIds){
       return { lines, who:who(fs) };
     };
     const grp = (head, types, mk)=>{ const l = sx_get(dT, D, [[L.id, types]]).map(mk); return l.length ? { head, lines:l } : null; };
+    const kd = ck_kind(L.id), cut = kd === 'saumon' || kd === 'boeuf' || kd === 'crevette';
     const g = [
-      grp('Découpe · pris dans le bac', ['dc'], e=>({ lab:ck2_P(e.r.p) || 'Découpe', sub:sb(e), e, f:['b', 'n'], fmt:x=>'brut ' + nn(x.r.f.b) + ' → net ' + nn(x.r.f.n) })),
+      grp(cut ? 'Brut pris et net obtenu' : 'Découpe · pris dans le bac', ['dc'], e=>({ lab:ck2_P(e.r.p) || 'Découpe', sub:sb(e), e, f:['b', 'n'], fmt:x=>(cut ? 'brut pris ' : 'brut ') + nn(x.r.f.b) + (cut ? ' → net obtenu ' : ' → net ') + nn(x.r.f.n) })),
       grp('Poulet haché', ['hc'], e=>({ lab:ck2_P(e.r.p) || 'Haché', sub:sb(e), e, f:['q', 'b'], sep:' + brut ', fmt:x=>'bac ' + nn(x.r.f.q) + (Number(x.r.f.b) > 0 ? ' + brut ' + nn(x.r.f.b) : '') })),
-      grp('Opérations de friture', ['fr'], e=>({ lab:ck2_P(e.r.p) || 'Friture', sub:sb(e), e, f:['q'] })),
-      grp('Déchets', ['wd'], e=>({ lab:ck2_P(e.r.p) || 'Déchet', sub:sb(e), e, f:['q'] })),
+      grp(kd === 'crevette' ? 'Opérations de crispy' : 'Opérations de friture', ['fr'], e=>({ lab:ck2_P(e.r.p) || 'Friture', sub:sb(e), e, f:['q'] })),
+      grp(kd === 'avocat' ? 'Déchets pesés par le Sushi' : 'Déchets', ['wd'], e=>({ lab:ck2_P(e.r.p) || 'Déchet', sub:sb(e), e, f:['q'] })),
       grp('Pertes', ['pq'], e=>({ lab:ck2_P(e.r.p) || 'Perte', sub:sb(e) + ck2_stLab(e.r), e, f:['q'] }))
-    ].filter(Boolean);
+    ].filter(Boolean).filter(x=>!cut || x.head === 'Brut pris et net obtenu' || x.head === 'Opérations de crispy');
     if(escIds.length && pouIds.indexOf(L.id) >= 0){ const x = grp('Découpes d’escalope (haché)', ['dc'], e=>({ lab:ck2_P(e.r.p) || 'Découpe', sub:sb(e), e, f:['b', 'n'], fmt:y=>'brut ' + nn(y.r.f.b) + ' → net ' + nn(y.r.f.n) })); const el = sx_get(dT, D, escIds.map(i=>[i, ['dc']])).map(e=>({ lab:ck2_P(e.r.p) || 'Découpe', sub:sb(e), e, f:['b', 'n'], fmt:y=>'brut ' + nn(y.r.f.b) + ' → net ' + nn(y.r.f.n) })); if(el.length) g.unshift({ head:'Découpes d’escalope (haché)', lines:el }); }
     if(!g.length) g.push({ lines:[{ lab:'Aucune saisie', e:null, f:['q'] }] });
     const a = gfin(dP, dPrev), b = gfin(dT, D);
