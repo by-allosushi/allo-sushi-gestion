@@ -914,6 +914,12 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .ck-pill.ko{background:rgba(248,113,113,.16);color:#FCA5A5;}
     #module-cuisine .rs-box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin:0 0 14px;}
     #module-cuisine .rs-box h3{font-size:15px;font-weight:600;margin:0 0 6px;}
+    #module-cuisine .rs-k{padding:0;overflow:hidden;}
+    #module-cuisine .rs-kh{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;background:rgba(127,127,127,.12);}#module-cuisine .rs-kh b{font-size:15px;font-weight:600;}#module-cuisine .rs-kh small{color:var(--ink-muted);font-size:12px;}
+    #module-cuisine .rs-r{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 14px;border-top:1px solid var(--line);font-size:16px;}#module-cuisine .rs-kh + .rs-r,#module-cuisine .rs-kh + .rs-x{border-top:0;}
+    #module-cuisine .rs-r b{font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:600;white-space:nowrap;}
+    #module-cuisine .rs-x{border-top:1px solid var(--line);padding:10px 0 4px;}#module-cuisine .rs-n{padding:0 14px 2px;font-size:16px;font-weight:600;}#module-cuisine .rs-x .rs-r{border-top:0;padding:5px 14px 5px 26px;}#module-cuisine .rs-x .rs-r span{color:var(--ink-muted);font-size:15px;}
+    @media(min-width:760px){#module-cuisine .rs-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;}#module-cuisine .rs-grid .rs-box{margin:0;}}
     #module-cuisine .rs-t{width:100%;border-collapse:collapse;table-layout:fixed;font-size:15px;}
     #module-cuisine .rs-t th{font-weight:600;text-align:start;padding:6px 6px 8px;border-bottom:1px solid var(--line);vertical-align:bottom;}
     #module-cuisine .rs-t th small{display:block;font-weight:400;font-size:12px;color:var(--ink-muted);}
@@ -976,6 +982,9 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .lg-sep{border-top:2px solid var(--line);margin:2px 0;}
     #module-cuisine .lg-fin{background:rgba(127,127,127,.1);border-radius:10px;padding:0 10px;margin:4px 0;}#module-cuisine .lg-fin .lg-l{border-top:0;}
     #module-cuisine .lg-form{padding:4px 0 8px;}
+    #module-cuisine .ck-ig{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;}#module-cuisine .ck-ig .ck-row{margin:0;}
+    #module-cuisine .ck-qd summary{font-size:13px;color:#7CB4F5;cursor:pointer;padding:6px 0;}
+    #module-cuisine .ck-gc{display:inline-flex;align-items:center;gap:3px;margin:0 4px;font-size:12px;color:var(--ink-muted);}
     #module-cuisine .lg-sm{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:2px 0 6px;}#module-cuisine .lg-sm>div{background:rgba(127,127,127,.1);border-radius:10px;padding:6px 10px;text-align:center;}#module-cuisine .lg-sm small{display:block;font-size:11px;color:var(--ink-muted);}#module-cuisine .lg-sm b{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;}
     #module-cuisine .lg-sm .p b{color:#4ADE80;}#module-cuisine .lg-sm .m b{color:#FCA5A5;}#module-cuisine .lg-sm .h b{color:#FCD34D;}
     #module-cuisine .lg-l{padding:6px 0;}
@@ -7422,7 +7431,7 @@ function ck_writeCook(code, patch){
 function ck_cfgSave(){
   if(!ck_isAdmin()) return; clearTimeout(ck_saveT);
   ck_saveT = setTimeout(async ()=>{
-    try{ const meta = {}; ck_ingList().forEach(i=>{ meta[i.id] = { n:i.n || '', u:i.u || 'kg' }; }); ck_cfg.meta = meta; ck_cfgFix(); await CK_CFG_REF.set(ck_cfg); }
+    try{ const meta = {}; ck_ingList().forEach(i=>{ meta[i.id] = { n:i.n || '', u:i.u || 'kg' }; }); ck_cfg.meta = meta; ck_cfgFix(); await CK_CFG_REF.set(ck_cfg); ck_savedAt = Date.now(); const sv = document.getElementById('ck-saved'); if(sv) sv.textContent = ck_savedTxt(); }
     catch(e){ console.error(e); alert('Réglage non enregistré : ' + (e.message || e) + '\nVérifie que les règles Firestore autorisent la collection « mise_en_place ».'); }
     ck_saveT = null;
   }, 400);
@@ -7499,7 +7508,7 @@ function ck_setLang(){ ck_lang = ck_lang === 'ar' ? 'fr' : 'ar'; try{ localStora
 /* ==================== AFFICHAGE ==================== */
 /* ==================== SUIVI DU STOCK : canettes et eau, autres articles, ingrédients ==================== */
 Object.assign(CK_T, {
-  rs_tile:['Reste du dernier service', 'المتبقي من آخر خدمة'], rs_tileSub:['Voir les 2 dernières fins de service', 'عرض آخر خدمتين'], rs_tileStk:['Voir le dernier comptage', 'عرض آخر جرد'],
+  rs_tile:['Reste du dernier service', 'المتبقي من آخر خدمة'], rs_tileSub:['Voir la dernière fin de service', 'عرض آخر نهاية خدمة'], rs_tileStk:['Voir le dernier comptage', 'عرض آخر جرد'],
   rs_fb:['Brut', 'خام'], rs_fn:['Net', 'صافي'], rs_fc:['Crispy', 'كريسبي'], rs_fh:['Bac à haché', 'وعاء المفروم'], rs_aut:['Autres articles', 'مواد أخرى'], rs_can:['Canettes et eau', 'العلب والمياه'],
   rs_none:['Aucune fin de service enregistrée pour le moment.', 'لا توجد نهاية خدمة مسجلة بعد.'], rs_noStk:['Aucun comptage pour le moment.', 'لا يوجد جرد بعد.'], rs_load:['Chargement…', 'جارٍ التحميل…'],
   rs_dec:['Découpé', 'مقطّع'], rs_cnt:['Compté', 'المعدود'], rs_theo:['Théorique', 'النظري'], rs_gap:['Écart', 'الفرق'], rs_miss:['Manque', 'نقص'], rs_exact:['Exact', 'مطابق'], rs_sur:['Surplus', 'فائض'], rs_last:['Dernier comptage', 'آخر جرد'],
@@ -7576,7 +7585,7 @@ function rst_theo(it, bd){   // même calcul que le suivi de l’administrateur 
   try{
     stk.rp = RST.rp; stk.buy = RST.buy; ck_adate = bd;
     const st0 = stk_start(), day0 = st0 && bd === st0.date, p = rst_doc(ck_addDays(bd, -1)), d = rst_doc(bd);
-    const vei = day0 ? stk_init(it.id) : stk_num((p.c || {})[it.id]);
+    const vei = stk_num((p.c || {})[it.id]);
     return vei === null ? null : ck_r(vei + stk_buyOf(it.dep, '') - stk_salesOf(it) - (stk_num((d.l || {})[it.id]) || 0));
   }finally{ stk.rp = sv.rp; stk.buy = sv.buy; ck_adate = sv.ad; }
 }
@@ -7592,31 +7601,31 @@ function rst_vals(K){   // les 2 dernières validations « Terminer mon service 
 }
 function rst_kitchen(K){
   const vals = rst_vals(K); if(!vals.length) return `<div class="rs-box"><h3>${esc(K.p)}</h3><div class="rs-e">${esc(ck_s('rs_none'))}</div></div>`;
-  const list = ck_ingList().map(i=>i.id), seen = {}; K.ids.forEach(id=>{ seen[id] = 1; });
-  vals.forEach(d=>Object.keys(d.recs || {}).forEach(id=>{ if(ck_ingById(id) && ck_recOne(d, id, ck2_fid(K.p))) seen[id] = 1; }));
-  const ids = Object.keys(seen).sort((a, b)=>{ const x = list.indexOf(a), y = list.indexOf(b); return (x < 0 ? 999 : x) - (y < 0 ? 999 : y); }), w = Math.floor(78 / vals.length);
-  const head = `<tr><th style="width:${100 - w * vals.length}%"></th>${vals.map(d=>`<th style="width:${w}%">${esc(d.name || ck_empName(d.emp))}<small>${esc(rst_dl(d.done))}</small></th>`).join('')}</tr>`;
+  const d = vals[0], list = ck_ingList().map(i=>i.id), seen = {}; K.ids.forEach(id=>{ seen[id] = 1; });
+  Object.keys(d.recs || {}).forEach(id=>{ if(ck_ingById(id) && ck_recOne(d, id, ck2_fid(K.p))) seen[id] = 1; });
+  const ids = Object.keys(seen).sort((a, b)=>{ const x = list.indexOf(a), y = list.indexOf(b); return (x < 0 ? 999 : x) - (y < 0 ? 999 : y); });
   const rows = ids.map(id=>{
-    const u = ck_unit(id), keys = ck2_finKeys(id, K.p);
-    const cells = vals.map(d=>{ const r = ck_recOne(d, id, ck2_fid(K.p)), f = r && r.f; if(!f) return '<td>—</td>';
-      if(K.p === 'Wok' && ck_kind(id) === 'escalope'){   // Chaud : le découpé du Wok en haut, puis le brut restant pesé par le Sushi (sans dire par qui)
-        const dec = Number(f.fn) || 0, br = rst_sushiBrut(id, d.done);
-        return `<td><b>${esc(ck_fmt(dec))} ${esc(u)}</b><small>${esc(ck_s('rs_dec'))} ${esc(ck_fmt(dec))}<br>${esc(ck_s('rs_fb'))} ${br === null ? '—' : esc(ck_fmt(br))}</small></td>`; }
-      const tot = ck_r(keys.filter(k=>k !== 'fc').reduce((a, k)=>a + (Number(f[k]) || 0), 0));
-      return `<td><b>${esc(ck_fmt(tot))} ${esc(u)}</b><small>${keys.filter(k=>f[k] !== undefined && f[k] !== null).map(k=>esc(ck_s('rs_' + k)) + ' ' + esc(ck_fmt(Number(f[k]) || 0))).join('<br>')}</small></td>`; }).join('');
-    return `<tr><td class="i">${esc(ck_ingName(id))}</td>${cells}</tr>`; }).join('');
-  return `<div class="rs-box"><h3>${esc(K.p)}</h3><table class="rs-t">${head}${rows}</table></div>`;
+    const u = ck_unit(id), keys = ck2_finKeys(id, K.p), r = ck_recOne(d, id, ck2_fid(K.p)), f = r && r.f, nm = esc(ck_ingName(id)), v = (x)=>x === null ? '—' : esc(ck_fmt(x)) + ' ' + esc(u);
+    if(!f) return `<div class="rs-r"><span>${nm}</span><b>—</b></div>`;
+    if(ck_kind(id) === 'escalope'){   // brut + net de cette cuisine
+      const br = K.p === 'Wok' ? rst_sushiBrut(id, d.done) : (f.fb === undefined || f.fb === null ? null : Number(f.fb) || 0), nt = f.fn === undefined || f.fn === null ? null : Number(f.fn) || 0;
+      return `<div class="rs-x"><div class="rs-n">${nm}</div><div class="rs-r"><span>${esc(ck_s('rs_fb'))}</span><b>${v(br)}</b></div><div class="rs-r"><span>${esc(ck_s('rs_fn'))} ${esc(K.p)}</span><b>${v(nt)}</b></div></div>`;
+    }
+    const tot = ck_r(keys.filter(k=>k !== 'fc').reduce((a, k)=>a + (Number(f[k]) || 0), 0));
+    return `<div class="rs-r"><span>${nm}</span><b>${v(tot)}</b></div>`;
+  }).join('');
+  return `<div class="rs-box rs-k"><div class="rs-kh"><b>${esc(K.p)}</b><small>${esc(d.name || ck_empName(d.emp))} · ${esc(rst_dl(d.done))}</small></div>${rows}</div>`;
 }
 function rst_sushiBrut(id, before){   // dernier brut d’escalope saisi en fin de service par le Sushi, avant la fin de service donnée
   let best = null; Object.keys(RST.docs).forEach(k=>{ const d = RST.docs[k]; if(!d || !d.done || String(d.done) > String(before)) return; const r = ck_recOne(d, id, ck2_fid('Sushi')); if(r && r.f && r.f.fb !== undefined && r.f.fb !== null && (!best || String(d.done) > String(best.done))) best = { done:d.done, fb:Number(r.f.fb) || 0 }; });
   return best ? best.fb : null;
 }
-function rst_autHtml(me, n){
+function rst_autHtml(me){
   const its = stk_autIds(me).map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean); if(!its.length) return '';
-  const ds = rst_cntDates(its.map(i=>i.id), n, ck_who); if(!ds.length) return `<div class="rs-box"><h3>${esc(ck_s('rs_aut'))}</h3><div class="rs-e">${esc(ck_s('rs_noStk'))}</div></div>`;
-  const w = Math.floor(78 / ds.length), hd = (d)=>{ const dd = rst_doc(d), a = its.map(i=>stk_autQ(dd, i.id, ck_who)).filter(x=>x && x.at).sort((x, y)=>String(y.at).localeCompare(String(x.at)))[0] || {}; return `<th style="width:${w}%">${esc(a.by || '')}<small>${esc(rst_dl(a.at || d + 'T12:00:00'))}</small></th>`; };
-  const rows = its.map(i=>`<tr><td class="i">${esc(i.n)}</td>${ds.map(d=>{ const q = stk_num(stk_autQ(rst_doc(d), i.id, ck_who)); return `<td><b>${q === null ? '—' : esc(ck_fmt(q))}</b></td>`; }).join('')}</tr>`).join('');
-  return `<div class="rs-box"><h3>${esc(ck_s('rs_aut'))}</h3><table class="rs-t"><tr><th style="width:${100 - w * ds.length}%"></th>${ds.map(hd).join('')}</tr>${rows}</table></div>`;
+  const ds = rst_cntDates(its.map(i=>i.id), 1, ck_who); if(!ds.length) return `<div class="rs-box"><h3>${esc(ck_s('rs_aut'))}</h3><div class="rs-e">${esc(ck_s('rs_noStk'))}</div></div>`;
+  const d = ds[0], dd = rst_doc(d), a = its.map(i=>stk_autQ(dd, i.id, ck_who)).filter(x=>x && x.at).sort((x, y)=>String(y.at).localeCompare(String(x.at)))[0] || {};
+  const rows = its.map(i=>{ const q = stk_num(stk_autQ(dd, i.id, ck_who)); return `<div class="rs-r"><span>${esc(i.n)}</span><b>${q === null ? '—' : esc(ck_fmt(q))}</b></div>`; }).join('');
+  return `<div class="rs-box rs-k"><div class="rs-kh"><b>${esc(ck_s('rs_aut'))}</b><small>${esc(a.by || '')} · ${esc(rst_dl(a.at || d + 'T12:00:00'))}</small></div>${rows}</div>`;
 }
 function rst_canHtml(me){
   const its = stk_items('can'), bd = RST.bd || rst_cntDates(its.map(i=>i.id), 1)[0] || ''; if(!its.length) return '';
@@ -7629,7 +7638,7 @@ function rst_canHtml(me){
 }
 function rst_html(){
   const me = ck_cook(ck_who) || {}, ks = ck2_kitchens();
-  const body = ks.length ? ks.map(rst_kitchen).join('') + rst_autHtml(me, 2) : (rst_canOn(me) ? rst_canHtml(me) : '') + rst_autHtml(me, 1);
+  const body = ks.length ? `<div class="rs-grid">` + ks.map(rst_kitchen).join('') + rst_autHtml(me, 1) + `</div>` : (rst_canOn(me) ? rst_canHtml(me) : '') + rst_autHtml(me, 1);
   return ck_topHtml() + ck_alerts() + `<h2 style="font-size:18px;margin:6px 0 12px">${esc(ck_s('rs_tile'))}</h2>` + (body || `<div class="ck-empty">${esc(ck_s('rs_none'))}</div>`) + `<div style="margin-top:14px"><button class="ck-btn" onclick="ck_backToTiles()">‹ ${esc(ck_s('back'))}</button></div>`;
 }
 function rst_tileHtml(me){
@@ -7777,6 +7786,9 @@ function ckc_save(){
   writes.forEach(w=>ck_write(w[0], w[1])); ckc = null; ckcErr = ''; ck_render();
 }
 /* calcul du bilan de chaque ingrédient pour la journée D */
+function stk_tolG(){ const t = (ck_cfg.settings || {}).tol; return t === undefined || t === null || t === '' || !isFinite(Number(t)) ? 2 : Number(t); }
+function stk_tol(id){ const t = ((ck_cfg.ings || {})[id] || {}).tol; return t === undefined || t === null || t === '' || !isFinite(Number(t)) ? stk_tolG() : Number(t); }
+function ck_ingTol(id, v){ const n = ck_num(v); if(!ck_cfg.ings[id]) ck_cfg.ings[id] = {}; if(String(v).trim() === '' || n === null) delete ck_cfg.ings[id].tol; else ck_cfg.ings[id].tol = Math.max(0, Math.min(50, n)); ck_cfgSave(); ck_render(); }
 function stk_ledger(D){
   const st = stk_start(), day0 = !!(st && D === st.date), docs = stk_docsFrom(ck_docs(), D), prev = ck_prevSrv, S = (st && D < st.date) ? { tot:0, ok:0, no:0, g:{}, prods:{} } : fi_sales(D), cks = ck_cooks(), out = [];
   const sumF = (d, id, key, pl)=>{ const l = pl.filter(p=>ck2_finP(d, id, p, key) !== null); return l.length ? ck_r(l.reduce((a, p)=>a + ck2_finP(d, id, p, key), 0)) : null; };
@@ -7787,9 +7799,9 @@ function stk_ledger(D){
     const id = it.id, k = ck_kind(id), u = ck_unit(id), ps = ck2_ps(docs, id), pp = ck2_ps(prev, id), po = k === 'poulet', av = k === 'avocat', es = k === 'escalope', cr = k === 'crevette', KB = po ? 'fh' : 'fb';
     const d0 = ['kg', 'l'].indexOf(String(u).toLowerCase()) < 0, rd = (x)=>d0 ? Math.round(x) : Math.round(x * 100) / 100, rdf = (x)=>d0 ? Math.round(x) : ck_r(x);   // g, ml, pièces : nombres entiers ; kg, l : 2 décimales au plus (chaque montant converti est arrondi avant d’être additionné)
     const sold = (sl)=>rd(fi_toUnit(id, S.g[sl] || 0)), ach = rd(stk_buyOf(it.n, u)), asg = (K)=>cks.some(c=>(K ? (c.ingsK[K] || []) : c.ings).includes(id));
-    const vB = day0 ? stk_init(id) : pp.length ? ck_r(pp.reduce((a, p)=>a + (ck2_finP(prev, id, p, KB) || 0), 0)) : null;
+    const vB = pp.length ? ck_r(pp.reduce((a, p)=>a + (ck2_finP(prev, id, p, KB) || 0), 0)) : null;
     const pe = ps.filter(p=>ck2_finP(docs, id, p, KB) !== null), fB = pe.length ? ck_r(pe.reduce((a, p)=>a + ck2_finP(docs, id, p, KB), 0)) : null;
-    const veilleOf = (key, pl)=>day0 ? 0 : (pl.length ? sumF(prev, id, key, pl) : null), stages = [];
+    const veilleOf = (key, pl)=>(pl.length ? sumF(prev, id, key, pl) : null), stages = [];
     if(es) ['Sushi', 'Wok'].forEach(K=>{ if(ps.includes(K) || pp.includes(K) || asg(K)) stages.push({ K, lab:'Net ' + K, veille:veilleOf('fn', pp.filter(x=>x === K)), pese:ck2_finP(docs, id, K, 'fn') }); });
     else if(k === 'saumon' || k === 'gamba'){ if(ps.length || pp.length || asg(null)) stages.push({ K:null, lab:k === 'gamba' ? 'Décortiquée' : 'Net', veille:veilleOf('fn', pp), pese:sumF(docs, id, 'fn', ps) }); }
     else if(cr){ if(ps.length || pp.length || asg(null)) stages.push({ K:null, lab:'Crispy', veille:veilleOf('fc', pp), pese:sumF(docs, id, 'fc', ps) }); }
@@ -7862,14 +7874,14 @@ function sx_box(key, list, extra){
 }
 function stk_ingTable(){
   const D = ck_adate || ck_service(), st = stk_start(), fm = (x)=>ck_fmt(Math.abs(x)), sg = (x)=>x > 0 ? '+' : x < 0 ? '−' : '';
-  const rk = { ok:1, wa:2, ko:3 }, lvl = (ec, t)=>{ if(ec === null) return null; const a = Math.abs(ec), pc = t > 0 ? a / t * 100 : (a > 0 ? 100 : 0); return { ec, pc, k:pc <= 2 ? 'ok' : ec > 0 ? 'wa' : 'ko' }; };
+  const rk = { ok:1, wa:2, ko:3 }, lvl = (ec, t, id)=>{ if(ec === null) return null; const a = Math.abs(ec), pc = t > 0 ? a / t * 100 : (a > 0 ? 100 : 0); return { ec, pc, k:pc <= stk_tol(id) ? 'ok' : ec > 0 ? 'wa' : 'ko' }; };
   const led = stk_ledger(D), S = (st && D < st.date) ? { tot:0, ok:0, no:0, prods:{} } : fi_sales(D);
   const parts = (a)=>a.filter(x=>x.v).map(x=>x.lab + ' ' + ck_fmt(x.v)).join(' · ');
   const ln = (t, sub, v, cls, btn)=>`<div class="lg-l"><div class="lg-t">${t}${sub ? `<small>${esc(sub)}</small>` : ''}</div><div class="lg-v ${cls || ''}">${v}</div>${btn || '<span></span>'}</div>`;
   const mo = (key)=>`<button class="lg-mo ${sxo[key] ? 'on' : ''}" aria-label="Saisies de cette ligne" onclick="sx_tog(${ck_a(key)})">⋯</button>`;
   const dT = stk_docsFrom(ck_docs(), D), dP = ck_prevSrv, dPrev = ck_addDays(D, -1), ingL = ck_ingList(), escIds = ingL.filter(t=>ck_kind(t.id) === 'escalope').map(t=>t.id), pouIds = ingL.filter(t=>ck_kind(t.id) === 'poulet').map(t=>t.id), day0 = !!(st && D === st.date);
   const items = led.map(L=>{
-    const lv = lvl(L.ec, L.th), f = (x)=>ck_fmt(x) + ' ' + L.u, form = (w)=>ckc && ckc.id === L.id && ckc.which === w ? `<div class="lg-form">${ckc_form(L.id, w)}</div>` : '';
+    const lv = lvl(L.ec, L.th, L.id), f = (x)=>ck_fmt(x) + ' ' + L.u, form = (w)=>ckc && ckc.id === L.id && ckc.which === w ? `<div class="lg-form">${ckc_form(L.id, w)}</div>` : '';
     const K = (n)=>L.id + '|' + n, tod = (specs)=>sx_get(dT, D, specs);
     let bd;
     if(lv) bd = lv.k === 'ko' ? `<span class="sc-bd ko">Manque ${esc(f(-lv.ec))}</span>` : lv.k === 'wa' ? `<span class="sc-bd wa">Surplus ${esc(f(lv.ec))}</span>` : `<span class="sc-bd ok">Exact${lv.ec ? ' · ' + sg(lv.ec) + esc(fm(lv.ec)) : ''}</span>`;
@@ -7877,7 +7889,7 @@ function stk_ingTable(){
     const cls = lv ? (lv.k === 'ko' ? 'm' : lv.k === 'wa' ? 'h' : 'p') : '', z = '<span class="sc-z">—</span>';
     let h = `<div class="lg-sm"><div><small>Théorique</small><b>${L.th === null ? z : esc(ck_fmt(L.th))}</b></div><div><small>Réel</small><b>${L.reel === null ? z : esc(ck_fmt(L.reel))}</b></div><div class="${cls}"><small>Écart</small><b>${L.ec === null ? z : (L.ec ? sg(L.ec) + ' ' : '') + esc(fm(L.ec))}</b></div></div>`;
     const ckAll = (w)=>`<button class="ck-btn sm" onclick="ckc_open(${ck_a(L.id)},'${w}')">Saisir / corriger tout</button>`;
-    h += ln('Veille (J-1)', parts(L.vP), L.veille === null ? z : esc(ck_fmt(L.veille)), '', mo(K('veille'))) + sx_box(K('veille'), day0 ? [] : sx_get(dP, dPrev, [[L.id, ['fin2']]]), ckAll('veille')) + form('veille');
+    h += ln('Veille (J-1)', parts(L.vP), L.veille === null ? z : esc(ck_fmt(L.veille)), '', mo(K('veille'))) + sx_box(K('veille'), sx_get(dP, dPrev, [[L.id, ['fin2']]]), ckAll('veille')) + form('veille');
     h += ln('+ Achat <small style="display:inline;font-size:12px;color:var(--ink-muted)">(Dépenses)</small>', '', (L.ach ? '+ ' : '') + esc(ck_fmt(L.ach)), L.ach ? 'p' : 'z');
     if(L.hIn) h += ln('+ Haché des découpes d’escalope', '', '+ ' + esc(ck_fmt(L.hIn)), 'p', mo(K('hin'))) + sx_box(K('hin'), tod(escIds.map(i=>[i, ['dc']])));
     if(L.es && L.transf) h += ln('− Vers poulet haché', L.transfD.filter(x=>x[1]).map(x=>(x[0] === 'découpe' ? 'découpes' : 'hachage') + ' ' + ck_fmt(x[1])).join(' + '), '− ' + esc(ck_fmt(L.transf)), 'h', mo(K('vers'))) + sx_box(K('vers'), tod([[L.id, ['dc']]].concat(L.id === escIds[0] ? pouIds.map(i=>[i, ['hc']]) : [])));
@@ -7901,7 +7913,7 @@ function stk_ingTable(){
   const tile = (n, one, many, k)=>`<div class="sc-t ${k}"><b>${n}</b><span>${n > 1 ? many : one}</span></div>`;
   const miss = Object.keys(S.prods || {}).filter(k=>S.prods[k].miss).length, cov = S.tot > 0 ? Math.round(S.ok / S.tot * 100) : null;
   const chip = S.tot === 0 ? '<span class="stk-chip">Aucune vente lue pour ce jour</span>' : `<span class="stk-chip ${S.no > 0 ? 'wa' : 'ok'}">Fiches remplies ${cov} %${S.no > 0 ? ' · résultats incomplets' : ''}</span>${miss ? '<button class="ck-btn sm" onclick="ck_tab=\'fiche\';ck_syncSub();ck_render()">Remplir les fiches</button>' : ''}`;
-  const help = `<div class="ck3-n" id="stk-help" style="display:none;background:rgba(127,127,127,.12);padding:8px 10px;border-radius:8px;line-height:1.5;">Une carte par ingrédient : stock de la veille pesé (brut + net) + achat − sorties − consommation théorique (bons de vente) − pertes = stock final théorique, comparé au stock final réel pesé. Écart = réel − théorique. Vert : entre −2 % et +2 % ; orange : surplus ; rouge : manque. Escalope : la différence brut − net de la découpe et le brut pris pour le hachage vont en poulet haché (pas des pertes). Le reste crispy est converti en net avec le rendement réel du jour (crispy fait ÷ net consommé) et compté en perte. Les pertes n’apparaissent que le jour où elles sont saisies. Tous les montants sont arrondis (nombres entiers pour g, ml et pièces). Le bouton « ⋯ » d’une ligne montre les saisies des cuisiniers : Corriger ou Supprimer chacune.</div>`;
+  const help = `<div class="ck3-n" id="stk-help" style="display:none;background:rgba(127,127,127,.12);padding:8px 10px;border-radius:8px;line-height:1.5;">Une carte par ingrédient : stock de la veille pesé (brut + net) + achat − sorties − consommation théorique (bons de vente) − pertes = stock final théorique, comparé au stock final réel pesé. Écart = réel − théorique. Vert : dans la marge réglée (2 % par défaut) ; orange : surplus ; rouge : manque. Escalope : la différence brut − net de la découpe et le brut pris pour le hachage vont en poulet haché (pas des pertes). Le reste crispy est converti en net avec le rendement réel du jour (crispy fait ÷ net consommé) et compté en perte. Les pertes n’apparaissent que le jour où elles sont saisies. Tous les montants sont arrondis (nombres entiers pour g, ml et pièces). Le bouton « ⋯ » d’une ligne montre les saisies des cuisiniers : Corriger ou Supprimer chacune.</div>`;
   const body = !led.length ? '<div class="ck-empty">Aucun ingrédient suivi.</div>' : `<div class="sc-sum">${tile(nKo, 'manque à vérifier', 'manques à vérifier', 'ko')}${tile(nWa, 'surplus à vérifier', 'surplus à vérifier', 'wa')}${tile(good.length, 'correct', 'corrects', 'ok')}${tile(pend.length, 'pas encore pesé', 'pas encore pesés', '')}</div><div class="sc-g">${ordered.map(x=>x.html).join('')}</div>`;
   return `<div class="ck-box" id="stk-ing"><div class="ck3-h"><b>Ingrédients : bilan du jour</b><span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${chip}<button class="stk-q" onclick="var e=document.getElementById('stk-help');e.style.display=e.style.display==='none'?'block':'none'" aria-label="Comment lire cette page">?</button></span></div>${body}${help}</div>`;
 }
@@ -7911,7 +7923,7 @@ function stk_setSub(k){ stk_sub = k; ck_render(); }
 function stk_canTable(){
   const date = ck_adate || ck_service(), d = stk_doc(date), p = stk_doc(ck_addDays(date, -1)), its = stk_items('can'), st0 = stk_start(), day0 = st0 && date === st0.date; let last = null;
   const rows = its.map(i=>{
-    const vei = day0 ? stk_init(i.id) : stk_num((p.c || {})[i.id]), cnt = stk_num((d.c || {})[i.id]), ach = stk_buyOf(i.dep, ''), ven = stk_salesOf(i), per = stk_num((d.l || {})[i.id]) || 0, c0 = (d.c || {})[i.id];
+    const vei = stk_num((p.c || {})[i.id]), cnt = stk_num((d.c || {})[i.id]), ach = stk_buyOf(i.dep, ''), ven = stk_salesOf(i), per = stk_num((d.l || {})[i.id]) || 0, c0 = (d.c || {})[i.id];
     if(c0 && c0.at && (!last || c0.at > last.at)) last = c0;
     const th = vei === null ? null : ck_r(vei + ach - ven - per), ec = (th === null || cnt === null) ? null : ck_r(cnt - th);
     return `<tr><td>${esc(i.n)}</td><td>${stk_c(vei)}</td><td>${stk_c(ach)}</td><td>${stk_c(ven)}</td><td>${stk_c(per)}</td><td>${stk_c(th)}</td><td>${stk_c(cnt)}</td><td>${stk_pill(ec)}</td></tr>`;
@@ -8001,7 +8013,7 @@ function fi_rows(D){
     }
     else if(k === 'avocat'){
       const pe = ps.filter(p=>ck2_finP(docs, id, p, 'fb') !== null), pes = pe.length ? ck_r(pe.reduce((a, p)=>a + ck2_finP(docs, id, p, 'fb'), 0)) : null;
-      const vei = day0 ? stk_init(id) : pp.length ? ck_r(pp.reduce((a, p)=>a + (ck2_finP(prev, id, p, 'fb') || 0), 0)) : null, v = sold(id);
+      const vei = pp.length ? ck_r(pp.reduce((a, p)=>a + (ck2_finP(prev, id, p, 'fb') || 0), 0)) : null, v = sold(id);
       if(vei === null || pes === null) mk({ mes:'net utilisé', vendu:v, perte:0, ecart:null, pct:null });
       else { const nu = ck_r(vei + stk_buyOf(it.n, u) - pes - ck2_sumP(docs, id, 'wd', null, 'q') - ck2_pqS(docs, id, null, 'b')), ec = ck_r(v - nu); mk({ mes:'net utilisé', vendu:v, perte:0, ecart:ec, pct:pct(ec, v), nu }); }
     }
@@ -8182,6 +8194,11 @@ function stk_canRegHtml(){
   }).join('');
   return dl + `<div class="ck-box"><h3>Stock : canettes et bouteilles d’eau</h3><div class="ck-sub" style="margin-bottom:8px;">Liste reprise de Dépenses › sortie « Boissons ». Touche une boisson pour la suivre ; les achats viennent de Dépenses (même nom). Relie ensuite les produits Resto Pro qui la consomment.</div><div class="ck-fr">${tog}</div>${links}</div>`;
 }
+function stk_startHtml(){
+  const st = (ck_cfg.stk || {}).start || {};
+  return `<div class="ck-box"><h3>Début du suivi du stock</h3><div class="ck-fr"><label>Date</label><input class="ck-in" type="date" value="${esc(ck_okDate(st.date) ? st.date : '')}" onchange="stk_setStart('date',this.value)"><label>Heure</label><input class="ck-in" type="time" value="${esc(st.hm || '')}" onchange="stk_setStart('hm',this.value)"></div>
+    <div class="ck-sub" style="margin-top:6px;">Avant ce moment, rien n’est compté dans le Suivi du stock (rien n’est effacé). Le stock saisi en fin de service la veille sert de départ : pas besoin de saisir un stock de départ.</div></div>`;
+}
 function stk_regHtml(){
   const names = Array.from(new Set((ck_ingsRaw || []).filter(i=>i && i.n).map(i=>i.n))), dl = `<datalist id="stk-dl">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`;
   const block = (k, titre, can)=>{
@@ -8190,11 +8207,7 @@ function stk_regHtml(){
       <button class="ck-btn sm danger" onclick="stk_del(${ck_a(i.id)})">Retirer</button></div>${can ? '' : ck_cooks().filter(c=>stk_autIds(c).includes(i.id)).map(c=>`<div class="ck-fr" style="margin:2px 0 8px 14px"><span class="ck-sub" style="min-width:200px">${esc(stk_cookLabel(c.code))} : seuil minimum</span><input class="ck-in" inputmode="decimal" style="width:90px" placeholder="${i.seuil ? esc(ck_fmt(i.seuil)) : ''}" value="${esc(((((ck_cfg.cooks || {})[c.code] || {}).seuils || {})[i.id]) ? ck_fmt(ck_cfg.cooks[c.code].seuils[i.id]) : '')}" onchange="stk_setSeuil(${ck_a(c.code)},${ck_a(i.id)},this.value)"></div>`).join('')}`).join('');
     return `<div class="ck-box"><h3>${titre}</h3>${its || '<div class="ck-sub">Aucun article.</div>'}<div style="margin-top:8px"><button class="ck-btn sm" onclick="stk_add('${k}')">+ Ajouter un article</button></div></div>`;
   };
-  const st = (ck_cfg.stk || {}).start || {}, ini = (id, u)=>`<div class="ck-fr"><label style="min-width:170px">${esc(id.n)}</label><input class="ck-in" inputmode="decimal" style="width:110px" value="${esc(stk_init(id.id) === null ? '' : ck_fmt(stk_init(id.id)))}" onchange="stk_setInit(${ck_a(id.id)},this.value)"><span class="ck-sub">${esc(u)}</span></div>`;
-  const startBox = `<div class="ck-box"><h3>Début du suivi du stock</h3><div class="ck-fr"><label>Date</label><input class="ck-in" type="date" value="${esc(ck_okDate(st.date) ? st.date : '')}" onchange="stk_setStart('date',this.value)"><label>Heure</label><input class="ck-in" type="time" value="${esc(st.hm || '')}" onchange="stk_setStart('hm',this.value)"></div>
-    <div class="ck-sub" style="margin:6px 0 10px;">Avant ce moment, rien n’est compté dans le Suivi du stock (rien n’est effacé). Le jour du début, le « reste veille » est le stock de départ ci-dessous : le reste réel de chaque ingrédient (en cru) et le comptage de chaque article à cet instant.</div>
-    <h3 style="font-size:15px">Stock de départ</h3>${ck_ingList().map(i=>ini(i, ck_unit(i.id))).join('')}${stk_items('can').concat(stk_items('autre')).map(i=>ini(i, 'unité')).join('')}</div>`;
-  return startBox + dl + stk_canRegHtml() + block('autre', 'Stock : autres articles', false) + `<div class="ck-sub" style="margin:0 0 10px;">Les personnes qui comptent les canettes et l’eau se choisissent plus haut, dans la fiche de chaque cuisinier (« Comptage du stock »). Les autres articles s’attribuent à chaque cuisinier de la même façon que les ingrédients.</div>`;
+  return dl + stk_canRegHtml() + block('autre', 'Stock : autres articles', false) + `<div class="ck-sub" style="margin:0 0 10px;">Les personnes qui comptent les canettes et l’eau se choisissent plus haut, dans la fiche de chaque cuisinier (« Comptage du stock »). Les autres articles s’attribuent à chaque cuisinier de la même façon que les ingrédients.</div>`;
 }
 
 /* ==================== SAISIE v2 : brut → net → crispy / hachage → fin de service ==================== */
@@ -8780,8 +8793,7 @@ function ck_regHtml(){
       <div class="ck-fr" style="flex-wrap:wrap"><label>Poste</label><select class="ck-in" onchange="ck_cookSet(${ck_a(c.code)},'poste',this.value)">${CK_POSTES.map(p=>ck_opt(p, p || 'Personnalisé', c.poste)).join('')}</select>
         <label>Code à 4 chiffres</label><input class="ck-in ck-pin" inputmode="numeric" maxlength="4" value="${esc(c.pin)}" placeholder="••••" onchange="ck_cookSet(${ck_a(c.code)},'pin',this.value)">
         ${others.length ? `<span style="margin-inline-start:auto;display:flex;gap:6px;flex-wrap:wrap"><select class="ck-in" id="ck-cp-${esc(c.code)}"><option value="">Copier les réglages de…</option>${others.map(o=>ck_opt(o.code, o.name, '')).join('')}</select><button class="ck-btn sm" onclick="ck_cookCopy(${ck_a(c.code)})">Copier</button></span>` : ''}</div>
-      <div class="ck-ch">Ingrédients à saisir</div>
-      ${ings.length ? `<table class="ck3-t ck-ctab"><tr><th>Ingrédient</th><th>Sushi</th><th>Wok</th></tr>${ings.map(i=>`<tr><td>${esc(i.n)}</td>${['Sushi', 'Wok'].map(K=>`<td><input type="checkbox" ${c.ingsK[K].includes(i.id) ? 'checked' : ''} onchange="ck_cookIngK(${ck_a(c.code)},${ck_a(K)},${ck_a(i.id)})"></td>`).join('')}</tr>`).join('')}</table>` : '<span class="ck-sub">Aucun ingrédient suivi.</span>'}
+      <div class="ck-fr"><button class="ck-btn sm ${ck_prevCook === c.code ? 'on' : ''}" onclick="ck_prevTog(${ck_a(c.code)})">Aperçu de son écran</button><span class="ck-sub" style="margin:0">Les ingrédients se cochent dans la grille ci-dessus.</span></div>${ck_prevCook === c.code ? ck_prevHtml(c) : ''}
       <div class="ck-ch">Comptage du stock</div>
       <label class="ck-cl"><input type="checkbox" ${c.stk.includes('can') ? 'checked' : ''} onchange="ck_cookStk(${ck_a(c.code)},'can')">Canettes et eau</label>
       <div class="ck-ch" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><span>Autres articles à compter <span class="ck-sub" style="margin:0">· ${nArt} sur ${arts.length}</span></span>${arts.length ? `<span><a class="ck-lk" onclick="ck_cookArtAll(${ck_a(c.code)},true)">Tout cocher</a><a class="ck-lk" onclick="ck_cookArtAll(${ck_a(c.code)},false)">Tout décocher</a></span>` : ''}</div>
@@ -8790,14 +8802,33 @@ function ck_regHtml(){
   }).join('');
   const add = `<div class="ck-box"><h3>Cuisiniers</h3><div class="ck-sub" style="margin-bottom:8px;">Les prénoms viennent du module Pointage. Un même ingrédient peut être attribué à plusieurs cuisiniers : chacun a sa propre saisie.</div>
     <div class="ck-fr"><select class="ck-in" id="ck-addsel"><option value="">Choisir un employé…</option>${empCodes.map(c=>ck_opt(c, ck_empName(c), '')).join('')}</select><button class="ck-btn sm" onclick="ck_addCook()">+ Ajouter</button></div></div>`;
-  const ingBoxes = ings.length ? `<div class="ck-box"><h3>Ingrédients</h3><div class="ck-sub" style="margin-bottom:6px;">Liste tirée de Dépenses › Ingrédients (case « Suivi »). La fiche de chaque ingrédient est reconnue par son nom.</div>${ings.map(i=>{ const k = ck_kind(i.id), c = (ck_cfg.ings || {})[i.id] || {};
+  const asg = (id)=>cooks.filter(c=>ck_ingsAll({ ingsK:c.ingsK }).includes(id)).map(c=>c.name);
+  const ingBoxes = ings.length ? `<div class="ck-box"><h3>Ingrédients</h3><div class="ck-sub" style="margin-bottom:6px;">Liste tirée de Dépenses › Ingrédients (case « Suivi »). La fiche de chaque ingrédient est reconnue par son nom.</div><div class="ck-ig">${ings.map(i=>{ const k = ck_kind(i.id), c = (ck_cfg.ings || {})[i.id] || {}, who = asg(i.id);
     return `<div class="ck-row" style="grid-template-columns:1fr;--c:${ck_color(i.id)}"><span class="n">${ck_icon(k, 28)}${esc(i.n)} <small style="color:var(--ink-muted);font-weight:500">${esc(i.u || 'kg')}</small></span>
-      <div class="ck-fr"><span class="ck-pill ${k === 'simple' ? 'wa' : 'ok'}">${esc(k === 'simple' ? 'nom non reconnu : ' + CK_KLAB.simple : 'fiche : ' + CK_KLAB[k])}</span>
-      <label>Nom en arabe</label><input class="ck-in" dir="rtl" style="width:130px" value="${esc(c.ar || '')}" onchange="ck_ingSet(${ck_a(i.id)},'ar',this.value)"></div>${ck_qHtml(i.id)}</div>`; }).join('')}</div>`
+      <div class="ck-fr"><span class="ck-pill ${k === 'simple' ? 'wa' : 'ok'}">${esc(k === 'simple' ? 'nom non reconnu : ' + CK_KLAB.simple : 'fiche : ' + CK_KLAB[k])}</span>${who.length ? `<span class="ck-sub" style="margin:0">Saisi par ${esc(who.join(', '))}</span>` : `<span class="ck-pill ko">À attribuer</span>`}</div>
+      <div class="ck-fr"><label>Nom en arabe</label><input class="ck-in" dir="rtl" style="width:130px" value="${esc(c.ar || '')}" onchange="ck_ingSet(${ck_a(i.id)},'ar',this.value)"><label>Marge d’écart</label><input class="ck-in" inputmode="decimal" style="width:64px" placeholder="${esc(ck_fmt(stk_tolG()))}" value="${esc(c.tol === undefined || c.tol === '' ? '' : ck_fmt(Number(c.tol)))}" onchange="ck_ingTol(${ck_a(i.id)},this.value)"><span class="ck-sub" style="margin:0">%</span></div>
+      <details class="ck-qd"><summary>Questions du cuisinier</summary>${ck_qHtml(i.id)}</details></div>`; }).join('')}</div></div>`
     : '<div class="ck-box"><h3>Ingrédients</h3><div class="ck-empty">Aucun ingrédient suivi. Cochez « Suivi » dans Dépenses › Ingrédients.</div></div>';
-  return general + add + cookBoxes + stk_regHtml() + fi_regBox() + ingBoxes;
+  const cell = (c, id)=>{ const K = ck_ingsK(c), main = (c.poste === 'Sushi' || c.poste === 'Wok') ? c.poste : null, ks = ['Sushi', 'Wok'].filter(x=>!main || x === main || K[x].includes(id)); return `<td>${ks.map(x=>`<label class="ck-gc"><input type="checkbox" ${K[x].includes(id) ? 'checked' : ''} onchange="ck_cookIngK(${ck_a(c.code)},${ck_a(x)},${ck_a(id)})">${ks.length > 1 ? x[0] : ''}</label>`).join('')}</td>`; };
+  const grid = cooks.length && ings.length ? `<div class="ck-box"><h3>Qui saisit quoi</h3><div class="ck-sub" style="margin-bottom:6px;">Coche les ingrédients que chaque cuisinier saisit. Un même ingrédient peut être attribué à plusieurs cuisiniers.</div><div style="overflow-x:auto"><table class="ck3-t ck-ctab"><tr><th>Ingrédient</th>${cooks.map(c=>`<th>${esc(c.name)}<small style="display:block;font-weight:400;color:var(--ink-muted)">${esc(c.poste || 'Personnalisé')}</small></th>`).join('')}</tr>${ings.map(i=>`<tr><td>${esc(i.n)}</td>${cooks.map(c=>cell(c, i.id)).join('')}</tr>`).join('')}</table></div></div>` : '';
+  const tolBox = `<div class="ck-box"><h3>Marge des écarts</h3><div class="ck-fr"><label>« Correct » si l’écart reste dans</label><input class="ck-in" inputmode="decimal" style="width:70px" value="${esc(ck_fmt(stk_tolG()))}" onchange="ck_setSet('tol',this.value)"><label>%</label></div><div class="ck-sub">Dans la marge : Exact. Au-dessus : Surplus. En dessous : Manque. Chaque ingrédient peut avoir sa propre marge (onglet Ingrédients).</div></div>`;
+  const unas = ings.filter(i=>!asg(i.id).length); let mf = 0; try{ const SS = fi_sales(ck_adate || ck_service()); mf = Object.keys(SS.prods || {}).filter(k=>SS.prods[k].miss).length; }catch(e){}
+  const sub = ck_rsub, TABS = [['gen', 'Général'], ['team', 'Équipe'], ['ing', 'Ingrédients'], ['stk', 'Stock'], ['fi', 'Fiches']];
+  const bar = `<div class="ck-fr" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:10px"><div class="ck-tabs" style="margin:0">${TABS.map(t=>`<button class="ck-btn ${sub === t[0] ? 'on' : ''}" onclick="ck_rsub='${t[0]}';ck_render()">${t[1]}</button>`).join('')}</div><span id="ck-saved" class="ck-sub" style="margin:0;color:#4ADE80">${esc(ck_savedTxt())}</span></div>`;
+  const al = (unas.length ? `<div class="ck-fr"><span class="ck-pill ko">À attribuer</span><span>${esc(unas.map(i=>i.n).join(', '))} ${unas.length > 1 ? 'sont suivis mais attribués' : 'est suivi mais attribué'} à personne.</span><button class="ck-btn sm" onclick="ck_rsub='team';ck_render()">Attribuer</button></div>` : '') + (mf ? `<div class="ck-fr"><span class="ck-pill wa">Fiches à compléter</span><span>${mf} produit${mf > 1 ? 's' : ''} vendu${mf > 1 ? 's' : ''} sans fiche technique.</span><button class="ck-btn sm" onclick="ck_tab='fiche';ck_syncSub();ck_render()">Remplir les fiches</button></div>` : '');
+  const alerts = al ? `<div class="ck-box">${al}</div>` : '';
+  const body = sub === 'team' ? add + grid + cookBoxes : sub === 'ing' ? ingBoxes : sub === 'stk' ? stk_regHtml() : sub === 'fi' ? fi_regBox() : general + stk_startHtml() + tolBox;
+  return bar + alerts + body;
 }
-function ck_setSet(k, v){ const n = Number(v); if(k === 'lockMin') ck_cfg.settings.lockMin = Math.max(1, Math.min(30, Math.round(n) || 3)); else if(k === 'cutoff') ck_cfg.settings.cutoff = Math.max(0, Math.min(10, Math.round(n) || 0)); ck_cfgSave(); ck_render(); }
+let ck_rsub = 'gen', ck_prevCook = '', ck_savedAt = 0;
+const ck_savedTxt = ()=>ck_savedAt ? '✓ enregistré ' + ck_hm(new Date(ck_savedAt).toISOString()) : '';
+function ck_prevTog(code){ ck_prevCook = ck_prevCook === code ? '' : code; ck_render(); }
+function ck_prevHtml(c){
+  const ings = ck_ingList(), K = ck_ingsK(c), nm = (k)=>K[k].map(id=>ings.find(i=>i.id === id)).filter(Boolean), blk = (k)=>nm(k).length ? `<div class="ck-sub" style="margin:6px 0 2px">${k}</div><div class="ck-fr" style="flex-wrap:wrap">${nm(k).map(i=>`<span class="ck-pill ok">${esc(i.n)}</span>`).join('')}</div>` : '';
+  const ex = [(c.stk || []).includes('can') ? 'Canettes et eau' : '', stk_autIds(c).length ? 'Autres articles (' + stk_autIds(c).length + ')' : '', rst_has(c) ? 'Reste du dernier service' : ''].filter(Boolean);
+  return `<div class="ck-box" style="background:rgba(127,127,127,.08)"><b>Écran de ${esc(c.name)}</b> <span class="ck-sub" style="margin:0">lecture seule</span>${blk('Sushi')}${blk('Wok')}${!nm('Sushi').length && !nm('Wok').length ? '<div class="ck-sub">Aucun ingrédient attribué.</div>' : ''}${ex.length ? `<div class="ck-sub" style="margin:8px 0 2px">Autres tuiles</div><div class="ck-fr" style="flex-wrap:wrap">${ex.map(x=>`<span class="ck-pill">${esc(x)}</span>`).join('')}</div>` : ''}</div>`;
+}
+function ck_setSet(k, v){ const n = Number(v); if(k === 'lockMin') ck_cfg.settings.lockMin = Math.max(1, Math.min(30, Math.round(n) || 3)); else if(k === 'tol'){ const x = ck_num(v); ck_cfg.settings.tol = x === null ? 2 : Math.max(0, Math.min(50, x)); } else if(k === 'cutoff') ck_cfg.settings.cutoff = Math.max(0, Math.min(10, Math.round(n) || 0)); ck_cfgSave(); ck_render(); }
 function ck_addCook(){ const el = document.getElementById('ck-addsel'), code = el && el.value; if(!code) return; ck_cfg.cooks[code] = { n:ck_empName(code), pin:'', poste:'', ings:[] }; ck_cfgSave(); ck_render(); }
 const ck_cookOpen = {};
 function ck_cookTog(code){ ck_cookOpen[code] = !ck_cookOpen[code]; ck_render(); }
