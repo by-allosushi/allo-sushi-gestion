@@ -8102,6 +8102,7 @@ const FI_MES = { saumon:'net', gamba:'net', viande:'net', boeuf:'net', simple:'n
 function fi_ing(k, D){   // fiche en vigueur le jour D (null = pas de fiche ; {} = aucun ingrédient)
   const f = fi_all()[k]; if(!f || !Array.isArray(f.v)) return null; let best = null;
   f.v.forEach(v=>{ if(v && String(v.from) <= D && (!best || String(v.from) >= String(best.from))) best = v; });
+  if(!best) f.v.forEach(v=>{ if(v && (!best || String(v.from) < String(best.from))) best = v; });   // jours d’avant la 1re fiche : la 1re fiche compte aussi (le plat n’en avait pas)
   return best ? (best.ing || {}) : null;
 }
 const fi_isDrink = (k)=>stk_items('can').some(i=>stk_rpList(i).some(l=>rp_normName(l.n) === k));   // les boissons sont déjà suivies dans « Canettes et eau »
@@ -8217,7 +8218,7 @@ function fi_listHtml(){
     if(open){
       const cur = fi_ing(p.k, D) || {}, f0 = fi_all()[p.k], vs = f0 && Array.isArray(f0.v) ? f0.v.filter(v=>v && String(v.from) <= D).sort((a, b)=>String(a.from).localeCompare(String(b.from))) : [], since = vs.length ? vs[vs.length - 1].from : '';
       const frs = ings.map(it=>fi_slots(it.id).map(sl=>`<div class="fi-fr"><label>${esc(it.n)}${sl.lab ? ' · ' + esc(sl.lab) : ''}</label><input class="ck-in" inputmode="decimal" style="width:90px" data-s="${esc(sl.s)}" value="${cur[sl.s] ? esc(ck_fmt(Number(cur[sl.s]))) : ''}" placeholder="0"><span class="ck-sub">g</span></div>`).join('')).join('');
-      form = `<div class="fi-form"><div class="ck-sub" style="margin:8px 0;">Quantité de chaque ingrédient dans <b>un</b> plat, en grammes. Laisse vide ce que le plat ne contient pas.${since && since !== '0000-00-00' ? ' Fiche en vigueur depuis le ' + esc(String(since).split('-').reverse().join('/')) + '.' : ''}</div>${ings.length ? frs : '<div class="ck-empty">Aucun ingrédient suivi.</div>'}<div class="ck-err">${esc(fi.err)}</div>
+      form = `<div class="fi-form"><div class="ck-sub" style="margin:8px 0;">Quantité de chaque ingrédient dans <b>un</b> plat, en grammes. Laisse vide ce que le plat ne contient pas.${since && since !== '0000-00-00' ? ' Fiche en vigueur depuis le ' + esc(String(since).split('-').reverse().join('/')) + '.' : ''}</div>${ings.length ? frs : '<div class="ck-empty">Aucun ingrédient suivi.</div>'}${vs.length ? '<div class="ck-sub" style="margin:10px 0 4px;">À partir de quand ?</div><label style="display:block;margin:2px 0;"><input type="radio" name="fi-when" value="today" checked> Aujourd’hui</label><label style="display:block;margin:2px 0;"><input type="radio" name="fi-when" value="start"> Depuis le début du suivi (corrige aussi les jours passés)</label>' : ''}<div class="ck-err">${esc(fi.err)}</div>
         <div class="ck-fr"><button class="ck-btn on" onclick="fi_save(${ck_a(p.k)})">Enregistrer la fiche</button><button class="ck-btn" onclick="fi_none(${ck_a(p.k)})">Aucun ingrédient (menu, sauce…)</button><button class="ck-btn" onclick="fi_toggle(${ck_a(p.k)})">Annuler</button></div></div>`;
     }
     return `<div class="fi-p"><div class="fi-h" onclick="fi_toggle(${ck_a(p.k)})"><span class="n">${esc(p.name)}</span>${p.q > 0 ? `<small>${esc(ck_fmt(p.q))} vendus (30 j)</small>` : ''}${pill(s)}</div>${form}</div>`;
@@ -8230,8 +8231,8 @@ function fi_toggle(k){ fi.open = fi.open === k ? '' : k; fi.err = ''; fi_renderL
 function fi_put(k, ing){
   const nm = (fi_products().find(p=>p.k === k) || {}).name || k, F = fi_all(), f = F[k] || (F[k] = { n:nm, v:[] });
   if(!Array.isArray(f.v)) f.v = [];
-  const today = ck_service(), st = stk_start(), from = !f.v.length ? (st && today >= st.date ? today : '0000-00-00') : today;
-  f.n = nm; f.v = f.v.filter(v=>v && String(v.from) !== from).concat([{ from, ing }]).sort((a, b)=>String(a.from).localeCompare(String(b.from)));
+  const today = ck_service(), wEl = document.querySelector('#ck-root input[name="fi-when"]:checked'), all = !f.v.length || (wEl && wEl.value === 'start'), from = all ? '0000-00-00' : today;
+  f.n = nm; f.v = f.v.filter(v=>v && String(v.from) !== from && !(all && String(v.from) <= today)).concat([{ from, ing }]).sort((a, b)=>String(a.from).localeCompare(String(b.from)));
   fi.open = ''; fi.err = ''; ck_cfgSave(); ck_render();
 }
 function fi_save(k){
