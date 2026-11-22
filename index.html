@@ -937,6 +937,7 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .rs-v td.c{font-size:18px;font-weight:600;}#module-cuisine .rs-v td.p{font-size:15px;color:var(--ink-muted);}#module-cuisine .rs-v td small{font-size:11px;font-weight:400;color:var(--ink-muted);font-family:inherit;}
     #module-cuisine .rs-v .rs-todo{font-family:inherit;font-size:14px;font-weight:400;font-style:italic;color:var(--ink-muted);}
     #module-cuisine .rs-va td.c .q{display:block;font-size:18px;font-weight:600;}#module-cuisine .rs-va td.p .q{display:block;font-size:15px;}#module-cuisine .rs-va td small{display:block;margin-top:2px;line-height:1.35;}
+    #module-cuisine .bl-u{font-family:inherit;font-size:.72em;font-weight:400;color:var(--ink-muted);margin-inline-start:2px;}
     #module-cuisine .rs-one{padding:4px 14px 8px;}
     @media(min-width:760px){#module-cuisine .rs-one{display:grid;grid-template-columns:1.1fr .9fr;column-gap:28px;align-items:start;}}
     #module-cuisine .rs-sec{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:14px 0 7px;border-bottom:1px solid var(--line);}
@@ -7832,6 +7833,8 @@ function stk_salesOf(it){
 }
 const stk_pill = (e)=>e === null ? '—' : `<span class="ck-pill ${e === 0 ? 'ok' : e < 0 ? 'ko' : 'wa'}">${e > 0 ? '+' : e < 0 ? '−' : ''}${ck_fmt(Math.abs(e))}</span>`;
 const stk_c = (x)=>x === null || x === undefined ? '—' : ck_fmt(x);
+const stk_un = (u)=>u ? ' <span class="bl-u">' + esc(u) + '</span>' : '';   // unité écrite à côté du chiffre
+const stk_cu = (x, u)=>x === null || x === undefined ? '—' : esc(ck_fmt(x)) + stk_un(u);
 /* ===== Suivi des ingrédients : bilan par ingrédient (veille → achat → sorties → théorique → réel → écart) ===== */
 let ckc = null, ckcErr = '';
 const CKC_LAB = { fb:'Brut', fn:'Net', fc:'Crispy restant', fh:'Bac à haché' };
@@ -8102,15 +8105,16 @@ function stk_ingTable(){
   const parts = (a)=>a.filter(x=>x.v).map(x=>x.lab + ' ' + ck_fmt(x.v)).join(' · ');
   const dT = stk_docsFrom(ck_docs(), D), dP = ck_prevSrv, dPrev = ck_addDays(D, -1), ingL = ck_ingList(), escIds = ingL.filter(t=>ck_kind(t.id) === 'escalope').map(t=>t.id), pouIds = ingL.filter(t=>ck_kind(t.id) === 'poulet').map(t=>t.id);
   const z = '<span class="bl-z">—</span>', num = (x)=>x === null || x === undefined ? z : esc(ck_fmt(x));
-  const ln = (t, v, cls, sub)=>`<div class="bl-ln ${cls || ''}"><span>${t}${sub ? `<small>${esc(sub)}</small>` : ''}</span><b>${v}</b></div>`;
+  let UU = ''; const nu = (x, u)=>x === null || x === undefined ? z : esc(ck_fmt(x)) + stk_un(u);
+  const ln = (t, v, cls, sub)=>`<div class="bl-ln ${cls || ''}"><span>${t}${sub ? `<small>${esc(sub)}</small>` : ''}</span><b>${v}${v === z ? '' : stk_un(UU)}</b></div>`;
   const rows = led.map(L=>{
-    const lv = lvl(L.ec, L.th, L.id), f = (x)=>ck_fmt(x) + ' ' + L.u, open = stk_det === L.id;
+    UU = L.u; const lv = lvl(L.ec, L.th, L.id), f = (x)=>ck_fmt(x) + ' ' + L.u, open = stk_det === L.id;
     const entrees = ck_r(L.ach + L.hIn), sorties = ck_r(L.transf + L.pris + L.dec + L.conso + L.pertes);
     let pill, noData = L.th === null || L.reel === null;
     if(lv) pill = lv.k === 'ko' ? `<span class="bl-p ko">− ${esc(fm(lv.ec))}</span>` : lv.k === 'wa' ? `<span class="bl-p wa">+ ${esc(fm(lv.ec))}</span>` : `<span class="bl-p ok">Exact</span>`;
     else pill = `<span class="bl-p no">${L.quiet ? '—' : 'À saisir'}</span>`;
     const dim = L.quiet ? ' bl-dim' : '';
-    let tr = `<tr class="bl-r${open ? ' op' : ''}${dim}"><td>${esc(L.name)} <small>${esc(L.u)}</small></td><td class="hs">${num(L.veille)}</td><td class="hs">${L.quiet ? z : esc(ck_fmt(entrees))}</td><td class="hs">${L.quiet ? z : esc(ck_fmt(sorties))}</td><td>${num(L.th)}</td><td>${num(L.reel)}</td><td>${pill}</td><td><button class="bl-b ${open ? 'on' : ''}" onclick="stk_detTog(${ck_a(L.id)})" aria-label="Détails de ${esc(L.name)}"><span class="ds">Détails ${open ? '▴' : '▾'}</span><span class="ph">⋯</span></button></td></tr>`;
+    let tr = `<tr class="bl-r${open ? ' op' : ''}${dim}"><td>${esc(L.name)}</td><td class="hs">${nu(L.veille, L.u)}</td><td class="hs">${L.quiet ? z : nu(entrees, L.u)}</td><td class="hs">${L.quiet ? z : nu(sorties, L.u)}</td><td>${nu(L.th, L.u)}</td><td>${nu(L.reel, L.u)}</td><td>${pill}</td><td><button class="bl-b ${open ? 'on' : ''}" onclick="stk_detTog(${ck_a(L.id)})" aria-label="Détails de ${esc(L.name)}"><span class="ds">Détails ${open ? '▴' : '▾'}</span><span class="ph">⋯</span></button></td></tr>`;
     if(open){
       const form = (w)=>ckc && ckc.id === L.id && ckc.which === w ? `<div class="lg-form">${ckc_form(L.id, w)}</div>` : '';
       let c = ln('Veille (J-1)', num(L.veille), '', parts(L.vP));
@@ -8171,7 +8175,7 @@ function stk_autTable(){
       const c = L.rec ? stk_num(L.rec) : null, s0 = L.code ? stk_seuil(L.code, i.id) : (Number(i.seuil) || 0); let st = '—';
       if(c !== null) st = s0 > 0 && c < s0 ? '<span class="ck-pill ko">À racheter</span>' : s0 > 0 && c <= s0 * 1.2 ? '<span class="ck-pill wa">Proche du seuil</span>' : '<span class="ck-pill ok">OK</span>';
       const lab = L.code ? stk_cookLabel(L.code) : (L.rec ? (L.rec.by || '') : ''), who = c !== null && L.rec && L.rec.at ? esc((L.rec.by || '') + ' · ' + ck_hm(L.rec.at)) : '—';
-      rows.push(`<tr><td>${esc(i.n)}${lines.length > 1 || lab ? ` <span class="ck-pill">${esc(lab)}</span>` : ''}</td><td>${stk_c(c)}</td><td>${s0 ? ck_fmt(s0) : '—'}</td><td>${st}</td><td style="font-family:inherit;color:var(--ink-muted)">${who}</td></tr>`);
+      rows.push(`<tr><td>${esc(i.n)}${lines.length > 1 || lab ? ` <span class="ck-pill">${esc(lab)}</span>` : ''}</td><td>${stk_cu(c, i.u)}</td><td>${s0 ? esc(ck_fmt(s0)) + stk_un(i.u) : '—'}</td><td>${st}</td><td style="font-family:inherit;color:var(--ink-muted)">${who}</td></tr>`);
     });
   });
   return `<div class="ck-box" id="stk-aut"><div class="ck3-h"><b>Autres articles</b><span>un comptage par cuisinier</span></div>${rows.length ? `<div class="ck3-w"><table class="ck3-t"><tr><th>Article</th><th>Comptage</th><th>Seuil minimum</th><th>État</th><th>Compté par</th></tr>${rows.join('')}</table></div>` : '<div class="ck-empty">Aucun article. Ajoute-les dans Réglages.</div>'}</div>`;
@@ -8267,7 +8271,7 @@ function fi_bilanHtml(){
   const covH = S.tot === 0 ? '<div class="ck3-n">Aucune vente lue pour ce jour (bouton « Actualiser » dans CA Resto Pro).</div>' : `<div class="ck3-n">Fiches remplies : <b>${cov} %</b> des produits vendus${miss ? ' · ' + miss + ' produit' + (miss > 1 ? 's' : '') + ' sans fiche' : ''}. <button class="ck-btn sm" onclick="${goF}">Remplir les fiches</button></div>`;
   const body = rows.map(r=>{
     const den = ck_r(r.vendu + r.perte), pc = r.pct === null ? '—' : (r.pct > 0 ? '+' : r.pct < 0 ? '−' : '') + ck_fmt(Math.abs(r.pct)) + ' %';
-    return `<tr><td>${esc(r.name)}${r.lab ? ' · ' + esc(r.lab) : ''} <small style="color:var(--ink-muted)">${esc(r.u)}</small><small style="display:block;color:var(--ink-muted)">${esc(r.mes)}${r.taux ? ' · taux net → crispy ' + ck_fmt(Math.round(r.taux * 1000) / 10) + ' %' : ''}</small></td><td>${stk_c(r.vendu)}</td><td>${stk_c(r.perte)}</td><td>${stk_c(den)}</td><td>${stk_pill(r.ecart)}${r.ecart !== null && r.inc ? '<small style="display:block;color:var(--ink-muted)">incomplet</small>' : ''}</td><td>${pc}</td></tr>`;
+    return `<tr><td>${esc(r.name)}${r.lab ? ' · ' + esc(r.lab) : ''}<small style="display:block;color:var(--ink-muted)">${esc(r.mes)}${r.taux ? ' · taux net → crispy ' + ck_fmt(Math.round(r.taux * 1000) / 10) + ' %' : ''}</small></td><td>${stk_cu(r.vendu, r.u)}</td><td>${stk_cu(r.perte, r.u)}</td><td>${stk_cu(den, r.u)}</td><td>${stk_pill(r.ecart)}${r.ecart !== null && r.inc ? '<small style="display:block;color:var(--ink-muted)">incomplet</small>' : ''}</td><td>${pc}</td></tr>`;
   }).join('');
   if(!rows.length && S.tot === 0) return '';
   return `<div class="ck-box" id="stk-bil"><div class="ck3-h"><b>Bilan du jour : ingrédients et ventes</b><span>un seul suivi, à l’étape où chaque ingrédient est vendu</span></div>${covH}${rows.length ? `<div class="ck3-w"><table class="ck3-t"><tr><th>Ingrédient</th><th>Vendu (fiches)</th><th>+ Pertes</th><th>Devait sortir</th><th>Écart</th><th>Écart %</th></tr>${body}</table></div>` : '<div class="ck-empty">Aucune saisie de cuisine pour ce jour.</div>'}
@@ -8376,7 +8380,7 @@ function fi_stages(D){
 function fi_stageHtml(){
   const D = ck_adate || ck_service(), st = stk_start(); if(st && D < st.date) return '';
   const rows = fi_stages(D); if(!rows.length) return '';
-  const body = rows.map(r=>`<tr><td>${esc(r.name)} <small style="color:var(--ink-muted)">${esc(r.u)}</small><small style="display:block;color:var(--ink-muted)">${esc(r.lab)}</small></td><td>${stk_c(r.veille)}</td><td>${stk_c(r.obt)}</td><td>${stk_c(r.vend)}${r.fritNote ? '<small style="display:block;color:var(--ink-muted)">net frit</small>' : ''}</td><td>${stk_c(r.perte)}</td><td>${stk_c(r.th)}</td><td>${stk_c(r.pese)}</td><td>${stk_pill(r.ec)}${r.ec !== null && r.inc ? '<small style="display:block;color:var(--ink-muted)">incomplet</small>' : ''}</td></tr>`).join('');
+  const body = rows.map(r=>`<tr><td>${esc(r.name)}<small style="display:block;color:var(--ink-muted)">${esc(r.lab)}</small></td><td>${stk_cu(r.veille, r.u)}</td><td>${stk_cu(r.obt, r.u)}</td><td>${stk_cu(r.vend, r.u)}${r.fritNote ? '<small style="display:block;color:var(--ink-muted)">net frit</small>' : ''}</td><td>${stk_cu(r.perte, r.u)}</td><td>${stk_cu(r.th, r.u)}</td><td>${stk_cu(r.pese, r.u)}</td><td>${stk_pill(r.ec)}${r.ec !== null && r.inc ? '<small style="display:block;color:var(--ink-muted)">incomplet</small>' : ''}</td></tr>`).join('');
   return `<div class="ck-box" id="stk-net"><div class="ck3-h"><b>Reste net et crispy</b><span>étapes après la découpe, par ingrédient</span></div><div class="ck3-w"><table class="ck3-t"><tr><th>Ingrédient (étape)</th><th>Reste veille</th><th>+ Obtenu</th><th>− Vendu</th><th>− Perte</th><th>Théorique</th><th>Reste pesé</th><th>Écart</th></tr>${body}</table></div>
     <div class="ck3-n">Théorique = reste veille + obtenu (net de la découpe, ou crispy de la friture) − vendu d’après les fiches − pertes déclarées à cette étape. « — » : donnée non saisie (reste veille inconnu, pas de fin de service, ou pas de fiche). Escalope Sushi : le net frit est déduit des saisies (reste veille + obtenu − reste pesé), il n’a donc pas d’écart ; le crispy restant est jeté en fin de service et n’est pas reporté au lendemain. Le premier jour du suivi, le reste veille net et crispy est 0.</div></div>`;
 }
@@ -8430,14 +8434,14 @@ function stk_startHtml(){
     <div class="ck-sub" style="margin-top:6px;">Avant ce moment, rien n’est compté dans le Suivi du stock (rien n’est effacé). Le stock saisi en fin de service la veille sert de départ : pas besoin de saisir un stock de départ.</div></div>`;
 }
 function stk_regHtml(){
-  const names = Array.from(new Set((ck_ingsRaw || []).filter(i=>i && i.n).map(i=>i.n))), dl = `<datalist id="stk-dl">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`, udl = `<datalist id="stk-udl">${['pcs', 'kg', 'g', 'L', 'ml', 'sachets', 'boîtes', 'bouteilles'].map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`;
+  const names = Array.from(new Set((ck_ingsRaw || []).filter(i=>i && i.n).map(i=>i.n))), dl = `<datalist id="stk-dl">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`;
   const block = (k, titre, can)=>{
     const its = stk_itemsAll(k).map(i=>`<div class="ck-fr" style="align-items:flex-end;flex-wrap:wrap"><div><label>Nom</label><br><input class="ck-in" style="width:170px" value="${esc(i.n)}" onchange="stk_set(${ck_a(i.id)},'n',this.value)"></div>
-      ${can ? `<div><label>Nom dans Dépenses</label><br><input class="ck-in" list="stk-dl" style="width:170px" value="${esc(i.dep || '')}" onchange="stk_set(${ck_a(i.id)},'dep',this.value)"></div><div><label>Nom dans Resto Pro (séparer par ;)</label><br><input class="ck-in" style="width:210px" value="${esc(i.rp || '')}" onchange="stk_set(${ck_a(i.id)},'rp',this.value)"></div>` : `<div><label>Unité</label><br><input class="ck-in" list="stk-udl" style="width:90px" placeholder="pcs, kg…" value="${esc(i.u || '')}" onchange="stk_set(${ck_a(i.id)},'u',this.value)"></div>`+`<div><label>Seuil par défaut</label><br><input class="ck-in" inputmode="decimal" style="width:90px" value="${esc(i.seuil ? ck_fmt(i.seuil) : '')}" onchange="stk_set(${ck_a(i.id)},'seuil',this.value)"></div>`}
+      ${can ? `<div><label>Nom dans Dépenses</label><br><input class="ck-in" list="stk-dl" style="width:170px" value="${esc(i.dep || '')}" onchange="stk_set(${ck_a(i.id)},'dep',this.value)"></div><div><label>Nom dans Resto Pro (séparer par ;)</label><br><input class="ck-in" style="width:210px" value="${esc(i.rp || '')}" onchange="stk_set(${ck_a(i.id)},'rp',this.value)"></div>` : `<div><label>Unité</label><br><input class="ck-in" style="width:90px" placeholder="pcs, kg, L…" value="${esc(i.u || '')}" onchange="stk_set(${ck_a(i.id)},'u',this.value)"></div>`+`<div><label>Seuil par défaut</label><br><input class="ck-in" inputmode="decimal" style="width:90px" value="${esc(i.seuil ? ck_fmt(i.seuil) : '')}" onchange="stk_set(${ck_a(i.id)},'seuil',this.value)"></div>`}
       <button class="ck-btn sm danger" onclick="stk_del(${ck_a(i.id)})">Retirer</button></div>${can ? '' : ck_cooks().filter(c=>stk_autIds(c).includes(i.id)).map(c=>`<div class="ck-fr" style="margin:2px 0 8px 14px"><span class="ck-sub" style="min-width:200px">${esc(stk_cookLabel(c.code))} : seuil minimum</span><input class="ck-in" inputmode="decimal" style="width:90px" placeholder="${i.seuil ? esc(ck_fmt(i.seuil)) : ''}" value="${esc(((((ck_cfg.cooks || {})[c.code] || {}).seuils || {})[i.id]) ? ck_fmt(ck_cfg.cooks[c.code].seuils[i.id]) : '')}" onchange="stk_setSeuil(${ck_a(c.code)},${ck_a(i.id)},this.value)"></div>`).join('')}`).join('');
     return `<div class="ck-box"><h3>${titre}</h3>${its || '<div class="ck-sub">Aucun article.</div>'}<div style="margin-top:8px"><button class="ck-btn sm" onclick="stk_add('${k}')">+ Ajouter un article</button></div></div>`;
   };
-  return dl + udl + stk_canRegHtml() + block('autre', 'Stock : autres articles', false) + `<div class="ck-sub" style="margin:0 0 10px;">Les personnes qui comptent les canettes et l’eau se choisissent plus haut, dans la fiche de chaque cuisinier (« Comptage du stock »). Les autres articles s’attribuent à chaque cuisinier de la même façon que les ingrédients.</div>`;
+  return dl + stk_canRegHtml() + block('autre', 'Stock : autres articles', false) + `<div class="ck-sub" style="margin:0 0 10px;">Les personnes qui comptent les canettes et l’eau se choisissent plus haut, dans la fiche de chaque cuisinier (« Comptage du stock »). Les autres articles s’attribuent à chaque cuisinier de la même façon que les ingrédients.</div>`;
 }
 
 /* ==================== SAISIE v2 : brut → net → crispy / hachage → fin de service ==================== */
