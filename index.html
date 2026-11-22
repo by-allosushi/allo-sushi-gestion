@@ -1042,6 +1042,11 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .bl-pn{padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px;border-top:1px solid var(--line);background:rgba(127,127,127,.05);}
     #module-cuisine .bl-cd{border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0;}
     #module-cuisine .bl-cd h5{margin:0 0 8px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-muted);display:flex;justify-content:space-between;}
+    #module-cuisine .bl-ind{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;margin:6px 0;font-size:14px;}#module-cuisine .bl-ind small{display:block;font-size:12px;color:var(--ink-muted);}
+    #module-cuisine .bl-ind .iv{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:500;white-space:nowrap;}#module-cuisine .bl-ind .ip{font-family:inherit;font-size:11px;padding:2px 9px;border-radius:999px;margin-inline-start:8px;vertical-align:middle;}
+    #module-cuisine .bl-ind.ok{background:#0F2A1C;border:1px solid #1F5A44;}#module-cuisine .bl-ind.ok .iv{color:#6EE7B7;}#module-cuisine .bl-ind.ok .ip{background:#1F5A4455;}
+    #module-cuisine .bl-ind.wa{background:#2A1D08;border:1px solid #7A5A1C;}#module-cuisine .bl-ind.wa .iv{color:#F59E0B;}#module-cuisine .bl-ind.wa .ip{background:#7A5A1C55;}
+    #module-cuisine .bl-ind.ko{background:#2A0F13;border:1px solid #7A2A31;}#module-cuisine .bl-ind.ko .iv{color:#F87171;}#module-cuisine .bl-ind.ko .ip{background:#7A2A3155;}
     #module-cuisine .bl-brut{margin-top:12px;padding-top:6px;border-top:2px solid var(--line);}#module-cuisine .bl-brut h6{margin:6px 0 2px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-muted);}
     #module-cuisine .bl-ln{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:14px;}#module-cuisine .bl-ln:first-of-type{border-top:0;}
     #module-cuisine .bl-ln small{display:block;font-size:12px;color:var(--ink-muted);}#module-cuisine .bl-ln b{font-family:'IBM Plex Mono',monospace;font-weight:500;white-space:nowrap;}#module-cuisine .bl-ln.t{font-weight:600;}
@@ -7965,7 +7970,8 @@ function stk_ledger(D){
     const cv = (x)=>taux ? rd(x / taux) : x;
     const hb = es && id === escId ? hbAll : 0, transf = es ? ck_r(dcB - dcN + hb) : 0, pris = po ? ck2_sumP(docs, id, 'hc', null, 'q') : 0, hIn = po ? hache : 0;
     let bru = null;
-    if(es){ const pS = ck2_sumP(docs, id, 'dc', 'Sushi', 'b'), pW = ck2_sumP(docs, id, 'dc', 'Wok', 'b'), thB = vB === null ? null : ck_r(vB + ach - pS - pW - hb); bru = { veille:vB, ach, pS, pW, hb, th:thB, reel:fB, ec:(thB === null || fB === null) ? null : ck_r(fB - thB) }; }
+    if(es){ const pS = ck2_sumP(docs, id, 'dc', 'Sushi', 'b'), pW = ck2_sumP(docs, id, 'dc', 'Wok', 'b'), thB = vB === null ? null : ck_r(vB + ach - pS - pW - hb); const frF = ck2_sumP(docs, id, 'fr', 'Sushi', 'q'), frV = ck_r(fi_toUnit(id, S.g[id + '|Sushi'] || 0)), frR = ck2_finP(docs, id, 'Sushi', 'fc');
+      bru = { veille:vB, ach, pS, pW, hb, th:thB, reel:fB, ec:(thB === null || fB === null) ? null : ck_r(fB - thB), cr:{ fait:frF, vente:frV, reste:frR, ec:(frR === null || !(frF > 0)) ? null : ck_r(frR - (frF - frV)) } }; }
     const dec = (es || po || av) ? 0 : cr ? ck_r(dcB - qF) : ck_r(dcB - dcN);
     const cs = es ? [['Sushi', cv(fi_toUnit(id, S.g[id + '|Sushi'] || 0))], ['Wok', sold(id + '|Wok')]] : po ? [] : [['', sold(id)]], conso = ck_r(cs.reduce((a, x)=>a + x[1], 0));
     const pqB = ck2_pqS(docs, id, null, 'b'), pqN = ck2_pqS(docs, id, null, 'n'), pqC = ck2_pqS(docs, id, null, 'c'), wd = av ? ck2_sumP(docs, id, 'wd', null, 'q') : 0, fcS = es ? (ck2_finP(docs, id, 'Sushi', 'fc') || 0) : 0;
@@ -8196,9 +8202,12 @@ function stk_ingTable(){
       if(L.es) calc += `<div class="sc-f">Découpe : la différence brut − net part en poulet haché, ce n’est pas une perte.</div>`;
       if(L.av && L.th !== null && L.reel !== null) calc += `<div class="sc-f">Net utilisé = ${esc(ck_fmt(ck_r(L.veille + L.ach - L.reel)))} brut utilisé − déchets${L.pl[2][1] ? ' ' + esc(ck_fmt(L.pl[2][1])) : ''} − pertes qualité${L.pl[0][1] ? ' ' + esc(ck_fmt(L.pl[0][1])) : ''}</div>`;
       if(calc) c += `<details class="sc-d"><summary>Voir le calcul</summary>${calc}</details>`;
-      if(L.bru && (L.bru.th !== null || L.bru.reel !== null)){
-        const B = L.bru, lb = lvl(B.ec, B.th, L.id), pb = lb ? (lb.k === 'ko' ? `<span class="bl-p ko">− ${esc(fm(lb.ec))}</span>` : lb.k === 'wa' ? `<span class="bl-p wa">+ ${esc(fm(lb.ec))}</span>` : `<span class="bl-p ok">Exact</span>`) : '';
-        c += `<div class="bl-brut"><h6>Brut seul</h6>` + ln('Brut J-1', num(B.veille)) + ln('+ Achat', esc(ck_fmt(B.ach))) + ln('− Pris Sushi', esc(ck_fmt(B.pS)), '', 'brut découpé') + ln('− Pris Wok', esc(ck_fmt(B.pW)), '', 'brut découpé') + ln('− Pris pour hachage', esc(ck_fmt(B.hb)), '', 'brut') + ln('Théorique brut', num(B.th), 't') + ln('Brut pesé (fin de service)', num(B.reel), 't') + (pb ? `<div class="bl-ln"><span>Écart</span><span style="display:flex;gap:8px;align-items:center;"><b>${sg(lb.ec)}${esc(fm(lb.ec))}${stk_un(L.u)}</b>${pb}</span></div>` : '') + `</div>`;
+      if(L.bru && (L.bru.ec !== null || (L.bru.cr && L.bru.cr.ec !== null))){
+        const B = L.bru, ind = (lab, ec, base, sub)=>{
+          const lb = lvl(ec, base, L.id); if(!lb) return '';
+          const k = lb.k === 'ok' ? 'ok' : lb.k === 'wa' ? 'wa' : 'ko', st = lb.k === 'ok' ? 'Exact' : lb.k === 'wa' ? 'Surplus' : 'Manque', pc = Math.round(lb.pc * 10) / 10;
+          return `<div class="bl-ind ${k}"><div><div>${lab}</div><small>${esc(ck_fmt(pc))} % ${esc(sub)}${lb.k === 'ok' ? ' · dans la marge' : ' · hors marge'}</small></div><div class="iv">${sg(ec) || ''}${esc(fm(ec))}${stk_un(L.u)}<span class="ip">${st}</span></div></div>`; };
+        c += `<div class="bl-brut"><h6>Indicateurs</h6>` + ind('Écart brut', B.ec, B.th, 'du théorique') + (B.cr ? ind('Écart crispy', B.cr.ec, B.cr.fait, 'du crispy fait') : '') + `</div>`;
       }
       const specs = [[L.id, ['dc', 'fr', 'hc', 'wd', 'pq', 'fin2']]].concat(L.es && L.id === escIds[0] ? pouIds.map(i=>[i, ['hc']]) : []).concat(L.po ? escIds.map(i=>[i, ['dc']]) : []);
       const list = sx_get(dP, dPrev, [[L.id, ['fin2']]]).concat(sx_get(dT, D, specs)).map(e=>Object.assign(e, { ctx:L.id })).sort((a, b)=>String(a.r.at).localeCompare(String(b.r.at)));
