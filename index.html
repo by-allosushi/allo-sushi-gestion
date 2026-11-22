@@ -2505,6 +2505,21 @@ async function ca_erpAutoSync(){
   ca_erpWriting = false;
   try{ ca_render(); }catch(e){}
 }
+function ca_erpFixHtml(existing){   // admin, journée passée : le total Resto Pro a changé depuis l'enregistrement (ticket fermé ou corrigé après coup)
+  if(!existing || !ca_isAdminNow() || ca_workingDate === todayISO()) return '';
+  const r = ca_rp; if(!(r && r.loaded && r.exists && r.date === ca_workingDate)) return '';
+  const cur = ca_parseNum(existing.totalVentesErp); if(Math.abs(r.ca - cur) <= 0.004) return '';
+  return `<div class="ticket" style="border:1.5px solid var(--amber);background:var(--amber-bg);margin-bottom:10px;"><div style="font-weight:700;font-size:14px;color:var(--amber);">🧾 Total ventes Resto Pro à mettre à jour</div><div class="cg-sub" style="margin:4px 0 8px;">Enregistré : ${ca_fmtMoney(cur)} · Resto Pro indique maintenant : <b>${ca_fmtMoney(r.ca)}</b></div><button class="btn t-save" style="height:40px;" onclick="ca_erpApply()">Mettre à jour : ${ca_fmtMoney(r.ca)}</button></div>`;
+}
+async function ca_erpApply(){
+  const d = ca_workingDate, r = ca_rp, ex = ca_allSessions[d]; if(!ex || !r || r.date !== d || !r.loaded || !r.exists || !ca_isAdminNow()) return;
+  try{
+    await ca_caisseCol.doc(d).update({ totalVentesErp:r.ca });
+    ca_allSessions = { ...ca_allSessions, [d]: { ...ex, totalVentesErp:r.ca } };
+    ca_session.totalVentesErp = r.ca;
+  }catch(e){ console.error(e); alert('Erreur : total non mis à jour (' + (e.message || e) + ').'); }
+  ca_render();
+}
 function ca_erpChangeOk(){ ca_erpChange = null; ca_render(); }
 function ca_refreshErp(){
   ca_erpLive = true;
@@ -2657,7 +2672,7 @@ function ca_renderCaisseTab(){
     <div style="margin:10px 0;">${ca_renderStatusBanner(existing, ecart)}</div>
 
     ${ca_restantAdminCard_ctl()}
-    ${(ca_erpCard(existing), '')}
+    ${(ca_erpCard(existing), ca_erpFixHtml(existing))}
 
     <div class="actions-row" style="margin-top:6px;">
       <button class="btn b-neutral" onclick="ca_saveSession()">✓ Enregistrer la clôture du ${fmtDateShort(ca_session.date)}</button>
