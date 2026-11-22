@@ -2600,7 +2600,12 @@ function ca_adminDebutCard(eff, srcTxt, editUi){
 function ca_adminRestantCard(){
   const M = ca_fmtMoney, ok = ca_restantsList(ca_session).filter(r=>r.statut === 'valide').sort(ca_cmpAt), last = ok.length ? ok[ok.length - 1] : null, rc = ca_session.restantCorrige, has = ca_nz(ca_session.montantCompte) || last;
   let body;
-  if(!has) body = '<div class="cg-sub">Pas encore validé par un employé.</div>';
+  if(!has){
+    const e0 = ca_rEdit
+      ? `<input id="restant-edit" class="cg-in" type="text" inputmode="decimal" value="${esc(ca_rEditVal)}" placeholder="Montant" oninput="ca_rEditVal=this.value" onkeydown="if(event.key==='Enter')ca_restantAdminSet()"><div style="display:flex;gap:8px;"><button class="btn t-save" style="flex:1;height:40px;" onclick="ca_restantAdminSet()">Enregistrer</button><button class="btn ghost" style="flex:1;height:40px;" onclick="ca_rEdit=false;ca_render()">Annuler</button></div>`
+      : `<div><a href="#" style="color:var(--forest-light);" onclick="ca_rEdit=true;ca_rEditVal='';ca_render();return false;">✎ Saisir le montant restant</a></div>`;
+    body = `<div class="cg-sub">Pas encore validé par un employé.</div>${e0}`;
+  }
   else {
     const val = ca_nz(ca_session.montantCompte) ? ca_parseNum(ca_session.montantCompte) : ca_parseNum(last.montant);
     const sub = rc ? '✎ Corrigé par l’admin · l’employé avait validé ' + M(rc.avant) + (rc.avantPar ? ' (' + esc(rc.avantPar) + ' à ' + esc(rc.avantHeure || '') + ')' : '') : last ? '✓ Validé par ' + esc(last.par || '') + ' à ' + esc(last.heure || '') + (last.note ? ' · « ' + esc(last.note) + ' »' : '') : '';
