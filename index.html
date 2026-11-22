@@ -7990,6 +7990,13 @@ function stk_ledger(D){
         const rr = (o)=>({ b:ck_r(o.b), n:ck_r(o.n), r:o.b > 0 ? o.n / o.b : null });
         const rend = { tot:rr(rdm.T), K:['Sushi', 'Wok'].map(K=>Object.assign({ K }, rr(rdm.K[K]), { c:Object.keys(rdm.K[K].c).map(ck=>Object.assign({ name:rdm.K[K].c[ck].name }, rr(rdm.K[K].c[ck]))).sort((a, b)=>String(a.name).localeCompare(String(b.name), 'fr')) })), cr:{ fait:frS, net:frit, r:taux } };
         bru = { veille:vB, ach, pS, pW, hb, th:thB, reel:fB, rend, ec:(thB === null || fB === null) ? null : ck_r(fB - thB), cr:{ fait:frF, vente:frV, reste:frR, ec:(frR === null || !(frF > 0)) ? null : ck_r(frR - (frF - frV)) } }; }
+    else if(cr){ const st0 = stages[0] || {}, vei = day0 ? 0 : st0.veille, rest = st0.pese;
+      const pqb = ck2_pqS(docs, id, null, 'b'), pqc = ck2_pqS(docs, id, null, 'c'), vend = sold(id), thB = vB === null ? null : ck_r(vB + ach - dcB - pqb);
+      const cd = {}; Object.keys(docs || {}).forEach(dk=>{ const d = docs[dk] || {}; ck_recs(d, id, 'dc').forEach(r=>{ const ck = String(d.emp || d.name || ''), o = cd[ck] || (cd[ck] = { name:d.name || ck_empName(ck), b:0, n:0 }); o.b += Number(r.f && r.f.b) || 0; o.n += Number(r.f && r.f.n) || 0; }); });
+      cks.forEach(c=>{ if(c.ings.includes(id) && !cd[c.code]) cd[c.code] = { name:c.name, b:0, n:0 }; });
+      const rr = (o)=>({ b:ck_r(o.b), n:ck_r(o.n), r:o.b > 0 ? o.n / o.b : null });
+      const rend = { tot:rr({ b:dcB, n:dcN }), K:[], c:Object.keys(cd).map(ck=>Object.assign({ name:cd[ck].name }, rr(cd[ck]))).sort((a, b)=>String(a.name).localeCompare(String(b.name), 'fr')), cr:{ fait:qF, net:dcN, r:(qF > 0 && dcN > 0) ? qF / dcN : null } };
+      bru = { veille:vB, ach, pS:dcB, pW:0, hb:0, th:thB, reel:fB, rend, ec:(thB === null || fB === null) ? null : ck_r(fB - thB), cr:{ fait:qF, vente:vend, reste:rest, base:ck_r((vei || 0) + qF), ec:(rest === null || rest === undefined || vei === null || vei === undefined || !(qF > 0)) ? null : ck_r(rest - (vei + qF - vend - pqc)) } }; }
     const dec = (es || po || av) ? 0 : cr ? ck_r(dcB - qF) : ck_r(dcB - dcN);
     const cs = es ? [['Sushi', cv(fi_toUnit(id, S.g[id + '|Sushi'] || 0))], ['Wok', sold(id + '|Wok')]] : po ? [] : [['', sold(id)]], conso = ck_r(cs.reduce((a, x)=>a + x[1], 0));
     const pqB = ck2_pqS(docs, id, null, 'b'), pqN = ck2_pqS(docs, id, null, 'n'), pqC = ck2_pqS(docs, id, null, 'c'), wd = av ? ck2_sumP(docs, id, 'wd', null, 'q') : 0, fcS = es ? (ck2_finP(docs, id, 'Sushi', 'fc') || 0) : 0;
@@ -8226,12 +8233,13 @@ function stk_ingTable(){
           const lb = lvl(e, base, L.id); if(!lb) return '';
           const k = lb.k === 'ok' ? 'ok' : lb.k === 'wa' ? 'wa' : 'ko', st = lb.k === 'ok' ? 'Correct' : lb.k === 'wa' ? 'Surplus' : 'Manque', pc = Math.round(lb.pc * 10) / 10;
           return `<div class="bl-ec ${k}"><div class="el"><span>${lab}</span><span class="ip">${st}</span></div><div class="ev">${sg(e) || ''}${esc(fm(e))}<small>${stk_un(L.u)}</small></div><div class="es">${esc(ck_fmt(pc))} % ${esc(sub)}</div></div>`; };
-        const e1 = ec('Écart brut', B.ec, B.th, 'du théorique'), e2 = B.cr ? ec('Écart crispy', B.cr.ec, B.cr.fait, 'du crispy fait') : '';
+        const e1 = ec('Écart brut', B.ec, B.th, 'du théorique'), e2 = B.cr ? ec('Écart crispy', B.cr.ec, B.cr.base !== undefined ? B.cr.base : B.cr.fait, B.cr.base !== undefined ? 'du crispy disponible' : 'du crispy fait') : '';
         const bar = (x)=>x === null ? '' : `<div class="rbar"><i class="${rc(x)}" style="width:${Math.max(0, Math.min(100, pr(x)))}%"></i></div>`;
         let h = '';
         if(e1 || e2) h += `<h6>Écarts</h6><div class="bl-g2">${e1}${e2}</div>`;
         if(R && R.tot.b > 0){
-          h += `<h6>Rendement brut → net</h6><div class="bl-rh ${rc(R.tot.r)}"><div class="el"><span>Total des deux cuisines</span></div><div class="rv t${rc(R.tot.r)}">${rp(R.tot.r)}</div>${bar(R.tot.r)}</div>`;
+          h += `<h6>Rendement brut → net</h6><div class="bl-rh ${rc(R.tot.r)}"><div class="el"><span>${R.K.length ? 'Total des deux cuisines' : 'Total'}</span></div><div class="rv t${rc(R.tot.r)}">${rp(R.tot.r)}</div>${bar(R.tot.r)}</div>`;
+          if(R.c && R.c.length) h += `<div class="bl-rk"><div class="rkc" style="margin-top:0">${R.c.map(c=>`${esc(c.name)} <b class="${c.r === null ? 'tna' : 't' + rc(c.r)}">${c.r === null ? '–' : rp(c.r)}</b>`).join('<span class="rsep">|</span>')}</div></div>`;
           R.K.forEach(K=>{ if(!(K.b > 0) && !K.c.length) return;
             h += `<div class="bl-rk"><div class="rkh"><span>${esc(K.K)}</span><span class="t${rc(K.r)}">${rp(K.r)}</span></div>${bar(K.r)}${K.c.length ? `<div class="rkc">${K.c.map(c=>`${esc(c.name)} <b class="${c.r === null ? 'tna' : 't' + rc(c.r)}">${c.r === null ? '–' : rp(c.r)}</b>`).join('<span class="rsep">|</span>')}</div>` : ''}</div>`; });
         }
