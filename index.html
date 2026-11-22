@@ -953,6 +953,7 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .rs-row .v{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;white-space:nowrap;text-align:end;}
     #module-cuisine .rs-sub{padding:4px 0 4px 16px;font-size:14px;color:var(--ink-muted);}
     #module-cuisine .rs-sub i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-inline-end:8px;}
+    #module-cuisine .rs-sub small{display:block;font-size:11px;color:var(--ink-muted);margin-top:1px;}#module-cuisine .rs-sub small.rs-old{color:#E8B84A;}
     #module-cuisine .rs-sub .v{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:500;color:var(--ink);white-space:nowrap;}
     #module-cuisine .u{font-family:inherit;font-size:12px;font-weight:400;color:var(--ink-muted);margin-inline-start:4px;}
     #module-cuisine .rs-todo{font-size:14px;font-weight:500;color:#E8B84A;white-space:nowrap;}
@@ -7617,6 +7618,8 @@ function stk_autLines(d, id){   // tous les comptages d’un article « autre »
 }
 const stk_cookLabel = (code)=>{ const c = ck_cook(code); return c ? (c.poste ? ck_empName(code) + ' · ' + c.poste : ck_empName(code)) : ''; };
 function stk_seuil(code, id){ const c = (ck_cfg.cooks || {})[code] || {}, v = Number((c.seuils || {})[id]); if(v > 0) return v; const it = stk_itemsAll('autre').find(x=>x.id === id); return Number(it && it.seuil) || 0; }
+const stk_place = (code, id)=>String((((ck_cfg.cooks || {})[code] || {}).places || {})[id] || '').trim();   // « Cuisine », « Stock »… : où cet employé compte cet article
+function stk_setPlace(code, id, val){ const c = (ck_cfg.cooks || {})[code]; if(!c) return; if(!c.places) c.places = {}; const v = String(val || '').trim(); if(v) c.places[id] = v; else delete c.places[id]; ck_cfgSave(); ck_render(); }
 function stk_setSeuil(code, id, val){ const c = (ck_cfg.cooks || {})[code]; if(!c) return; const n = ck_num(val); if(!c.seuils) c.seuils = {}; if(n === null || n <= 0) delete c.seuils[id]; else c.seuils[id] = n; ck_cfgSave(); ck_render(); }
 const stk_num = (x)=>{ const n = Number(x && x.q); return x && x.q !== undefined && x.q !== null && x.q !== '' && isFinite(n) ? n : null; };
 
@@ -7698,24 +7701,33 @@ function rst_escHtml(id, u, nm){   // escalope : brut (saisi par le Sushi) + net
   const sub = (lab, o, c)=>`<div class="rs-sub"><span><i style="background:${c}"></i>${esc(ck_s(lab))}</span>${o.v === null ? '<span class="rs-todo">—</span>' : `<span class="v">${rst_val(o.v, u)}</span>`}</div>${o.v === null ? '' : rst_fixH(o.r)}`;
   return `<div class="rs-it rs-ew"><div class="rs-row rs-esc"><span class="n">${nm}</span>${tot === null ? `<span class="rs-todo">${esc(ck_s('rs_todo'))}</span>` : `<span class="v">${rst_val(tot, u)}</span>`}</div>` + sub('rs_fb', B, '#7fd6b0') + sub('rs_ns', S, '#2aa3ff') + sub('rs_nw', W, '#f0a05a') + '</div>';
 }
-function rst_autHtml(me){   // section « Autres articles » : dernier comptage de chacun, fait par n’importe quel cuisinier
-  const its = stk_autIds(me).map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean); if(!its.length) return '';
-  const dates = Object.keys(RST.stk).sort().reverse();
-  const last = (id)=>{   // dernier comptage de cet article, tous cuisiniers confondus
-    const out = []; dates.forEach(d=>{ stk_autLines(rst_doc(d), id).forEach(x=>{ const q = stk_num(x.rec); if(q !== null) out.push({ q, rec:x.rec, by:x.rec.by || (x.code !== '' ? ck_empName(x.code) : ''), at:x.rec.at || d + 'T12:00:00' }); }); });
-    return out.sort((p, q)=>String(q.at).localeCompare(String(p.at)))[0] || null;
-  };
-  const rows = its.map(i=>({ i, c:last(i.id) })), ttl = esc(ck_s('rs_aut'));
-  if(!rows.some(r=>r.c)) return `<div class="rs-sec"><span class="st">${ttl}</span></div><div class="rs-e">${esc(ck_s('rs_noStk'))}</div>`;
-  const top = rows.filter(r=>r.c).map(r=>r.c).sort((p, q)=>String(q.at).localeCompare(String(p.at)))[0], same = (c)=>c && c.by === top.by && String(c.at).slice(0, 10) === String(top.at).slice(0, 10);
-  const body = rows.map(r=>{ const c = r.c, u = r.i.u || '';
-    return `<div class="rs-it"><div class="rs-row"><span class="n">${esc(r.i.n)}</span>${c ? `<span class="v">${rst_val(c.q, u)}</span>` : `<span class="rs-todo">${esc(ck_s('rs_todo'))}</span>`}</div>` + (c && !same(c) ? `<div class="rs-by">${esc(c.by || '')} · ${esc(rst_dl(c.at))}</div>` : '') + (c ? rst_fixH(c.rec) : '') + '</div>';
-  }).join('');
-  return `<div class="rs-sec"><span class="st">${ttl}</span><span class="cw">${esc(top.by || '')} · ${esc(rst_dl(top.at))}</span></div>${body}`;
-}
 function rst_sushiBrut(id, before){   // dernier brut d’escalope saisi en fin de service par le Sushi, avant la fin de service donnée
   let best = null; Object.keys(RST.docs).forEach(k=>{ const d = RST.docs[k]; if(!d || !d.done || String(d.done) > String(before)) return; const r = ck_recOne(d, id, ck2_fid('Sushi')); if(r && r.f && r.f.fb !== undefined && r.f.fb !== null && (!best || String(d.done) > String(best.done))) best = { done:d.done, fb:Number(r.f.fb) || 0 }; });
   return best ? best.fb : null;
+}
+function rst_autCnts(id){   // dernier comptage de chaque cuisinier pour cet article (8 derniers jours)
+  const by = {};
+  Object.keys(RST.stk).forEach(d=>{ stk_autLines(rst_doc(d), id).forEach(x=>{ const q = stk_num(x.rec); if(q === null) return; const at = x.rec.at || d + 'T12:00:00', k = String(x.code); if(!by[k] || String(at) > String(by[k].at)) by[k] = { code:x.code, q, rec:x.rec, by:x.rec.by || (x.code !== '' ? ck_empName(x.code) : ''), at }; }); });
+  return Object.keys(by).map(k=>by[k]);
+}
+function rst_autGroups(id){   // par emplacement (Cuisine, Stock…) : le comptage le plus récent ; sans emplacement, tout est un seul groupe
+  const g = {}; rst_autCnts(id).forEach(c=>{ const pl = c.code !== '' ? stk_place(c.code, id) : '', k = pl.toLowerCase(); if(!g[k] || String(c.at) > String(g[k].at)) g[k] = Object.assign({ place:pl }, c); });
+  return Object.keys(g).map(k=>g[k]).sort((p, q)=>String(q.at).localeCompare(String(p.at)));
+}
+function rst_autHtml(me){   // section « Autres articles » : dernier comptage ; si l'article est compté à plusieurs endroits, total puis détail
+  const its = stk_autIds(me).map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean); if(!its.length) return '';
+  const rows = its.map(i=>({ i, g:rst_autGroups(i.id) })), ttl = esc(ck_s('rs_aut'));
+  if(!rows.some(r=>r.g.length)) return `<div class="rs-sec"><span class="st">${ttl}</span></div><div class="rs-e">${esc(ck_s('rs_noStk'))}</div>`;
+  const all = []; rows.forEach(r=>r.g.forEach(c=>all.push(c)));
+  const top = all.sort((p, q)=>String(q.at).localeCompare(String(p.at)))[0], same = (c)=>c && c.by === top.by && String(c.at).slice(0, 10) === String(top.at).slice(0, 10);
+  const oldD = ck_addDays(ck_service(), -2), cols = ['#2aa3ff', '#f0a05a', '#7fd6b0', '#c084fc'];
+  const body = rows.map(r=>{ const u = r.i.u || '', g = r.g, nm = esc(r.i.n);
+    if(!g.length) return `<div class="rs-it"><div class="rs-row"><span class="n">${nm}</span><span class="rs-todo">${esc(ck_s('rs_todo'))}</span></div></div>`;
+    if(g.length === 1){ const c = g[0]; return `<div class="rs-it"><div class="rs-row"><span class="n">${nm}</span><span class="v">${rst_val(c.q, u)}</span></div>${same(c) ? '' : `<div class="rs-by">${esc(c.by || '')} · ${esc(rst_dl(c.at))}</div>`}${rst_fixH(c.rec)}</div>`; }
+    const tot = ck_r(g.reduce((a, c)=>a + c.q, 0)), ord = g.slice().sort((p, q)=>(p.place || p.by).localeCompare(q.place || q.by, 'fr'));
+    return `<div class="rs-it rs-ew"><div class="rs-row rs-esc"><span class="n">${nm}</span><span class="v">${rst_val(tot, u)}</span></div>` + ord.map((c, n)=>`<div class="rs-sub"><span><i style="background:${cols[n % cols.length]}"></i>${esc(c.place || c.by)}<small class="${String(c.at).slice(0, 10) < oldD ? 'rs-old' : ''}">${esc(c.by || '')} · ${esc(rst_dl(c.at))}</small></span><span class="v">${rst_val(c.q, u)}</span></div>${rst_fixH(c.rec)}`).join('') + '</div>';
+  }).join('');
+  return `<div class="rs-sec"><span class="st">${ttl}</span><span class="cw">${esc(top.by || '')} · ${esc(rst_dl(top.at))}</span></div>${body}`;
 }
 function rst_canHtml(me){
   const its = stk_items('can'), bd = RST.bd || rst_cntDates(its.map(i=>i.id), 1)[0] || ''; if(!its.length) return '';
@@ -8167,18 +8179,26 @@ function stk_canTable(){
 }
 function stk_autTable(){
   const d = stk_doc(ck_adate || ck_service()), its = stk_items('autre'), rows = [];
+  const who = (L)=>L && L.rec && stk_num(L.rec) !== null && L.rec.at ? esc((L.rec.by || '') + ' · ' + ck_hm(L.rec.at)) : '—';
   its.forEach(i=>{
     const lines = stk_autLines(d, i.id), codes = lines.map(x=>x.code);
     ck_cooks().forEach(c=>{ if(!codes.includes(c.code) && stk_autIds(c).includes(i.id)) lines.push({ code:c.code, rec:null }); });
     if(!lines.length) lines.push({ code:'', rec:null, none:true });
+    const pl = {};   // emplacement -> comptage le plus récent
+    lines.forEach(L=>{ const k = L.code ? stk_place(L.code, i.id) : ''; if(!k) return; const kk = k.toLowerCase(), cur = pl[kk]; if(!cur || (stk_num(L.rec) !== null && (stk_num(cur.L.rec) === null || String(L.rec.at || '') > String(cur.L.rec.at || '')))) pl[kk] = { k, L }; });
+    const places = Object.keys(pl).map(k=>pl[k]);
+    if(places.length >= 2){   // un article compté à plusieurs endroits : total, puis le détail par emplacement
+      const got = places.filter(x=>stk_num(x.L.rec) !== null), tot = got.length ? ck_r(got.reduce((a, x)=>a + stk_num(x.L.rec), 0)) : null;
+      rows.push(`<tr><td><b>${esc(i.n)}</b></td><td>${stk_cu(tot, i.u)}</td><td style="font-family:inherit;color:var(--ink-muted)">${got.length && got.length < places.length ? 'incomplet' : 'total'}</td></tr>`);
+      places.forEach(x=>rows.push(`<tr class="aut-d"><td style="padding-inline-start:22px;color:var(--ink-muted)">${esc(x.k)}</td><td>${stk_cu(stk_num(x.L.rec), i.u)}</td><td style="font-family:inherit;color:var(--ink-muted)">${who(x.L)}</td></tr>`));
+      return;
+    }
     lines.sort((a, b)=>String(stk_cookLabel(a.code)).localeCompare(String(stk_cookLabel(b.code)), 'fr')).forEach(L=>{
-      const c = L.rec ? stk_num(L.rec) : null, s0 = L.code ? stk_seuil(L.code, i.id) : (Number(i.seuil) || 0); let st = '—';
-      if(c !== null) st = s0 > 0 && c < s0 ? '<span class="ck-pill ko">À racheter</span>' : s0 > 0 && c <= s0 * 1.2 ? '<span class="ck-pill wa">Proche du seuil</span>' : '<span class="ck-pill ok">OK</span>';
-      const lab = L.code ? stk_cookLabel(L.code) : (L.rec ? (L.rec.by || '') : ''), who = c !== null && L.rec && L.rec.at ? esc((L.rec.by || '') + ' · ' + ck_hm(L.rec.at)) : '—';
-      rows.push(`<tr><td>${esc(i.n)}${lines.length > 1 || lab ? ` <span class="ck-pill">${esc(lab)}</span>` : ''}</td><td>${stk_cu(c, i.u)}</td><td>${s0 ? esc(ck_fmt(s0)) + stk_un(i.u) : '—'}</td><td>${st}</td><td style="font-family:inherit;color:var(--ink-muted)">${who}</td></tr>`);
+      const c = L.rec ? stk_num(L.rec) : null, lab = L.code ? stk_cookLabel(L.code) : (L.rec ? (L.rec.by || '') : '');
+      rows.push(`<tr><td>${esc(i.n)}${lines.length > 1 || lab ? ` <span class="ck-pill">${esc(lab)}</span>` : ''}</td><td>${stk_cu(c, i.u)}</td><td style="font-family:inherit;color:var(--ink-muted)">${who(L)}</td></tr>`);
     });
   });
-  return `<div class="ck-box" id="stk-aut"><div class="ck3-h"><b>Autres articles</b><span>un comptage par cuisinier</span></div>${rows.length ? `<div class="ck3-w"><table class="ck3-t"><tr><th>Article</th><th>Comptage</th><th>Seuil minimum</th><th>État</th><th>Compté par</th></tr>${rows.join('')}</table></div>` : '<div class="ck-empty">Aucun article. Ajoute-les dans Réglages.</div>'}</div>`;
+  return `<div class="ck-box" id="stk-aut"><div class="ck3-h"><b>Autres articles</b><span>un comptage par emplacement</span></div>${rows.length ? `<div class="ck3-w"><table class="ck3-t"><tr><th>Article</th><th>Comptage</th><th>Compté par</th></tr>${rows.join('')}</table></div>` : '<div class="ck-empty">Aucun article. Ajoute-les dans Réglages.</div>'}</div>`;
 }
 /* ==================== FICHES TECHNIQUES et BILAN DES VENTES ==================== */
 const fi = { q:'', only:false, open:'', max:30, err:'', prods:null, tried:false, loading:false, loadedAt:0 };
@@ -8437,8 +8457,8 @@ function stk_regHtml(){
   const names = Array.from(new Set((ck_ingsRaw || []).filter(i=>i && i.n).map(i=>i.n))), dl = `<datalist id="stk-dl">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`;
   const block = (k, titre, can)=>{
     const its = stk_itemsAll(k).map(i=>`<div class="ck-fr" style="align-items:flex-end;flex-wrap:wrap"><div><label>Nom</label><br><input class="ck-in" style="width:170px" value="${esc(i.n)}" onchange="stk_set(${ck_a(i.id)},'n',this.value)"></div>
-      ${can ? `<div><label>Nom dans Dépenses</label><br><input class="ck-in" list="stk-dl" style="width:170px" value="${esc(i.dep || '')}" onchange="stk_set(${ck_a(i.id)},'dep',this.value)"></div><div><label>Nom dans Resto Pro (séparer par ;)</label><br><input class="ck-in" style="width:210px" value="${esc(i.rp || '')}" onchange="stk_set(${ck_a(i.id)},'rp',this.value)"></div>` : `<div><label>Unité</label><br><input class="ck-in" style="width:90px" placeholder="pcs, kg, L…" value="${esc(i.u || '')}" onchange="stk_set(${ck_a(i.id)},'u',this.value)"></div>`+`<div><label>Seuil par défaut</label><br><input class="ck-in" inputmode="decimal" style="width:90px" value="${esc(i.seuil ? ck_fmt(i.seuil) : '')}" onchange="stk_set(${ck_a(i.id)},'seuil',this.value)"></div>`}
-      <button class="ck-btn sm danger" onclick="stk_del(${ck_a(i.id)})">Retirer</button></div>${can ? '' : ck_cooks().filter(c=>stk_autIds(c).includes(i.id)).map(c=>`<div class="ck-fr" style="margin:2px 0 8px 14px"><span class="ck-sub" style="min-width:200px">${esc(stk_cookLabel(c.code))} : seuil minimum</span><input class="ck-in" inputmode="decimal" style="width:90px" placeholder="${i.seuil ? esc(ck_fmt(i.seuil)) : ''}" value="${esc(((((ck_cfg.cooks || {})[c.code] || {}).seuils || {})[i.id]) ? ck_fmt(ck_cfg.cooks[c.code].seuils[i.id]) : '')}" onchange="stk_setSeuil(${ck_a(c.code)},${ck_a(i.id)},this.value)"></div>`).join('')}`).join('');
+      ${can ? `<div><label>Nom dans Dépenses</label><br><input class="ck-in" list="stk-dl" style="width:170px" value="${esc(i.dep || '')}" onchange="stk_set(${ck_a(i.id)},'dep',this.value)"></div><div><label>Nom dans Resto Pro (séparer par ;)</label><br><input class="ck-in" style="width:210px" value="${esc(i.rp || '')}" onchange="stk_set(${ck_a(i.id)},'rp',this.value)"></div>` : `<div><label>Unité</label><br><input class="ck-in" style="width:90px" placeholder="pcs, kg, L…" value="${esc(i.u || '')}" onchange="stk_set(${ck_a(i.id)},'u',this.value)"></div>`}
+      <button class="ck-btn sm danger" onclick="stk_del(${ck_a(i.id)})">Retirer</button></div>${can ? '' : ck_cooks().filter(c=>stk_autIds(c).includes(i.id)).map(c=>`<div class="ck-fr" style="margin:2px 0 8px 14px"><span class="ck-sub" style="min-width:200px">${esc(stk_cookLabel(c.code))} : emplacement</span><input class="ck-in" style="width:140px" placeholder="Cuisine, Stock…" value="${esc(stk_place(c.code, i.id))}" onchange="stk_setPlace(${ck_a(c.code)},${ck_a(i.id)},this.value)"></div>`).join('')}`).join('');
     return `<div class="ck-box"><h3>${titre}</h3>${its || '<div class="ck-sub">Aucun article.</div>'}<div style="margin-top:8px"><button class="ck-btn sm" onclick="stk_add('${k}')">+ Ajouter un article</button></div></div>`;
   };
   return dl + stk_canRegHtml() + block('autre', 'Stock : autres articles', false) + `<div class="ck-sub" style="margin:0 0 10px;">Les personnes qui comptent les canettes et l’eau se choisissent plus haut, dans la fiche de chaque cuisinier (« Comptage du stock »). Les autres articles s’attribuent à chaque cuisinier de la même façon que les ingrédients.</div>`;
