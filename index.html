@@ -7670,20 +7670,24 @@ function rst_vals(K){   // les 2 dernières validations « Terminer mon service 
 function rst_who(dd){ return dd ? esc(dd.name || ck_empName(dd.emp)) + ' · ' + esc(rst_dl(dd.done)) : ''; }
 const rst_val = (x, u)=>esc(ck_fmt(x)) + (u ? '<span class="u">' + esc(u) + '</span>' : '');
 const rst_fixH = (r)=>r && r.adm ? `<div class="rs-fix">✎ ${esc(sx_corrTxt(r))}</div>` : '';
-function rst_kitchen(K, multi){   // section « Ingrédients » d’une cuisine : une seule ligne « qui · quand », puis les articles
-  const vals = rst_vals(K), ttl = esc(ck_s('rs_ing')) + (multi ? ' · ' + esc(K.p) : '');
-  if(!vals.length) return `<div class="rs-sec"><span class="st">${ttl}</span></div><div class="rs-e">${esc(ck_s('rs_none'))}</div>`;
-  const d = vals[0], list = ck_ingList().map(i=>i.id), seen = {}; K.ids.forEach(id=>{ seen[id] = 1; });
-  Object.keys(d.recs || {}).forEach(id=>{ if(ck_ingById(id) && ck_recOne(d, id, ck2_fid(K.p))) seen[id] = 1; });
-  const ids = Object.keys(seen).sort((a, b)=>{ const x = list.indexOf(a), y = list.indexOf(b); return (x < 0 ? 999 : x) - (y < 0 ? 999 : y); });
-  const fv = (id)=>{ const r = ck_recOne(d, id, ck2_fid(K.p)), f = r && r.f; if(!f) return null; return ck_r(ck2_finKeys(id, K.p).filter(k=>k !== 'fc').reduce((a, k)=>a + (Number(f[k]) || 0), 0)); };
+function rst_kitchen(ks){   // une seule section « Ingrédients » pour toutes les cuisines du cuisinier (escalope une seule fois)
+  const list = ck_ingList().map(i=>i.id), ttl = esc(ck_s('rs_ing')), src = {};   // id -> { K, d } (premier poste qui le porte)
+  ks.forEach(K=>{ const d = rst_vals(K)[0] || null, seen = {}; K.ids.forEach(id=>{ seen[id] = 1; });
+    if(d) Object.keys(d.recs || {}).forEach(id=>{ if(ck_ingById(id) && ck_recOne(d, id, ck2_fid(K.p))) seen[id] = 1; });
+    Object.keys(seen).forEach(id=>{ if(!src[id] || (!src[id].d && d)) src[id] = { K, d }; }); });
+  const ids = Object.keys(src).sort((a, b)=>{ const x = list.indexOf(a), y = list.indexOf(b); return (x < 0 ? 999 : x) - (y < 0 ? 999 : y); });
+  const docs = ids.map(id=>src[id].d).filter(Boolean);
+  if(!docs.length) return `<div class="rs-sec"><span class="st">${ttl}</span></div><div class="rs-e">${esc(ck_s('rs_none'))}</div>`;
+  const top = docs.slice().sort((a, b)=>String(b.done).localeCompare(String(a.done)))[0], nm0 = (dd)=>String(dd.name || ck_empName(dd.emp));
+  const same = (dd)=>dd && nm0(dd) === nm0(top) && String(dd.done).slice(0, 10) === String(top.done).slice(0, 10);
   const rows = ids.map(id=>{
-    const u = ck_unit(id), nm = esc(ck_ingName(id));
+    const { K, d } = src[id], u = ck_unit(id), nm = esc(ck_ingName(id));
     if(ck_kind(id) === 'escalope') return rst_escHtml(id, u, nm);
-    const cur = fv(id), r = ck_recOne(d, id, ck2_fid(K.p));
-    return `<div class="rs-it"><div class="rs-row"><span class="n">${nm}</span>${cur === null ? `<span class="rs-todo">${esc(ck_s('rs_todo'))}</span>` : `<span class="v">${rst_val(cur, u)}</span>`}</div>${cur === null ? '' : rst_fixH(r)}</div>`;
+    const r = d && ck_recOne(d, id, ck2_fid(K.p)), f = r && r.f;
+    const cur = f ? ck_r(ck2_finKeys(id, K.p).filter(k=>k !== 'fc').reduce((a, k)=>a + (Number(f[k]) || 0), 0)) : null;
+    return `<div class="rs-it"><div class="rs-row"><span class="n">${nm}</span>${cur === null ? `<span class="rs-todo">${esc(ck_s('rs_todo'))}</span>` : `<span class="v">${rst_val(cur, u)}</span>`}</div>${cur !== null && !same(d) ? `<div class="rs-by">${rst_who(d)}</div>` : ''}${cur === null ? '' : rst_fixH(r)}</div>`;
   }).join('');
-  return `<div class="rs-sec"><span class="st">${ttl}</span><span class="cw">${rst_who(d)}</span></div>${rows}`;
+  return `<div class="rs-sec"><span class="st">${ttl}</span><span class="cw">${rst_who(top)}</span></div>${rows}`;
 }
 function rst_escHtml(id, u, nm){   // escalope : brut (saisi par le Sushi) + net de chaque cuisine, total = somme des trois lignes
   const net = (p)=>{ const dd = rst_vals({ p })[0], r = dd && ck_recOne(dd, id, ck2_fid(p)), f = r && r.f; return { v:f && f.fn !== undefined && f.fn !== null ? Number(f.fn) || 0 : null, r }; };
@@ -7723,7 +7727,7 @@ function rst_canHtml(me){
 }
 function rst_html(){
   const me = ck_cook(ck_who) || {}, ks = ck2_kitchens(), aut = rst_autHtml(me);
-  const body = ks.length ? `<div class="rs-box rs-one"><div class="rs-col">${ks.map(K=>rst_kitchen(K, ks.length > 1)).join('')}</div>${aut ? `<div class="rs-col">${aut}</div>` : ''}</div>` : (rst_canOn(me) ? rst_canHtml(me) : '') + (aut ? `<div class="rs-box rs-one"><div class="rs-col">${aut}</div></div>` : '');
+  const body = ks.length ? `<div class="rs-box rs-one"><div class="rs-col">${rst_kitchen(ks)}</div>${aut ? `<div class="rs-col">${aut}</div>` : ''}</div>` : (rst_canOn(me) ? rst_canHtml(me) : '') + (aut ? `<div class="rs-box rs-one"><div class="rs-col">${aut}</div></div>` : '');
   return ck_topHtml() + ck_alerts() + `<h2 style="font-size:18px;margin:6px 0 12px">${esc(ck_s('rs_tile'))}</h2>` + (body || `<div class="ck-empty">${esc(ck_s('rs_none'))}</div>`) + `<div style="margin-top:14px"><button class="ck-btn" onclick="ck_backToTiles()">‹ ${esc(ck_s('back'))}</button></div>`;
 }
 function rst_tileHtml(me){
