@@ -7808,9 +7808,18 @@ function rst_canHtml(me){
     return `<tr><td class="i">${esc(i.n)}</td><td>${cnt === null ? '—' : esc(ck_fmt(cnt))}</td><td>${th === null ? '—' : esc(ck_fmt(th))}</td><td>${pill}</td></tr>`; }).join('');
   return `<div class="rs-box"><h3>${esc(ck_s('rs_can'))}</h3><div class="rs-e" style="padding-top:0">${esc(ck_s('rs_last'))} · ${esc(a.by || '')} · ${esc(rst_dl(a.at || bd + 'T12:00:00'))}</div><table class="rs-t"><tr><th style="width:30%"></th><th style="width:18%">${esc(ck_s('rs_cnt'))}</th><th style="width:22%">${esc(ck_s('rs_theo'))}</th><th style="width:30%">${esc(ck_s('rs_gap'))}</th></tr>${rows}</table></div>`;
 }
+function rst_canListHtml(me){   // « Canettes et eau » au même format que « Autres articles » : dernier comptage de chaque article
+  if(!rst_canOn(me)) return '';
+  const its = stk_items('can'); if(!its.length) return '';
+  const bd = RST.bd || rst_cntDates(its.map(i=>i.id), 1)[0] || '', ttl = esc(ck_s('rs_can'));
+  if(!bd) return `<div class="rs-sec"><span class="st">${ttl}</span></div><div class="rs-e">${esc(ck_s('rs_noStk'))}</div>`;
+  const c = rst_doc(bd).c || {}, a = its.map(i=>c[i.id]).filter(x=>x && x.at).sort((x, y)=>String(y.at).localeCompare(String(x.at)))[0] || {};
+  const body = its.map(i=>{ const cnt = stk_num(c[i.id]); return `<div class="rs-it"><div class="rs-row"><span class="n">${esc(i.n)}</span>${cnt === null ? `<span class="rs-todo">${esc(ck_s('rs_todo'))}</span>` : `<span class="v">${rst_val(cnt, i.u || '')}</span>`}</div></div>`; }).join('');
+  return `<div class="rs-sec"><span class="st">${ttl}</span><span class="cw">${esc(a.by || '')} · ${esc(rst_dl(a.at || bd + 'T12:00:00'))}</span></div>${body}`;
+}
 function rst_html(){
-  const me = ck_cook(ck_who) || {}, ks = rst_ks(me), aut = rst_autHtml(me);
-  const body = ks.length ? `<div class="rs-box rs-one"><div class="rs-col">${rst_kitchen(ks)}</div>${aut ? `<div class="rs-col">${aut}</div>` : ''}</div>` : (rst_canOn(me) ? rst_canHtml(me) : '') + (aut ? `<div class="rs-box rs-one"><div class="rs-col">${aut}</div></div>` : '');
+  const me = ck_cook(ck_who) || {}, ks = rst_ks(me), aut = rst_autHtml(me), canL = ks.length ? rst_canListHtml(me) : '';
+  const body = ks.length ? `<div class="rs-box rs-one"><div class="rs-col">${rst_kitchen(ks)}</div>${aut || canL ? `<div class="rs-col">${aut}${canL ? `<div style="margin-top:14px">${canL}</div>` : ''}</div>` : ''}</div>` : (rst_canOn(me) ? rst_canHtml(me) : '') + (aut ? `<div class="rs-box rs-one"><div class="rs-col">${aut}</div></div>` : '');
   return ck_topHtml() + ck_alerts() + `<h2 style="font-size:18px;margin:6px 0 12px">${esc(ck_s('rs_tile'))}</h2>` + (body || `<div class="ck-empty">${esc(ck_s('rs_none'))}</div>`) + `<div style="margin-top:14px"><button class="ck-btn" onclick="ck_backToTiles()">‹ ${esc(ck_s('back'))}</button></div>`;
 }
 function rst_tileHtml(me){
