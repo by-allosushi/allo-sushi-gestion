@@ -7845,7 +7845,7 @@ function stk_tilesHtml(me){
 function stk_open(kind){
   const me = ck_cook(ck_who), its = kind === 'autre' ? stk_autIds(me).map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean) : stk_items(kind), d = stk_doc(ck_service()), v = {}, fresh = {};
   its.forEach(i=>{ const q = stk_num(kind === 'autre' ? stk_autQ(d, i.id, ck_who) : (d.c || {})[i.id]); if(q !== null){ v[i.id] = ck_fmt(q); fresh[i.id] = true; } });
-  stkS = { kind, tab:'c', ids:its.map(i=>i.id), i:0, act:its.length ? its[0].id : '', v, fresh, err:'', dps:{} }; ck_view = 'stk'; ck_render();
+  stkS = { kind, tab:'c', ids:its.map(i=>i.id), i:0, act:its.length ? its[0].id : '', v, fresh, err:'', dps:{}, dpT:{} }; ck_view = 'stk'; ck_render();
 }
 function stk_one(){   // « Autres articles » : un seul bouton, tout le comptage est enregistré d’un coup
   const S = stkS; if(!S) return; const me = ck_cook(ck_who) || { name:'' }, its = S.ids.map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean), miss = its.filter(i=>S.v[i.id] === undefined || S.v[i.id] === '');
@@ -7902,12 +7902,22 @@ function stk_pePill(it){
   const n = Math.round((stk_ymd(e.d) - stk_ymd(ck_service())) / 86400000), more = e.more.length ? ` <small class="stk-pe no">${esc(ck_s('stk_peMore', { d:e.more.map(stk_dm).join(' · ') }))}</small>` : '';
   return (n <= pj ? `<br><small class="stk-pe so">${esc(ck_s('stk_peFj', { d:stk_dm(e.d), n }))}</small>` : `<br><small class="stk-pe ok">${esc(ck_s('stk_peF', { d:stk_dm(e.d) }))}</small>`) + more;
 }
-function stk_dtHtml(id){
-  const l = stk_peCur(id).slice(0, 3), slots = l.concat(l.length < 3 ? [''] : []);
-  return `<div class="stk-dt"><label>${esc(ck_s('stk_peLab'))}</label>${slots.map((v, k)=>`<div class="stk-dr"><input type="date" class="ck-in" value="${esc(v)}" onchange="stk_setDpAt(${k},this.value)">${v ? `<button class="ck-btn sm" aria-label="Effacer" onclick="stk_clrDp(${k})">✕</button>` : ''}</div>`).join('')}</div>`;
+const stk_fmtDp = (iso)=>/^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '';
+function stk_dtHtml(id){   // saisie au clavier (jj/mm/aaaa) : le sélecteur de date du téléphone se fermait tout seul à chaque rafraîchissement
+  const l = stk_peCur(id).slice(0, 3), slots = l.concat(l.length < 3 ? [''] : []), T = ((stkS || {}).dpT || {});
+  return `<div class="stk-dt"><label>${esc(ck_s('stk_peLab'))}</label>${slots.map((v, k)=>{ const t = T[id + ':' + k]; return `<div class="stk-dr"><input type="text" inputmode="numeric" autocomplete="off" maxlength="10" class="ck-in stk-di" placeholder="jj/mm/aaaa" value="${esc(t !== undefined ? t : stk_fmtDp(v))}" oninput="stk_dpInput(${k},this)">${v ? `<button class="ck-btn sm" aria-label="Effacer" onclick="stk_clrDp(${k})">✕</button>` : ''}</div>`; }).join('')}</div>`;
 }
-function stk_setDpAt(k, v){ const S = stkS; if(!S || !S.act) return; if(!S.dps) S.dps = {}; const l = stk_peCur(S.act).slice(0, 3); if(v){ if(k < l.length) l[k] = v; else if(l.length < 3) l.push(v); } else if(k < l.length) l.splice(k, 1); S.dps[S.act] = l; S.err = ''; ck_render(); }
-function stk_clrDp(k){ const S = stkS; if(!S || !S.act) return; if(!S.dps) S.dps = {}; const l = stk_peCur(S.act).slice(); l.splice(k, 1); S.dps[S.act] = l; S.err = ''; ck_render(); }
+function stk_dpInput(k, el){
+  const S = stkS; if(!S || !S.act) return; const dg = String(el.value || '').replace(/\D/g, '').slice(0, 8), f = dg.length > 4 ? dg.slice(0, 2) + '/' + dg.slice(2, 4) + '/' + dg.slice(4) : dg.length > 2 ? dg.slice(0, 2) + '/' + dg.slice(2) : dg;
+  el.value = f; if(!S.dpT) S.dpT = {}; S.dpT[S.act + ':' + k] = f;
+  if(dg.length === 0){ if(k < stk_peCur(S.act).length) stk_setDpAt(k, ''); return; }
+  if(dg.length < 8){ el.style.borderColor = ''; return; }
+  const d = +dg.slice(0, 2), m = +dg.slice(2, 4), y = +dg.slice(4), t = new Date(Date.UTC(y, m - 1, d)), ok = y >= 2000 && y <= 2100 && t.getUTCDate() === d && t.getUTCMonth() === m - 1;
+  if(!ok){ el.style.borderColor = '#ff6b6b'; return; }
+  stk_setDpAt(k, y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0'));
+}
+function stk_setDpAt(k, v){ const S = stkS; if(!S || !S.act) return; if(!S.dps) S.dps = {}; S.dpT = {}; const l = stk_peCur(S.act).slice(0, 3); if(v){ if(k < l.length) l[k] = v; else if(l.length < 3) l.push(v); } else if(k < l.length) l.splice(k, 1); S.dps[S.act] = l; S.err = ''; ck_render(); }
+function stk_clrDp(k){ const S = stkS; if(!S || !S.act) return; if(!S.dps) S.dps = {}; S.dpT = {}; const l = stk_peCur(S.act).slice(); l.splice(k, 1); S.dps[S.act] = l; S.err = ''; ck_render(); }
 function stk_htmlOne(){
   const S = stkS, me = ck_cook(ck_who) || { name:'' }, its = S.ids.map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean), pd = ck_addDays(ck_service(), -1), pdoc = stk_doc(pd), dl = pd.slice(8, 10) + '/' + pd.slice(5, 7);
   const isE = (id)=>S.v[id] === undefined || S.v[id] === '', lastOf = (id)=>{ const l = stk_autLines(pdoc, id).map(x=>x.rec).sort((a, b)=>String(b.at || '').localeCompare(String(a.at || '')))[0]; return l ? stk_num(l) : null; };
