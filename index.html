@@ -1050,6 +1050,7 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .ck2-sep{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted);margin:12px 0 6px;}#module-cuisine .ck2-rep{font-size:13px;color:var(--ink-muted);margin:6px 0 2px;}#module-cuisine .ck2-rep.ok{color:#3ECF8E;}
     #module-cuisine .bl-ec.nu{background:#1D2029;border:1px solid #2A2F3C;}#module-cuisine .bl-ec.nu .ev{color:#667;}#module-cuisine .bl-ec .calc2{font-size:12px;color:var(--ink-muted);margin-top:8px;padding-top:8px;border-top:1px solid #2A2F3C;line-height:1.6;}
     #module-cuisine .bl-cl{cursor:pointer}.bl-ch{font-style:normal;display:inline-block;width:14px;color:var(--muted,#888)}.bl-svd{margin:2px 0 8px 14px;padding:6px 8px;border-left:2px solid var(--line,#444);font-size:12px}.bl-sl,.bl-sr{display:flex;justify-content:space-between;gap:8px;padding:2px 0}.bl-sh{font-weight:600;margin-top:6px}.bl-sum{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px}.bl-sr .rg{color:#e5484d}.bl-sr .or{color:#f0a020}.bl-sr .vt{color:#30a46c}
+.bl-g2.bl-g1{grid-template-columns:1fr;margin-top:8px}
 .bl-g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0;}
     #module-cuisine .bl-ec{border-radius:12px;padding:12px 14px;}#module-cuisine .bl-ec .el{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--ink-muted);}
     #module-cuisine .bl-ec .ev{font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:500;line-height:1.15;margin:6px 0 2px;}#module-cuisine .bl-ec .ev small{font-size:15px;font-weight:400;margin-inline-start:3px;}#module-cuisine .bl-ec .es{font-size:12px;color:var(--ink-muted);}
@@ -8257,10 +8258,14 @@ function stk_ingTable(){
           const lb = lvl(e, base, L.id); if(!lb) return '';
           const k = lb.k === 'ok' ? 'ok' : lb.k === 'wa' ? 'wa' : 'ko', st = lb.k === 'ok' ? 'Correct' : lb.k === 'wa' ? 'Surplus' : 'Manque', pc = Math.round(lb.pc * 10) / 10;
           return `<div class="bl-ec ${k}"><div class="el"><span>${lab}</span><span class="ip">${st}</span></div><div class="ev">${sg(e) || ''}${esc(fm(e))}<small>${stk_un(L.u)}</small></div><div class="es">${esc(ck_fmt(pc))} % ${esc(sub)}</div></div>`; };
-        const e1 = ec('Écart brut', B.ec, B.th, 'du théorique'), e2 = B.cr ? ec('Écart crispy', B.cr.ec, B.cr.base !== undefined ? B.cr.base : B.cr.fait, B.cr.base !== undefined ? 'du crispy disponible' : 'du crispy fait') : '';
+        const e1 = ec('Écart brut', B.ec, B.th, 'du théorique');
+        let eN = '';
+        if(L.es && L.ec !== null && B.ec !== null){ const nE = ck_r(L.ec - B.ec); let wk = null; if(SV){ const ch = SV.chains.find(c=>c.p === 'Wok'); if(ch){ wk = 0; ch.services.forEach(sv=>sv.rows.forEach(r=>{ if(r.ec !== null) wk += r.ec; })); wk = ck_r(wk); } }
+          eN = ec('Écart net', nE, L.th, 'du théorique global' + (wk !== null ? ' · Sushi ' + (ck_r(nE - wk) > 0 ? '+' : ck_r(nE - wk) < 0 ? '−' : '') + ck_fmt(Math.abs(ck_r(nE - wk))) + ' · Wok ' + (wk > 0 ? '+' : wk < 0 ? '−' : '') + ck_fmt(Math.abs(wk)) : '')); }
+        const e2 = B.cr ? ec('Écart crispy', B.cr.ec, B.cr.base !== undefined ? B.cr.base : B.cr.fait, B.cr.base !== undefined ? 'du crispy disponible' : 'du crispy fait') : '';
         const bar = (x)=>x === null ? '' : `<div class="rbar"><i class="${rc(x)}" style="width:${Math.max(0, Math.min(100, pr(x)))}%"></i></div>`;
         let h = '';
-        if(e1 || e2) h += `<h6>Écarts</h6><div class="bl-g2">${e1}${e2}</div>`;
+        if(e1 || e2) h += `<h6>Écarts</h6><div class="bl-g2">${e1}${eN}</div>${e2 ? `<div class="bl-g2 bl-g1">${e2}</div>` : ''}${eN ? `<div class="bl-n" style="margin-top:6px;">Brut + net = écart global (${esc(sg(L.ec) + fm(L.ec))}${esc(stk_un(L.u))}). Le crispy est un écart à part : il reprend une partie du net.</div>` : ''}`;
         { const sd = svEc(); if(sd) h += `<div class="bl-ln bl-cl" onclick="stk_svTog(${ck_a(L.id)},'ecs')"><span><i class="bl-ch">${stk_sv[L.id + '|ecs'] ? '▾' : '▸'}</i>Écart par service</span></div>${stk_sv[L.id + '|ecs'] ? `<div class="bl-svd">${sd}</div>` : ''}`; }
         if(R && R.tot.b > 0){
           h += `<h6>Rendement brut → net</h6><div class="bl-rh ${rc(R.tot.r)}"><div class="el"><span>${R.K.length ? 'Total des deux cuisines' : 'Total'}</span></div><div class="rv t${rc(R.tot.r)}">${rp(R.tot.r)}</div>${bar(R.tot.r)}</div>`;
