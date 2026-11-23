@@ -1047,7 +1047,10 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .bl-ind.ok{background:#0F2A1C;border:1px solid #1F5A44;}#module-cuisine .bl-ind.ok .iv{color:#6EE7B7;}#module-cuisine .bl-ind.ok .ip{background:#1F5A4455;}
     #module-cuisine .bl-ind.wa{background:#2A1D08;border:1px solid #7A5A1C;}#module-cuisine .bl-ind.wa .iv{color:#F59E0B;}#module-cuisine .bl-ind.wa .ip{background:#7A5A1C55;}
     #module-cuisine .bl-ind.ko{background:#2A0F13;border:1px solid #7A2A31;}#module-cuisine .bl-ind.ko .iv{color:#F87171;}#module-cuisine .bl-ind.ko .ip{background:#7A2A3155;}
-    #module-cuisine .bl-g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0;}
+    #module-cuisine .ck2-sep{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted);margin:12px 0 6px;}#module-cuisine .ck2-rep{font-size:13px;color:var(--ink-muted);margin:6px 0 2px;}#module-cuisine .ck2-rep.ok{color:#3ECF8E;}
+    #module-cuisine .bl-ec.nu{background:#1D2029;border:1px solid #2A2F3C;}#module-cuisine .bl-ec.nu .ev{color:#667;}#module-cuisine .bl-ec .calc2{font-size:12px;color:var(--ink-muted);margin-top:8px;padding-top:8px;border-top:1px solid #2A2F3C;line-height:1.6;}
+    #module-cuisine .bl-cl{cursor:pointer}.bl-ch{font-style:normal;display:inline-block;width:14px;color:var(--muted,#888)}.bl-svd{margin:2px 0 8px 14px;padding:6px 8px;border-left:2px solid var(--line,#444);font-size:12px}.bl-sl,.bl-sr{display:flex;justify-content:space-between;gap:8px;padding:2px 0}.bl-sh{font-weight:600;margin-top:6px}.bl-sum{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px}.bl-sr .rg{color:#e5484d}.bl-sr .or{color:#f0a020}.bl-sr .vt{color:#30a46c}
+.bl-g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0;}
     #module-cuisine .bl-ec{border-radius:12px;padding:12px 14px;}#module-cuisine .bl-ec .el{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--ink-muted);}
     #module-cuisine .bl-ec .ev{font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:500;line-height:1.15;margin:6px 0 2px;}#module-cuisine .bl-ec .ev small{font-size:15px;font-weight:400;margin-inline-start:3px;}#module-cuisine .bl-ec .es{font-size:12px;color:var(--ink-muted);}
     #module-cuisine .bl-ec .ip{font-size:11px;padding:2px 9px;border-radius:999px;font-weight:500;}
@@ -3325,8 +3328,8 @@ function pt_payroll(code, sessions){
 const PT_CONGE_START = '2026-10-24';
 function pt_congeOpen(code){ const d = pt_entries.find(e=>e.kind === 'congeopen' && e.code === code); return d ? (Number(d.amount) || 0) : 0; }
 /* mode de calcul du congé, au choix par employé : 'twelfth' (1/12 du salaire perçu, arrondi) ou 'jours' (2,5 jours par mois travaillé × 250 DA × 8 h) */
-const PT_CONGE_JOUR = 250 * 8, PT_CONGE_JOURS_MOIS = 2.5;
-function pt_congeMode(code){ const d = pt_entries.find(e=>e.kind === 'congemode' && e.code === code); return d && (d.mode === 'jours' || d.mode === 'twelfth') ? d.mode : 'min'; }
+const PT_CONGE_JOUR = 250 * 8, PT_CONGE_JOURS_MOIS = 2.5, PT_CONGE_HEURES = 240;   /* 2,5 jours de congé pour 30 jours travaillés, ou pour 240 h travaillées (employés pointés à l'heure uniquement) */
+function pt_congeMode(code){ const d = pt_entries.find(e=>e.kind === 'congemode' && e.code === code); return d && (d.mode === 'jours' || d.mode === 'twelfth' || d.mode === 'heures') ? d.mode : 'min'; }
 function pt_congeMonths(from, to){ const a = from.split('-').map(Number), b = to.split('-').map(Number); if(to < from) return 0; return Math.max(0, (b[0] - a[0]) * 12 + (b[1] - a[1]) - (b[2] < a[2] ? 1 : 0)); }
 async function pt_congeSaveMode(code, mode){
   try{ await pt_entriesCol.doc('congemode_' + code).set({ kind:'congemode', code, mode:(mode === 'jours' || mode === 'twelfth') ? mode : 'min', savedAt:new Date().toISOString() }, { merge:true }); pt_toast('Mode de calcul du congé enregistré.'); }
@@ -3339,21 +3342,21 @@ function pt_congeForfait(code){
   const e = pt_emp[code] || {}, h = Number(e.congeHours) > 0 ? Number(e.congeHours) : 8, r = Number(e.congeRate) > 0 ? Number(e.congeRate) : 250;
   return { hours:h, rate:r };
 }
-/* Congé : 3 modes — 'min' (défaut : le plus petit des deux montants), 'twelfth' (1/12 du salaire perçu, arrondi), 'jours' (2,5 jours par 30 jours travaillés,
+/* Congé : 3 modes — 'min' (défaut : le plus petit des montants), 'twelfth' (1/12 du salaire perçu, arrondi), 'jours' (2,5 jours par 30 jours travaillés), 'heures' (2,5 jours par 240 h pointées, employés pointés à l'heure),
    1 jour = taux horaire × 8 h). Départ : le calcul s'arrête à la date de sortie ; un montant connu (congeFixed) remplace le calcul. */
 function pt_congeJourValue(code){ const fo = pt_congeForfait(code); if(fo) return fo.hours * fo.rate; if(pt_isAuto(code)) return PT_CONGE_JOUR; /* Sidahmed (présent tous les jours) : 1 jour = 250 DA × 8 h */ const r = pt_rate(code); return r > 0 ? r * 8 : PT_CONGE_JOUR; }
 function pt_conge(code, asOf){
   const dep = pt_departOf(code); let to = asOf || todayISO(); if(dep && dep.date && to > dep.date) to = dep.date;
-  const from = PT_CONGE_START, forfait = pt_congeForfait(code); let workedDays = 0;
-  const base = to < from ? 0 : pt_withFilter(from, to, ()=>{ const b = pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))); workedDays = b.workedDays; return b.baseWage; /* salaire réellement perçu (jours × taux journalier, ou heures × taux) */ });
-  const mode = pt_congeMode(code), days = workedDays / 30 * PT_CONGE_JOURS_MOIS, jourVal = pt_congeJourValue(code);
-  const amtTwelfth = pt_ceil10(base / 12), amtJours = pt_ceil10(days * jourVal);
-  let computed = mode === 'jours' ? amtJours : mode === 'twelfth' ? amtTwelfth : Math.min(amtJours, amtTwelfth);
+  const from = PT_CONGE_START, forfait = pt_congeForfait(code); let workedDays = 0, totalHours = 0;
+  const base = to < from ? 0 : pt_withFilter(from, to, ()=>{ const b = pt_baseOf(code, pt_compute().sessions.filter(s=>pt_inRange(pt_day(s.date)))); workedDays = b.workedDays; totalHours = b.totalHours; return b.baseWage; /* salaire réellement perçu (jours × taux journalier, ou heures × taux) */ });
+  const mode = pt_congeMode(code), auto = pt_isAuto(code), hasH = !auto && !forfait, hours = totalHours, days = workedDays / 30 * PT_CONGE_JOURS_MOIS, daysH = hasH ? hours / PT_CONGE_HEURES * PT_CONGE_JOURS_MOIS : null, jourVal = pt_congeJourValue(code);
+  const amtTwelfth = pt_ceil10(base / 12), amtJours = pt_ceil10(days * jourVal), amtHeures = hasH ? pt_ceil10(daysH * jourVal) : null;
+  let computed = mode === 'jours' ? amtJours : mode === 'heures' && hasH ? amtHeures : mode === 'twelfth' ? amtTwelfth : Math.min(amtJours, amtTwelfth, hasH ? amtHeures : Infinity);
   const fixed = dep && dep.congeFixed !== undefined && dep.congeFixed !== null && dep.congeFixed !== '' ? Number(dep.congeFixed) : null;
   if(fixed !== null && !isNaN(fixed)) computed = fixed; const open = pt_congeOpen(code);
   const taken = pt_congePaidList(code).filter(e=>e.date <= to).reduce((t,e)=>t + (Number(e.amount) || 0), 0);
   const total = Math.round((open + computed) * 100) / 100;
-  return { mode, workedDays, days, jourVal, amtTwelfth, amtJours, fixed:(fixed !== null && !isNaN(fixed)) ? fixed : null, from, to, base, computed, open, total, taken, left:Math.round((total - taken) * 100) / 100 };
+  return { mode, workedDays, hours, auto, hasH, days, daysH, amtHeures, jourVal, amtTwelfth, amtJours, fixed:(fixed !== null && !isNaN(fixed)) ? fixed : null, from, to, base, computed, open, total, taken, left:Math.round((total - taken) * 100) / 100 };
 }
 /* solde de tout compte d'un employé sorti : paie de la dernière période jusqu'à la date de sortie + congé restant à verser */
 function pt_departDefaultFrom(code, date){
@@ -3412,7 +3415,7 @@ async function pt_departUndo(code){
   if(!confirm('Annuler la sortie de ' + pt_name(code) + ' ? Ses heures et son congé seront de nouveau comptés.')) return;
   try{ await pt_entriesCol.doc('depart_' + code).delete(); pt_toast('Sortie annulée.'); }catch(e){ console.error(e); alert('Erreur : ' + (e.message || e)); }
 }
-function pt_congeModeLabel(k){ return pt_fmtMoney(k.amtTwelfth) + ' (1/12) · ' + pt_fmtMoney(k.amtJours) + ' (2,5 j) → retenu ' + pt_fmtMoney(k.computed); }
+function pt_congeModeLabel(k){ return pt_fmtMoney(k.amtTwelfth) + ' (1/12) · ' + pt_fmtMoney(k.amtJours) + ' (2,5 j / 30 j)' + (k.hasH ? ' · ' + pt_fmtMoney(k.amtHeures) + ' (2,5 j / 240 h)' : '') + ' → retenu ' + pt_fmtMoney(k.computed); }
 function pt_departHtml(code){
   const d = pt_departOf(code), S = d ? pt_departSolde(code) : null, today = todayISO();
   const zone = (zk, title, sub, val, ok, by)=>`<div style="border:2px solid ${ok ? 'var(--moss)' : 'var(--line)'};border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;min-height:190px;">
@@ -4163,9 +4166,9 @@ function pt_congeEmpHtml(code){
   return `<div class="pt-muted">Période de calcul : du <b>${fmtDateShort(k.from)}</b> au <b>${fmtDateShort(k.to)}</b> (aujourd’hui). Congé = 1/12 × ${mode ? 'jours travaillés × taux journalier' : 'heures travaillées × taux'}, arrondi vers le haut au multiple de 10 DA. Le Jour Off n’est pas compté.</div>
     <div class="pt-row" style="margin-top:10px;"><div class="field"><label>Solde initial de congé (DA)</label><input type="text" inputmode="decimal" id="pt-co-open" class="pt-w90" value="${pt_e(k.open || '')}" placeholder="0"></div><button class="btn small t-save" onclick="pt_congeSaveOpen(${code})">Enregistrer</button></div>
     <div class="pt-muted" style="margin:4px 0 8px;">À saisir une fois (tu peux le modifier). Mets un montant négatif si l’employé te doit déjà du congé.</div>
-    <div class="pt-cards">${card('c-hours', 'Solde initial', pt_money2(k.open))}${(()=>{ const small = k.amtJours < k.amtTwelfth ? 'jours' : 'twelfth', eff = k.mode === 'min' ? small : k.mode, pick = (m, l, amt)=>`<div class="pt-card c-base" style="cursor:pointer;${eff === m && k.fixed === null ? 'outline:3px solid var(--moss);outline-offset:-2px;' : 'opacity:.75;'}" onclick="pt_congeSaveMode(${code}, '${m}')"><div class="l">${l}</div><div class="n">${pt_fmtMoney(amt)}</div><div class="pa-dt" style="font-size:11px;">${eff === m && k.fixed === null ? '✓ retenu' + (k.mode === 'min' ? ' (le plus petit)' : '') : 'cliquer pour choisir'}</div></div>`; return pick('twelfth', 'Congé calculé (1/12, arrondi)', k.amtTwelfth) + pick('jours', 'Congé calculé (2,5 j / 30 j)', k.amtJours); })()}${card('c-days', 'Congé de toute la période', pt_money2(k.total))}${card('c-bonus', 'Congé versé', pt_fmtMoney(k.taken))}${card(k.left < 0 ? 'c-adv' : 'c-transport', 'Reste à verser', pt_money2(k.left))}</div>
+    <div class="pt-cards">${card('c-hours', 'Solde initial', pt_money2(k.open))}${(()=>{ const cand = [['twelfth', k.amtTwelfth], ['jours', k.amtJours]].concat(k.hasH ? [['heures', k.amtHeures]] : []), small = cand.reduce((a, b)=>b[1] < a[1] ? b : a)[0], eff = k.mode === 'min' ? small : (k.mode === 'heures' && !k.hasH ? 'jours' : k.mode), pick = (m, l, amt)=>`<div class="pt-card c-base" style="cursor:pointer;${eff === m && k.fixed === null ? 'outline:3px solid var(--moss);outline-offset:-2px;' : 'opacity:.75;'}" onclick="pt_congeSaveMode(${code}, '${m}')"><div class="l">${l}</div><div class="n">${pt_fmtMoney(amt)}</div><div class="pa-dt" style="font-size:11px;">${eff === m && k.fixed === null ? '✓ retenu' + (k.mode === 'min' ? ' (le plus petit)' : '') : 'cliquer pour choisir'}</div></div>`; return pick('twelfth', 'Congé calculé (1/12, arrondi)', k.amtTwelfth) + pick('jours', 'Congé calculé (2,5 j / 30 j)', k.amtJours) + (k.hasH ? pick('heures', 'Congé calculé (2,5 j / 240 h)', k.amtHeures) : ''); })()}${card('c-days', 'Congé de toute la période', pt_money2(k.total))}${card('c-bonus', 'Congé versé', pt_fmtMoney(k.taken))}${card(k.left < 0 ? 'c-adv' : 'c-transport', 'Reste à verser', pt_money2(k.left))}</div>
     ${k.mode !== 'min' && k.fixed === null ? `<div class="actions-row" style="margin:4px 0;"><button class="btn ghost small" onclick="pt_congeSaveMode(${code}, 'min')">↺ Revenir au choix automatique (le plus petit)</button></div>` : ''}
-    <div class="pt-muted"><b>Mode 1/12</b> : salaire de base perçu ${pt_fmtMoney(k.base)} ÷ 12 = ${(k.base / 12).toLocaleString('fr-FR', { maximumFractionDigits:2 })} DA → arrondi <b>${pt_fmtMoney(k.amtTwelfth)}</b>.<br><b>Mode jours</b> : ${k.workedDays} jour(s) travaillé(s) depuis le ${fmtDateShort(k.from)} ÷ 30 × 2,5 = ${(k.days).toLocaleString('fr-FR', { maximumFractionDigits:2 })} jours × ${pt_fmtMoney(k.jourVal)} (jour = taux horaire × 8 h) = <b>${pt_fmtMoney(k.amtJours)}</b>.<br>${k.fixed !== null ? 'Montant connu saisi dans « Démission » : <b>' + pt_fmtMoney(k.fixed) + '</b> (remplace le calcul).' : 'Retenu : <b>' + pt_fmtMoney(k.computed) + '</b>' + (k.mode === 'min' ? ' (le plus petit des deux ; c’est ce montant que l’employé voit)' : '') + '.'} Total = solde initial + congé calculé.</div>
+    <div class="pt-muted"><b>Mode 1/12</b> : salaire de base perçu ${pt_fmtMoney(k.base)} ÷ 12 = ${(k.base / 12).toLocaleString('fr-FR', { maximumFractionDigits:2 })} DA → arrondi <b>${pt_fmtMoney(k.amtTwelfth)}</b>.<br><b>Mode jours</b> : ${k.workedDays} jour(s) travaillé(s) depuis le ${fmtDateShort(k.from)} ÷ 30 × 2,5 = ${(k.days).toLocaleString('fr-FR', { maximumFractionDigits:2 })} jours × ${pt_fmtMoney(k.jourVal)} (jour = taux horaire × 8 h) = <b>${pt_fmtMoney(k.amtJours)}</b>.${k.hasH ? '<br><b>Mode heures</b> : ' + (Math.round(k.hours * 100) / 100).toLocaleString('fr-FR') + ' h pointées depuis le ' + fmtDateShort(k.from) + ' ÷ 240 × 2,5 = ' + (k.daysH).toLocaleString('fr-FR', { maximumFractionDigits:2 }) + ' jours × ' + pt_fmtMoney(k.jourVal) + ' = <b>' + pt_fmtMoney(k.amtHeures) + '</b>.' : ''}<br>${k.fixed !== null ? 'Montant connu saisi dans « Démission » : <b>' + pt_fmtMoney(k.fixed) + '</b> (remplace le calcul).' : 'Retenu : <b>' + pt_fmtMoney(k.computed) + '</b>' + (k.mode === 'min' ? ' (le plus petit des montants ; c’est ce montant que l’employé voit)' : '') + '.'} Total = solde initial + congé calculé.</div>
     <h2 class="section" style="margin-top:16px;">Congés versés</h2>
     <div class="pt-row"><input type="date" id="pt-cp-date" class="pt-draft pt-auto" value="${todayISO()}"><input type="text" inputmode="decimal" id="pt-cp-amt" class="pt-draft pt-w90" placeholder="Montant (DA)"><input type="text" id="pt-cp-note" class="pt-draft pt-grow" placeholder="Motif"><button class="btn small b-add t-add" onclick="pt_congePayAdd(${code})">Ajouter</button></div>
     <div class="pt-scroll" style="margin-top:8px;"><table class="pt-table"><thead><tr><th>Date</th><th>Motif</th><th>Montant</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="pt-muted">Aucun congé versé.</td></tr>'}${list.length ? `<tr class="pt-total"><td colspan="2">Total versé</td><td>${pt_fmtMoney(k.taken)}</td><td></td></tr>` : ''}</tbody></table></div>`;
@@ -7915,7 +7918,7 @@ const stk_un = (u)=>u ? ' <span class="bl-u">' + esc(u) + '</span>' : '';   // u
 const stk_cu = (x, u)=>x === null || x === undefined ? '—' : esc(ck_fmt(x)) + stk_un(u);
 /* ===== Suivi des ingrédients : bilan par ingrédient (veille → achat → sorties → théorique → réel → écart) ===== */
 let ckc = null, ckcErr = '';
-const CKC_LAB = { fb:'Brut', fn:'Net', fc:'Crispy restant', fh:'Bac à haché' };
+const CKC_LAB = { fb:'Brut', fn:'Net', fc:'Crispy restant', fh:'Bac à haché', fg:'Farce de gyoza', fm:'Nems restants' };
 function ckc_open(id, which){ ckc = { id, which }; ckcErr = ''; ck_render(); }
 function ckc_cancel(){ ckc = null; ckcErr = ''; ck_render(); }
 function ckc_src(which){ const D = ck_adate || ck_service(); return which === 'veille' ? { date:ck_addDays(D, -1), docs:ck_prevSrv } : { date:D, docs:ck_docs() }; }
@@ -7958,6 +7961,7 @@ function ckc_save(){
 /* calcul du bilan de chaque ingrédient pour la journée D */
 function stk_tolG(){ const t = (ck_cfg.settings || {}).tol; return t === undefined || t === null || t === '' || !isFinite(Number(t)) ? 2 : Number(t); }
 function stk_tol(id){ const t = ((ck_cfg.ings || {})[id] || {}).tol; return t === undefined || t === null || t === '' || !isFinite(Number(t)) ? stk_tolG() : Number(t); }
+function ck_ingNum(id, key, v, mx){ const n = ck_num(v); if(!ck_cfg.ings[id]) ck_cfg.ings[id] = {}; if(String(v).trim() === '' || n === null) delete ck_cfg.ings[id][key]; else ck_cfg.ings[id][key] = Math.max(0, Math.min(mx, n)); ck_cfgSave(); ck_render(); }
 function ck_ingTol(id, v){ const n = ck_num(v); if(!ck_cfg.ings[id]) ck_cfg.ings[id] = {}; if(String(v).trim() === '' || n === null) delete ck_cfg.ings[id].tol; else ck_cfg.ings[id].tol = Math.max(0, Math.min(50, n)); ck_cfgSave(); ck_render(); }
 function stk_ledger(D){
   const st = stk_start(), day0 = !!(st && D === st.date), docs = stk_docsFrom(ck_docs(), D), prev = ck_prevSrv, S = (st && D < st.date) ? { tot:0, ok:0, no:0, g:{}, prods:{} } : fi_sales(D), cks = ck_cooks(), out = [];
@@ -7982,7 +7986,7 @@ function stk_ledger(D){
     if(es){ frS = ck2_sumP(docs, id, 'fr', 'Sushi', 'q'); const sS = stages.find(s=>s.K === 'Sushi'); if(sS && sS.veille !== null && sS.pese !== null){ frit = ck_r(sS.veille + ck2_sumP(docs, id, 'dc', 'Sushi', 'n') - sS.pese); if(frS > 0 && frit > 0) taux = frS / frit; } }
     const cv = (x)=>taux ? rd(x / taux) : x;
     const hb = es && id === escId ? hbAll : 0, transf = es ? ck_r(dcB - dcN + hb) : 0, pris = po ? ck2_sumP(docs, id, 'hc', null, 'q') : 0, hIn = po ? hache : 0;
-    let bru = null;
+    let bru = null, gn = null;
     if(es){ const pS = ck2_sumP(docs, id, 'dc', 'Sushi', 'b'), pW = ck2_sumP(docs, id, 'dc', 'Wok', 'b'), thB = vB === null ? null : ck_r(vB + ach - pS - pW - hb); const frF = ck2_sumP(docs, id, 'fr', 'Sushi', 'q'), frV = ck_r(fi_toUnit(id, S.g[id + '|Sushi'] || 0)), frR = ck2_finP(docs, id, 'Sushi', 'fc');
       const rdm = { T:{ b:0, n:0 }, K:{ Sushi:{ b:0, n:0, c:{} }, Wok:{ b:0, n:0, c:{} } } };
         Object.keys(docs || {}).forEach(dk=>{ const d = docs[dk] || {}; ck_recs(d, id, 'dc').forEach(r=>{ const K = ck2_P(r.p), b = Number(r.f && r.f.b) || 0, n = Number(r.f && r.f.n) || 0; if(!rdm.K[K]) return; rdm.T.b += b; rdm.T.n += n; rdm.K[K].b += b; rdm.K[K].n += n; const ck = String(d.emp || d.name || ''), o = rdm.K[K].c[ck] || (rdm.K[K].c[ck] = { name:d.name || ck_empName(ck), b:0, n:0 }); o.b += b; o.n += n; }); });
@@ -7997,13 +8001,24 @@ function stk_ledger(D){
       const rr = (o)=>({ b:ck_r(o.b), n:ck_r(o.n), r:o.b > 0 ? o.n / o.b : null });
       const rend = { tot:rr({ b:dcB, n:dcN }), K:[], c:Object.keys(cd).map(ck=>Object.assign({ name:cd[ck].name }, rr(cd[ck]))).sort((a, b)=>String(a.name).localeCompare(String(b.name), 'fr')), cr:{ fait:qF, net:dcN, r:(qF > 0 && dcN > 0) ? qF / dcN : null } };
       bru = { veille:vB, ach, pS:dcB, pW:0, hb:0, th:thB, reel:fB, rend, ec:(thB === null || fB === null) ? null : ck_r(fB - thB), cr:{ fait:qF, vente:vend, reste:rest, base:ck_r((vei || 0) + qF), ec:(rest === null || rest === undefined || vei === null || vei === undefined || !(qF > 0)) ? null : ck_r(rest - (vei + qF - vend - pqc)) } }; }
+    if(po){ const cf = (ck_cfg.ings || {})[id] || {}, fp = (cf.farcePct === undefined || cf.farcePct === '' || !isFinite(Number(cf.farcePct))) ? 0.6 : Number(cf.farcePct) / 100, ng = (cf.nemG !== undefined && cf.nemG !== '' && Number(cf.nemG) > 0) ? fi_toUnit(id, Number(cf.nemG)) : null;
+      const mG = ck2_sumP(docs, id, 'hc', null, 'gy'), mN = ck2_sumP(docs, id, 'hc', null, 'ne');
+      let gv = 0, nv = 0, gM = false, nM = false;
+      Object.keys(S.prods || {}).forEach(pk=>{ const o = S.prods[pk], nm = String(o.name || pk), isG = /gyoza/i.test(nm), isN = !isG && /\bnems?\b/i.test(nm); if(!isG && !isN) return; const ig = fi_ing(pk, D), g = ig ? (Number(ig[id]) || 0) : 0; if(isG) gv += o.q * g; else nv += o.q * g; if(!(g > 0)){ if(isG) gM = true; else nM = true; } });
+      gv = rd(fi_toUnit(id, gv)); nv = rd(fi_toUnit(id, nv));
+      const vf = day0 ? 0 : (sumF(prev, id, 'fg', pp) || 0), vm = day0 ? 0 : (sumF(prev, id, 'fm', pp) || 0), rf = sumF(docs, id, 'fg', ps), rm = sumF(docs, id, 'fm', ps);
+      if(mG > 0 || mN > 0 || rf !== null || rm !== null || vf > 0 || vm > 0){
+        const gVe = ck_r(vf * fp), gTh = ck_r(gVe + mG - gv), gRe = rf === null ? null : ck_r(rf * fp);
+        const nVe = ng === null ? null : ck_r(vm * ng), nTh = ng === null ? null : ck_r(nVe + mN - nv), nRe = (ng === null || rm === null) ? null : ck_r(rm * ng);
+        gn = { G:{ veille:gVe, mis:mG, vendu:gv, th:gTh, reel:gRe, ec:gRe === null ? null : ck_r(gRe - gTh), base:ck_r(gVe + mG), miss:gM, pct:fp, farce:rf }, N:{ veille:nVe, mis:mN, vendu:nv, th:nTh, reel:nRe, ec:nRe === null ? null : ck_r(nRe - nTh), base:ng === null ? null : ck_r(nVe + mN), miss:nM, ng, pcs:rm, needNg:ng === null } }; }
+    }
     const dec = (es || po || av) ? 0 : cr ? ck_r(dcB - qF) : ck_r(dcB - dcN);
     const cs = es ? [['Sushi', cv(fi_toUnit(id, S.g[id + '|Sushi'] || 0))], ['Wok', sold(id + '|Wok')]] : po ? [] : [['', sold(id)]], conso = ck_r(cs.reduce((a, x)=>a + x[1], 0));
     const pqB = ck2_pqS(docs, id, null, 'b'), pqN = ck2_pqS(docs, id, null, 'n'), pqC = ck2_pqS(docs, id, null, 'c'), wd = av ? ck2_sumP(docs, id, 'wd', null, 'q') : 0, fcS = es ? (ck2_finP(docs, id, 'Sushi', 'fc') || 0) : 0;
     const pl = [['qualité', ck_r(pqB + pqN + (es ? cv(pqC) : pqC))], ['reste crispy', es ? cv(fcS) : 0], ['déchets', wd]], pertes = ck_r(pl.reduce((a, x)=>a + x[1], 0));
     const th = veille === null ? null : rdf(veille + ach + hIn - transf - pris - dec - conso - pertes), ec = (th === null || reel === null) ? null : rdf(reel - th);
     const quiet = [veille, ach, dcB, dcN, qF, pqB, pqN, pqC, wd, reel, conso, pris].every(x=>x === null || x === 0);
-    out.push({ id, name:it.n, u, k, es, po, av, cr, bru, veille, vP, ach, hIn, transf, transfD:[['découpe', ck_r(dcB - dcN)], ['brut pris pour le hachage', hb]], pris, dec, cs, conso, pl, pertes, th, reel, rP, ec, taux, frS, frit, fcS, quiet, rd, inc:S.no > 0 && conso > 0 });
+    out.push({ id, name:it.n, u, k, es, po, av, cr, bru, gn, veille, vP, ach, hIn, transf, transfD:[['découpe', ck_r(dcB - dcN)], ['brut pris pour le hachage', hb]], pris, dec, cs, conso, pl, pertes, th, reel, rP, ec, taux, frS, frit, fcS, quiet, rd, inc:S.no > 0 && conso > 0 });
   });
   return out;
 }
@@ -8030,7 +8045,7 @@ function sx_text(e){
   else if(r.t === 'hc') d = 'bac ' + n(f.q) + (Number(f.b) > 0 ? ' + brut ' + n(f.b) : '');
   else if(r.t === 'wd') d = n(f.q);
   else if(r.t === 'pq') d = n(f.q) + ck2_stLab(r);
-  else d = ['fb', 'fn', 'fc', 'fh'].filter(k=>f[k] !== undefined).map(k=>CKC_LAB[k].toLowerCase() + ' ' + n(f[k])).join(' · ');
+  else d = ['fb', 'fn', 'fc', 'fh', 'fg', 'fm'].filter(k=>f[k] !== undefined).map(k=>CKC_LAB[k].toLowerCase() + ' ' + n(f[k])).join(' · ');
   return (e.ctx && e.id !== e.ctx ? ck_ingName(e.id) + ' · ' : '') + (e.date !== (ck_adate || ck_service()) ? ck_frDate(e.date) + ' · ' : '') + lab + (r.p ? ' ' + r.p : '') + ' · ' + e.name + ' · ' + ck_hm(r.at) + ' — ' + d + (r.adm ? ' (' + sx_corrTxt(r) + ')' : '');
 }
 function sx_tog(key){ sxo[key] = !sxo[key]; if(!sxo[key] && sxe && sxe.key === key) sxe = null; ck_render(); }
@@ -8199,9 +8214,10 @@ function stk_ingTable(){
   const dT = stk_docsFrom(ck_docs(), D), dP = ck_prevSrv, dPrev = ck_addDays(D, -1), ingL = ck_ingList(), escIds = ingL.filter(t=>ck_kind(t.id) === 'escalope').map(t=>t.id), pouIds = ingL.filter(t=>ck_kind(t.id) === 'poulet').map(t=>t.id);
   const z = '<span class="bl-z">—</span>', num = (x)=>x === null || x === undefined ? z : esc(ck_fmt(x));
   let UU = ''; const nu = (x, u)=>x === null || x === undefined ? z : esc(ck_fmt(x)) + stk_un(u);
-  const ln = (t, v, cls, sub)=>`<div class="bl-ln ${cls || ''}"><span>${t}${sub ? `<small>${esc(sub)}</small>` : ''}</span><b>${v}${v === z ? '' : stk_un(UU)}</b></div>`;
+  const ln = (t, v, cls, sub, dk, det)=>det ? `<div class="bl-ln bl-cl ${cls || ''}" onclick="stk_svTog(${ck_a(curId)},${ck_a(dk)})"><span><i class="bl-ch">${stk_sv[curId + '|' + dk] ? '▾' : '▸'}</i>${t}${sub ? `<small>${esc(sub)}</small>` : ''}</span><b>${v}${v === z ? '' : stk_un(UU)}</b></div>${stk_sv[curId + '|' + dk] ? `<div class="bl-svd">${det}</div>` : ''}` : `<div class="bl-ln ${cls || ''}"><span>${t}${sub ? `<small>${esc(sub)}</small>` : ''}</span><b>${v}${v === z ? '' : stk_un(UU)}</b></div>`;
+  let curId = '';
   const rows = led.map(L=>{
-    UU = L.u; const lv = lvl(L.ec, L.th, L.id), f = (x)=>ck_fmt(x) + ' ' + L.u, open = stk_det === L.id;
+    UU = L.u; curId = L.id; const lv = lvl(L.ec, L.th, L.id), f = (x)=>ck_fmt(x) + ' ' + L.u, open = stk_det === L.id;
     const entrees = ck_r(L.ach + L.hIn), sorties = ck_r(L.transf + L.pris + L.dec + L.conso + L.pertes);
     let pill, noData = L.th === null || L.reel === null;
     if(lv) pill = lv.k === 'ko' ? `<span class="bl-p ko">− ${esc(fm(lv.ec))}</span>` : lv.k === 'wa' ? `<span class="bl-p wa">+ ${esc(fm(lv.ec))}</span>` : `<span class="bl-p ok">Exact</span>`;
@@ -8209,16 +8225,24 @@ function stk_ingTable(){
     const dim = L.quiet ? ' bl-dim' : '';
     let tr = `<tr class="bl-r${open ? ' op' : ''}${dim}"><td>${esc(L.name)}</td><td class="hs">${nu(L.veille, L.u)}</td><td class="hs">${L.quiet ? z : nu(entrees, L.u)}</td><td class="hs">${L.quiet ? z : nu(sorties, L.u)}</td><td>${nu(L.th, L.u)}</td><td>${nu(L.reel, L.u)}</td><td>${pill}</td><td><button class="bl-b ${open ? 'on' : ''}" onclick="stk_detTog(${ck_a(L.id)})" aria-label="Détails de ${esc(L.name)}"><span class="ds">Détails ${open ? '▴' : '▾'}</span><span class="ph">⋯</span></button></td></tr>`;
     if(open){
+      const SV = stk_services(D, L), hm = (t)=>{ const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+      const svl = (sv)=>esc(sv.p) + ' · ' + (sv.from ? hm(sv.from) : 'début') + ' → ' + hm(sv.to) + ' · ' + esc(sv.cooks.join(' + '));
+      const svList = (field, signed)=>{ if(!SV) return ''; let h = '', n = 0; SV.chains.forEach(ch=>ch.services.forEach(sv=>{ const v = sv[field]; if(v === undefined || v === null) return; n++; h += `<div class="bl-sl"><span>${svl(sv)}</span><b>${esc(ck_fmt(v))}${stk_un(L.u)}</b></div>`; })); return n ? h : ''; };
+      const svEc = ()=>{ if(!SV) return ''; let h = '', tot = 0, any = false, ini = null, fin = null;
+        SV.chains.forEach(ch=>{ const first = ch.services[0], last = ch.services[ch.services.length - 1]; ini = (ini || 0) + (first.dep || 0); fin = (fin || 0) + (last.reel || 0);
+          ch.services.forEach(sv=>{ h += `<div class="bl-sh">${svl(sv)}</div>`; sv.rows.forEach(r=>{ const e = r.ec; if(e !== null) { tot += e; any = true; }
+            h += `<div class="bl-sr"><span>${esc(r.lab)}</span><span>${r.dep === null ? '—' : esc(ck_fmt(r.dep))} ${r.info ? '' : '+ ' + esc(ck_fmt(r.ent)) + ' − ' + esc(ck_fmt(r.sor)) + ' = ' + (r.att === null ? '—' : esc(ck_fmt(r.att)))} → <b>${r.fin === null ? '—' : esc(ck_fmt(r.fin))}</b></span><b class="${e === null ? '' : lvl(e, r.base, L.id) && lvl(e, r.base, L.id).k === 'ko' ? 'rg' : lvl(e, r.base, L.id) && lvl(e, r.base, L.id).k === 'wa' ? 'or' : 'vt'}">${e === null ? '—' : (e > 0 ? '+' : '') + esc(ck_fmt(e))}</b></div>`; }); }); });
+        return `<div class="bl-sum"><span>Début de journée <b>${esc(ck_fmt(ini || 0))}</b></span><span>Fin de journée <b>${esc(ck_fmt(fin || 0))}</b></span><span>Écart total <b>${any ? (tot > 0 ? '+' : '') + esc(ck_fmt(ck_r(tot))) : '—'}</b></span></div>` + h; };
       const form = (w)=>ckc && ckc.id === L.id && ckc.which === w ? `<div class="lg-form">${ckc_form(L.id, w)}</div>` : '';
-      let c = ln('Veille (J-1)', num(L.veille), '', parts(L.vP));
-      c += ln('+ Achat', esc(ck_fmt(L.ach)));
+      let c = ln('Veille (J-1)', num(L.veille), '', parts(L.vP), 'vei', svList('dep'));
+      c += ln('+ Achat', esc(ck_fmt(L.ach)), '', '', 'ach', svList('ach'));
       if(L.hIn) c += ln('+ Haché des découpes d’escalope', esc(ck_fmt(L.hIn)));
-      if(L.es && L.transf) c += ln('− Vers poulet haché', esc(ck_fmt(L.transf)), '', L.transfD.filter(x=>x[1]).map(x=>(x[0] === 'découpe' ? 'découpes' : 'hachage') + ' ' + ck_fmt(x[1])).join(' + '));
+      if(L.es && L.transf) c += ln('− Vers poulet haché', esc(ck_fmt(L.transf)), '', L.transfD.filter(x=>x[1]).map(x=>(x[0] === 'découpe' ? 'découpes' : 'hachage') + ' ' + ck_fmt(x[1])).join(' + '), 'trf', svList('transf'));
       if(L.pris) c += ln('− Pris pour hachage', esc(ck_fmt(L.pris)));
       if(L.dec) c += ln(L.cr ? '− Perte de découpe et friture' : '− Perte de découpe', esc(ck_fmt(L.dec)), '', 'brut − net');
-      if(L.conso) c += ln('− Consommation', esc(ck_fmt(L.conso)), '', L.cs.length > 1 ? 'bons de vente : ' + L.cs.map(x=>x[0] + ' ' + ck_fmt(x[1])).join(' + ') : 'bons de vente');
-      if(L.pertes) c += ln('− Pertes', esc(ck_fmt(L.pertes)), '', L.pl.filter(x=>x[1]).map(x=>x[0] + ' ' + ck_fmt(x[1])).join(' · '));
-      c += ln('Théorique', num(L.th), 't') + ln('Réel (fin de service)', num(L.reel), 't', parts(L.rP));
+      if(L.conso) c += ln('− Consommation', esc(ck_fmt(L.conso)), '', L.cs.length > 1 ? 'bons de vente : ' + L.cs.map(x=>x[0] + ' ' + ck_fmt(x[1])).join(' + ') : 'bons de vente', 'con', svList('conso'));
+      if(L.pertes) c += ln('− Pertes', esc(ck_fmt(L.pertes)), '', L.pl.filter(x=>x[1]).map(x=>x[0] + ' ' + ck_fmt(x[1])).join(' · '), 'per', svList('pertes'));
+      c += ln('Théorique', num(L.th), 't') + ln('Réel (fin de service)', num(L.reel), 't', parts(L.rP), 'ree', svList('reel'));
       if(L.inc) c += `<div class="bl-n">Résultat incomplet : des fiches techniques manquent.</div>`;
       if(L.es) c += `<div class="bl-rd"><small>Rendement réel Sushi · net → crispy</small><b>${L.taux ? esc(ck_fmt(Math.round(L.taux * 1000) / 10)) + ' %' : '—'}</b>${L.taux ? `<small>${esc(ck_fmt(L.frS))} ÷ ${esc(ck_fmt(L.frit))}</small>` : ''}</div>`;
       let calc = '';
@@ -8237,6 +8261,7 @@ function stk_ingTable(){
         const bar = (x)=>x === null ? '' : `<div class="rbar"><i class="${rc(x)}" style="width:${Math.max(0, Math.min(100, pr(x)))}%"></i></div>`;
         let h = '';
         if(e1 || e2) h += `<h6>Écarts</h6><div class="bl-g2">${e1}${e2}</div>`;
+        { const sd = svEc(); if(sd) h += `<div class="bl-ln bl-cl" onclick="stk_svTog(${ck_a(L.id)},'ecs')"><span><i class="bl-ch">${stk_sv[L.id + '|ecs'] ? '▾' : '▸'}</i>Écart par service</span></div>${stk_sv[L.id + '|ecs'] ? `<div class="bl-svd">${sd}</div>` : ''}`; }
         if(R && R.tot.b > 0){
           h += `<h6>Rendement brut → net</h6><div class="bl-rh ${rc(R.tot.r)}"><div class="el"><span>${R.K.length ? 'Total des deux cuisines' : 'Total'}</span></div><div class="rv t${rc(R.tot.r)}">${rp(R.tot.r)}</div>${bar(R.tot.r)}</div>`;
           if(R.c && R.c.length) h += `<div class="bl-rk"><div class="rkc" style="margin-top:0">${R.c.map(c=>`${esc(c.name)} <b class="${c.r === null ? 'tna' : 't' + rc(c.r)}">${c.r === null ? '–' : rp(c.r)}</b>`).join('<span class="rsep">|</span>')}</div></div>`;
@@ -8245,6 +8270,18 @@ function stk_ingTable(){
         }
         if(R){ const cr = R.cr; h += `<h6>Rendement net → crispy</h6><div class="bl-rh ${rc(cr.r)}"><div class="el"><span>Crispy fait ÷ net utilisé</span></div><div class="rv t${rc(cr.r)}">${rp(cr.r)}</div>${bar(cr.r)}${cr.r === null ? '' : `<div class="es">${esc(ck_fmt(cr.fait))} ÷ ${esc(ck_fmt(cr.net))}</div>`}</div>`; }
         if(h) c += `<div class="bl-brut"><h6 class="bl-t">Indicateurs</h6>${h}</div>`;
+      }
+      if(L.gn){
+        const G = L.gn.G, N = L.gn.N, un = stk_un(L.u);
+        const ecg = (lab, X, sub, calc)=>{
+          const lb = X.ec === null ? null : lvl(X.ec, X.base, L.id);
+          if(!lb) return `<div class="bl-ec nu"><div class="el"><span>${lab}</span></div><div class="ev">—</div><div class="es">${esc(X.needNg ? 'Poulet par nem à régler (Réglages)' : 'En attente de la fin de service')}</div></div>`;
+          const k = lb.k === 'ok' ? 'ok' : lb.k === 'wa' ? 'wa' : 'ko', st = lb.k === 'ok' ? 'Correct' : lb.k === 'wa' ? 'Surplus' : 'Manque', pc = Math.round(lb.pc * 10) / 10;
+          return `<div class="bl-ec ${k}"><div class="el"><span>${lab}</span><span class="ip">${st}</span></div><div class="ev">${sg(X.ec) || ''}${esc(fm(X.ec))}<small>${un}</small></div><div class="es">${esc(ck_fmt(pc))} % ${esc(sub)}${X.miss ? ' · fiche sans poulet' : ''}</div><div class="calc2">${calc}</div></div>`; };
+        const f2 = (x)=>esc(ck_fmt(x));
+        const cg = G.reel === null ? '' : `Départ ${f2(G.veille)} + mis ${f2(G.mis)} − vendu ${f2(G.vendu)} = ${f2(G.th)} attendus<br>Reste pesé : ${f2(G.farce)} de farce × ${f2(Math.round(G.pct * 1000) / 10)} % = ${f2(G.reel)}`;
+        const cn = N.reel === null ? '' : `Départ ${f2(N.veille)} + mis ${f2(N.mis)} − vendu ${f2(N.vendu)} = ${f2(N.th)} attendus<br>Restants : ${f2(N.pcs)} pcs × ${f2(Math.round(N.ng * 100) / 100)} = ${f2(N.reel)}`;
+        c += `<div class="bl-brut"><h6 class="bl-t">Indicateurs · gyoza et nems</h6><div class="bl-g2">${ecg('Écart gyoza', G, 'du poulet mis dans la farce', cg)}${ecg('Écart nems', N, 'du poulet mis dans les nems', cn)}</div></div>`;
       }
       const specs = [[L.id, ['dc', 'fr', 'hc', 'wd', 'pq', 'fin2']]].concat(L.es && L.id === escIds[0] ? pouIds.map(i=>[i, ['hc']]) : []).concat(L.po ? escIds.map(i=>[i, ['dc']]) : []);
       const list = sx_get(dP, dPrev, [[L.id, ['fin2']]]).concat(sx_get(dT, D, specs)).map(e=>Object.assign(e, { ctx:L.id })).sort((a, b)=>String(a.r.at).localeCompare(String(b.r.at)));
@@ -8310,6 +8347,53 @@ function fi_slots(id){
   return [{ s:id, lab:'' }];
 }
 const FI_MES = { saumon:'net', gamba:'net', viande:'net', boeuf:'net', simple:'net', crevette:'crispy', avocat:'net utilisé', poulet:'pris pour hachage' };
+
+let stk_sv = {};
+function stk_svTog(id, key){ const k = id + '|' + key; stk_sv[k] = !stk_sv[k]; ck_render(); }
+/* services d'un ingrédient : un service = tout ce qui se passe entre deux fins de service d'un même poste ; la fin du service précédent est le départ du suivant */
+function stk_services(D, L){
+  const id = L.id, k = ck_kind(id);
+  if(['escalope', 'crevette', 'saumon', 'gamba', 'poulet'].indexOf(k) < 0) return null;
+  const it = ck_ingById(id) || { n:'' }, u = ck_unit(id), st = stk_start(), day0 = !!(st && D === st.date), docs = stk_docsFrom(ck_docs(), D), prev = ck_prevSrv;
+  const d0 = ['kg', 'l'].indexOf(String(u).toLowerCase()) < 0, rd = (x)=>d0 ? Math.round(x) : Math.round(x * 100) / 100, T = (r)=>{ const t = Date.parse(r && r.at); return isNaN(t) ? 0 : t; };
+  const sumW = (idd, t, pst, key, w, stg)=>{ let a = 0; Object.keys(docs || {}).forEach(dk=>ck_recs(docs[dk], idd, t).forEach(r=>{ const tm = T(r); if(!(tm > w.t0 && tm <= w.t1)) return; if(pst !== null && ck2_P(r.p) !== pst) return; if(stg !== undefined && (((r.f && r.f.s) || 'b') !== stg)) return; a += Number(r.f && r.f[key]) || 0; })); return ck_r(a); };
+  const ings = ck_ingList(), escIds = ings.filter(t=>ck_kind(t.id) === 'escalope').map(t=>t.id), pouIds = ings.filter(t=>ck_kind(t.id) === 'poulet').map(t=>t.id);
+  const chain = (pst)=>{ const fins = []; Object.keys(docs || {}).forEach(dk=>{ const d = docs[dk], r = ck_recOne(d, id, ck2_fid(pst)); if(r && r.f) fins.push({ at:T(r), f:r.f, cook:d.name || ck_empName(d.emp) }); }); fins.sort((a, b)=>a.at - b.at);
+    return fins.map((fn, i)=>({ p:pst, i, w:{ t0:i ? fins[i - 1].at : -Infinity, t1:i === fins.length - 1 ? Infinity : fn.at }, fin:fn, prevFin:i ? fins[i - 1].f : null, from:i ? fins[i - 1].at : null, to:fn.at })); };
+  const depOf = (sv, pst, key)=>{ if(sv.prevFin) return sv.prevFin[key] === undefined ? null : Number(sv.prevFin[key]) || 0; if(day0) return 0; return ck2_finP(prev, id, pst, key); };
+  const fv = (sv, key)=>sv.fin.f[key] === undefined ? null : Number(sv.fin.f[key]) || 0;
+  const mk = (lab, dep, ent, sor, fin, base, noEc)=>{ const att = (dep === null || dep === undefined) ? null : ck_r(dep + ent - sor); return { lab, dep:dep === undefined ? null : dep, ent, sor, att, fin, ec:(noEc || att === null || fin === null) ? null : ck_r(fin - att), base:base === undefined ? att : base, info:!!noEc }; };
+  const cooksOf = (sv)=>{ const names = [sv.fin.cook]; Object.keys(docs || {}).forEach(dk=>{ const d = docs[dk]; if(ck_allRecs(d, id).some(r=>{ const tm = T(r); return tm > sv.w.t0 && tm <= sv.w.t1 && ck2_P(r.p) === sv.p; }) && names.indexOf(d.name || ck_empName(d.emp)) < 0) names.push(d.name || ck_empName(d.emp)); }); return names; };
+  const salesOf = (sv)=>fi_sales(D, sv.w), vend = (Sw, slot)=>rd(fi_toUnit(id, Sw.g[slot] || 0));
+  const cv = (x)=>L.taux ? rd(x / L.taux) : x, ach0 = rd(stk_buyOf(it.n, u));
+  const ps = ck2_ps(docs, id), postes = k === 'escalope' ? ['Sushi', 'Wok'] : ps, chains = [];
+  postes.forEach((pst, pi)=>{ const svs = chain(pst); if(!svs.length) return;
+    svs.forEach(sv=>{ const Sw = salesOf(sv), w = sv.w, first = sv.i === 0 && pi === (k === 'escalope' ? 0 : 0); sv.cooks = cooksOf(sv); sv.rows = []; sv.dep = 0; sv.reel = 0; sv.conso = 0; sv.pertes = 0; sv.transf = 0; sv.ach = 0;
+      if(k === 'escalope' && pst === 'Sushi'){
+        const dB = depOf(sv, pst, 'fb'), dN = depOf(sv, pst, 'fn'), ach = sv.i === 0 ? ach0 : 0, pris = sumW(id, 'dc', null, 'b', w), hb = ck_r(pouIds.reduce((a, pid)=>a + sumW(pid, 'hc', null, 'b', w), 0)), nObt = sumW(id, 'dc', 'Sushi', 'n', w), fait = sumW(id, 'fr', 'Sushi', 'q', w), ven = vend(Sw, id + '|Sushi');
+        sv.rows.push(mk('Brut', dB, ach, ck_r(pris + hb), fv(sv, 'fb')));
+        const fn = fv(sv, 'fn'), frit = (dN === null || fn === null) ? null : ck_r(dN + nObt - fn); sv.rows.push(Object.assign(mk('Net Sushi', dN, nObt, frit === null ? 0 : frit, fn, undefined, true), { att:fn }));
+        const fc = fv(sv, 'fc'); sv.rows.push(Object.assign(mk('Crispy', 0, fait, ven, fc, fait), { ec:(fc === null || !(fait > 0)) ? null : ck_r(fc - (fait - ven)) }));
+        const pqB = sumW(id, 'pq', null, 'q', w, 'b'), pqN = sumW(id, 'pq', null, 'q', w, 'n'), pqC = sumW(id, 'pq', null, 'q', w, 'c');
+        sv.dep = ck_r((dB || 0) + (dN || 0)); sv.reel = ck_r((fv(sv, 'fb') || 0) + (fn || 0)); sv.conso = cv(ven); sv.pertes = ck_r(pqB + pqN + cv(pqC) + cv(fc || 0)); sv.transf = ck_r(pris - sumW(id, 'dc', null, 'n', w) + hb); sv.ach = ach;
+      } else if(k === 'escalope'){
+        const dN = depOf(sv, pst, 'fn'), nObt = sumW(id, 'dc', 'Wok', 'n', w), ven = vend(Sw, id + '|Wok'), pqN = sumW(id, 'pq', 'Wok', 'q', w, 'n'), fn = fv(sv, 'fn');
+        sv.rows.push(mk('Net Wok', dN, nObt, ck_r(ven + pqN), fn)); sv.dep = dN || 0; sv.reel = fn || 0; sv.conso = ven; sv.pertes = pqN;
+      } else if(k === 'crevette'){
+        const dB = depOf(sv, pst, 'fb'), dC = depOf(sv, pst, 'fc'), ach = (sv.i === 0 && pi === 0) ? ach0 : 0, pr = sumW(id, 'dc', pst, 'b', w), pqB = sumW(id, 'pq', pst, 'q', w, 'b'), pqC = sumW(id, 'pq', pst, 'q', w, 'c'), fait = sumW(id, 'fr', pst, 'q', w), ven = pi === 0 ? vend(Sw, id) : 0;
+        sv.rows.push(mk('Brut', dB, ach, ck_r(pr + pqB), fv(sv, 'fb'))); sv.rows.push(mk('Crispy', dC, fait, ck_r(ven + pqC), fv(sv, 'fc'), ck_r((dC || 0) + fait)));
+        sv.dep = ck_r((dB || 0) + (dC || 0)); sv.reel = ck_r((fv(sv, 'fb') || 0) + (fv(sv, 'fc') || 0)); sv.conso = ven; sv.pertes = ck_r(pqB + pqC); sv.ach = ach;
+      } else if(k === 'saumon' || k === 'gamba'){
+        const dB = depOf(sv, pst, 'fb'), dN = depOf(sv, pst, 'fn'), ach = (sv.i === 0 && pi === 0) ? ach0 : 0, pr = sumW(id, 'dc', pst, 'b', w), nObt = sumW(id, 'dc', pst, 'n', w), pqB = sumW(id, 'pq', pst, 'q', w, 'b'), pqN = sumW(id, 'pq', pst, 'q', w, 'n'), ven = pi === 0 ? vend(Sw, id) : 0;
+        sv.rows.push(mk('Brut', dB, ach, ck_r(pr + pqB), fv(sv, 'fb'))); sv.rows.push(mk(k === 'gamba' ? 'Décortiquée' : 'Net', dN, nObt, ck_r(ven + pqN), fv(sv, 'fn')));
+        sv.dep = ck_r((dB || 0) + (dN || 0)); sv.reel = ck_r((fv(sv, 'fb') || 0) + (fv(sv, 'fn') || 0)); sv.conso = ven; sv.pertes = ck_r(pqB + pqN); sv.ach = ach;
+      } else if(k === 'poulet'){
+        const dH = depOf(sv, pst, 'fh'), hache = ck_r(escIds.reduce((a, eid)=>a + sumW(eid, 'dc', null, 'b', w) - sumW(eid, 'dc', null, 'n', w), 0)), pris = sumW(id, 'hc', null, 'q', w), pq = ck_r(sumW(id, 'pq', null, 'q', w, 'b'));
+        sv.rows.push(mk('Bac à haché', dH, hache, ck_r(pris + pq), fv(sv, 'fh'))); sv.dep = dH || 0; sv.reel = fv(sv, 'fh') || 0; sv.pertes = pq; sv.conso = 0;
+      } });
+    chains.push({ p:pst, services:svs }); });
+  return chains.length ? { chains } : null;
+}
 function fi_ing(k, D){   // fiche en vigueur le jour D (null = pas de fiche ; {} = aucun ingrédient)
   const f = fi_all()[k]; if(!f || !Array.isArray(f.v)) return null; let best = null;
   f.v.forEach(v=>{ if(v && String(v.from) <= D && (!best || String(v.from) >= String(best.from))) best = v; });
@@ -8317,11 +8401,13 @@ function fi_ing(k, D){   // fiche en vigueur le jour D (null = pas de fiche ; {}
   return best ? (best.ing || {}) : null;
 }
 const fi_isDrink = (k)=>stk_items('can').some(i=>stk_rpList(i).some(l=>rp_normName(l.n) === k));   // les boissons sont déjà suivies dans « Canettes et eau »
-function fi_sales(D){
+function stk_tkMs(D, tk){ const h = String(tk && tk.h || '').slice(0, 5).padStart(5, '0'), m = /^(\d\d):(\d\d)$/.exec(h); if(!m) return NaN; const c = Number((ck_cfg.settings || {}).cutoff), cut = isNaN(c) ? 5 : c; return new Date((Number(m[1]) < cut ? ck_addDays(D, 1) : D) + 'T' + h + ':00').getTime(); }
+function fi_sales(D, w){
   const st = stk_start(), out = { prods:{}, tot:0, ok:0, no:0, g:{} };
   const tks = (stk.rp && stk.date === D) ? (stk.rp.tickets || []) : [];
   tks.forEach(tk=>{
     if(st && D === st.date && tk.h && String(tk.h).slice(0, 5).padStart(5, '0') < st.hm.padStart(5, '0')) return;
+    if(w){ const tm = stk_tkMs(D, tk); if(isNaN(tm) ? w.t1 !== Infinity : !(tm > w.t0 && tm <= w.t1)) return; }
     (Array.isArray(tk.l) ? tk.l : []).forEach(l=>{
       if(l.p && String(l.p) !== String(l.i)) return;
       const k = fi_key(l.n), q = Number(l.q) || 0; if(!k || !q || fi_isDrink(k)) return;
@@ -8586,14 +8672,21 @@ Object.assign(CK_T, {
 Object.assign(CK_T, {
   k2_fnG:['Gamba décortiquée restante', 'الغمبا المقشّرة المتبقية'], k2_stCap:['Perte sur :', 'الخسارة من:'], k2_stB:['Brut', 'خام'], k2_stN:['Net', 'صافي'], k2_stC:['Crispy', 'كريسبي']
 });
+Object.assign(CK_T, {
+  k2_hcG:['Pour les gyoza', 'للجيوزا'], k2_hcGh:['Poulet mis dans la farce', 'الدجاج المضاف إلى الحشوة'], k2_hcNm:['Pour les nems', 'للنيم'], k2_hcNmh:['Poulet mis dans les nems', 'الدجاج المضاف إلى النيم'],
+  k2_hcRepCap:['Répartition des {n}', 'توزيع {n}'], k2_hcRepOk:['{a} + {b} = {t} · répartition complète', '{a} + {b} = {t} · التوزيع كامل'],
+  k2_hcRepLeft:['Il reste {n} à répartir', 'المتبقي للتوزيع: {n}'], k2_hcRepOver:['La répartition dépasse le total de {n}', 'التوزيع يتجاوز المجموع بـ {n}'],
+  k2_fg:['Farce de gyoza', 'حشوة الجيوزا'], k2_fgH:['Farce restante, pesée', 'الحشوة المتبقية موزونة'], k2_fm:['Nems restants', 'النيم المتبقي'], k2_fmH:['Comptés en pièces', 'يُحسب بالقطع'], k2_pcs:['pcs', 'قطعة'],
+  k2_hcGs:['gyoza', 'جيوزا'], k2_hcNs:['nems', 'نيم']
+});
 let ck2 = null, ck_tErr = '';
 const ck2_P = (p)=>String(p || '');
 const ck2_fid = (p)=>'fin2_' + (ck2_P(p) || 'x');
-const CK2_FL = { fb:['k2_fb', 'k2_hCount'], fn:['k2_fn', 'k2_hKeep'], fc:['k2_fc', 'k2_hKeep'], fh:['k2_fh', 'k2_hCount'] };
+const CK2_FL = { fb:['k2_fb', 'k2_hCount'], fn:['k2_fn', 'k2_hKeep'], fc:['k2_fc', 'k2_hKeep'], fh:['k2_fh', 'k2_hCount'], fg:['k2_fg', 'k2_fgH'], fm:['k2_fm', 'k2_fmH'] };
 function ck2_tabs(id, p){ const k = ck_kind(id), t = k === 'avocat' ? ['wd'] : k === 'poulet' ? ['hc'] : ['dc']; if(k === 'escalope' && ck2_P(p) !== 'Wok') t.push('fr'); else if(k === 'crevette') t.push('fr'); t.push('pq', 'fn'); return t; }
 function ck2_finKeys(id, p){
   const k = ck_kind(id), wok = ck2_P(p) === 'Wok';
-  if(k === 'poulet') return ['fh'];
+  if(k === 'poulet') return ['fh', 'fg', 'fm'];
   if(k === 'escalope') return wok ? ['fn'] : ['fb', 'fn', 'fc'];
   if(k === 'crevette') return ['fb', 'fc'];
   if(k === 'saumon' || k === 'gamba') return ['fb', 'fn'];
@@ -8644,7 +8737,7 @@ function ck2_edit(rid){
   const c = ck2; if(!c) return; const r = ck_recOne(ck_myDoc(), c.id, rid); if(!r) return;
   c.edit = rid; c.err = ''; c.v = {}; c.fresh = {};
   if(c.tab === 'dc'){ c.v.b = ck_fmt(Number(r.f.b) || 0); c.v.n = ck_fmt(Number(r.f.n) || 0); c.fresh.b = true; c.fresh.n = true; c.act = 'b'; }
-  else if(c.tab === 'hc'){ c.v.q = ck_fmt(Number(r.f.q) || 0); c.v.b = ck_fmt(Number(r.f.b) || 0); c.fresh.q = true; c.fresh.b = true; c.act = 'q'; }
+  else if(c.tab === 'hc'){ c.v.q = ck_fmt(Number(r.f.q) || 0); c.v.b = ck_fmt(Number(r.f.b) || 0); c.v.gy = ck_fmt(Number(r.f.gy) || 0); c.v.ne = ck_fmt(Number(r.f.ne) || 0); c.fresh.q = true; c.fresh.b = true; c.fresh.gy = true; c.fresh.ne = true; c.act = 'q'; }
   else { c.v.q = ck_fmt(Number(r.f.q) || 0); c.fresh.q = true; c.act = 'q'; if(c.tab === 'pq') c.st = (r.f && r.f.s) || 'b'; }
   ck_render();
 }
@@ -8668,7 +8761,9 @@ function ck2_save(){
   if(c.tab === 'hc'){
     if(!has('q') && !has('b')) return fail(ck_s('k2_needHc'), 'q');   // 0 accepté ; une case vide compte pour 0
     const old = c.edit ? ck_recOne(ck_myDoc(), id, c.edit) : null, rid = c.edit || ck_rid(), prev = old ? Object.assign({}, old) : null; if(prev) delete prev.id;
-    ck_putRec(id, rid, { t:'hc', f:{ q:has('q') ? ck_num(c.v.q) : 0, b:has('b') ? ck_num(c.v.b) : 0 }, p, at:old ? old.at : ck_nowIso() });
+    const hq = has('q') ? ck_num(c.v.q) : 0, hb2 = has('b') ? ck_num(c.v.b) : 0, hg = has('gy') ? ck_num(c.v.gy) : 0, hn = has('ne') ? ck_num(c.v.ne) : 0, hd = ck_r(hq + hb2 - hg - hn);
+    if(ck_kind(id) === 'poulet' && Math.abs(hd) >= 0.005) return fail(ck_s(hd > 0 ? 'k2_hcRepLeft' : 'k2_hcRepOver', { n:ck_fmt(Math.abs(hd)) + ' ' + ck_unit(id) }), 'gy');
+    ck_putRec(id, rid, { t:'hc', f:{ q:hq, b:hb2, gy:hg, ne:hn }, p, at:old ? old.at : ck_nowIso() });
     ck_setBan({ id, rid, prev, msg:ck_s('saved') });
     c.edit = ''; c.v = {}; c.fresh = {}; c.act = 'q'; c.err = ''; return ck_render();
   }
@@ -8703,7 +8798,7 @@ function ck2_html(){
   const c = ck2, id = c.id, p = c.p, u = ck_unit(id), k = ck_kind(id), tabs = ck2_tabs(id, p), it = ck_ingById(id) || {}, alt = ck_lang === 'ar' ? (it.n || '') : ((ck_cfg.ings[id] || {}).ar || '');
   const TL = { dc:'k2_dc', fr:'k2_fr', hc:'k2_hc', wd:'k2_wd', pq:'k2_pq', fn:'fin' }, f = (x)=>ck_fmt(x) + ' ' + u;
   const isE = (key)=>c.v[key] === undefined || c.v[key] === '';
-  const row = (key, label, hint)=>`<div class="ck2-rw ${c.act === key ? 'act' : ''}" onclick="ck2_focus('${key}')"><span>${esc(label)}${hint ? `<small>${esc(hint)}</small>` : ''}</span><b class="${isE(key) ? 'e' : ''}">${esc(isE(key) ? '0' : c.v[key])} <i>${esc(u)}</i></b></div>`;
+  const row = (key, label, hint, un)=>`<div class="ck2-rw ${c.act === key ? 'act' : ''}" onclick="ck2_focus('${key}')"><span>${esc(label)}${hint ? `<small>${esc(hint)}</small>` : ''}</span><b class="${isE(key) ? 'e' : ''}">${esc(isE(key) ? '0' : c.v[key])} <i>${esc(un || u)}</i></b></div>`;
   const mini = (r)=>`<span class="ck2-mini"><button class="ck-btn sm" aria-label="Corriger" onclick="ck2_edit(${ck_a(r.id)})">✎</button><button class="ck-btn sm danger" aria-label="Supprimer" onclick="ck2_del(${ck_a(r.id)})">✕</button></span>`;
   let body = '';
   if(c.tab === 'dc'){
@@ -8713,7 +8808,9 @@ function ck2_html(){
   } else if(c.tab === 'hc'){
     const list = ck2_myRecs(id, 'hc', p), idx = c.edit ? list.findIndex(r=>r.id === c.edit) : -1, n = idx >= 0 ? idx + 1 : list.length + 1, tot = ck_r(ck_sumF(list, 'q') + ck_sumF(list, 'b'));
     const bx = (key, label, hint)=>`<div class="ck2-bx ${c.act === key ? 'act' : ''}" onclick="ck2_focus('${key}')"><span class="l">${esc(label)}<small>${esc(hint)}</small></span><b class="${isE(key) ? 'e' : ''}">${esc(isE(key) ? '0' : c.v[key])} <i>${esc(u)}</i></b></div>`;
-    body = `<div class="ck2-pair">${bx('q', ck_s('k2_hcN', { n }), ck_s('k2_hcQh'))}${bx('b', ck_s('k2_hcB'), ck_s('k2_hcBh'))}</div><div class="ck-err">${esc(c.err)}</div><button class="ck-ok" onclick="ck2_save()">✓ ${esc(ck_s('k2_valHc'))}</button><div class="ck2-tot" style="margin-top:8px;"><span>${esc(ck_s('k2_hcTot'))}</span><b>${esc(f(tot))}</b></div>`;
+    const cT = ck_r((ck_num(c.v.q) || 0) + (ck_num(c.v.b) || 0)), cG = ck_num(c.v.gy) || 0, cN = ck_num(c.v.ne) || 0, cD = ck_r(cT - cG - cN);
+    const repMsg = cT <= 0 && cG + cN <= 0 ? '' : Math.abs(cD) < 0.005 ? `<div class="ck2-rep ok">${esc(ck_s('k2_hcRepOk', { a:ck_fmt(cG), b:ck_fmt(cN), t:f(cT) }))}</div>` : `<div class="ck2-rep">${esc(ck_s(cD > 0 ? 'k2_hcRepLeft' : 'k2_hcRepOver', { n:f(Math.abs(cD)) }))}</div>`;
+    body = `<div class="ck2-pair">${bx('q', ck_s('k2_hcN', { n }), ck_s('k2_hcQh'))}${bx('b', ck_s('k2_hcB'), ck_s('k2_hcBh'))}</div><div class="ck2-sep">${esc(ck_s('k2_hcRepCap', { n:f(cT) }))}</div><div class="ck2-pair">${bx('gy', ck_s('k2_hcG'), ck_s('k2_hcGh'))}${bx('ne', ck_s('k2_hcNm'), ck_s('k2_hcNmh'))}</div>${repMsg}<div class="ck-err">${esc(c.err)}</div><button class="ck-ok" onclick="ck2_save()">✓ ${esc(ck_s('k2_valHc'))}</button><div class="ck2-tot" style="margin-top:8px;"><span>${esc(ck_s('k2_hcTot'))}</span><b>${esc(f(tot))}</b></div>`;
   } else if(c.tab === 'fr' || c.tab === 'wd' || c.tab === 'pq'){
     const LB = { fr:['k2_frCap', 'k2_frN', 'k2_crTot', 'k2_valFr'], hc:['k2_hcCap', 'k2_hcN', 'k2_hcTot', 'k2_valHc'], wd:['k2_wdCap', 'k2_wdN', 'k2_wdTot', 'k2_valWd'], pq:['k2_pqCap', 'k2_pqN', 'k2_pqTot', 'k2_valPq'] }[c.tab];
     const list = ck2_myRecs(id, c.tab, p), idx = c.edit ? list.findIndex(r=>r.id === c.edit) : -1, n = idx >= 0 ? idx + 1 : list.length + 1, tot = ck_sumF(list, 'q'), pqm = c.tab === 'pq';
@@ -8721,14 +8818,14 @@ function ck2_html(){
     const sts = ck2_stages(id, p), motif = pqm && sts.length > 1 ? `<div class="ck2-st"><span>${esc(ck_s('k2_stCap'))}</span>${sts.map(x=>`<button class="ck-tg ${(c.st || 'b') === x ? 'on' : ''}" onclick="ck2_st('${x}')">${esc(ck_s('k2_st' + x.toUpperCase()))}</button>`).join('')}</div>` : '';
     body = `<div class="ck2-cap">${esc(ck_s(LB[0]))}</div>${row('q', ck_s(LB[1], { n }))}${motif}<div class="ck2-tot"><span>${esc(ck_s(LB[2]))}</span><b>${esc(f(tot))}</b></div><div class="ck-err">${esc(c.err)}</div><button class="ck-ok" onclick="ck2_save()">✓ ${esc(ck_s(LB[3]))}</button>`;
   } else {
-    const rows = ck2_finKeys(id, p).map(key=>row(key, ck2_flab(id, key), ck_s(ck2_hint(id, key)))).join('');
+    const rows = ck2_finKeys(id, p).map(key=>row(key, ck2_flab(id, key), ck_s(ck2_hint(id, key)), key === 'fm' ? ck_s('k2_pcs') : '')).join('');
     body = `<div class="ck2-cap">${esc(ck_s('k2_finCap'))}</div>${rows}<div class="ck-err">${esc(c.err)}</div><button class="ck-ok" onclick="ck2_save()">✓ ${esc(ck_s('k2_val'))}</button>`;
   }
   const kp = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ','].map(x=>`<button onclick="ck2_press('${x}')">${x}</button>`).join('') + `<button onclick="ck2_press('0')">0</button><button onclick="ck2_press('del')" aria-label="Effacer">⌫</button>`;
   const tabsH = tabs.map(t=>`<button class="ck2-tab ${c.tab === t ? 'on' : ''}" onclick="ck2_setTab('${t}')">${t === 'fn' ? `<span class="l">${esc(ck_s(TL[t]))}</span><span class="s">${ck_lang === 'ar' ? 'نهاية' : 'Fin'}</span>` : esc(ck_s(TL[t]))}</button>`).join('');
   const hl = c.tab === 'fn' ? [] : ck2_myRecs(id, c.tab, p), hlab = c.tab === 'dc' ? 'k2_dcn' : { fr:'k2_frN', hc:'k2_hcN', wd:'k2_wdN', pq:'k2_pqN' }[c.tab];
   const hrow = (r, i)=>{
-    const lab = ck_s(hlab, { n:i + 1 }), txt = c.tab === 'dc' ? ck2_recText(id, r) : f(Number(r.f.q) || 0) + (c.tab === 'hc' && Number(r.f.b) > 0 ? ' + ' + f(Number(r.f.b)) + ' ' + ck_s('k2_hcBs') : '') + (c.tab === 'pq' ? ck2_stLab(r) : '');
+    const lab = ck_s(hlab, { n:i + 1 }), txt = c.tab === 'dc' ? ck2_recText(id, r) : f(Number(r.f.q) || 0) + (c.tab === 'hc' && Number(r.f.b) > 0 ? ' + ' + f(Number(r.f.b)) + ' ' + ck_s('k2_hcBs') : '') + (c.tab === 'hc' && (Number(r.f.gy) > 0 || Number(r.f.ne) > 0) ? ' · ' + ck_s('k2_hcGs') + ' ' + f(Number(r.f.gy) || 0) + ' · ' + ck_s('k2_hcNs') + ' ' + f(Number(r.f.ne) || 0) : '') + (c.tab === 'pq' ? ck2_stLab(r) : '');
     const acts = c.delAsk === r.id ? `<span class="ck2-cf"><button class="y" onclick="ck2_del(${ck_a(r.id)})">${esc(ck_s('k2_delQ'))}</button><button onclick="ck2_delNo()">${esc(ck_s('k2_delNo'))}</button></span>` : `<span class="ck2-ac"><button aria-label="Corriger" onclick="ck2_edit(${ck_a(r.id)})">✎</button><button aria-label="Supprimer" onclick="ck2_delAsk(${ck_a(r.id)})">✕</button></span>`;
     return `<div class="ck2-hr ${c.delAsk === r.id ? 'del' : ''}"><span class="tx"><b>${esc(lab)}</b> : ${esc(txt)}<small>${esc(ck_hm(r.at))}</small></span>${acts}</div>`;
   };
@@ -8745,7 +8842,7 @@ function ck2_recText(id, r){
   if(r.t === 'wd') return ck_s('k2_wd') + ' ' + v(f.q) + pp;
   if(r.t === 'pq') return ck_s('k2_pq') + ' ' + v(f.q) + ck2_stLab(r) + pp;
   if(r.t === 'hc') return ck_s('k2_hc') + ' ' + v(f.q) + (Number(f.b) > 0 ? ' + ' + v(f.b) + ' ' + ck_s('k2_hcBs') : '') + pp;
-  return ck_s('fin') + ' : ' + ['fb', 'fn', 'fc', 'fh'].filter(k=>f[k] !== undefined).map(k=>ck2_flab(id, k) + ' ' + v(f[k])).join(' · ') + pp;
+  return ck_s('fin') + ' : ' + ['fb', 'fn', 'fc', 'fh', 'fg', 'fm'].filter(k=>f[k] !== undefined).map(k=>ck2_flab(id, k) + ' ' + v(f[k])).join(' · ') + pp;
 }
 function ck2_figs(id, doc){
   const u = ck_unit(id), f = (x)=>ck_fmt(x) + ' ' + u, o = [], dc = ck_recs(doc, id, 'dc'), b = ck_sumF(dc, 'b'), n = ck_sumF(dc, 'n');
@@ -8754,7 +8851,7 @@ function ck2_figs(id, doc){
   const wd = ck_recs(doc, id, 'wd'); if(wd.length) o.push([ck_s('k2_wdTot'), f(ck_sumF(wd, 'q'))]);
   const pq = ck_recs(doc, id, 'pq'); if(pq.length) o.push([ck_s('k2_pqTot'), f(ck_sumF(pq, 'q'))]);
   const hc = ck_recs(doc, id, 'hc'); if(hc.length){ o.push([ck_s('k2_hcTot'), f(ck_sumF(hc, 'q'))]); if(ck_sumF(hc, 'b') > 0) o.push([ck_s('k2_hcB'), f(ck_sumF(hc, 'b'))]); }
-  ck_recs(doc, id, 'fin2').forEach(r=>{ const fl = r.f || {}; ['fb', 'fn', 'fc', 'fh'].forEach(k=>{ if(fl[k] !== undefined) o.push([ck2_flab(id, k) + (r.p ? ' (' + r.p + ')' : ''), f(Number(fl[k]) || 0)]); }); });
+  ck_recs(doc, id, 'fin2').forEach(r=>{ const fl = r.f || {}; ['fb', 'fn', 'fc', 'fh', 'fg', 'fm'].forEach(k=>{ if(fl[k] !== undefined) o.push([ck2_flab(id, k) + (r.p ? ' (' + r.p + ')' : ''), f(Number(fl[k]) || 0)]); }); });
   return o;
 }
 /* suivi admin : le circuit du jour, tous cuisiniers confondus (somme des saisies ; reste de la veille = fin de service de la veille) */
@@ -9027,7 +9124,7 @@ function ck_export(){
   const COL = { a:'À découper / sorti du stock', t:'Transféré', n:'Pour les nems', g:'Gyozas (poulet haché)', v:'Utilisée gyozas (viande hachée)', w:'Déchet', h:'Escalope hachée directement', b:'Viande hachée achetée directement', s:'Disponible au début', rc:'Restante coupée', rn:'Restante non coupée', r:'Restante', pc:'Perdue poulet crispy', pq:'Perdue mauvaise qualité', cr:'Crispée restante', pe:'Écart de reprise (perte)', rd:'Rendement du jour' };
   Object.keys(docs).forEach(k=>{ const d = docs[k]; Object.keys(d.recs || {}).forEach(id=>{ Object.keys(d.recs[id]).forEach(rid=>{ const r = d.recs[id][rid]; if(!r || r.del) return; const it = ck_ingById(id) || { n:id };
     const row = { Date:date, Cuisinier:d.name || ck_empName(d.emp), Poste:d.poste || '', Ingrédient:it.n, Saisie:TYPE[r.t] || r.t, Heure:ck_hm(r.at), Unité:ck_unit(id) };
-    const NEW = r.t === 'dc' || r.t === 'fr' || r.t === 'hc' || r.t === 'fin2' || r.t === 'wd' || r.t === 'pq', COLN = { b:'Brut pris', n:'Net obtenu', q:'Quantité obtenue / prise', fb:'Brut restant', fn:'Net restant', fc:'Crispy restant', fh:'Bac à haché' }; if(NEW && r.p) row['Cuisine'] = r.p;
+    const NEW = r.t === 'dc' || r.t === 'fr' || r.t === 'hc' || r.t === 'fin2' || r.t === 'wd' || r.t === 'pq', COLN = { b:'Brut pris', n:'Net obtenu', q:'Quantité obtenue / prise', fb:'Brut restant', fn:'Net restant', fc:'Crispy restant', fh:'Bac à haché', fg:'Farce de gyoza', fm:'Nems restants', gy:'Pour les gyoza', ne:'Pour les nems' }; if(NEW && r.p) row['Cuisine'] = r.p;
     Object.keys(NEW ? COLN : COL).forEach(c=>{ if(r.f && r.f[c] !== undefined) row[(NEW ? COLN : COL)[c]] = Number(r.f[c]) || 0; }); if(r.f && r.f.corr) row['Quantité corrigée'] = 'oui';
     rows.push(row); }); }); });
   if(!rows.length){ alert('Rien à exporter pour cette journée.'); return; }
@@ -9164,6 +9261,7 @@ function ck_regHtml(){
     return `<div class="ck-row" style="grid-template-columns:1fr;--c:${ck_color(i.id)}"><span class="n">${ck_icon(k, 28)}${esc(i.n)} <small style="color:var(--ink-muted);font-weight:500">${esc(i.u || 'kg')}</small></span>
       <div class="ck-fr"><span class="ck-pill ${k === 'simple' ? 'wa' : 'ok'}">${esc(k === 'simple' ? 'nom non reconnu : ' + CK_KLAB.simple : 'fiche : ' + CK_KLAB[k])}</span>${who.length ? `<span class="ck-sub" style="margin:0">Saisi par ${esc(who.join(', '))}</span>` : `<span class="ck-pill ko">À attribuer</span>`}</div>
       <div class="ck-fr"><label>Nom en arabe</label><input class="ck-in" dir="rtl" style="width:130px" value="${esc(c.ar || '')}" onchange="ck_ingSet(${ck_a(i.id)},'ar',this.value)"><label>Marge d’écart</label><input class="ck-in" inputmode="decimal" style="width:64px" placeholder="${esc(ck_fmt(stk_tolG()))}" value="${esc(c.tol === undefined || c.tol === '' ? '' : ck_fmt(Number(c.tol)))}" onchange="ck_ingTol(${ck_a(i.id)},this.value)"><span class="ck-sub" style="margin:0">%</span></div>
+      ${k === 'poulet' ? `<div class="ck-fr"><label>Part de poulet dans la farce</label><input class="ck-in" inputmode="decimal" style="width:64px" placeholder="60" value="${esc(c.farcePct === undefined || c.farcePct === '' ? '' : ck_fmt(Number(c.farcePct)))}" onchange="ck_ingNum(${ck_a(i.id)},'farcePct',this.value,100)"><span class="ck-sub" style="margin:0">%</span><label>Poulet par nem</label><input class="ck-in" inputmode="decimal" style="width:64px" value="${esc(c.nemG === undefined || c.nemG === '' ? '' : ck_fmt(Number(c.nemG)))}" onchange="ck_ingNum(${ck_a(i.id)},'nemG',this.value,1000)"><span class="ck-sub" style="margin:0">g</span></div>` : ''}
       <details class="ck-qd"><summary>Questions du cuisinier</summary>${ck_qHtml(i.id)}</details></div>`; }).join('')}</div></div>`
     : '<div class="ck-box"><h3>Ingrédients</h3><div class="ck-empty">Aucun ingrédient suivi. Cochez « Suivi » dans Dépenses › Ingrédients.</div></div>';
   const cell = (c, id)=>{ const K = ck_ingsK(c), main = (c.poste === 'Sushi' || c.poste === 'Wok') ? c.poste : null, ks = ['Sushi', 'Wok'].filter(x=>!main || x === main || K[x].includes(id)); return `<td>${ks.map(x=>`<label class="ck-gc"><input type="checkbox" ${K[x].includes(id) ? 'checked' : ''} onchange="ck_cookIngK(${ck_a(c.code)},${ck_a(x)},${ck_a(id)})">${ks.length > 1 ? x[0] : ''}</label>`).join('')}</td>`; };
