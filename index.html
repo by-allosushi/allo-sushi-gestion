@@ -1049,7 +1049,8 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .bl-ind.ko{background:#2A0F13;border:1px solid #7A2A31;}#module-cuisine .bl-ind.ko .iv{color:#F87171;}#module-cuisine .bl-ind.ko .ip{background:#7A2A3155;}
     #module-cuisine .ck2-sep{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted);margin:12px 0 6px;}#module-cuisine .ck2-rep{font-size:13px;color:var(--ink-muted);margin:6px 0 2px;}#module-cuisine .ck2-rep.ok{color:#3ECF8E;}
     #module-cuisine .bl-ec.nu{background:#1D2029;border:1px solid #2A2F3C;}#module-cuisine .bl-ec.nu .ev{color:#667;}#module-cuisine .bl-ec .calc2{font-size:12px;color:var(--ink-muted);margin-top:8px;padding-top:8px;border-top:1px solid #2A2F3C;line-height:1.6;}
-    #module-cuisine .bl-cl{cursor:pointer}.bl-ch{font-style:normal;display:inline-block;width:14px;color:var(--muted,#888)}.bl-svd{margin:2px 0 8px 14px;padding:6px 8px;border-left:2px solid var(--line,#444);font-size:12px}.bl-sl,.bl-sr{display:flex;justify-content:space-between;gap:8px;padding:2px 0}.bl-sh{font-weight:600;margin-top:6px}.bl-sum{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px}.bl-sr .rg{color:#e5484d}.bl-sr .or{color:#f0a020}.bl-sr .vt{color:#30a46c}
+    #module-cuisine .stk-rt{display:flex;align-items:center;gap:10px}.stk-rt b,.stk-last{box-sizing:border-box;width:104px;text-align:center;border-radius:8px;padding:9px 6px;font-size:15px}.stk-rt b{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.22)}.stk-last{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);color:#8a948d}.stk-last i,.stk-rt b i{font-style:normal;font-size:12px;opacity:.7}.act .stk-rt b{border:2px solid #4c8dff;padding:8px 5px}.stk-hd{display:flex;justify-content:flex-end;gap:10px;margin:2px 4px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#8a948d}.stk-hd .stk-th{width:104px;text-align:center}.stk-hd small{display:block;font-size:11px;text-transform:none}.stk-pe{display:inline-block;margin-top:3px;font-size:11px;border-radius:6px;padding:2px 7px}.stk-pe.ok{background:rgba(63,185,110,.16);color:#7fd39b}.stk-pe.so{background:rgba(242,184,75,.18);color:#f2b84b}.stk-pe.ex{background:rgba(255,100,90,.18);color:#ff8a80}.stk-pe.no{background:rgba(255,255,255,.08);color:#9aa0a6}.stk-dt{margin:8px 0}.stk-dt label{display:block;font-size:12px;color:#8a948d;margin-bottom:4px}
+.bl-cl{cursor:pointer}.bl-ch{font-style:normal;display:inline-block;width:14px;color:var(--muted,#888)}.bl-svd{margin:2px 0 8px 14px;padding:6px 8px;border-left:2px solid var(--line,#444);font-size:12px}.bl-sl,.bl-sr{display:flex;justify-content:space-between;gap:8px;padding:2px 0}.bl-sh{font-weight:600;margin-top:6px}.bl-sum{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px}.bl-sr .rg{color:#e5484d}.bl-sr .or{color:#f0a020}.bl-sr .vt{color:#30a46c}
 .bl-g2.bl-g1{grid-template-columns:1fr;margin-top:8px}
 .bl-g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0;}
     #module-cuisine .bl-ec{border-radius:12px;padding:12px 14px;}#module-cuisine .bl-ec .el{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--ink-muted);}
@@ -7635,6 +7636,8 @@ Object.assign(CK_T, {
   rs_now:['Dernier inventaire', 'آخر جرد'], rs_prev:['Avant', 'قبل'], rs_art:['Article', 'المادة'], rs_todo:['À saisir', 'للإدخال'],
   rs_none:['Aucune fin de service enregistrée pour le moment.', 'لا توجد نهاية خدمة مسجلة بعد.'], rs_noStk:['Aucun comptage pour le moment.', 'لا يوجد جرد بعد.'], rs_load:['Chargement…', 'جارٍ التحميل…'],
   rs_dec:['Découpé', 'مقطّع'], rs_cnt:['Compté', 'المعدود'], rs_theo:['Théorique', 'النظري'], rs_gap:['Écart', 'الفرق'], rs_miss:['Manque', 'نقص'], rs_exact:['Exact', 'مطابق'], rs_sur:['Surplus', 'فائض'], rs_last:['Dernier comptage', 'آخر جرد'],
+  stk_lastInv:['Dernier inventaire', 'آخر جرد'], stk_today:['Aujourd’hui', 'اليوم'], stk_needMany:['Il reste à compter : {n}', 'بقي للعدّ: {n}'],
+  stk_peF:['Péremption {d}', 'الصلاحية {d}'], stk_peFj:['Péremption {d} · {n} j', 'الصلاحية {d} · {n} يوم'], stk_peX:['Périmé depuis {d}', 'منتهي الصلاحية منذ {d}'], stk_peN:['Date à saisir', 'أدخل التاريخ'], stk_peLab:['Date de péremption (facultatif)', 'تاريخ الصلاحية (اختياري)'],
   stk_next:['Valider et passer au suivant', 'تأكيد والانتقال إلى التالي'], stk_artN:['Article {a} sur {b}', 'المادة {a} من {b}'], stk_prev:['‹ Précédent', '‹ السابق'], stk_capA:['Combien en reste-t-il ?', 'كم تبقى؟'],
   stk_sec:['Stock', 'المخزون'], stk_can:['Canettes et eau', 'العلب والمياه'], stk_aut:['Autres articles', 'مواد أخرى'], stk_cnt:['Comptage', 'الجرد'], stk_loss:['Pertes', 'الخسائر'],
   stk_done:['Compté à {t}', 'تم الجرد على {t}'], stk_todo:['À compter', 'للجرد'], stk_need:['Indique le comptage de {n}', 'أدخل جرد {n}'],
@@ -7842,14 +7845,14 @@ function stk_tilesHtml(me){
 function stk_open(kind){
   const me = ck_cook(ck_who), its = kind === 'autre' ? stk_autIds(me).map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean) : stk_items(kind), d = stk_doc(ck_service()), v = {}, fresh = {};
   its.forEach(i=>{ const q = stk_num(kind === 'autre' ? stk_autQ(d, i.id, ck_who) : (d.c || {})[i.id]); if(q !== null){ v[i.id] = ck_fmt(q); fresh[i.id] = true; } });
-  stkS = { kind, tab:'c', ids:its.map(i=>i.id), i:0, act:its.length ? its[0].id : '', v, fresh, err:'' }; ck_view = 'stk'; ck_render();
+  stkS = { kind, tab:'c', ids:its.map(i=>i.id), i:0, act:its.length ? its[0].id : '', v, fresh, err:'', dp:{} }; ck_view = 'stk'; ck_render();
 }
-function stk_one(){   // article par article : valider enregistre cet article et passe au suivant
-  const S = stkS; if(!S) return; const id = S.ids[S.i], raw = S.v[id], me = ck_cook(ck_who) || { name:'' }, it = stk_items('autre').find(x=>x.id === id) || { n:'' };
-  if(raw === undefined || raw === ''){ S.err = ck_s('stk_need', { n:it.n }); return ck_render(); }
-  const date = ck_service(); ck_write('stk_' + date, { sdate:date, ca:{ [String(ck_who)]:{ [id]:{ q:ck_num(raw) || 0, at:ck_nowIso(), by:me.name } } } });
-  if(S.i >= S.ids.length - 1){ stkS = null; ck_view = 'tiles'; return ck_render(); }
-  S.i++; S.act = S.ids[S.i]; S.err = ''; ck_render();
+function stk_one(){   // « Autres articles » : un seul bouton, tout le comptage est enregistré d’un coup
+  const S = stkS; if(!S) return; const me = ck_cook(ck_who) || { name:'' }, its = S.ids.map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean), miss = its.filter(i=>S.v[i.id] === undefined || S.v[i.id] === '');
+  if(miss.length){ S.act = miss[0].id; S.err = ck_s('stk_needMany', { n:miss.slice(0, 6).map(i=>i.n).join(', ') + (miss.length > 6 ? ' …' : '') }); return ck_render(); }
+  const date = ck_service(), at = ck_nowIso(), put = {}; its.forEach(i=>{ put[i.id] = { q:ck_num(S.v[i.id]) || 0, at, by:me.name }; if(i.pe){ const e = stk_peEff(i.id, (S.dp || {})[i.id]); if(e) put[i.id].dp = e.d; } });
+  ck_write('stk_' + date, { sdate:date, ca:{ [String(ck_who)]:put } });
+  stkS = null; ck_view = 'tiles'; ck_render();
 }
 function stk_prev(){ const S = stkS; if(!S || S.i <= 0) return; S.i--; S.act = S.ids[S.i]; S.err = ''; ck_render(); }
 function stk_back(){ stkS = null; ck_view = 'tiles'; ck_render(); }
@@ -7878,13 +7881,32 @@ function stk_save(){
   ck_write('stk_' + date, { sdate:date, [loss ? 'l' : 'c']:put });
   stkS = null; ck_view = 'tiles'; ck_render();
 }
+const stk_ymd = (d)=>{ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d || '')); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : NaN; };
+const stk_dm = (d)=>String(d).slice(8, 10) + '/' + String(d).slice(5, 7);
+/* Date de péremption : on garde toujours la plus proche des dates à venir (une date passée est ignorée tant qu’une date à venir existe) */
+function stk_peEff(id, entered){
+  const today = ck_service(), pd = ck_addDays(today, -1), all = [];
+  [stk_doc(pd), stk_doc(today)].forEach(dc=>stk_autLines(dc, id).forEach(x=>{ if(x.rec && x.rec.dp) all.push(String(x.rec.dp)); }));
+  if(entered) all.push(String(entered));
+  const ok = all.filter(x=>isFinite(stk_ymd(x))).sort(), fut = ok.filter(x=>x >= today)[0];
+  if(fut) return { d:fut, exp:false }; const past = ok.filter(x=>x < today).pop(); return past ? { d:past, exp:true } : null;
+}
+function stk_pePill(it, entered){
+  if(!it || !it.pe) return ''; const e = stk_peEff(it.id, entered), pj = Number(((ck_cfg.stk || {}).pj)) || 7;
+  if(!e) return `<br><small class="stk-pe no">${esc(ck_s('stk_peN'))}</small>`;
+  if(e.exp) return `<br><small class="stk-pe ex">${esc(ck_s('stk_peX', { d:stk_dm(e.d) }))}</small>`;
+  const n = Math.round((stk_ymd(e.d) - stk_ymd(ck_service())) / 86400000);
+  return n <= pj ? `<br><small class="stk-pe so">${esc(ck_s('stk_peFj', { d:stk_dm(e.d), n }))}</small>` : `<br><small class="stk-pe ok">${esc(ck_s('stk_peF', { d:stk_dm(e.d) }))}</small>`;
+}
+function stk_setDp(v){ const S = stkS; if(!S || !S.act) return; if(v) S.dp[S.act] = v; else delete S.dp[S.act]; S.err = ''; ck_render(); }
 function stk_htmlOne(){
-  const S = stkS, id = S.ids[S.i], it = stk_items('autre').find(x=>x.id === id) || { n:'' }, me = ck_cook(ck_who) || { name:'' }, last = S.i >= S.ids.length - 1, e = S.v[id] === undefined || S.v[id] === '';
+  const S = stkS, me = ck_cook(ck_who) || { name:'' }, its = S.ids.map(id=>stk_items('autre').find(x=>x.id === id)).filter(Boolean), pd = ck_addDays(ck_service(), -1), pdoc = stk_doc(pd), dl = pd.slice(8, 10) + '/' + pd.slice(5, 7);
+  const isE = (id)=>S.v[id] === undefined || S.v[id] === '', lastOf = (id)=>{ const l = stk_autLines(pdoc, id).map(x=>x.rec).sort((a, b)=>String(b.at || '').localeCompare(String(a.at || '')))[0]; return l ? stk_num(l) : null; };
+  const rows = its.map(i=>{ const L = lastOf(i.id), un = i.u ? ' <i>' + esc(i.u) + '</i>' : ''; return `<div class="ck2-rw ${S.act === i.id ? 'act' : ''}" onclick="stk_focus(${ck_a(i.id)})"><span>${esc(i.n)}${stk_pePill(i, (S.dp || {})[i.id])}</span><span class="stk-rt"><b class="${isE(i.id) ? 'e' : ''}">${isE(i.id) ? '—' : esc(S.v[i.id]) + un}</b><span class="stk-last">${L === null ? '—' : esc(ck_fmt(L)) + un}</span></span></div>`; }).join('');
+  const ai = its.find(i=>i.id === S.act), dtF = ai && ai.pe ? `<div class="stk-dt"><label>${esc(ck_s('stk_peLab'))}</label><input type="date" class="ck-in" value="${esc((S.dp || {})[ai.id] || '')}" onchange="stk_setDp(this.value)"></div>` : '';
   const kp = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ','].map(x=>`<button onclick="stk_press('${x}')">${x}</button>`).join('') + `<button onclick="stk_press('0')">0</button><button onclick="stk_press('del')" aria-label="Effacer">⌫</button>`;
   return `<div class="ck2-wrap"><div class="ck2-bar"><span>${esc(me.name)}</span><span style="display:flex;gap:8px;align-items:center">${ck_langBtn()}<button class="ck-btn" onclick="stk_back()">‹ ${esc(ck_s('back'))}</button></span></div>${ck_alerts()}
-    <div class="ck-card"><div class="ck2-hd"><b>${esc(ck_s('stk_aut'))}</b></div><div class="ck2-grid"><div><div class="ck2-cap">${esc(ck_s('stk_artN', { a:S.i + 1, b:S.ids.length }))} · ${esc(ck_s('stk_capA'))}</div>
-    <div class="ck2-rw act"><span>${esc(it.n)}</span><b class="${e ? 'e' : ''}">${esc(e ? '0' : S.v[id])}</b></div><div class="ck-err">${esc(S.err)}</div>
-    <button class="ck-ok" onclick="stk_one()">✓ ${esc(ck_s(last ? 'k2_val' : 'stk_next'))}</button>${S.i > 0 ? `<button class="ck-btn" style="width:100%;margin-top:10px" onclick="stk_prev()">${esc(ck_s('stk_prev'))}</button>` : ''}</div><div class="ck-kp" dir="ltr">${kp}</div></div></div></div>`;
+    <div class="ck-card"><div class="ck2-hd"><b>${esc(ck_s('stk_aut'))}</b></div>${its.length ? `<div class="ck2-grid"><div><div class="ck2-cap">${esc(ck_s('stk_capC'))}</div><div class="stk-hd"><span class="stk-th">${esc(ck_s('stk_today'))}</span><span class="stk-th">${esc(ck_s('stk_lastInv'))}<small>${esc(dl)}</small></span></div>${rows}${dtF}<div class="ck-err">${esc(S.err)}</div><button class="ck-ok" onclick="stk_one()">✓ ${esc(ck_s('k2_val'))}</button></div><div class="ck-kp" dir="ltr">${kp}</div></div>` : `<div class="ck-empty">${esc(ck_s('stk_none'))}</div>`}</div></div>`;
 }
 function stk_html(){
   if(stkS.kind === 'autre') return stk_htmlOne();
@@ -8634,6 +8656,8 @@ function stk_setStart(k, v){ if(k === 'date' && v && !ck_okDate(v)) return; if(!
 function stk_setInit(id, v){ if(!ck_cfg.stk.init) ck_cfg.stk.init = {}; const n = ck_num(v); if(n === null || String(v).trim() === '') delete ck_cfg.stk.init[id]; else ck_cfg.stk.init[id] = n; ck_cfgSave(); ck_render(); }
 function stk_add(k){ ck_cfg.stk.items.push({ id:'s' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4), n:'', k, dep:'', rp:'', seuil:0 }); ck_cfgSave(); ck_render(); }
 function stk_del(id){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it || !confirm('Retirer « ' + (it.n || 'cet article') + ' » de la liste ? Les comptages déjà saisis restent enregistrés.')) return; ck_cfg.stk.items = ck_cfg.stk.items.filter(x=>x.id !== id); ck_cfgSave(); ck_render(); }
+function stk_setPe(id, on){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; if(on) it.pe = true; else delete it.pe; ck_cfgSave(); ck_render(); }
+function stk_setPj(v){ const n = Math.round(ck_num(v) || 0); if(!ck_cfg.stk) ck_cfg.stk = { items:[] }; if(n > 0 && n !== 7) ck_cfg.stk.pj = n; else delete ck_cfg.stk.pj; ck_cfgSave(); ck_render(); }
 function stk_set(id, key, val){ const it = ck_cfg.stk.items.find(x=>x.id === id); if(!it) return; if(key === 'seuil'){ const n = ck_num(val); val = n === null || n < 0 ? 0 : n; } else val = String(val).trim(); it[key] = val; ck_cfgSave(); ck_render(); }
 function stk_boissons(){ const b = (ck_btnsRaw || []).find(x=>x && /boisson/i.test(x.n || '')); return b && Array.isArray(b.items) ? b.items.filter(x=>x && x.n && !x.off).map(x=>x.n) : []; }
 function stk_rpNames(){
@@ -8672,8 +8696,8 @@ function stk_regHtml(){
   const block = (k, titre, can)=>{
     const its = stk_itemsAll(k).map(i=>`<div class="ck-fr" style="align-items:flex-end;flex-wrap:wrap"><div><label>Nom</label><br><input class="ck-in" style="width:170px" value="${esc(i.n)}" onchange="stk_set(${ck_a(i.id)},'n',this.value)"></div>
       ${can ? `<div><label>Nom dans Dépenses</label><br><input class="ck-in" list="stk-dl" style="width:170px" value="${esc(i.dep || '')}" onchange="stk_set(${ck_a(i.id)},'dep',this.value)"></div><div><label>Nom dans Resto Pro (séparer par ;)</label><br><input class="ck-in" style="width:210px" value="${esc(i.rp || '')}" onchange="stk_set(${ck_a(i.id)},'rp',this.value)"></div>` : `<div><label>Unité</label><br><input class="ck-in" style="width:90px" placeholder="pcs, kg, L…" value="${esc(i.u || '')}" onchange="stk_set(${ck_a(i.id)},'u',this.value)"></div>`}
-      <button class="ck-btn sm danger" onclick="stk_del(${ck_a(i.id)})">Retirer</button></div>${can ? '' : ck_cooks().filter(c=>stk_autIds(c).includes(i.id)).map(c=>`<div class="ck-fr" style="margin:2px 0 8px 14px"><span class="ck-sub" style="min-width:200px">${esc(stk_cookLabel(c.code))} : emplacement</span><input class="ck-in" style="width:140px" placeholder="Cuisine, Stock…" value="${esc(stk_place(c.code, i.id))}" onchange="stk_setPlace(${ck_a(c.code)},${ck_a(i.id)},this.value)"></div>`).join('')}`).join('');
-    return `<div class="ck-box"><h3>${titre}</h3>${its || '<div class="ck-sub">Aucun article.</div>'}<div style="margin-top:8px"><button class="ck-btn sm" onclick="stk_add('${k}')">+ Ajouter un article</button></div></div>`;
+      ${can ? '' : `<label class="ck-sub" style="display:flex;align-items:center;gap:6px;margin:0 8px 6px"><input type="checkbox" ${i.pe ? 'checked' : ''} onchange="stk_setPe(${ck_a(i.id)},this.checked)"> A une date de péremption</label>`}<button class="ck-btn sm danger" onclick="stk_del(${ck_a(i.id)})">Retirer</button></div>${can ? '' : ck_cooks().filter(c=>stk_autIds(c).includes(i.id)).map(c=>`<div class="ck-fr" style="margin:2px 0 8px 14px"><span class="ck-sub" style="min-width:200px">${esc(stk_cookLabel(c.code))} : emplacement</span><input class="ck-in" style="width:140px" placeholder="Cuisine, Stock…" value="${esc(stk_place(c.code, i.id))}" onchange="stk_setPlace(${ck_a(c.code)},${ck_a(i.id)},this.value)"></div>`).join('')}`).join('');
+    return `<div class="ck-box"><h3>${titre}</h3>${its || '<div class="ck-sub">Aucun article.</div>'}<div style="margin-top:8px"><button class="ck-btn sm" onclick="stk_add('${k}')">+ Ajouter un article</button></div>${can ? '' : `<div class="ck-fr" style="margin-top:10px"><span class="ck-sub">Pastille orange quand il reste moins de</span><input class="ck-in" type="number" min="1" style="width:70px" value="${esc(String(Number((ck_cfg.stk || {}).pj) || 7))}" onchange="stk_setPj(this.value)"><span class="ck-sub">jours</span></div>`}</div>`;
   };
   return dl + stk_canRegHtml() + block('autre', 'Stock : autres articles', false) + `<div class="ck-sub" style="margin:0 0 10px;">Les personnes qui comptent les canettes et l’eau se choisissent plus haut, dans la fiche de chaque cuisinier (« Comptage du stock »). Les autres articles s’attribuent à chaque cuisinier de la même façon que les ingrédients.</div>`;
 }
