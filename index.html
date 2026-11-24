@@ -1080,6 +1080,7 @@ input[type="checkbox"],input[type="radio"]{width:22px !important;min-width:22px;
     #module-cuisine .bl-bt{border:1px solid var(--line);background:transparent;color:inherit;border-radius:8px;padding:4px 14px;font-size:12px;min-width:76px;cursor:pointer;font-family:inherit;}#module-cuisine .bl-bt.on{background:rgba(61,139,255,.2);border-color:rgba(61,139,255,.5);}#module-cuisine .bl-bt.bp{background:#1f4a8a;border-color:#2b6cb0;color:#fff;}
     #module-cuisine .bl-sub{padding:7px 12px 2px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-muted);}
     #module-cuisine .bl-sl{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--line);font-size:14px;}#module-cuisine .bl-sh + .bl-sl,#module-cuisine .bl-sub + .bl-sl{border-top:0;}
+    .bl-ed{background:none;border:1px solid var(--line,#555);border-radius:6px;color:inherit;font-size:12px;padding:0 6px;margin-left:6px;cursor:pointer}.bl-md{font-style:normal;font-size:11px;margin-left:6px;color:var(--ink-muted,#999)}.bl-pf{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 12px;font-size:13px}.bl-pf input{width:70px;text-align:center;font-family:'IBM Plex Mono',monospace}.bl-pf small{color:#ff6b6b;flex-basis:100%}
     #module-cuisine .bl-sl small{display:block;color:var(--ink-muted);font-size:11px;}#module-cuisine .bl-sl b{font-family:'IBM Plex Mono',monospace;font-weight:500;text-align:right;}
     #module-cuisine .bl-ed{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
     #module-cuisine .bl-in{width:76px;background:var(--bg,transparent);color:inherit;border:1px solid rgba(61,139,255,.6);border-radius:6px;padding:3px 8px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:14px;}
@@ -8327,7 +8328,12 @@ function stk_ingTable(){
     if(open){
       const SV = stk_services(D, L), hm = (t)=>{ const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
       const svl = (sv)=>esc(sv.p) + ' · ' + (sv.from ? hm(sv.from) : 'début') + ' → ' + hm(sv.to) + ' · ' + esc(sv.cooks.join(' + '));
-      const svList = (field, signed)=>{ if(!SV) return ''; let h = '', n = 0; SV.chains.forEach(ch=>ch.services.forEach(sv=>{ const v = sv[field]; if(v === undefined || v === null) return; n++; if(field === 'conso' && sv.parts){ sv.parts.forEach(pt=>{ h += `<div class="bl-sl"><span>${esc(sv.p)} · ${pt.from ? hm(pt.from) : 'début'} → ${hm(pt.to)} · ${esc(pt.cook)}</span><b>${esc(ck_fmt(pt.conso))}${stk_un(L.u)}</b></div>`; }); return; }
+      const svList = (field, signed)=>{ if(!SV) return ''; let h = '', n = 0; SV.chains.forEach(ch=>ch.services.forEach(sv=>{ const v = sv[field]; if(v === undefined || v === null) return; n++; if(field === 'conso' && (sv.parts || sv.pasIn || sv.pasB)){
+          const ed = (pp, t)=>pp ? `<button class="bl-ed" onclick="stk_pasEd('${pp.k}','${t ? hm(t) : ''}','${D}')" aria-label="Corriger l’heure de passage">✎</button>${pp.set ? '<em class="bl-md">modifiée</em>' : ''}` : '';
+          const frm = (pp)=>pp && stk_pasK === pp.k ? `<div class="bl-pf"><span>Heure de passage</span><input type="text" inputmode="numeric" maxlength="5" placeholder="hh:mm" value="${esc(stk_pasV)}" oninput="stk_pasIn(this)"><button class="ck-btn sm" onclick="stk_pasOk()">OK</button>${pp.set ? `<button class="ck-btn sm" onclick="stk_pasAuto('${pp.k}')">Auto</button>` : ''}<button class="ck-btn sm" onclick="stk_pasEd('')">✕</button>${stk_pasErr ? '<small>Format : hh:mm</small>' : ''}</div>` : '';
+          if(sv.parts){ sv.parts.forEach((pt, ix)=>{ const pp = (ix === 0 && sv.pasB) ? sv.pasB : (ix > 0 && sv.pasIn) ? sv.pasIn : null, tt = ix === 0 ? pt.from : pt.from;
+            h += `<div class="bl-sl"><span>${esc(sv.p)} · ${pt.from ? hm(pt.from) : 'début'} → ${hm(pt.to)} · ${esc(pt.cook)} ${ed(pp, tt)}</span><b>${esc(ck_fmt(pt.conso))}${stk_un(L.u)}</b></div>${frm(pp)}`; }); return; }
+          const pp = sv.pasIn || sv.pasB; h += `<div class="bl-sl"><span>${svl(sv)} ${ed(pp, pp && pp.t)}</span><b>${esc(ck_fmt(v))}${stk_un(L.u)}</b></div>${frm(pp)}`; return; }
         h += `<div class="bl-sl"><span>${svl(sv)}</span><b>${esc(ck_fmt(v))}${stk_un(L.u)}</b></div>`; })); return n ? h : ''; };
       const svEc = ()=>{ if(!SV) return ''; let h = '', tot = 0, any = false, ini = null, fin = null;
         SV.chains.forEach(ch=>{ const first = ch.services[0], last = ch.services[ch.services.length - 1]; ini = (ini || 0) + (first.dep || 0); fin = (fin || 0) + (last.reel || 0);
@@ -8455,6 +8461,15 @@ function fi_slots(id){
 const FI_MES = { saumon:'net', gamba:'net', viande:'net', boeuf:'net', simple:'net', crevette:'crispy', avocat:'net utilisé', poulet:'pris pour hachage' };
 
 let stk_sv = {};
+let stk_pasK = '', stk_pasV = '', stk_pasD = '', stk_pasErr = false;
+function stk_pasEd(k, v, D){ stk_pasK = k || ''; stk_pasV = v || ''; stk_pasD = D || stk_pasD; stk_pasErr = false; ck_render(); }
+function stk_pasIn(el){ const d = String(el.value || '').replace(/\D/g, '').slice(0, 4), f = d.length > 2 ? d.slice(0, 2) + ':' + d.slice(2) : d; el.value = f; stk_pasV = f; stk_pasErr = false; }
+function stk_pasOk(){
+  const m = /^(\d{1,2}):?(\d{2})$/.exec(String(stk_pasV || '')); if(!m || +m[1] > 23 || +m[2] > 59){ stk_pasErr = true; return ck_render(); }
+  const ms = stk_tkMs(stk_pasD, { h:String(m[1]).padStart(2, '0') + ':' + m[2] }); if(isNaN(ms)){ stk_pasErr = true; return ck_render(); }
+  ck_write('stk_' + stk_pasD, { pas:{ [stk_pasK]:new Date(ms).toISOString() } }); stk_pasK = ''; ck_render();
+}
+function stk_pasAuto(k){ ck_write('stk_' + stk_pasD, { pas:{ [k]:'' } }); stk_pasK = ''; ck_render(); }
 function stk_svTog(id, key){ const k = id + '|' + key; stk_sv[k] = !stk_sv[k]; ck_render(); }
 /* services d'un ingrédient : un service = tout ce qui se passe entre deux fins de service d'un même poste ; la fin du service précédent est le départ du suivant */
 function stk_services(D, L){
@@ -8497,18 +8512,29 @@ function stk_services(D, L){
         const dH = depOf(sv, pst, 'fh'), hache = ck_r(escIds.reduce((a, eid)=>a + sumW(eid, 'dc', null, 'b', w) - sumW(eid, 'dc', null, 'n', w), 0)), pris = sumW(id, 'hc', null, 'q', w), pq = ck_r(sumW(id, 'pq', null, 'q', w, 'b'));
         sv.rows.push(mk('Bac à haché', dH, hache, ck_r(pris + pq), fv(sv, 'fh'))); sv.dep = dH || 0; sv.reel = fv(sv, 'fh') || 0; sv.pertes = pq; sv.conso = 0;
       } });
-    svs.forEach(sv=>{   // plusieurs cuisiniers sur un service : la consommation est séparée à l’heure de passage (dernière validation « Autres articles » du cuisinier qui n’a pas fait sa fin de service)
+    const PAS = (stk_doc(D) || {}).pas || {}, pT = (kk)=>{ const t = Date.parse(PAS[kk]); return isNaN(t) ? null : t; };   // heures de passage corrigées à la main (admin)
+    const conF = (Sw)=>{ if(k === 'escalope') return pst === 'Sushi' ? cv(vend(Sw, id + '|Sushi')) : vend(Sw, id + '|Wok'); if(k === 'poulet') return 0; if(pi !== 0) return 0;
+      if(k === 'gamba') return Math.max(0, ck_r(vend(Sw, id) - rd(fi_toUnit(id, stk_gamNem(id, D, Sw).soldG)))); return vend(Sw, id); };
+    const mkPart = (cook, t0, t1, to)=>({ cook, from:isFinite(t0) ? t0 : null, to:isFinite(t1) ? t1 : to, conso:conF(fi_sales(D, { t0, t1 })) });
+    svs.forEach(sv=>{   // plusieurs cuisiniers sur un service : la consommation est séparée à l’heure de passage (dernière validation « Autres articles » du cuisinier sans fin de service), corrigeable par l’admin
       if(!sv.cooks || sv.cooks.length < 2) return;
-      const dc = stk_doc(D) || {}, ca = dc.ca || {}, cuts = [];
-      for(const nm of sv.cooks){ if(nm === sv.fin.cook) continue;
+      const ca = (stk_doc(D) || {}).ca || {}, nonFin = sv.cooks.filter(nm=>nm !== sv.fin.cook), kIn = pst + '|' + sv.i + '|in', ov = pT(kIn); let cuts = [], autoT = null;
+      for(const nm of nonFin){
         const dk = Object.keys(docs || {}).find(x=>(docs[x].name || ck_empName(docs[x].emp)) === nm), code = dk ? String(docs[dk].emp) : '', recs = code && ca[code] ? Object.keys(ca[code]).map(x=>T(ca[code][x])).filter(t=>t > sv.w.t0 && t <= sv.w.t1) : [];
-        if(!recs.length) return; cuts.push({ nm, t:Math.max.apply(null, recs) }); }
-      cuts.sort((a, b)=>a.t - b.t);
+        if(!recs.length){ cuts = []; break; } cuts.push({ nm, t:Math.max.apply(null, recs) }); }
+      cuts.sort((a, b)=>a.t - b.t); if(nonFin.length === 1 && cuts.length === 1) autoT = cuts[0].t;
+      if(ov !== null && nonFin.length === 1) cuts = [{ nm:nonFin[0], t:Math.min(Math.max(ov, isFinite(sv.w.t0) ? sv.w.t0 : ov), isFinite(sv.w.t1) ? sv.w.t1 : ov) }];
+      sv.pasIn = nonFin.length === 1 ? { k:kIn, auto:autoT, set:ov !== null, t:cuts.length ? cuts[0].t : null } : null;
+      if(!cuts.length) return;
       const segs = []; let t0 = sv.w.t0; cuts.forEach(c=>{ segs.push({ cook:c.nm, t0, t1:c.t }); t0 = c.t; }); segs.push({ cook:sv.fin.cook, t0, t1:sv.w.t1 });
-      const conF = (Sw)=>{ if(k === 'escalope') return pst === 'Sushi' ? cv(vend(Sw, id + '|Sushi')) : vend(Sw, id + '|Wok'); if(k === 'poulet') return 0; if(pi !== 0) return 0;
-        if(k === 'gamba') return Math.max(0, ck_r(vend(Sw, id) - rd(fi_toUnit(id, stk_gamNem(id, D, Sw).soldG)))); return vend(Sw, id); };
-      sv.parts = segs.map(g=>({ cook:g.cook, from:isFinite(g.t0) ? g.t0 : null, to:isFinite(g.t1) ? g.t1 : sv.to, conso:conF(fi_sales(D, { t0:g.t0, t1:g.t1 })) }));
+      sv.parts = segs.map(g=>mkPart(g.cook, g.t0, g.t1, sv.to));
     });
+    svs.forEach((sv, i)=>{   // passage d’un service à l’autre (fin de service de l’un) : l’admin peut déplacer l’heure, seule la consommation en tient compte
+      if(!i) return; const pv = svs[i - 1];
+      if(pv.parts || sv.parts || !pv.cooks || !sv.cooks || pv.cooks.length !== 1 || sv.cooks.length !== 1) return;
+      const kB = pst + '|' + i + '|b', ov = pT(kB); sv.pasB = { k:kB, auto:sv.from, set:ov !== null, t:ov !== null ? ov : sv.from };
+      if(ov === null) return; const o = Math.min(Math.max(ov, isFinite(pv.w.t0) ? pv.w.t0 : ov), sv.w.t1 === Infinity ? ov : sv.w.t1);
+      pv.parts = [mkPart(pv.cooks[0], pv.w.t0, o, pv.to)]; sv.parts = [mkPart(sv.cooks[0], o, sv.w.t1, sv.to)]; sv.parts[0].from = o; pv.parts[0].to = o; });
     chains.push({ p:pst, services:svs }); });
   return chains.length ? { chains } : null;
 }
