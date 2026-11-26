@@ -7776,7 +7776,7 @@ function rst_kitchen(ks){   // une seule section « Ingrédients » pour toutes 
     const { K, d } = src[id], u = ck_unit(id), nm = esc(ck_ingName(id));
     if(ck_kind(id) === 'escalope') return rst_escHtml(id, u, nm);
     const r = d && ck_recOne(d, id, ck2_fid(K.p)), f = r && r.f;
-    const cur = f ? ck_r(ck2_finKeys(id, K.p).filter(k=>k !== 'fc' && k !== 'fm' && k !== 'fg').reduce((a, k)=>a + (Number(f[k]) || 0), 0)) : null;
+    const cur = f ? ck_r(ck2_finKeys(id, K.p).filter(k=>k !== 'fc' && k !== 'fm' && k !== 'fg' && k !== 'ff').reduce((a, k)=>a + (Number(f[k]) || 0), 0)) : null;
     return `<div class="rs-it"><div class="rs-row"><span class="n">${nm}</span>${cur === null ? `<span class="rs-todo">${esc(ck_s('rs_todo'))}</span>` : `<span class="v">${rst_val(cur, u)}</span>`}</div>${cur !== null && !same(d) ? `<div class="rs-by">${rst_who(d)}</div>` : ''}${cur === null ? '' : rst_fixH(r)}</div>`;
   }).join('');
   return `<div class="rs-sec"><span class="st">${ttl}</span><span class="cw">${rst_who(top)}</span></div>${rows}`;
@@ -8006,7 +8006,7 @@ const stk_un = (u)=>u ? ' <span class="bl-u">' + esc(u) + '</span>' : '';   // u
 const stk_cu = (x, u)=>x === null || x === undefined ? '—' : esc(ck_fmt(x)) + stk_un(u);
 /* ===== Suivi des ingrédients : bilan par ingrédient (veille → achat → sorties → théorique → réel → écart) ===== */
 let ckc = null, ckcErr = '';
-const CKC_LAB = { fb:'Brut', fn:'Net', fc:'Crispy restant', fh:'Bac à haché', fg:'Farce de gyoza', fm:'Nems restants' };
+const CKC_LAB = { fb:'Brut', fn:'Net', fc:'Crispy restant', fh:'Bac à haché', fg:'Farce de gyoza', fm:'Nems restants', ff:'Farce de nem' };
 function ckc_open(id, which){ ckc = { id, which }; ckcErr = ''; ck_render(); }
 function ckc_cancel(){ ckc = null; ckcErr = ''; ck_render(); }
 function ckc_src(which){ const D = ck_adate || ck_service(); return which === 'veille' ? { date:ck_addDays(D, -1), docs:ck_prevSrv } : { date:D, docs:ck_docs() }; }
@@ -8074,7 +8074,8 @@ function stk_ledger(D){
     if(es) ['Sushi', 'Wok'].forEach(K=>{ if(ps.includes(K) || pp.includes(K) || asg(K)) stages.push({ K, lab:'Net ' + K, veille:veilleOf('fn', pp.filter(x=>x === K)), pese:ck2_finP(docs, id, K, 'fn') }); });
     else if(k === 'saumon' || k === 'gamba'){ if(ps.length || pp.length || asg(null)) stages.push({ K:null, lab:k === 'gamba' ? 'Décortiquée' : 'Net', veille:veilleOf('fn', pp), pese:sumF(docs, id, 'fn', ps) }); }
     else if(cr){ if(ps.length || pp.length || asg(null)) stages.push({ K:null, lab:'Crispy', veille:veilleOf('fc', pp), pese:sumF(docs, id, 'fc', ps) }); }
-    const bl = po ? 'Bac' : 'Brut', vP = [{ lab:bl, v:vB }].concat(stages.map(s=>({ lab:s.lab, v:s.veille }))), rP = [{ lab:bl, v:fB }].concat(stages.map(s=>({ lab:s.lab, v:s.pese })));
+    const vi = k === 'viande', cfv = (ck_cfg.ings || {})[id] || {}, fpv = (cfv.farcePct === undefined || cfv.farcePct === '' || !isFinite(Number(cfv.farcePct))) ? 0.6 : Number(cfv.farcePct) / 100, farceV = (d, pl)=>{ const v = pl.length ? sumF(d, id, 'fg', pl) : null; return v === null ? 0 : ck_r(v * fpv); };   // viande hachée : la farce de gyoza restante compte dans le stock (farce × part de viande)
+    const bl = po ? 'Bac' : 'Brut', vP = [{ lab:bl, v:vB }].concat(stages.map(s=>({ lab:s.lab, v:s.veille }))).concat(vi ? [{ lab:'Farce gyoza', v:vB === null ? null : farceV(prev, pp) }] : []), rP = [{ lab:bl, v:fB }].concat(stages.map(s=>({ lab:s.lab, v:s.pese }))).concat(vi ? [{ lab:'Farce gyoza', v:fB === null ? null : farceV(docs, ps) }] : []);
     const veille = vP.every(x=>x.v !== null) ? ck_r(vP.reduce((a, x)=>a + x.v, 0)) : null, reel = rP.every(x=>x.v !== null) ? ck_r(rP.reduce((a, x)=>a + x.v, 0)) : null;
     const dcB = ck2_sumP(docs, id, 'dc', null, 'b'), dcN = ck2_sumP(docs, id, 'dc', null, 'n'), qF = ck2_sumP(docs, id, 'fr', null, 'q');
     let taux = null, frit = null, frS = 0;
@@ -8102,17 +8103,18 @@ function stk_ledger(D){
       Object.keys(S.prods || {}).forEach(pk=>{ const o = S.prods[pk], nm = String(o.name || pk), isG = /gyoza/i.test(nm), isN = !isG && /\bnems?\b/i.test(nm); if(!isG && !isN) return; const ig = fi_ing(pk, D), g = ig ? (Number(ig[id]) || 0) : 0; if(isG) gv += o.q * g; else nv += o.q * g; if(!(g > 0)){ if(isG) gM = true; else nM = true; } });
       gv = rd(fi_toUnit(id, gv)); nv = rd(fi_toUnit(id, nv));
       const vf = day0 ? 0 : (sumF(prev, id, 'fg', pp) || 0), vm = day0 ? 0 : (sumF(prev, id, 'fm', pp) || 0), rf = sumF(docs, id, 'fg', ps), rm = sumF(docs, id, 'fm', ps);
-      if(mG > 0 || mN > 0 || rf !== null || rm !== null || vf > 0 || vm > 0){
+      const fpn = (cf.farceNemPct === undefined || cf.farceNemPct === '' || !isFinite(Number(cf.farceNemPct))) ? 0.6 : Number(cf.farceNemPct) / 100, vff = day0 ? 0 : (sumF(prev, id, 'ff', pp) || 0), rff = sumF(docs, id, 'ff', ps);
+      if(mG > 0 || mN > 0 || rf !== null || rm !== null || rff !== null || vf > 0 || vm > 0 || vff > 0){
         const gVe = ck_r(vf * fp), gTh = ck_r(gVe + mG - gv), gRe = rf === null ? null : ck_r(rf * fp);
-        const nVe = ng === null ? null : ck_r(vm * ng), nTh = ng === null ? null : ck_r(nVe + mN - nv), nRe = (ng === null || rm === null) ? null : ck_r(rm * ng);
-        gn = { G:{ veille:gVe, mis:mG, vendu:gv, th:gTh, reel:gRe, ec:gRe === null ? null : ck_r(gRe - gTh), base:ck_r(gVe + mG), miss:gM, pct:fp, farce:rf }, N:{ veille:nVe, mis:mN, vendu:nv, th:nTh, reel:nRe, ec:nRe === null ? null : ck_r(nRe - nTh), base:ng === null ? null : ck_r(nVe + mN), miss:nM, ng, pcs:rm, needNg:ng === null } }; }
+        const nVe = ng === null ? null : ck_r(vm * ng + vff * fpn), nTh = ng === null ? null : ck_r(nVe + mN - nv), nRe = (ng === null || (rm === null && rff === null)) ? null : ck_r((rm || 0) * ng + (rff || 0) * fpn);
+        gn = { G:{ veille:gVe, mis:mG, vendu:gv, th:gTh, reel:gRe, ec:gRe === null ? null : ck_r(gRe - gTh), base:ck_r(gVe + mG), miss:gM, pct:fp, farce:rf }, N:{ veille:nVe, mis:mN, vendu:nv, th:nTh, reel:nRe, ec:nRe === null ? null : ck_r(nRe - nTh), base:ng === null ? null : ck_r(nVe + mN), miss:nM, ng, pcs:rm, farce:rff, fpct:fpn, needNg:ng === null } }; }
     }
     const gb = k === 'gamba', nemOut = gb ? ck2_sumP(docs, id, 'dc', null, 'ne') : 0;
     if(gb){ const gm = stk_gamNem(id, D, S), ng = gm.ng === null ? null : fi_toUnit(id, gm.ng), nvU = rd(fi_toUnit(id, gm.soldG));
-      const vm = day0 ? 0 : (sumF(prev, id, 'fm', pp) || 0), rm = sumF(docs, id, 'fm', ps);
-      if(nemOut > 0 || rm !== null || vm > 0){
-        const nVe = ng === null ? null : ck_r(vm * ng), nTh = ng === null ? null : ck_r(nVe + nemOut - nvU), nRe = (ng === null || rm === null) ? null : ck_r(rm * ng);
-        gn = { gb:true, N:{ veille:nVe, mis:nemOut, vendu:nvU, th:nTh, reel:nRe, ec:nRe === null ? null : ck_r(nRe - nTh), base:ng === null ? null : ck_r(nVe + nemOut), miss:false, ng, pcs:rm, needNg:ng === null } }; } }
+      const vm = day0 ? 0 : (sumF(prev, id, 'fm', pp) || 0), rm = sumF(docs, id, 'fm', ps), cfg = (ck_cfg.ings || {})[id] || {}, fpn = (cfg.farceNemPct === undefined || cfg.farceNemPct === '' || !isFinite(Number(cfg.farceNemPct))) ? 0.6 : Number(cfg.farceNemPct) / 100, vff = day0 ? 0 : (sumF(prev, id, 'ff', pp) || 0), rff = sumF(docs, id, 'ff', ps);
+      if(nemOut > 0 || rm !== null || rff !== null || vm > 0 || vff > 0){
+        const nVe = ng === null ? null : ck_r(vm * ng + vff * fpn), nTh = ng === null ? null : ck_r(nVe + nemOut - nvU), nRe = (ng === null || (rm === null && rff === null)) ? null : ck_r((rm || 0) * ng + (rff || 0) * fpn);
+        gn = { gb:true, N:{ veille:nVe, mis:nemOut, vendu:nvU, th:nTh, reel:nRe, ec:nRe === null ? null : ck_r(nRe - nTh), base:ng === null ? null : ck_r(nVe + nemOut), miss:false, ng, pcs:rm, farce:rff, fpct:fpn, needNg:ng === null } }; } }
     const dec = (es || po || av) ? 0 : cr ? ck_r(dcB - qF) : ck_r(dcB - dcN);
     const cs = es ? [['Sushi', cv(fi_toUnit(id, S.g[id + '|Sushi'] || 0))], ['Wok', sold(id + '|Wok')]] : po ? [] : gb ? [['', Math.max(0, ck_r(sold(id) - rd(fi_toUnit(id, stk_gamNem(id, D, S).soldG))))]] : [['', sold(id)]], conso = ck_r(cs.reduce((a, x)=>a + x[1], 0));
     const pqB = ck2_pqS(docs, id, null, 'b'), pqN = ck2_pqS(docs, id, null, 'n'), pqC = ck2_pqS(docs, id, null, 'c'), wd = av ? ck2_sumP(docs, id, 'wd', null, 'q') : 0, fcS = es ? (ck2_finP(docs, id, 'Sushi', 'fc') || 0) : 0;
@@ -8146,7 +8148,7 @@ function sx_text(e){
   else if(r.t === 'hc') d = 'bac ' + n(f.q) + (Number(f.b) > 0 ? ' + brut ' + n(f.b) : '');
   else if(r.t === 'wd') d = n(f.q);
   else if(r.t === 'pq') d = n(f.q) + ck2_stLab(r);
-  else d = ['fb', 'fn', 'fc', 'fh', 'fg', 'fm'].filter(k=>f[k] !== undefined).map(k=>CKC_LAB[k].toLowerCase() + ' ' + n(f[k])).join(' · ');
+  else d = ['fb', 'fn', 'fc', 'fh', 'fm', 'ff', 'fg'].filter(k=>f[k] !== undefined).map(k=>CKC_LAB[k].toLowerCase() + ' ' + n(f[k])).join(' · ');
   return (e.ctx && e.id !== e.ctx ? ck_ingName(e.id) + ' · ' : '') + (e.date !== (ck_adate || ck_service()) ? ck_frDate(e.date) + ' · ' : '') + lab + (r.p ? ' ' + r.p : '') + ' · ' + e.name + ' · ' + ck_hm(r.at) + ' — ' + d + (r.adm ? ' (' + sx_corrTxt(r) + ')' : '');
 }
 function sx_tog(key){ sxo[key] = !sxo[key]; if(!sxo[key] && sxe && sxe.key === key) sxe = null; ck_render(); }
@@ -8392,7 +8394,7 @@ function stk_ingTable(){
           return `<div class="bl-ec ${k}"><div class="el"><span>${lab}</span><span class="ip">${st}</span></div><div class="ev">${sg(X.ec) || ''}${esc(fm(X.ec))}<small>${un}</small></div><div class="es">${esc(ck_fmt(pc))} % ${esc(sub)}${X.miss ? ' · fiche sans ' + mat : ''}</div><div class="calc2">${calc}</div></div>`; };
         const f2 = (x)=>esc(ck_fmt(x));
         const cg = (!G || G.reel === null) ? '' : `Départ ${f2(G.veille)} + mis ${f2(G.mis)} − vendu ${f2(G.vendu)} = ${f2(G.th)} attendus<br>Reste pesé : ${f2(G.farce)} de farce × ${f2(Math.round(G.pct * 1000) / 10)} % = ${f2(G.reel)}`;
-        const cn = N.reel === null ? '' : `Départ ${f2(N.veille)} + mis ${f2(N.mis)} − vendu ${f2(N.vendu)} = ${f2(N.th)} attendus<br>Restants : ${f2(N.pcs)} pcs × ${f2(Math.round(N.ng * 100) / 100)} = ${f2(N.reel)}`;
+        const cn = N.reel === null ? '' : `Départ ${f2(N.veille)} + mis ${f2(N.mis)} − vendu ${f2(N.vendu)} = ${f2(N.th)} attendus<br>Restants : ${f2(N.pcs || 0)} pcs × ${f2(Math.round(N.ng * 100) / 100)}${N.farce ? ' + ' + f2(N.farce) + ' de farce × ' + f2(Math.round(N.fpct * 1000) / 10) + ' %' : ''} = ${f2(N.reel)}`;
         c += L.gn.gb ? `<div class="bl-brut"><h6 class="bl-t">Indicateurs · nems</h6><div class="bl-g2 bl-g1">${ecg('Écart nems', N, 'de la gamba mise dans les nems', cn)}</div></div>` : `<div class="bl-brut"><h6 class="bl-t">Indicateurs · gyoza et nems</h6><div class="bl-g2">${ecg('Écart gyoza', G, 'du poulet mis dans la farce', cg)}${ecg('Écart nems', N, 'du poulet mis dans les nems', cn)}</div></div>`;
       }
       const specs = [[L.id, ['dc', 'fr', 'hc', 'wd', 'pq', 'fin2']]].concat(L.es && L.id === escIds[0] ? pouIds.map(i=>[i, ['hc']]) : []).concat(L.po ? escIds.map(i=>[i, ['dc']]) : []);
@@ -8823,20 +8825,21 @@ Object.assign(CK_T, {
   k2_hcG:['Pour les gyoza', 'للجيوزا'], k2_hcGh:['Poulet mis dans la farce', 'الدجاج المضاف إلى الحشوة'], k2_hcNm:['Pour les nems', 'للنيم'], k2_hcNmh:['Poulet mis dans les nems', 'الدجاج المضاف إلى النيم'],
   k2_hcRepCap:['Répartition des {n}', 'توزيع {n}'], k2_hcRepOk:['{a} + {b} = {t} · répartition complète', '{a} + {b} = {t} · التوزيع كامل'],
   k2_hcRepLeft:['Il reste {n} à répartir', 'المتبقي للتوزيع: {n}'], k2_hcRepOver:['La répartition dépasse le total de {n}', 'التوزيع يتجاوز المجموع بـ {n}'],
-  k2_fg:['Farce de gyoza', 'حشوة الجيوزا'], k2_fgH:['Farce restante, pesée', 'الحشوة المتبقية موزونة'], k2_fm:['Nems restants', 'النيم المتبقي'], k2_fmH:['Comptés en pièces', 'يُحسب بالقطع'], k2_pcs:['pcs', 'قطعة'],
+  k2_fg:['Farce de gyoza', 'حشوة الجيوزا'], k2_fgH:['Farce restante, pesée', 'الحشوة المتبقية موزونة'], k2_ff:['Farce de nem', 'حشوة النيم'], k2_ffH:['Farce restante, pesée', 'الحشوة المتبقية موزونة'], k2_fm:['Nombre de pièces de nem', 'عدد قطع النيم'], k2_fmH:['Comptés en pièces', 'يُحسب بالقطع'], k2_pcs:['pcs', 'قطعة'],
   k2_hcGs:['gyoza', 'جيوزا'], k2_hcNs:['nems', 'نيم']
 });
 let ck2 = null, ck_tErr = '';
 const ck2_P = (p)=>String(p || '');
 const ck2_fid = (p)=>'fin2_' + (ck2_P(p) || 'x');
-const CK2_FL = { fb:['k2_fb', 'k2_hCount'], fn:['k2_fn', 'k2_hKeep'], fc:['k2_fc', 'k2_hKeep'], fh:['k2_fh', 'k2_hCount'], fg:['k2_fg', 'k2_fgH'], fm:['k2_fm', 'k2_fmH'] };
+const CK2_FL = { fb:['k2_fb', 'k2_hCount'], fn:['k2_fn', 'k2_hKeep'], fc:['k2_fc', 'k2_hKeep'], fh:['k2_fh', 'k2_hCount'], fg:['k2_fg', 'k2_fgH'], fm:['k2_fm', 'k2_fmH'], ff:['k2_ff', 'k2_ffH'] };
 function ck2_tabs(id, p){ const k = ck_kind(id), t = k === 'avocat' ? ['wd'] : k === 'poulet' ? ['hc'] : ['dc']; if(k === 'escalope' && ck2_P(p) !== 'Wok') t.push('fr'); else if(k === 'crevette') t.push('fr'); t.push('pq', 'fn'); return t; }
 function ck2_finKeys(id, p){
   const k = ck_kind(id), wok = ck2_P(p) === 'Wok';
-  if(k === 'poulet') return ['fh', 'fg', 'fm'];
+  if(k === 'poulet') return ['fh', 'fm', 'ff', 'fg'];
+  if(k === 'viande') return ['fb', 'fg'];
   if(k === 'escalope') return wok ? ['fn'] : ['fb', 'fn', 'fc'];
   if(k === 'crevette') return ['fb', 'fc'];
-  if(k === 'gamba') return ['fb', 'fn', 'fm'];
+  if(k === 'gamba') return ['fb', 'fn', 'fm', 'ff'];
   if(k === 'saumon') return ['fb', 'fn'];
   return ['fb'];
 }
@@ -8994,7 +8997,7 @@ function ck2_recText(id, r){
   if(r.t === 'wd') return ck_s('k2_wd') + ' ' + v(f.q) + pp;
   if(r.t === 'pq') return ck_s('k2_pq') + ' ' + v(f.q) + ck2_stLab(r) + pp;
   if(r.t === 'hc') return ck_s('k2_hc') + ' ' + v(f.q) + (Number(f.b) > 0 ? ' + ' + v(f.b) + ' ' + ck_s('k2_hcBs') : '') + pp;
-  return ck_s('fin') + ' : ' + ['fb', 'fn', 'fc', 'fh', 'fg', 'fm'].filter(k=>f[k] !== undefined).map(k=>ck2_flab(id, k) + ' ' + v(f[k])).join(' · ') + pp;
+  return ck_s('fin') + ' : ' + ['fb', 'fn', 'fc', 'fh', 'fm', 'ff', 'fg'].filter(k=>f[k] !== undefined).map(k=>ck2_flab(id, k) + ' ' + v(f[k])).join(' · ') + pp;
 }
 function ck2_figs(id, doc){
   const u = ck_unit(id), f = (x)=>ck_fmt(x) + ' ' + u, o = [], dc = ck_recs(doc, id, 'dc'), b = ck_sumF(dc, 'b'), n = ck_sumF(dc, 'n');
@@ -9003,7 +9006,7 @@ function ck2_figs(id, doc){
   const wd = ck_recs(doc, id, 'wd'); if(wd.length) o.push([ck_s('k2_wdTot'), f(ck_sumF(wd, 'q'))]);
   const pq = ck_recs(doc, id, 'pq'); if(pq.length) o.push([ck_s('k2_pqTot'), f(ck_sumF(pq, 'q'))]);
   const hc = ck_recs(doc, id, 'hc'); if(hc.length){ o.push([ck_s('k2_hcTot'), f(ck_sumF(hc, 'q'))]); if(ck_sumF(hc, 'b') > 0) o.push([ck_s('k2_hcB'), f(ck_sumF(hc, 'b'))]); }
-  ck_recs(doc, id, 'fin2').forEach(r=>{ const fl = r.f || {}; ['fb', 'fn', 'fc', 'fh', 'fg', 'fm'].forEach(k=>{ if(fl[k] !== undefined) o.push([ck2_flab(id, k) + (r.p ? ' (' + r.p + ')' : ''), f(Number(fl[k]) || 0)]); }); });
+  ck_recs(doc, id, 'fin2').forEach(r=>{ const fl = r.f || {}; ['fb', 'fn', 'fc', 'fh', 'fm', 'ff', 'fg'].forEach(k=>{ if(fl[k] !== undefined) o.push([ck2_flab(id, k) + (r.p ? ' (' + r.p + ')' : ''), f(Number(fl[k]) || 0)]); }); });
   return o;
 }
 /* suivi admin : le circuit du jour, tous cuisiniers confondus (somme des saisies ; reste de la veille = fin de service de la veille) */
@@ -9277,7 +9280,7 @@ function ck_export(){
   const COL = { a:'À découper / sorti du stock', t:'Transféré', n:'Pour les nems', g:'Gyozas (poulet haché)', v:'Utilisée gyozas (viande hachée)', w:'Déchet', h:'Escalope hachée directement', b:'Viande hachée achetée directement', s:'Disponible au début', rc:'Restante coupée', rn:'Restante non coupée', r:'Restante', pc:'Perdue poulet crispy', pq:'Perdue mauvaise qualité', cr:'Crispée restante', pe:'Écart de reprise (perte)', rd:'Rendement du jour' };
   Object.keys(docs).forEach(k=>{ const d = docs[k]; Object.keys(d.recs || {}).forEach(id=>{ Object.keys(d.recs[id]).forEach(rid=>{ const r = d.recs[id][rid]; if(!r || r.del) return; const it = ck_ingById(id) || { n:id };
     const row = { Date:date, Cuisinier:d.name || ck_empName(d.emp), Poste:d.poste || '', Ingrédient:it.n, Saisie:TYPE[r.t] || r.t, Heure:ck_hm(r.at), Unité:ck_unit(id) };
-    const NEW = r.t === 'dc' || r.t === 'fr' || r.t === 'hc' || r.t === 'fin2' || r.t === 'wd' || r.t === 'pq', COLN = { b:'Brut pris', n:'Net obtenu', q:'Quantité obtenue / prise', fb:'Brut restant', fn:'Net restant', fc:'Crispy restant', fh:'Bac à haché', fg:'Farce de gyoza', fm:'Nems restants', gy:'Pour les gyoza', ne:'Pour les nems' }; if(NEW && r.p) row['Cuisine'] = r.p;
+    const NEW = r.t === 'dc' || r.t === 'fr' || r.t === 'hc' || r.t === 'fin2' || r.t === 'wd' || r.t === 'pq', COLN = { b:'Brut pris', n:'Net obtenu', q:'Quantité obtenue / prise', fb:'Brut restant', fn:'Net restant', fc:'Crispy restant', fh:'Bac à haché', fg:'Farce de gyoza', fm:'Nems restants', ff:'Farce de nem', gy:'Pour les gyoza', ne:'Pour les nems' }; if(NEW && r.p) row['Cuisine'] = r.p;
     Object.keys(NEW ? COLN : COL).forEach(c=>{ if(r.f && r.f[c] !== undefined) row[(NEW ? COLN : COL)[c]] = Number(r.f[c]) || 0; }); if(r.f && r.f.corr) row['Quantité corrigée'] = 'oui';
     rows.push(row); }); }); });
   if(!rows.length){ alert('Rien à exporter pour cette journée.'); return; }
@@ -9415,7 +9418,9 @@ function ck_regHtml(){
     return `<div class="ck-row" style="grid-template-columns:1fr;--c:${ck_color(i.id)}"><span class="n">${ck_icon(k, 28)}${esc(i.n)} <small style="color:var(--ink-muted);font-weight:500">${esc(i.u || 'kg')}</small></span>
       <div class="ck-fr"><span class="ck-pill ${k === 'simple' ? 'wa' : 'ok'}">${esc(k === 'simple' ? 'nom non reconnu : ' + CK_KLAB.simple : 'fiche : ' + CK_KLAB[k])}</span>${who.length ? `<span class="ck-sub" style="margin:0">Saisi par ${esc(who.join(', '))}</span>` : `<span class="ck-pill ko">À attribuer</span>`}</div>
       <div class="ck-fr"><label>Nom en arabe</label><input class="ck-in" dir="rtl" style="width:130px" value="${esc(c.ar || '')}" onchange="ck_ingSet(${ck_a(i.id)},'ar',this.value)"><label>Marge d’écart</label><input class="ck-in" inputmode="decimal" style="width:64px" placeholder="${esc(ck_fmt(stk_tolG()))}" value="${esc(c.tol === undefined || c.tol === '' ? '' : ck_fmt(Number(c.tol)))}" onchange="ck_ingTol(${ck_a(i.id)},this.value)"><span class="ck-sub" style="margin:0">%</span></div>
-      ${k === 'poulet' ? `<div class="ck-fr"><label>Part de poulet dans la farce</label><input class="ck-in" inputmode="decimal" style="width:64px" placeholder="60" value="${esc(c.farcePct === undefined || c.farcePct === '' ? '' : ck_fmt(Number(c.farcePct)))}" onchange="ck_ingNum(${ck_a(i.id)},'farcePct',this.value,100)"><span class="ck-sub" style="margin:0">%</span><label>Poulet par nem</label><input class="ck-in" inputmode="decimal" style="width:64px" value="${esc(c.nemG === undefined || c.nemG === '' ? '' : ck_fmt(Number(c.nemG)))}" onchange="ck_ingNum(${ck_a(i.id)},'nemG',this.value,1000)"><span class="ck-sub" style="margin:0">g</span></div>` : ''}
+      ${k === 'poulet' ? `<div class="ck-fr"><label>Part de poulet dans la farce</label><input class="ck-in" inputmode="decimal" style="width:64px" placeholder="60" value="${esc(c.farcePct === undefined || c.farcePct === '' ? '' : ck_fmt(Number(c.farcePct)))}" onchange="ck_ingNum(${ck_a(i.id)},'farcePct',this.value,100)"><span class="ck-sub" style="margin:0">%</span><label>Poulet par nem</label><input class="ck-in" inputmode="decimal" style="width:64px" value="${esc(c.nemG === undefined || c.nemG === '' ? '' : ck_fmt(Number(c.nemG)))}" onchange="ck_ingNum(${ck_a(i.id)},'nemG',this.value,1000)"><span class="ck-sub" style="margin:0">g</span></div><div class="ck-fr"><label>Part de poulet dans la farce de nem</label><input class="ck-in" inputmode="decimal" style="width:64px" placeholder="60" value="${esc(c.farceNemPct === undefined || c.farceNemPct === '' ? '' : ck_fmt(Number(c.farceNemPct)))}" onchange="ck_ingNum(${ck_a(i.id)},'farceNemPct',this.value,100)"><span class="ck-sub" style="margin:0">%</span></div>` : ''}
+      ${k === 'gamba' ? `<div class="ck-fr"><label>Part de gamba dans la farce de nem</label><input class="ck-in" inputmode="decimal" style="width:64px" placeholder="60" value="${esc(c.farceNemPct === undefined || c.farceNemPct === '' ? '' : ck_fmt(Number(c.farceNemPct)))}" onchange="ck_ingNum(${ck_a(i.id)},'farceNemPct',this.value,100)"><span class="ck-sub" style="margin:0">%</span></div>` : ''}
+      ${k === 'viande' ? `<div class="ck-fr"><label>Part de viande dans la farce de gyoza</label><input class="ck-in" inputmode="decimal" style="width:64px" placeholder="60" value="${esc(c.farcePct === undefined || c.farcePct === '' ? '' : ck_fmt(Number(c.farcePct)))}" onchange="ck_ingNum(${ck_a(i.id)},'farcePct',this.value,100)"><span class="ck-sub" style="margin:0">%</span></div>` : ''}
       <details class="ck-qd"><summary>Questions du cuisinier</summary>${ck_qHtml(i.id)}</details></div>`; }).join('')}</div></div>`
     : '<div class="ck-box"><h3>Ingrédients</h3><div class="ck-empty">Aucun ingrédient suivi. Cochez « Suivi » dans Dépenses › Ingrédients.</div></div>';
   const cell = (c, id)=>{ const K = ck_ingsK(c), main = (c.poste === 'Sushi' || c.poste === 'Wok') ? c.poste : null, ks = ['Sushi', 'Wok'].filter(x=>!main || x === main || K[x].includes(id)); return `<td>${ks.map(x=>`<label class="ck-gc"><input type="checkbox" ${K[x].includes(id) ? 'checked' : ''} onchange="ck_cookIngK(${ck_a(c.code)},${ck_a(x)},${ck_a(id)})">${ks.length > 1 ? x[0] : ''}</label>`).join('')}</td>`; };
