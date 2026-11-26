@@ -8416,13 +8416,26 @@ function stk_ingTable(){
 const stk_exp = {}; let stk_sub = 'ing';
 function stk_tog(id){ stk_exp[id] = !stk_exp[id]; ck_render(); }
 function stk_setSub(k){ stk_sub = k; ck_render(); }
+let stk_edK = '', stk_edV = '', stk_edErr = false;
+function stk_edOpen(k, v){ stk_edK = k || ''; stk_edV = v === undefined || v === null ? '' : String(v).replace('.', ','); stk_edErr = false; ck_render(); const el = document.getElementById('stk-edi'); if(el){ el.focus(); el.select(); } }
+function stk_edOk(){   // l’admin corrige un comptage (canettes et eau, autres articles) pour la date choisie en haut
+  const p = String(stk_edK).split('|'), n = ck_num(stk_edV); if(!p[0] || String(stk_edV).trim() === '' || n === null || n < 0){ stk_edErr = true; return ck_render(); }
+  const D = ck_adate || ck_service(), now = ck_nowIso(), at0 = D === ck_service() ? now : new Date(D + 'T12:00:00').toISOString(), d = stk_doc(D);
+  if(p[0] === 'a' && p[1]){ const o = ((d.ca || {})[p[1]] || {})[p[2]] || {}; ck_write('stk_' + D, { sdate:D, ca:{ [p[1]]:{ [p[2]]:{ q:n, at:o.at || at0, by:o.by || ck_empName(p[1]), fix:now } } } }); }
+  else { const id = p[0] === 'a' ? p[2] : p[1], o = (d.c || {})[id] || {}; ck_write('stk_' + D, { sdate:D, c:{ [id]:{ q:n, at:o.at || at0, by:o.by || 'Admin', fix:now } } }); }
+  stk_edK = ''; ck_render();
+}
+function stk_edCell(k, valHtml, cur, rec){
+  if(stk_edK === k) return `<span class="stk-ed"><input id="stk-edi" class="ck-in" inputmode="decimal" style="width:80px" value="${esc(stk_edV)}" oninput="stk_edV=this.value;stk_edErr=false" onkeydown="if(event.key==='Enter')stk_edOk()"><button class="ck-btn sm" onclick="stk_edOk()">OK</button><button class="ck-btn sm" onclick="stk_edOpen('')">✕</button>${stk_edErr ? '<small style="color:#ff6b6b;display:block">Nombre attendu</small>' : ''}</span>`;
+  return valHtml + `<button class="bl-ed" onclick="stk_edOpen(${ck_a(k)},${ck_a(cur === null || cur === undefined ? '' : cur)})" aria-label="Corriger">✎</button>` + (rec && rec.fix ? `<em class="bl-md">corrigé ${esc(ck_hm(rec.fix))}</em>` : '');
+}
 function stk_canTable(){
   const date = ck_adate || ck_service(), d = stk_doc(date), p = stk_doc(ck_addDays(date, -1)), its = stk_items('can'), st0 = stk_start(), day0 = st0 && date === st0.date; let last = null;
   const rows = its.map(i=>{
     const vei = stk_num((p.c || {})[i.id]), cnt = stk_num((d.c || {})[i.id]), ach = stk_buyOf(i.dep, ''), ven = stk_salesOf(i), per = stk_num((d.l || {})[i.id]) || 0, c0 = (d.c || {})[i.id];
     if(c0 && c0.at && (!last || c0.at > last.at)) last = c0;
     const th = vei === null ? null : ck_r(vei + ach - ven - per), ec = (th === null || cnt === null) ? null : ck_r(cnt - th);
-    return `<tr><td>${esc(i.n)}</td><td>${stk_c(vei)}</td><td>${stk_c(ach)}</td><td>${stk_c(ven)}</td><td>${stk_c(per)}</td><td>${stk_c(th)}</td><td>${stk_c(cnt)}</td><td>${stk_pill(ec)}</td></tr>`;
+    return `<tr><td>${esc(i.n)}</td><td>${stk_c(vei)}</td><td>${stk_c(ach)}</td><td>${stk_c(ven)}</td><td>${stk_c(per)}</td><td>${stk_c(th)}</td><td>${stk_edCell('c|' + i.id, stk_c(cnt), cnt, c0)}</td><td>${stk_pill(ec)}</td></tr>`;
   }).join('');
   const who = last ? 'comptage de ' + esc(last.by || '') + ', ' + esc(ck_hm(last.at)) : 'pas encore compté';
   return `<div class="ck-box" id="stk-can"><div class="ck3-h"><b>Canettes et bouteilles d’eau</b><span>${who}</span></div>${rows ? `<div class="ck3-w"><table class="ck3-t"><tr><th>Article</th><th>Comptage veille</th><th>+ Achat</th><th>− Vente</th><th>− Perte</th><th>Théorique</th><th>Comptage</th><th>Écart</th></tr>${rows}</table></div>` : '<div class="ck-empty">Aucun article. Ajoute-les dans Réglages.</div>'}
@@ -8430,6 +8443,7 @@ function stk_canTable(){
 }
 function stk_autTable(){
   const d = stk_doc(ck_adate || ck_service()), its = stk_items('autre'), rows = [];
+  const edK = (L, id)=>L && L.code ? 'a|' + L.code + '|' + id : 'c|' + id;
   const who = (L)=>L && L.rec && stk_num(L.rec) !== null && L.rec.at ? esc((L.rec.by || '') + ' · ' + ck_hm(L.rec.at)) : '—';
   its.forEach(i=>{
     const lines = stk_autLines(d, i.id), codes = lines.map(x=>x.code);
@@ -8441,12 +8455,12 @@ function stk_autTable(){
     if(places.length >= 2){   // un article compté à plusieurs endroits : total, puis le détail par emplacement
       const got = places.filter(x=>stk_num(x.L.rec) !== null), tot = got.length ? ck_r(got.reduce((a, x)=>a + stk_num(x.L.rec), 0)) : null;
       rows.push(`<tr><td><b>${esc(i.n)}</b></td><td>${stk_cu(tot, i.u)}</td><td style="font-family:inherit;color:var(--ink-muted)">${got.length && got.length < places.length ? 'incomplet' : 'total'}</td></tr>`);
-      places.forEach(x=>rows.push(`<tr class="aut-d"><td style="padding-inline-start:22px;color:var(--ink-muted)">${esc(x.k)}</td><td>${stk_cu(stk_num(x.L.rec), i.u)}</td><td style="font-family:inherit;color:var(--ink-muted)">${who(x.L)}</td></tr>`));
+      places.forEach(x=>rows.push(`<tr class="aut-d"><td style="padding-inline-start:22px;color:var(--ink-muted)">${esc(x.k)}</td><td>${stk_edCell(edK(x.L, i.id), stk_cu(stk_num(x.L.rec), i.u), stk_num(x.L.rec), x.L.rec)}</td><td style="font-family:inherit;color:var(--ink-muted)">${who(x.L)}</td></tr>`));
       return;
     }
     lines.sort((a, b)=>String(stk_cookLabel(a.code)).localeCompare(String(stk_cookLabel(b.code)), 'fr')).forEach(L=>{
       const c = L.rec ? stk_num(L.rec) : null, lab = L.code ? stk_cookLabel(L.code) : (L.rec ? (L.rec.by || '') : '');
-      rows.push(`<tr><td>${esc(i.n)}${lines.length > 1 || lab ? ` <span class="ck-pill">${esc(lab)}</span>` : ''}</td><td>${stk_cu(c, i.u)}</td><td style="font-family:inherit;color:var(--ink-muted)">${who(L)}</td></tr>`);
+      rows.push(`<tr><td>${esc(i.n)}${lines.length > 1 || lab ? ` <span class="ck-pill">${esc(lab)}</span>` : ''}</td><td>${L.none ? stk_edCell(edK(L, i.id), stk_cu(c, i.u), c, null) : stk_edCell(edK(L, i.id), stk_cu(c, i.u), c, L.rec)}</td><td style="font-family:inherit;color:var(--ink-muted)">${who(L)}</td></tr>`);
     });
   });
   return `<div class="ck-box" id="stk-aut"><div class="ck3-h"><b>Autres articles</b><span>un comptage par emplacement</span></div>${rows.length ? `<div class="ck3-w"><table class="ck3-t"><tr><th>Article</th><th>Comptage</th><th>Compté par</th></tr>${rows.join('')}</table></div>` : '<div class="ck-empty">Aucun article. Ajoute-les dans Réglages.</div>'}</div>`;
